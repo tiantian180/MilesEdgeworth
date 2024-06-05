@@ -1,0 +1,25 @@
+﻿  uic MilesEdgeworth.ui
+  uic PicViewer.ui
+  uic ProsecutorBadge.ui
+  rcc MilesEdgeworth.qrc
+  moc MilesEdgeworth.h
+  moc ProsecutorBadge.h
+  moc MyGraphicsView.h
+  moc PicViewer.h
+  MyGraphicsView.cpp
+  PicViewer.cpp
+  ProsecutorBadge.cpp
+  MilesEdgeworth.cpp
+  main.cpp
+E:\code\MilesEdgeworth\MilesEdgeworth.cpp(39,28): warning C4305: 'argument': truncation from 'double' to 'float'
+E:\code\MilesEdgeworth\MilesEdgeworth.cpp(407,36): warning C4305: 'argument': truncation from 'double' to 'float'
+  qrc_MilesEdgeworth.cpp
+  moc_MilesEdgeworth.cpp
+  moc_ProsecutorBadge.cpp
+  moc_MyGraphicsView.cpp
+  moc_PicViewer.cpp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 824 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  MilesEdgeworth.vcxproj -> E:\code\MilesEdgeworth\x64\Release\MilesEdgeworth.exe
