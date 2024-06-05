@@ -309,11 +309,11 @@ void MilesEdgeworth::createContextMenu()
 
     smallSize = sizeMenu->addAction("小");
     smallSize->setCheckable(true);    // 设置action可选中
-    smallSize->setChecked(true);      // 默认选中小
     sizeGroup->addAction(smallSize);  // 加入action组
 
     medianSize = sizeMenu->addAction("中");
     medianSize->setCheckable(true);    // 设置action可选中
+    medianSize->setChecked(true);      // 默认选中小
     sizeGroup->addAction(medianSize);  // 加入action组
 
     bigSize = sizeMenu->addAction("大");
