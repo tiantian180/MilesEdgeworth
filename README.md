@@ -2,7 +2,7 @@
 
 图片素材和音频素材均来自游戏《逆转裁判》和《逆转检事》.
 
-MilesEdgeworth.rar为桌宠成品
+MilesEdgeworth——finished.rar为桌宠成品
 
 b站有演示：https://www.bilibili.com/video/BV1Rz42187m2/
 
