@@ -15,8 +15,6 @@ MilesEdgeworth::MilesEdgeworth(QWidget* parent)
     type = MilesEdgeworth::BRIEFCASEIN;
     direction = 0;
     nowScreen = QGuiApplication::primaryScreen();
-    qDebug() << "0号屏" << QGuiApplication::screens().at(0)->geometry();
-    qDebug() << "1号屏" << QGuiApplication::screens().at(1)->geometry();
     QRect desktopRect = nowScreen->availableGeometry();
     move(desktopRect.x() - 45 * scale, desktopRect.y() + desktopRect.height() - 90 * scale);
     ui.petLabel->setMovie(petMovie);
@@ -158,7 +156,6 @@ void MilesEdgeworth::moveEvent(QMoveEvent* event)
         // 如果咪酱的中心点没被移出屏幕, 则更新咪酱的所在屏幕
         nowScreen = QGuiApplication::screenAt(event->pos() + QPoint(50 * scale, 50 * scale));
     }
-    qDebug() << nowScreen;
     //QRect nowScreenRect = QGuiApplication::primaryScreen()->availableGeometry();
     QPoint newPos = event->pos();
     // 咪酱此时的四角坐标
@@ -205,31 +202,6 @@ void MilesEdgeworth::moveEvent(QMoveEvent* event)
                 xMax = 1000000000;
             }
         }
-        //if (scale == MINI) {
-        //    xMax = nowScreenRect.width() + nowScreenRect.x() - 61;
-        //    yMax = nowScreenRect.height() + nowScreenRect.y() - 50;
-        //    xMin = nowScreenRect.x() - 36;
-        //    yMin = nowScreenRect.y() - 9;
-        //}
-        //else if (scale == SMALL) {
-        //    xMax = nowScreenRect.width() + nowScreenRect.x() - 96;
-        //    yMax = nowScreenRect.height() + nowScreenRect.y() - 95;
-        //    xMin = nowScreenRect.x() - 54;
-        //    yMin = nowScreenRect.y() - 16;
-        //}
-        //else if (scale == MEDIAN) {
-        //    xMax = nowScreenRect.width() + nowScreenRect.x() - 127;
-        //    yMax = nowScreenRect.height() + nowScreenRect.y() - 140;
-        //    xMin = nowScreenRect.x() - 71;
-        //    yMin = nowScreenRect.y() - 20;
-        //}
-        //else {
-        //    xMax = nowScreenRect.width() + nowScreenRect.x() - 189;
-        //    yMax = nowScreenRect.height() + nowScreenRect.y() - 230;
-        //    xMin = nowScreenRect.x() - 108;
-        //    yMin = nowScreenRect.y() - 30;
-        //}
-
         // 限制左上角位置
         newPos.setX(qMax(xMin, newPos.x()));
         newPos.setY(qMax(yMin, newPos.y()));
