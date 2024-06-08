@@ -1,8 +1,0 @@
-﻿  MilesEdgeworth.cpp
-  PicViewer.cpp
-  main.cpp
-E:\code\MilesEdgeworth\MilesEdgeworth.cpp(39,28): warning C4305: 'argument': truncation from 'double' to 'float'
-E:\code\MilesEdgeworth\MilesEdgeworth.cpp(407,36): warning C4305: 'argument': truncation from 'double' to 'float'
-  moc_MilesEdgeworth.cpp
-  moc_PicViewer.cpp
-  MilesEdgeworth.vcxproj -> E:\code\MilesEdgeworth\x64\Debug\MilesEdgeworth.exe
