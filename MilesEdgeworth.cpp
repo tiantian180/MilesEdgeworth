@@ -780,7 +780,7 @@ void MilesEdgeworth::runMove()
         break;
     }
     }
-    if (leftPrimary->isChecked()) {
+    if (leftPrimary->isChecked() && QGuiApplication::screens().at(1) != null) {
         int primaryXMax = QGuiApplication::screens().at(0)->geometry().x() + QGuiApplication::screens().at(0)->geometry().width();
         int secondXMin = QGuiApplication::screens().at(1)->geometry().x();
         int newPosX = pos().x() + delta.x();
@@ -795,7 +795,7 @@ void MilesEdgeworth::runMove()
         int newPosY = pos().y() + delta.y();
         move(newPosX, newPosY);
     }
-    else if (rightPrimary->isChecked()) {
+    else if (rightPrimary->isChecked() && QGuiApplication::screens().at(1) != nullptr) {
         // 主屏幕在右侧时, 跨屏时要注意坐标
         int secondXMax = QGuiApplication::screens().at(1)->geometry().x() + QGuiApplication::screens().at(1)->geometry().width();
         int primaryXMin = QGuiApplication::screens().at(0)->geometry().x();
@@ -874,7 +874,7 @@ void MilesEdgeworth::walkMove()
         break;
     }
     }
-    if (leftPrimary->isChecked()) {
+    if (leftPrimary->isChecked() && QGuiApplication::screens().at(1) != nullptr) {
         int primaryXMax = QGuiApplication::primaryScreen()->geometry().x() + QGuiApplication::primaryScreen()->geometry().width();
         int secondXMin = QGuiApplication::screens().at(1)->geometry().x();
         int newPosX = pos().x() + delta.x();
@@ -889,7 +889,7 @@ void MilesEdgeworth::walkMove()
         int newPosY = pos().y() + delta.y();
         move(newPosX, newPosY);
     }
-    else if (rightPrimary->isChecked()) {
+    else if (rightPrimary->isChecked() && QGuiApplication::screens().at(1) != nullptr) {
         // 主屏幕在右侧时, 跨屏时要注意坐标
         int secondXMax = QGuiApplication::screens().at(1)->geometry().x() + QGuiApplication::screens().at(1)->geometry().width();
         int primaryXMin = QGuiApplication::screens().at(0)->geometry().x();
