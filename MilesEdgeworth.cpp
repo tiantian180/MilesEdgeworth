@@ -35,7 +35,7 @@ MilesEdgeworth::MilesEdgeworth(QWidget* parent)
     // 创建音效播放器, 并移动到独立线程
     thread = new QThread();
     soundEffect = new QSoundEffect(this);
-    soundEffect->setVolume(0.3);
+    soundEffect->setVolume(0.8f);
     soundEffect->moveToThread(thread);
     // 创建检察官徽章
     prosbadge = new ProsecutorBadge();
@@ -490,7 +490,7 @@ void MilesEdgeworth::createContextMenu()
             soundEffect->setVolume(0);
         }
         else {
-            soundEffect->setVolume(0.2);
+            soundEffect->setVolume(0.8f);
         }
         });
     // 喂食红茶
