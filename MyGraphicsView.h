@@ -34,8 +34,4 @@ private:
 	double itemWidth;
 	double itemHeight;
 	QGraphicsScene* scene = nullptr;
-	bool spacePressed = false;
-	bool m_dragging;	        // 是否正在拖动
-	QPoint m_startPosition;     // 拖动开始前的鼠标位置, 是全局坐标
-	QPoint m_scenePosition;	    // scene的原始位置
 };
