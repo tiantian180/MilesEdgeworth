@@ -80,7 +80,7 @@ set(QT_LIB
 	Multimedia
 	Network
 )
-
+message(LOG ${CMAKE_PREFIX_PATH})
 find_package(Qt6 COMPONENTS REQUIRED
 ${QT_LIB}
 )
@@ -104,6 +104,15 @@ set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES
 	WIN32_EXECUTABLE ON
 )
 
+if(WIN32)
+		set(ICON_NAME favicon.ico)
+    set(APP_ICON_RESOURCE_WINDOWS "${CMAKE_CURRENT_BINARY_DIR}/appicon.rc")
+    add_custom_command(OUTPUT ${APP_ICON_RESOURCE_WINDOWS}
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/resource/icon/${ICON_NAME} ${CMAKE_CURRENT_BINARY_DIR}/${ICON_NAME}
+        COMMAND ${CMAKE_COMMAND} -E echo "IDI_ICON1 ICON DISCARDABLE \"${ICON_NAME}\"" > ${APP_ICON_RESOURCE_WINDOWS}
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resource/icon/${ICON_NAME})
+    target_sources(${PROJECT_NAME} PRIVATE ${APP_ICON_RESOURCE_WINDOWS})
+endif()
 
 if (WIN32)
 		set(DeployArg
