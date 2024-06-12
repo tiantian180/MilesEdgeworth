@@ -780,7 +780,7 @@ void MilesEdgeworth::runMove()
         break;
     }
     }
-    if (leftPrimary->isChecked() && QGuiApplication::screens().at(1) != null) {
+    if (leftPrimary->isChecked() && QGuiApplication::screens().at(1) != nullptr) {
         int primaryXMax = QGuiApplication::screens().at(0)->geometry().x() + QGuiApplication::screens().at(0)->geometry().width();
         int secondXMin = QGuiApplication::screens().at(1)->geometry().x();
         int newPosX = pos().x() + delta.x();
