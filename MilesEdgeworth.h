@@ -41,7 +41,8 @@ public:
         TAKETHAT,
         BRIEFCASEIN,
         BRIEFCASESTOP,
-        CROUCH
+        CROUCH,
+        TEA
     };
 
     explicit MilesEdgeworth(QWidget *parent = nullptr);
