@@ -2,8 +2,6 @@
 
 图片素材和音频素材均来自游戏《逆转裁判》和《逆转检事》.
 
-MilesEdgeworth_finished.rar为桌宠成品.
-
 b站有演示：https://www.bilibili.com/video/BV1Rz42187m2/
 
 这是我第一次从零开始一个项目一直到发布，还有很多不完善的地方，请大家多多包涵。在这里记录一下实现的内容和一点心得:
