@@ -20,7 +20,11 @@ MilesEdgeworth::MilesEdgeworth(QWidget* parent)
     ui.petLabel->setMovie(petMovie);
     // 设置窗口为无边框 透明 置顶
     setAttribute(Qt::WA_TranslucentBackground);
+    #ifdef Q_OS_MACOS
+    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);  
+    #else
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);  
+    #endif
     // 提示: 如果设置为Qt::Tool, this->close()是不会退出程序的, 只会隐藏当前窗口. 
     // 我的解决方法是close的时候发送信号, 让main里的QApplication接收到信号时调用quit()函数退出程序.
     
