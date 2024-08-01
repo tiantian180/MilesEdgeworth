@@ -1,0 +1,18 @@
+{
+  "OutputFoldersPerTargetSystem": {
+    "\u672C\u5730\u8BA1\u7B97\u673A": [
+      "out\\build"
+    ]
+  },
+  "ExpandedNodes": [
+    "",
+    "\\codes",
+    "\\codes\\qt_src",
+    "\\codes\\qt_src\\MilesEdgeworth",
+    "\\codes\\qt_src\\PicViewer",
+    "\\codes\\qt_src\\ProsecutorBadge",
+    "\\codes\\src",
+    "\\resource"
+  ],
+  "PreviewInSolutionExplorer": false
+}

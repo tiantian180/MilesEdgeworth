@@ -232,7 +232,18 @@ void MilesEdgeworth::mouseMoveEvent(QMouseEvent* event)
             //delta 相对偏移量
             QPoint delta = event->globalPosition().toPoint() - m_startPosition;
             //新位置：窗体原始位置+偏移量
-            move(m_framePosition + delta);
+            //在这里拿到屏幕的位置信息
+            QScreen* screen = QGuiApplication::screenAt(event->position().toPoint());
+            QRect screenGeometry = screen->geometry();
+            QPoint m_newPosition = m_framePosition + delta;
+
+            //限制窗口超出屏幕边缘
+            m_newPosition.setX(qBound(screenGeometry.x() - int(36 * scale), m_newPosition.x(), screenGeometry.x() + screenGeometry.width() - int(63 * scale)));
+            m_newPosition.setY(qBound(screenGeometry.y() - int(10 * scale), m_newPosition.y(), screenGeometry.y() + screenGeometry.height() - int(90 * scale)));
+
+            //计算完毕后进行屏幕移动
+            move(m_newPosition);
+
         }
         // 此段用于判断是否触发害怕地震动画
         if (type != MilesEdgeworth::SLEEP && type != MilesEdgeworth::SLEEPING
