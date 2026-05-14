@@ -16,6 +16,14 @@ set(DESKTOP_SOURCES
     resources/pet_assets.qrc
 )
 
+if(APPLE)
+    enable_language(OBJCXX)
+    list(APPEND DESKTOP_SOURCES
+        src/platform/MacPetWindowBehavior.h
+        src/platform/MacPetWindowBehavior.mm
+    )
+endif()
+
 qt_add_executable(MilesEdgeworthDesktop
     MANUAL_FINALIZATION
     ${DESKTOP_SOURCES}
