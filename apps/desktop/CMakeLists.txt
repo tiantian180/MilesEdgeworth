@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Quick)
 
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -36,7 +36,6 @@ target_include_directories(MilesEdgeworthDesktop
 target_link_libraries(MilesEdgeworthDesktop
     PRIVATE
         Qt6::Quick
-        Qt6::QuickControls2
 )
 
 set_target_properties(MilesEdgeworthDesktop PROPERTIES
