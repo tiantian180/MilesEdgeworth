@@ -6,7 +6,7 @@
 
 ### 前置工具
 
-Phase 0 构建需要先安装 Xcode Command Line Tools、CMake、Ninja 和 Qt 6。Apple Silicon Mac 通常使用 Homebrew 的 `/opt/homebrew` 前缀；Intel Mac 通常使用 `/usr/local` 前缀。
+Phase 0 构建需要先安装 Xcode Command Line Tools、CMake、Ninja 和 Qt 6。当前验证环境是 Qt 6.11；工程基础要求保持在 Qt 6.5+，并对 Qt 6.8+ 的 QML policy 做了兼容处理。Apple Silicon Mac 通常使用 Homebrew 的 `/opt/homebrew` 前缀；Intel Mac 通常使用 `/usr/local` 前缀。
 
 ```sh
 xcode-select --install
