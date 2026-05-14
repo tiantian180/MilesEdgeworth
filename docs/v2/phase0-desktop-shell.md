@@ -4,6 +4,24 @@
 
 ## Build
 
+### 前置工具
+
+Phase 0 构建需要先安装 Xcode Command Line Tools、CMake、Ninja 和 Qt 6。Apple Silicon Mac 通常使用 Homebrew 的 `/opt/homebrew` 前缀；Intel Mac 通常使用 `/usr/local` 前缀。
+
+```sh
+xcode-select --install
+brew install cmake ninja qt
+```
+
+安装后可以用这些命令确认工具可用：
+
+```sh
+clang++ --version
+cmake --version
+ninja --version
+qtpaths6 --version
+```
+
 ### Apple Silicon
 
 ```sh
@@ -33,11 +51,12 @@ open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgew
 - 失焦后可见：点击其他应用让桌宠失焦后，桌宠仍应保持可见，不应因为失焦而隐藏或最小化。
 - 切换 Spaces 可见：在 macOS Spaces 之间切换时，桌宠应继续出现在当前 Space 中。
 - 全屏 app 上方可见：切到全屏应用后，桌宠应仍显示在全屏应用上方。
-- 动画资源 alias：确认 QML 使用的动画资源 alias 可以解析，`stand-right` 与 `stand-left` 能正常显示。
+- 动画资源 alias：运行态确认 `qrc:/pet/stand-right.gif` 可以解析并显示。`stand-left` 已注册 alias，但 Phase 0 还没有切换朝向的运行时入口，后续由 Pet Runtime 验证。
 
 ## Known Limits
 
 - Phase 0 点击区域仍是矩形，尚未按透明像素或角色轮廓裁剪命中区域。
 - Pet Runtime 未实现；当前只验证桌面窗口壳层和基础动画资源接入。
 - 当前只注册 `stand-right` 和 `stand-left` 两个动画 alias。
+- macOS 跨 Space / 全屏置顶能力依赖 SkyLight 私有 API。它适合技术验证和个人分发，但不适合 Mac App Store；未来 macOS 版本也可能需要维护适配。
 - Windows/Linux 桌面层级、透明窗口、跨工作区和全屏覆盖行为需要另行验证。
