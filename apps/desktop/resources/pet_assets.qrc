@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/pet">
+    <file alias="stand-right.gif">../../../gifs/stand/0.gif</file>
+    <file alias="stand-left.gif">../../../gifs/stand/1.gif</file>
+  </qresource>
+</RCC>
