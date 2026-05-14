@@ -93,6 +93,43 @@ neutral
 
 ExpressionTag 不是项目写死的全局枚举。不同皮肤可以声明不同标签。模型只能从当前皮肤暴露的标签中选择，未知标签降级为 `neutral`。
 
+ExpressionTag 只表示“想表达什么”，不等于具体动作。比如 `annoyed` 可以表现为抱胸、指指点点、看表或转身，具体选哪个由当前皮肤的映射规则决定。
+
+### ExpressionMapping
+
+ExpressionMapping 描述 ExpressionTag 到 Action 的映射关系。
+
+它由皮肤 manifest 定义，Pet Runtime 执行。模型只选择 expression，不直接选择 action。这样可以做到：
+
+```text
+同一个 expression 可以对应多个 action。
+不同皮肤可以用不同 action 表达同一个 expression。
+同一皮肤可以按权重、轮询或上下文选择 action。
+换肤时不需要修改模型 prompt 以外的项目代码。
+```
+
+例如 `annoyed` 可以映射为：
+
+```text
+annoyed
+=> 50% crossed_thinking
+=> 30% objecting
+=> 20% check_watch
+```
+
+Pet Runtime 收到 `state=speaking + expression=annoyed` 后，会先过滤当前状态不可用的 action，再按映射策略选择一个。
+
+建议支持的选择策略：
+
+```text
+first_available    选择第一个当前可用 action
+weighted_random    按权重随机
+round_robin        轮流选择，减少重复感
+contextual         后续扩展，根据状态、位置、最近动作等上下文选择
+```
+
+MVP 优先实现 `first_available` 和 `weighted_random`。`round_robin` 和 `contextual` 可以后置。
+
 ### ActionRequest
 
 外部模块发给 Pet Runtime 的请求，表示“想让桌宠做什么”。
@@ -236,7 +273,7 @@ Miles 默认 behavior profile 用来还原旧版手感。
 皮肤能力建议拆成两个文件：
 
 ```text
-manifest.json：素材、Action、Clip、ExpressionTag、Facing、fallback
+manifest.json：素材、Action、Clip、ExpressionTag、ExpressionMapping、Facing、fallback
 behavior.json：随机行为、点击映射、菜单动作映射
 ```
 
@@ -282,6 +319,38 @@ behavior.json：随机行为、点击映射、菜单动作映射
   }
 }
 ```
+
+ExpressionTag 到 Action 的映射也应写在 manifest 中：
+
+```json
+{
+  "expressionMappings": {
+    "annoyed": {
+      "selection": "weighted_random",
+      "fallback": "neutral",
+      "actions": [
+        {
+          "action": "crossed_thinking",
+          "weight": 50,
+          "allowedStates": ["idle", "speaking"]
+        },
+        {
+          "action": "objecting",
+          "weight": 30,
+          "allowedStates": ["speaking"]
+        },
+        {
+          "action": "check_watch",
+          "weight": 20,
+          "allowedStates": ["idle"]
+        }
+      ]
+    }
+  }
+}
+```
+
+上例中，如果当前是 `speaking`，候选 action 是 `crossed_thinking` 和 `objecting`；如果当前是 `idle`，候选 action 是 `crossed_thinking` 和 `check_watch`。如果过滤后没有可用 action，则走 `fallback`。
 
 后续如果同一 GIF 标出局部循环段，可以改成：
 
@@ -586,6 +655,17 @@ run/1.gif -> run_west
 ## 11. Fallback 规则
 
 皮肤不需要实现所有能力。Pet Runtime 应按优先级 fallback。
+
+Expression 到 Action 的解析顺序建议为：
+
+```text
+1. 找当前 expression 的 expressionMappings。
+2. 按当前 PetState 过滤 allowedStates 不匹配的 action。
+3. 过滤当前皮肤不存在、当前 facing 不可用、当前播放类型不适合的 action。
+4. 按 selection 策略选择 action。
+5. 如果没有可用 action，使用 expressionMappings.fallback。
+6. 如果 fallback 仍不可用，使用 neutral 或 state 默认 action。
+```
 
 示例：
 
