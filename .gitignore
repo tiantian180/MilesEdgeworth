@@ -8,3 +8,6 @@ cmake-build-*/
 # Local Qt Creator state
 CMakeUserPresets.json
 *.user.*
+
+# Local brainstorming / visual companion artifacts
+.superpowers/
