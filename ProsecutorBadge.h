@@ -14,7 +14,8 @@ public:
 	ProsecutorBadge(QWidget *parent = nullptr);
 	~ProsecutorBadge();
 
-	virtual void mousePressEvent(QMouseEvent* event);
+	virtual void mousePressEvent(QMouseEvent* event) override;
+	virtual void showEvent(QShowEvent* event) override;
 	void setScale(double new_scale);
 	void moveAnimation(int direction);
 	

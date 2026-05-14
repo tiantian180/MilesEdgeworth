@@ -1,4 +1,7 @@
 #include "MilesEdgeworth.h"
+#ifdef Q_OS_MACOS
+#include "MacWindowLevel.h"
+#endif
 
 
 
@@ -16,11 +19,23 @@ MilesEdgeworth::MilesEdgeworth(QWidget* parent)
     direction = 0;
     nowScreen = QGuiApplication::primaryScreen();
     QRect desktopRect = nowScreen->availableGeometry();
-    move(desktopRect.x() - 45 * scale, desktopRect.y() + desktopRect.height() - 90 * scale);
+    move(desktopRect.x(), desktopRect.y() + desktopRect.height() - 100 * scale);
     ui.petLabel->setMovie(petMovie);
     // 设置窗口为无边框 透明 置顶
     setAttribute(Qt::WA_TranslucentBackground);
-    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);  
+    Qt::WindowFlags petWindowFlags = Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint;
+#ifdef Q_OS_MACOS
+    petWindowFlags |= Qt::Tool;
+#else
+    petWindowFlags |= Qt::Tool;
+#endif
+    setWindowFlags(petWindowFlags);
+#ifdef Q_OS_MACOS
+    applyMacPetWindowBehavior(this);
+    QTimer::singleShot(0, this, [this]() {
+        applyMacPetWindowBehavior(this);
+    });
+#endif
     // 提示: 如果设置为Qt::Tool, this->close()是不会退出程序的, 只会隐藏当前窗口. 
     // 我的解决方法是close的时候发送信号, 让main里的QApplication接收到信号时调用quit()函数退出程序.
     
@@ -34,7 +49,7 @@ MilesEdgeworth::MilesEdgeworth(QWidget* parent)
     petMovie->start();  
     // 创建音效播放器, 并移动到独立线程
     thread = new QThread();
-    soundEffect = new QSoundEffect(this);
+    soundEffect = new QSoundEffect();
     soundEffect->setVolume(0.8f);
     soundEffect->moveToThread(thread);
     // 创建检察官徽章
@@ -43,6 +58,7 @@ MilesEdgeworth::MilesEdgeworth(QWidget* parent)
     connect(this, &QWidget::customContextMenuRequested, this, &MilesEdgeworth::showContextMenu);
     // 帧切换: 走路/跑步要进行移动; 播放到最后一帧时判断是否要结束动作
     connect(petMovie, &QMovie::frameChanged, [=](int frame) {
+        updatePetMask();
         // 移动
         if ((type == MilesEdgeworth::RUN || type == MilesEdgeworth::BRIEFCASEIN) && !actionMove->isChecked()) {
             runMove();
@@ -55,14 +71,14 @@ MilesEdgeworth::MilesEdgeworth(QWidget* parent)
             switch (type) {
             case BRIEFCASEIN:
             {
-                petMovie->setFileName(QString(":gifs/special/briefcaseStop0.gif"));
+                petMovie->setFileName(QString(":/gifs/special/briefcaseStop0.gif"));
                 type = MilesEdgeworth::BRIEFCASESTOP;
                 direction = 0;
                 break;
             }
             case BRIEFCASESTOP:
             {
-                petMovie->setFileName(QString(":gifs/stand/0.gif"));
+                petMovie->setFileName(QString(":/gifs/stand/0.gif"));
                 type = MilesEdgeworth::STAND;
                 direction = 0;
                 break;
@@ -241,7 +257,7 @@ void MilesEdgeworth::mouseMoveEvent(QMouseEvent* event)
             if (shakeCount == 5 && shakeTimer->isActive()) {
                 // 计数达到五次时, 触发害怕地震动画, 计时器停止, 计数清零
                 petMovie->stop();
-                specifyChangeGif(QString(":gifs/special/crouch%1.gif").arg(direction % 2),
+                specifyChangeGif(QString(":/gifs/special/crouch%1.gif").arg(direction % 2),
                     MilesEdgeworth::CROUCH, direction % 2);
                 shakeTimer->stop();
                 shakeCount = 0;
@@ -305,13 +321,13 @@ void MilesEdgeworth::mouseReleaseEvent(QMouseEvent* event)
             // 如果处于蹲下状态, 则切换站起动作.
             if (petMovie->state() == QMovie::NotRunning) {
                 // 如果已经蹲下, 则切换完整的站起
-                specifyChangeGif(QString(":gifs/special/standup%1.gif").arg(direction),
+                specifyChangeGif(QString(":/gifs/special/standup%1.gif").arg(direction),
                     MilesEdgeworth::ONCE, direction);
             }
             else {
                 // 如果还没蹲下, 则切换惊吓恢复站立
                 petMovie->stop();
-                specifyChangeGif(QString(":gifs/special/standup%1.gif").arg(direction + 2),
+                specifyChangeGif(QString(":/gifs/special/standup%1.gif").arg(direction + 2),
                     MilesEdgeworth::ONCE, direction);
             }
 
@@ -340,6 +356,17 @@ void MilesEdgeworth::closeEvent(QCloseEvent* event)
 void MilesEdgeworth::enterEvent(QEnterEvent* event)
 {
     setCursor(Qt::PointingHandCursor);
+}
+
+void MilesEdgeworth::showEvent(QShowEvent* event)
+{
+    QWidget::showEvent(event);
+#ifdef Q_OS_MACOS
+    applyMacPetWindowBehavior(this);
+    QTimer::singleShot(100, this, [this]() {
+        applyMacPetWindowBehavior(this);
+    });
+#endif
 }
 
 // 创建右键菜单
@@ -430,6 +457,7 @@ void MilesEdgeworth::createContextMenu()
             QPoint nowPos = frameGeometry().topLeft();
             ui.petLabel->resize(100 * MINI, 100 * MINI);
             scale = MINI;
+            updatePetMask();
             move(nowPos + QPoint(1, 1));  //做这一步是为了调用moveEvent,从而防止缩放过程中咪酱被移出屏幕
         }
         });
@@ -438,6 +466,7 @@ void MilesEdgeworth::createContextMenu()
             QPoint nowPos = frameGeometry().topLeft();
             ui.petLabel->resize(100 * SMALL, 100 * SMALL);
             scale = SMALL;
+            updatePetMask();
             move(nowPos + QPoint(1, 1));
         }
         });
@@ -446,6 +475,7 @@ void MilesEdgeworth::createContextMenu()
             QPoint nowPos = frameGeometry().topLeft();
             ui.petLabel->resize(100 * MEDIAN, 100 * MEDIAN);
             scale = MEDIAN;
+            updatePetMask();
             move(nowPos + QPoint(1, 1));
         }
         });
@@ -454,6 +484,7 @@ void MilesEdgeworth::createContextMenu()
             QPoint nowPos = frameGeometry().topLeft();
             ui.petLabel->resize(100 * BIG, 100 * BIG);
             scale = BIG;
+            updatePetMask();
             move(nowPos + QPoint(1, 1));
         }
         });
@@ -483,6 +514,9 @@ void MilesEdgeworth::createContextMenu()
             setWindowFlags(this->windowFlags() & ~Qt::WindowStaysOnTopHint);
             this->show();
         }
+#ifdef Q_OS_MACOS
+        applyMacPetWindowBehavior(this);
+#endif
         });
     //静音
     connect(actionMute, &QAction::triggered, [=](bool checked) {
@@ -533,8 +567,7 @@ void MilesEdgeworth::createContextMenu()
 void MilesEdgeworth::createTrayIcon()
 {
     tray = new QSystemTrayIcon(this);
-    tray->setVisible(true);
-    tray->setIcon(QIcon(":/icon/favicon_bar.ico"));
+    tray->setIcon(QIcon(":/icon/prosbadge_icon.png"));
     QMenu* menu = new QMenu(this);
     menu->addAction(actionExit);
     tray->setContextMenu(menu);
@@ -708,6 +741,12 @@ void MilesEdgeworth::autoChangeGif()
         }
         break;
     }
+    case MilesEdgeworth::SLEEP:
+    case MilesEdgeworth::SLEEPING:
+    case MilesEdgeworth::BRIEFCASEIN:
+    case MilesEdgeworth::BRIEFCASESTOP:
+    case MilesEdgeworth::CROUCH:
+        return;
     }
     type = next_type;
     direction = next_direct;
@@ -722,6 +761,46 @@ void MilesEdgeworth::specifyChangeGif(const QString& filename, Type next_type, i
     direction = next_direct;
     petMovie->setFileName(filename);
     petMovie->start();
+}
+
+void MilesEdgeworth::updatePetMask()
+{
+    QPixmap currentFrame = petMovie->currentPixmap();
+    if (currentFrame.isNull()) {
+        clearMask();
+        return;
+    }
+
+    QImage image = currentFrame.toImage().convertToFormat(QImage::Format_ARGB32);
+    if (image.size() != ui.petLabel->size()) {
+        image = image.scaled(ui.petLabel->size(), Qt::IgnoreAspectRatio, Qt::FastTransformation);
+    }
+
+    QRegion region;
+    const int alphaThreshold = 8;
+    for (int y = 0; y < image.height(); ++y) {
+        int runStart = -1;
+        for (int x = 0; x < image.width(); ++x) {
+            const bool opaque = qAlpha(image.pixel(x, y)) > alphaThreshold;
+            if (opaque && runStart < 0) {
+                runStart = x;
+            }
+            else if (!opaque && runStart >= 0) {
+                region += QRect(ui.petLabel->x() + runStart, ui.petLabel->y() + y, x - runStart, 1);
+                runStart = -1;
+            }
+        }
+        if (runStart >= 0) {
+            region += QRect(ui.petLabel->x() + runStart, ui.petLabel->y() + y, image.width() - runStart, 1);
+        }
+    }
+
+    if (region.isEmpty()) {
+        clearMask();
+    }
+    else {
+        setMask(region);
+    }
 }
 
 
@@ -929,6 +1008,7 @@ void MilesEdgeworth::showProsBadge()
                 prosbadge->setGeometry(this->geometry().x() + 1 * scale, this->geometry().y() + 16 * scale, 94, 94);
             }
             prosbadge->show();
+            prosbadge->raise();
             prosbadge->moveAnimation(direction);
             badgeTimer->start();
         }
@@ -953,22 +1033,22 @@ void MilesEdgeworth::doubleClickEvent()
         double randnum = QRandomGenerator::global()->generateDouble();
         if (randnum < 0.25) {       // 等等
             filename = QString(":/gifs/special/crossed%1.gif").arg(direction % 2);
-            soundEffect->setSource(QUrl::fromLocalFile(QString(":/audios/holdit%1.wav").arg(language)));
+            soundEffect->setSource(QUrl(QString("qrc:/audios/holdit%1.wav").arg(language)));
         }
         else if (randnum < 0.5) {  // 看招
             filename = QString(":/gifs/special/object%1.gif").arg(direction % 2);
             next_type = MilesEdgeworth::TAKETHAT;
-            soundEffect->setSource(QUrl::fromLocalFile(QString(":/audios/takethat%1.wav").arg(language)));
+            soundEffect->setSource(QUrl(QString("qrc:/audios/takethat%1.wav").arg(language)));
             // 飞出检察官徽章
             showProsBadge();
         }
         else if (randnum < 0.75 || language == 2) {   // 异议
             filename = QString(":/gifs/special/object%1.gif").arg(direction % 2);
-            soundEffect->setSource(QUrl::fromLocalFile(QString(":/audios/objection%1.wav").arg(language)));
+            soundEffect->setSource(QUrl(QString("qrc:/audios/objection%1.wav").arg(language)));
         }
         else {                      // koreda
             filename = QString(":/gifs/special/object%1.gif").arg(direction % 2);
-            soundEffect->setSource(QUrl::fromLocalFile(QString(":/audios/eureka%1.wav").arg(language)));
+            soundEffect->setSource(QUrl(QString("qrc:/audios/eureka%1.wav").arg(language)));
         }
         // 更改动画
         specifyChangeGif(filename, next_type, direction % 2);

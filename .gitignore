@@ -1,0 +1,10 @@
+.DS_Store
+
+# CMake build directories
+build/
+cmake-build-*/
+*-cmake-build/
+
+# Local Qt Creator state
+CMakeUserPresets.json
+*.user.*

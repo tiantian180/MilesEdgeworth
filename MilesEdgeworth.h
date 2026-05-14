@@ -13,6 +13,7 @@
 #include <QPropertyAnimation>
 #include <QThread>
 #include <QSystemTrayIcon>
+#include <QRegion>
 #include "ProsecutorBadge.h"
 #include "PicViewer.h"
 
@@ -53,6 +54,7 @@ public:
     virtual void mouseReleaseEvent(QMouseEvent* event) override;
     virtual void closeEvent(QCloseEvent* event) override;
     virtual void enterEvent(QEnterEvent* event) override;
+    virtual void showEvent(QShowEvent* event) override;
     
     void createContextMenu();
     void createTrayIcon();
@@ -64,6 +66,7 @@ public:
 
     void autoChangeGif();
     void specifyChangeGif(const QString &filename, Type next_type, int next_direct);
+    void updatePetMask();
 
     void runMove();
     void walkMove();

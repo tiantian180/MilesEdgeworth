@@ -1,11 +1,14 @@
 #include "ProsecutorBadge.h"
+#ifdef Q_OS_MACOS
+#include "MacWindowLevel.h"
+#endif
 
 ProsecutorBadge::ProsecutorBadge(QWidget *parent)
 	: QWidget(parent)
 {
 	ui.setupUi(this);
 	setAttribute(Qt::WA_TranslucentBackground);
-	setWindowFlags(Qt::SubWindow | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
+	setWindowFlags(Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
 	ui.badgeLabel->setScaledContents(true);
 	animation = new QPropertyAnimation(this, "pos", this);
 	animation->setDuration(FLYINGTIME); // 动画持续时间
@@ -18,6 +21,14 @@ ProsecutorBadge::~ProsecutorBadge()
 void ProsecutorBadge::mousePressEvent(QMouseEvent * event)
 {
 	emit badgeClicked();
+}
+
+void ProsecutorBadge::showEvent(QShowEvent* event)
+{
+	QWidget::showEvent(event);
+#ifdef Q_OS_MACOS
+	applyMacPetWindowBehavior(this);
+#endif
 }
 
 void ProsecutorBadge::setScale(double new_scale)
