@@ -64,4 +64,5 @@ open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgew
 - 当前只注册 `stand-right` 和 `stand-left` 两个动画 alias。
 - macOS 跨 Space / 全屏置顶能力依赖 SkyLight 私有 API。它适合技术验证和个人分发，但不适合 Mac App Store；未来 macOS 版本也可能需要维护适配。
 - macOS 取消置顶是 best-effort：当前会降低窗口层级并移回活跃 Space，但 SkyLight 私有 Space 的行为在不同 macOS 版本上仍需要手动验证。
+- Phase 0 暂时不使用 `Qt.Tool`。macOS 由 `NSApplicationActivationPolicyAccessory` 和原生窗口属性承担辅助应用行为；Windows/Linux 的任务栏隐藏策略后续再单独验证。
 - Windows/Linux 桌面层级、透明窗口、跨工作区和全屏覆盖行为需要另行验证。

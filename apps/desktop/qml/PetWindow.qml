@@ -11,7 +11,6 @@ Window {
     title: "MilesEdgeworth v2"
 
     flags: Qt.FramelessWindowHint
-           | Qt.Tool
            | Qt.NoDropShadowWindowHint
 
     // Phase 0 还没有系统托盘和完整右键菜单。

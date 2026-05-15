@@ -160,5 +160,7 @@ void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop)
     behavior |= NSWindowCollectionBehaviorMoveToActiveSpace;
     [nativeWindow setCollectionBehavior:behavior];
     [nativeWindow setLevel:NSNormalWindowLevel];
-    [nativeWindow orderFront:nil];
+    // 取消置顶时不能继续 orderFront，否则窗口虽然降到普通 layer，
+    // 但仍会停在普通窗口队列最前面，用户体感上还是“压住别的窗口”。
+    [nativeWindow orderBack:nil];
 }

@@ -59,7 +59,8 @@ void DesktopShellController::applyCurrentLayerMode()
     setMacPetWindowAlwaysOnTop(m_petWindow, m_alwaysOnTop);
 #else
     // 其他平台先使用 Qt 公开窗口标志兜底。
-    // 修改窗口 flag 后主动 show 一次，避免部分窗口系统重新创建 native window 时短暂隐藏。
+    // 这里暂时不再强制 Qt::Tool：macOS 已经由原生层处理辅助应用行为；
+    // Windows/Linux 后续需要结合托盘和任务栏策略单独验证。
     m_petWindow->setFlag(Qt::WindowStaysOnTopHint, m_alwaysOnTop);
     m_petWindow->show();
 #endif
