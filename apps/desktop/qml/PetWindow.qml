@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import Qt.labs.platform as Platform
 
 Window {
     id: petWindow
@@ -13,75 +14,21 @@ Window {
     flags: Qt.FramelessWindowHint
            | Qt.NoDropShadowWindowHint
 
-    // Phase 0 还没有系统托盘和完整右键菜单。
-    // 先在桌宠窗口内部做一个极简右键浮层，避免额外创建 native popup 窗口。
-    Rectangle {
+    // Phase 0 先使用平台原生菜单承载最小操作入口。
+    // 这样菜单的 hover、外部点击关闭、阴影和系统质感都交给 Qt/系统处理。
+    Platform.Menu {
         id: contextMenu
 
-        visible: false
-        z: 2
-        width: 132
-        height: menuItems.implicitHeight
-        radius: 6
-        color: "#242424"
-        border.color: "#6a6a6a"
-        border.width: 1
+        Platform.MenuItem {
+            text: desktopShell.alwaysOnTop ? "取消置顶" : "始终置顶"
+            onTriggered: desktopShell.toggleAlwaysOnTop()
+        }
 
-        Column {
-            id: menuItems
+        Platform.MenuSeparator {}
 
-            width: parent.width
-
-            Rectangle {
-                width: parent.width
-                height: 36
-                color: topMostMouseArea.containsMouse ? "#343434" : "transparent"
-                radius: 6
-
-                Text {
-                    anchors.centerIn: parent
-                    color: "white"
-                    text: desktopShell.alwaysOnTop ? "取消置顶" : "始终置顶"
-                    font.pixelSize: 14
-                }
-
-                MouseArea {
-                    id: topMostMouseArea
-
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton
-
-                    onClicked: {
-                        desktopShell.toggleAlwaysOnTop()
-                        contextMenu.visible = false
-                    }
-                }
-            }
-
-            Rectangle {
-                width: parent.width
-                height: 36
-                color: quitMouseArea.containsMouse ? "#343434" : "transparent"
-                radius: 6
-
-                Text {
-                    anchors.centerIn: parent
-                    color: "white"
-                    text: "退出"
-                    font.pixelSize: 14
-                }
-
-                MouseArea {
-                    id: quitMouseArea
-
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    acceptedButtons: Qt.LeftButton
-
-                    onClicked: Qt.quit()
-                }
-            }
+        Platform.MenuItem {
+            text: "退出"
+            onTriggered: Qt.quit()
         }
     }
 
@@ -113,13 +60,10 @@ Window {
 
         onPressed: function(mouse) {
             if (mouse.button === Qt.RightButton) {
-                contextMenu.x = Math.min(mouse.x, petWindow.width - contextMenu.width)
-                contextMenu.y = Math.min(mouse.y, petWindow.height - contextMenu.height)
-                contextMenu.visible = true
+                contextMenu.open()
                 return
             }
 
-            contextMenu.visible = false
             pressX = mouse.x
             pressY = mouse.y
         }

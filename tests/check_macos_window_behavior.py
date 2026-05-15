@@ -15,6 +15,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 MAC_BEHAVIOR = ROOT / "apps/desktop/src/platform/MacPetWindowBehavior.mm"
+PET_WINDOW_QML = ROOT / "apps/desktop/qml/PetWindow.qml"
+DESKTOP_CMAKE = ROOT / "apps/desktop/CMakeLists.txt"
+MAIN_CPP = ROOT / "apps/desktop/src/main.cpp"
 
 
 def extract_function(source: str, name: str) -> str:
@@ -48,6 +51,7 @@ def main() -> int:
         "stationarySkyLightSpace",
         "SLSSpaceAddWindowsAndRemoveFromSpaces",
         "kCGAssistiveTechHighWindowLevelKey",
+        "orderBack",
     ]
 
     violations = [token for token in forbidden_tokens if token in function_body]
@@ -67,6 +71,30 @@ def main() -> int:
     if missing:
         joined = ", ".join(missing)
         print(f"普通置顶开关缺少预期的可逆 AppKit 行为：{joined}", file=sys.stderr)
+        return 1
+
+    qml_source = PET_WINDOW_QML.read_text(encoding="utf-8")
+    if "import Qt.labs.platform" not in qml_source or "Platform.Menu" not in qml_source:
+        print("桌宠右键菜单应使用 Qt.labs.platform 的原生菜单，而不是窗口内自绘菜单。", file=sys.stderr)
+        return 1
+
+    qml_forbidden_tokens = [
+        "id: contextMenu\n\n        visible: false",
+        "topMostMouseArea.containsMouse",
+        "quitMouseArea.containsMouse",
+    ]
+    qml_violations = [token for token in qml_forbidden_tokens if token in qml_source]
+    if qml_violations:
+        print("桌宠右键菜单仍残留窗口内自绘菜单逻辑。", file=sys.stderr)
+        return 1
+
+    cmake_source = DESKTOP_CMAKE.read_text(encoding="utf-8")
+    main_source = MAIN_CPP.read_text(encoding="utf-8")
+    if "Widgets" not in cmake_source or "Qt6::Widgets" not in cmake_source:
+        print("Qt.labs.platform 菜单需要链接 Qt Widgets 作为平台菜单兼容层。", file=sys.stderr)
+        return 1
+    if "QApplication" not in main_source or "QGuiApplication app" in main_source:
+        print("Qt.labs.platform 菜单应使用 QApplication，而不是纯 QGuiApplication。", file=sys.stderr)
         return 1
 
     return 0

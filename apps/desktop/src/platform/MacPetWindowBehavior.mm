@@ -86,7 +86,6 @@ void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop)
     behavior |= NSWindowCollectionBehaviorMoveToActiveSpace;
     [nativeWindow setCollectionBehavior:behavior];
     [nativeWindow setLevel:NSNormalWindowLevel];
-    // 取消置顶时不能继续 orderFront，否则窗口虽然降到普通 layer，
-    // 但仍会停在普通窗口队列最前面，用户体感上还是“压住别的窗口”。
-    [nativeWindow orderBack:nil];
+    // 取消置顶只改变之后的覆盖规则，不主动把桌宠丢到窗口栈底部。
+    // 这样用户手滑点错时，桌宠仍停在原地，后续自然可以被其他窗口覆盖。
 }

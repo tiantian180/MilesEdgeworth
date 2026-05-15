@@ -1,6 +1,6 @@
 #include "DesktopShellController.h"
 
-#include <QGuiApplication>
+#include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QTimer>
@@ -24,7 +24,9 @@ void attachPetWindowToShellController(QQmlApplicationEngine &engine, DesktopShel
 
 int main(int argc, char *argv[])
 {
-    QGuiApplication app(argc, argv);
+    // Qt.labs.platform 的原生菜单在部分平台需要 Qt Widgets fallback。
+    // 因此桌面壳层使用 QApplication，而不是更轻的 QGuiApplication。
+    QApplication app(argc, argv);
 
     DesktopShellController shellController;
 
