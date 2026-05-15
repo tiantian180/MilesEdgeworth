@@ -1,5 +1,8 @@
 .DS_Store
 
+# Local editor / language-server caches
+.cache/
+
 # CMake build directories
 build/
 cmake-build-*/
