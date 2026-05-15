@@ -42,6 +42,15 @@ cmake --build /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build
 open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgeworthDesktop.app
 ```
 
+## Automated Checks
+
+窗口层级仍然需要真实 macOS 桌面环境手动验证，但仓库里保留了一个小的静态检查，
+用来防止普通“始终置顶”开关重新依赖 SkyLight 私有 Space：
+
+```sh
+python3 tests/check_macos_window_behavior.py
+```
+
 ## Manual Checks
 
 手动验证时，先完成对应架构的 Build，再使用 Run 命令启动应用。启动后检查以下桌面壳层行为：
@@ -62,7 +71,8 @@ open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgew
 - Phase 0 只有最小右键菜单，包含置顶开关和退出入口；尚未实现旧版完整右键菜单或系统托盘菜单。
 - Pet Runtime 未实现；当前只验证桌面窗口壳层和基础动画资源接入。
 - 当前只注册 `stand-right` 和 `stand-left` 两个动画 alias。
-- macOS 跨 Space / 全屏置顶能力依赖 SkyLight 私有 API。它适合技术验证和个人分发，但不适合 Mac App Store；未来 macOS 版本也可能需要维护适配。
-- macOS 取消置顶是 best-effort：当前会降低窗口层级并移回活跃 Space，但 SkyLight 私有 Space 的行为在不同 macOS 版本上仍需要手动验证。
+- macOS 普通置顶开关使用标准 AppKit 窗口层级：置顶时切到 screen saver level 并加入所有 Space，取消置顶时降回普通窗口层级。这样比 SkyLight 私有 Space 更适合做可逆开关。
+- SkyLight 私有 Space 暂不作为普通置顶开关的实现。它可以作为未来“固定在屏幕最上层”的实验模式单独设计，但需要接受私有 API、不稳定、退出时可能要重建窗口等代价。
+- macOS 全屏 / Mission Control 场景仍需要真实机器手动验证。Qt 的 QWindow 不是原生 NSPanel；如果后续发现全屏覆盖能力不足，下一步应改成 macOS 专用 NSPanel 容器，而不是把普通置顶开关重新绑到 SkyLight。
 - Phase 0 暂时不使用 `Qt.Tool`。macOS 由 `NSApplicationActivationPolicyAccessory` 和原生窗口属性承担辅助应用行为；Windows/Linux 的任务栏隐藏策略后续再单独验证。
 - Windows/Linux 桌面层级、透明窗口、跨工作区和全屏覆盖行为需要另行验证。

@@ -8,4 +8,19 @@ project(MilesEdgeworthV2 VERSION 0.2.0 LANGUAGES CXX)
 # 真实 include 路径、宏定义和 Qt 模块参数；否则编辑器会把 Qt 头文件标红。
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+include(CTest)
+
 add_subdirectory(apps/desktop)
+
+if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        # 这个检查守住 macOS 桌宠窗口策略的边界：普通置顶开关必须保持可逆，
+        # 不能重新依赖 SkyLight 私有 Space。
+        add_test(
+            NAME check_macos_window_behavior
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_macos_window_behavior.py
+        )
+    endif()
+endif()

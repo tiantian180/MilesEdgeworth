@@ -11,6 +11,9 @@ class QWindow;
 void applyMacPetWindowBaseBehavior(QWindow *window);
 
 // 切换桌宠窗口的层级模式。
-// alwaysOnTop 为 true 时，尽量保持在所有 Space / 全屏窗口 / Mission Control 之上。
+// alwaysOnTop 为 true 时，使用标准 AppKit 窗口层级尽量覆盖所有 Space / 全屏窗口。
 // alwaysOnTop 为 false 时，保留桌宠基础行为，但允许其他普通窗口覆盖它。
+//
+// 注意：这里故意不使用 SkyLight 私有 Space。SkyLight 更适合未来单独做
+// “固定在屏幕最上层”的实验模式，不适合这个需要可随时取消的普通开关。
 void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop);
