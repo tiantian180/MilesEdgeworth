@@ -1,0 +1,32 @@
+{
+  "id": "miles-edgeworth",
+  "name": "Miles Edgeworth",
+  "version": 1,
+  "defaultFacing": "right",
+  "states": {
+    "idle": {
+      "action": "idle_stand"
+    },
+    "thinking": {
+      "action": "thinking"
+    },
+    "speaking": {
+      "action": "objecting"
+    }
+  },
+  "actions": {
+    "idle_stand": {
+      "animation": "qrc:/pet/stand-right.gif",
+      "loop": true
+    },
+    "thinking": {
+      "animation": "qrc:/pet/thinking-right.gif",
+      "loop": true
+    },
+    "objecting": {
+      "animation": "qrc:/pet/objecting-right.gif",
+      "loop": false
+    }
+  },
+  "fallbackAction": "idle_stand"
+}

@@ -22,5 +22,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_macos_window_behavior.py
         )
+
+        # Phase 0.5 的桌宠运行时检查：守住 QML singleton、PetRuntime、
+        # manifest 和动画绑定的最小纵切。
+        add_test(
+            NAME check_phase_0_5_pet_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_5_pet_runtime.py
+        )
     endif()
 endif()

@@ -18,6 +18,8 @@ set(DESKTOP_SOURCES
     src/DesktopShellController.cpp
     src/DesktopShellController.h
     src/main.cpp
+    src/pet/PetRuntime.cpp
+    src/pet/PetRuntime.h
     resources/pet_assets.qrc
 )
 
@@ -39,11 +41,15 @@ qt_add_qml_module(MilesEdgeworthDesktop
     VERSION 1.0
     QML_FILES
         qml/PetWindow.qml
+    SOURCES
+        src/DesktopShellController.h
+        src/pet/PetRuntime.h
 )
 
 target_include_directories(MilesEdgeworthDesktop
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
 )
 
 target_link_libraries(MilesEdgeworthDesktop

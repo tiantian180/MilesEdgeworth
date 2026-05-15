@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Qt.labs.platform as Platform
+import MilesEdgeworth as App
 
 Window {
     id: petWindow
@@ -20,8 +21,25 @@ Window {
         id: contextMenu
 
         Platform.MenuItem {
-            text: desktopShell.alwaysOnTop ? "取消置顶" : "始终置顶"
-            onTriggered: desktopShell.toggleAlwaysOnTop()
+            text: App.DesktopShell.alwaysOnTop ? "取消置顶" : "始终置顶"
+            onTriggered: App.DesktopShell.toggleAlwaysOnTop()
+        }
+
+        Platform.MenuSeparator {}
+
+        Platform.MenuItem {
+            text: "回到待机"
+            onTriggered: App.PetRuntime.returnToIdle()
+        }
+
+        Platform.MenuItem {
+            text: "测试思考"
+            onTriggered: App.PetRuntime.testThinking()
+        }
+
+        Platform.MenuItem {
+            text: "测试说话"
+            onTriggered: App.PetRuntime.testSpeaking()
         }
 
         Platform.MenuSeparator {}
@@ -32,13 +50,13 @@ Window {
         }
     }
 
-    // 当前阶段先直接显示一个旧版站立动画。
-    // 后续 Pet Runtime 会接管动画选择，不再让 QML 写死资源路径。
+    // QML 只负责播放当前动画，具体 state/action 到资源的选择交给 PetRuntime。
+    // 这样将来接入模型事件、点击交互、移动状态时，不需要反复改表现层。
     AnimatedImage {
         id: pet
 
         anchors.centerIn: parent
-        source: "qrc:/pet/stand-right.gif"
+        source: App.PetRuntime.currentAnimationUrl
         cache: false
         playing: true
         fillMode: Image.PreserveAspectFit

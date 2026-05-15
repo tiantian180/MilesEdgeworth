@@ -26,21 +26,21 @@ qtpaths6 --version
 ### Apple Silicon
 
 ```sh
-cmake -S apps/desktop -B /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew
-cmake --build /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew
+cmake --build build
 ```
 
 ### Intel Mac
 
 ```sh
-cmake -S apps/desktop -B /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build -G Ninja -DCMAKE_PREFIX_PATH=/usr/local
-cmake --build /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/usr/local
+cmake --build build
 ```
 
 ## Run
 
 ```sh
-open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgeworthDesktop.app
+open build/apps/desktop/MilesEdgeworthDesktop.app
 ```
 
 ## Automated Checks
@@ -49,8 +49,18 @@ open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgew
 用来防止普通“始终置顶”开关重新依赖 SkyLight 私有 Space：
 
 ```sh
-python3 tests/check_macos_window_behavior.py
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew
+cmake --build build
+ctest --test-dir build --output-on-failure
+/opt/homebrew/bin/qmllint -I build/apps/desktop apps/desktop/qml/PetWindow.qml
 ```
+
+其中 `check_phase_0_5_pet_runtime` 会额外检查：
+
+- QML 不再通过 `desktopShell` context property 访问桌面壳层。
+- `DesktopShell` 和 `PetRuntime` 已作为 QML singleton 暴露。
+- `AnimatedImage` 的资源路径由 `PetRuntime.currentAnimationUrl` 驱动。
+- 内置 skin manifest 至少包含 `idle`、`thinking`、`speaking` 三个状态。
 
 ## Manual Checks
 
@@ -66,13 +76,14 @@ python3 tests/check_macos_window_behavior.py
 - 全屏 app 上方可见：切到全屏应用后，桌宠应仍显示在全屏应用上方。
 - 取消置顶后可覆盖：点击“取消置顶”后，桌宠仍不应因为应用失焦而隐藏，也不应主动沉到窗口栈底部；后续允许被其他窗口自然覆盖。重新点击“始终置顶”后，应恢复当前 Phase 0 的跨 Space / 全屏上方显示行为。
 - 动画资源 alias：运行态确认 `qrc:/pet/stand-right.gif` 可以解析并显示。`stand-left` 已注册 alias，但 Phase 0 还没有切换朝向的运行时入口，后续由 Pet Runtime 验证。
+- Phase 0.5 动作测试：右键菜单中的“回到待机”“测试思考”“测试说话”应能在站立、思考、异议/强调三类动画之间切换。
 
 ## Known Limits
 
 - Phase 0 点击区域仍是矩形，尚未按透明像素或角色轮廓裁剪命中区域。
 - Phase 0 只有最小平台右键菜单，包含置顶开关和退出入口；尚未实现旧版完整右键菜单或系统托盘菜单。
-- Pet Runtime 未实现；当前只验证桌面窗口壳层和基础动画资源接入。
-- 当前只注册 `stand-right` 和 `stand-left` 两个动画 alias。
+- Pet Runtime 目前只实现最小 state/action/animation 映射，还没有完整动画编排器、优先级队列、enter/loop/exit 阶段或移动驱动动画。
+- 当前只注册 `stand-right`、`stand-left`、`thinking-right`、`thinking-left`、`objecting-right`、`objecting-left` 这几类 Phase 0.5 验证资源。
 - macOS 普通置顶开关使用标准 AppKit 窗口层级：置顶时切到 screen saver level 并加入所有 Space，取消置顶时降回普通窗口层级。这样比 SkyLight 私有 Space 更适合做可逆开关。
 - SkyLight 私有 Space 暂不作为普通置顶开关的实现。它可以作为未来“固定在屏幕最上层”的实验模式单独设计，但需要接受私有 API、不稳定、退出时可能要重建窗口等代价。
 - macOS 全屏 / Mission Control 场景仍需要真实机器手动验证。Qt 的 QWindow 不是原生 NSPanel；如果后续发现全屏覆盖能力不足，下一步应改成 macOS 专用 NSPanel 容器，而不是把普通置顶开关重新绑到 SkyLight。

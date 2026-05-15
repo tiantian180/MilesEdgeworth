@@ -1,6 +1,9 @@
 #pragma once
 
 #include <QObject>
+#include <QJSEngine>
+#include <QQmlEngine>
+#include <QtQml/qqmlregistration.h>
 
 class QWindow;
 
@@ -30,4 +33,30 @@ private:
 
     QWindow *m_petWindow = nullptr;
     bool m_alwaysOnTop = true;
+};
+
+// 这个 wrapper 只负责告诉 QML 类型系统：
+// 已经存在的 DesktopShellController 对象，要以 DesktopShell 单例暴露给 QML。
+//
+// 这样比 setContextProperty 更清晰：QML Language Server 能看到属性和方法，
+// 后续 QML 里使用 DesktopShell.alwaysOnTop 时也不再像访问“空气变量”。
+struct DesktopShellControllerForeign
+{
+    Q_GADGET
+    QML_FOREIGN(DesktopShellController)
+    QML_NAMED_ELEMENT(DesktopShell)
+    QML_SINGLETON
+
+public:
+    inline static DesktopShellController *s_instance = nullptr;
+
+    static DesktopShellController *create(QQmlEngine *, QJSEngine *scriptEngine)
+    {
+        Q_ASSERT(s_instance != nullptr);
+        Q_ASSERT(scriptEngine->thread() == s_instance->thread());
+
+        // 单例对象由 main.cpp 持有，QML 引擎只借用，不负责 delete。
+        QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership);
+        return s_instance;
+    }
 };

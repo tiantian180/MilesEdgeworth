@@ -2,5 +2,10 @@
   <qresource prefix="/pet">
     <file alias="stand-right.gif">../../../gifs/stand/0.gif</file>
     <file alias="stand-left.gif">../../../gifs/stand/1.gif</file>
+    <file alias="thinking-right.gif">../../../gifs/once/4.gif</file>
+    <file alias="thinking-left.gif">../../../gifs/once/5.gif</file>
+    <file alias="objecting-right.gif">../../../gifs/special/object0.gif</file>
+    <file alias="objecting-left.gif">../../../gifs/special/object1.gif</file>
+    <file alias="manifest.json">skins/miles-edgeworth/manifest.json</file>
   </qresource>
 </RCC>

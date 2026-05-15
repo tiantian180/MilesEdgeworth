@@ -1,8 +1,8 @@
 #include "DesktopShellController.h"
+#include "pet/PetRuntime.h"
 
 #include <QApplication>
 #include <QQmlApplicationEngine>
-#include <QQmlContext>
 #include <QTimer>
 #include <QWindow>
 
@@ -29,9 +29,12 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
 
     DesktopShellController shellController;
+    DesktopShellControllerForeign::s_instance = &shellController;
+
+    PetRuntime petRuntime;
+    PetRuntimeForeign::s_instance = &petRuntime;
 
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("desktopShell", &shellController);
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
