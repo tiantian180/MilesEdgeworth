@@ -15,6 +15,8 @@ if(Qt6_VERSION VERSION_GREATER_EQUAL "6.8.0")
 endif()
 
 set(DESKTOP_SOURCES
+    src/DesktopShellController.cpp
+    src/DesktopShellController.h
     src/main.cpp
     resources/pet_assets.qrc
 )

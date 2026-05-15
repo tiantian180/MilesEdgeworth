@@ -1,14 +1,13 @@
+#include "DesktopShellController.h"
+
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QTimer>
 #include <QWindow>
 
-#ifdef Q_OS_MACOS
-#include "platform/MacPetWindowBehavior.h"
-#endif
-
 namespace {
-void applyPlatformPetWindowBehavior(QQmlApplicationEngine &engine)
+void attachPetWindowToShellController(QQmlApplicationEngine &engine, DesktopShellController &shellController)
 {
     if (engine.rootObjects().isEmpty()) {
         return;
@@ -19,11 +18,7 @@ void applyPlatformPetWindowBehavior(QQmlApplicationEngine &engine)
         return;
     }
 
-#ifdef Q_OS_MACOS
-    applyMacPetWindowBehavior(window);
-#else
-    window->setFlag(Qt::WindowStaysOnTopHint, true);
-#endif
+    shellController.setPetWindow(window);
 }
 }
 
@@ -31,7 +26,10 @@ int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
 
+    DesktopShellController shellController;
+
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("desktopShell", &shellController);
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
@@ -42,8 +40,8 @@ int main(int argc, char *argv[])
     engine.loadFromModule("MilesEdgeworth", "PetWindow");
 
     // 等 QML Window 创建完 native handle 后，再追加平台级桌宠窗口行为。
-    QTimer::singleShot(0, &engine, [&engine]() {
-        applyPlatformPetWindowBehavior(engine);
+    QTimer::singleShot(0, &engine, [&engine, &shellController]() {
+        attachPetWindowToShellController(engine, shellController);
     });
 
     return app.exec();

@@ -11,7 +11,6 @@ Window {
     title: "MilesEdgeworth v2"
 
     flags: Qt.FramelessWindowHint
-           | Qt.WindowStaysOnTopHint
            | Qt.Tool
            | Qt.NoDropShadowWindowHint
 
@@ -22,25 +21,68 @@ Window {
 
         visible: false
         z: 2
-        width: 84
-        height: 36
+        width: 132
+        height: menuItems.implicitHeight
         radius: 6
         color: "#242424"
         border.color: "#6a6a6a"
         border.width: 1
 
-        Text {
-            anchors.centerIn: parent
-            color: "white"
-            text: "退出"
-            font.pixelSize: 14
-        }
+        Column {
+            id: menuItems
 
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
+            width: parent.width
 
-            onClicked: Qt.quit()
+            Rectangle {
+                width: parent.width
+                height: 36
+                color: topMostMouseArea.containsMouse ? "#343434" : "transparent"
+                radius: 6
+
+                Text {
+                    anchors.centerIn: parent
+                    color: "white"
+                    text: desktopShell.alwaysOnTop ? "取消置顶" : "始终置顶"
+                    font.pixelSize: 14
+                }
+
+                MouseArea {
+                    id: topMostMouseArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton
+
+                    onClicked: {
+                        desktopShell.toggleAlwaysOnTop()
+                        contextMenu.visible = false
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 36
+                color: quitMouseArea.containsMouse ? "#343434" : "transparent"
+                radius: 6
+
+                Text {
+                    anchors.centerIn: parent
+                    color: "white"
+                    text: "退出"
+                    font.pixelSize: 14
+                }
+
+                MouseArea {
+                    id: quitMouseArea
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    acceptedButtons: Qt.LeftButton
+
+                    onClicked: Qt.quit()
+                }
+            }
         }
     }
 

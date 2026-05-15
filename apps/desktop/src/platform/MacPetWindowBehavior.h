@@ -2,10 +2,15 @@
 
 class QWindow;
 
-// 给 macOS 桌宠窗口追加平台行为：
+// 给 macOS 桌宠窗口追加基础平台行为：
 // 1. 不因为应用失焦而隐藏。
-// 2. 尽量保持在所有 Space / 全屏窗口之上。
-// 3. 使用透明背景，避免普通应用窗口外观。
+// 2. 使用透明背景，避免普通应用窗口外观。
+// 3. 使用辅助应用模式，减少 Dock / 普通应用切换行为的干扰。
 //
-// 这个函数只在 macOS 编译。其他平台会在调用处使用公开 Qt 窗口标志兜底。
-void applyMacPetWindowBehavior(QWindow *window);
+// “是否始终置顶”不放在这里处理，因为它是用户可切换设置。
+void applyMacPetWindowBaseBehavior(QWindow *window);
+
+// 切换桌宠窗口的层级模式。
+// alwaysOnTop 为 true 时，尽量保持在所有 Space / 全屏窗口 / Mission Control 之上。
+// alwaysOnTop 为 false 时，保留桌宠基础行为，但允许其他普通窗口覆盖它。
+void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop);

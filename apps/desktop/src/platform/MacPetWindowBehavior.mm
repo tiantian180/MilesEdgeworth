@@ -82,33 +82,21 @@ void moveWindowToStationarySkyLightSpace(NSWindow *window)
     NSArray *windows = @[ @(windowNumber) ];
     state.addWindowsAndRemoveFromSpaces(state.connection, state.space, (__bridge void *)windows, 7);
 }
-}
 
-void applyMacPetWindowBehavior(QWindow *window)
+NSWindow *nativeWindowForQWindow(QWindow *window)
 {
     if (window == nullptr) {
-        return;
+        return nil;
     }
-
-    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 
     NSView *view = reinterpret_cast<NSView *>(window->winId());
-    NSWindow *nativeWindow = [view window];
-    if (nativeWindow == nil) {
-        return;
-    }
+    return [view window];
+}
 
-    [nativeWindow setHidesOnDeactivate:NO];
-    [nativeWindow setCanHide:NO];
-    [nativeWindow setRestorable:NO];
-    [nativeWindow setOpaque:NO];
-    [nativeWindow setBackgroundColor:[NSColor clearColor]];
-    [nativeWindow setMovable:NO];
-    [nativeWindow setAnimationBehavior:NSWindowAnimationBehaviorNone];
-
-    NSWindowCollectionBehavior behavior = [nativeWindow collectionBehavior];
-    behavior &= ~(NSWindowCollectionBehaviorMoveToActiveSpace
-                  | NSWindowCollectionBehaviorManaged
+NSWindowCollectionBehavior baseCollectionBehavior(NSWindow *window)
+{
+    NSWindowCollectionBehavior behavior = [window collectionBehavior];
+    behavior &= ~(NSWindowCollectionBehaviorManaged
                   | NSWindowCollectionBehaviorTransient
                   | NSWindowCollectionBehaviorParticipatesInCycle
                   | NSWindowCollectionBehaviorFullScreenPrimary
@@ -117,14 +105,60 @@ void applyMacPetWindowBehavior(QWindow *window)
     if (@available(macOS 13.0, *)) {
         behavior &= ~NSWindowCollectionBehaviorCanJoinAllApplications;
     }
-    behavior |= NSWindowCollectionBehaviorCanJoinAllSpaces
-                | NSWindowCollectionBehaviorStationary
-                | NSWindowCollectionBehaviorFullScreenAuxiliary
-                | NSWindowCollectionBehaviorIgnoresCycle
-                | NSWindowCollectionBehaviorFullScreenDisallowsTiling;
-    [nativeWindow setCollectionBehavior:behavior];
 
-    [nativeWindow setLevel:CGWindowLevelForKey(kCGAssistiveTechHighWindowLevelKey)];
-    moveWindowToStationarySkyLightSpace(nativeWindow);
-    [nativeWindow orderFrontRegardless];
+    behavior |= NSWindowCollectionBehaviorIgnoresCycle
+                | NSWindowCollectionBehaviorFullScreenDisallowsTiling;
+    return behavior;
+}
+}
+
+void applyMacPetWindowBaseBehavior(QWindow *window)
+{
+    NSWindow *nativeWindow = nativeWindowForQWindow(window);
+    if (nativeWindow == nil) {
+        return;
+    }
+
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+
+    [nativeWindow setHidesOnDeactivate:NO];
+    [nativeWindow setCanHide:NO];
+    [nativeWindow setRestorable:NO];
+    [nativeWindow setOpaque:NO];
+    [nativeWindow setBackgroundColor:[NSColor clearColor]];
+    [nativeWindow setMovable:NO];
+    [nativeWindow setAnimationBehavior:NSWindowAnimationBehaviorNone];
+}
+
+void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop)
+{
+    NSWindow *nativeWindow = nativeWindowForQWindow(window);
+    if (nativeWindow == nil) {
+        return;
+    }
+
+    // 这两项始终保留：即使用户取消置顶，也不希望桌宠因为应用失焦被系统隐藏。
+    [nativeWindow setHidesOnDeactivate:NO];
+    [nativeWindow setCanHide:NO];
+
+    NSWindowCollectionBehavior behavior = baseCollectionBehavior(nativeWindow);
+    if (alwaysOnTop) {
+        behavior &= ~NSWindowCollectionBehaviorMoveToActiveSpace;
+        behavior |= NSWindowCollectionBehaviorCanJoinAllSpaces
+                    | NSWindowCollectionBehaviorStationary
+                    | NSWindowCollectionBehaviorFullScreenAuxiliary;
+        [nativeWindow setCollectionBehavior:behavior];
+        [nativeWindow setLevel:CGWindowLevelForKey(kCGAssistiveTechHighWindowLevelKey)];
+        moveWindowToStationarySkyLightSpace(nativeWindow);
+        [nativeWindow orderFrontRegardless];
+        return;
+    }
+
+    behavior &= ~(NSWindowCollectionBehaviorCanJoinAllSpaces
+                  | NSWindowCollectionBehaviorStationary
+                  | NSWindowCollectionBehaviorFullScreenAuxiliary);
+    behavior |= NSWindowCollectionBehaviorMoveToActiveSpace;
+    [nativeWindow setCollectionBehavior:behavior];
+    [nativeWindow setLevel:NSNormalWindowLevel];
+    [nativeWindow orderFront:nil];
 }
