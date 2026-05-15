@@ -32,6 +32,34 @@ open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgew
 
 Intel Mac 的 Homebrew 默认路径通常是 `/usr/local`，对应把 `CMAKE_PREFIX_PATH` 改为 `/usr/local`。
 
+## Cursor / clangd 代码提示
+
+如果 C++ 代码里 `#include <QGuiApplication>`、`QWindow` 等 Qt 类型飘红，通常不是 Qt Extension Pack 没装好，而是 clangd 没读到 CMake 生成的 `compile_commands.json`。
+
+先从仓库根目录配置一次 CMake：
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew
+```
+
+确认文件存在：
+
+```bash
+ls build/compile_commands.json
+```
+
+然后在 Cursor 命令面板执行：
+
+```text
+clangd: Restart language server
+```
+
+必要时再执行：
+
+```text
+CMake: Delete Cache and Reconfigure
+```
+
 ## 当前状态
 
 Phase 0 已完成最小桌面壳层验证：
