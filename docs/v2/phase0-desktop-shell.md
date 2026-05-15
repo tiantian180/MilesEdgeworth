@@ -48,6 +48,7 @@ open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgew
 
 - 透明无边框：桌宠窗口背景应透明，窗口本身不显示系统标题栏、边框或默认窗口装饰。
 - 拖拽：按住桌宠可移动窗口位置，松开后窗口停留在新的桌面坐标。
+- 退出入口：右键桌宠应弹出最小菜单，点击“退出”后应用关闭。
 - 失焦后可见：点击其他应用让桌宠失焦后，桌宠仍应保持可见，不应因为失焦而隐藏或最小化。
 - 切换 Spaces 可见：在 macOS Spaces 之间切换时，桌宠应继续出现在当前 Space 中。
 - 全屏 app 上方可见：切到全屏应用后，桌宠应仍显示在全屏应用上方。
@@ -56,6 +57,7 @@ open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgew
 ## Known Limits
 
 - Phase 0 点击区域仍是矩形，尚未按透明像素或角色轮廓裁剪命中区域。
+- Phase 0 只有最小右键退出菜单，尚未实现旧版完整右键菜单或系统托盘菜单。
 - Pet Runtime 未实现；当前只验证桌面窗口壳层和基础动画资源接入。
 - 当前只注册 `stand-right` 和 `stand-left` 两个动画 alias。
 - macOS 跨 Space / 全屏置顶能力依赖 SkyLight 私有 API。它适合技术验证和个人分发，但不适合 Mac App Store；未来 macOS 版本也可能需要维护适配。
