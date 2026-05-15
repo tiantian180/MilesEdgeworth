@@ -10,7 +10,7 @@ v2 要同时满足两件事：
 1. 保留旧版 MilesEdgeworth 的桌宠体验：透明异形窗口、置顶、拖拽、随机动作、走路/跑步、检察官徽章、音效、喝茶、睡觉等。
 2. 建立新的 AI 桌宠架构：聊天窗口、设置中心、OpenAI-compatible provider、人设 prompt、流式回复、状态驱动动画，并为后续 tools、skills、MCP、权限确认和插件系统预留边界。
 
-v2 不迁移旧版的图片置顶查看器功能。`PicViewer` 只作为 legacy 代码保留，不进入新版主线。
+v2 不迁移旧版的图片置顶查看器功能。旧版 `PicViewer` 代码已从 v2 分支移除；如需参考实现，可回看仓库历史或旧分支。
 
 ## 2. 技术路线
 
@@ -93,7 +93,7 @@ MilesEdgeworth/
       packaging.md
 ```
 
-旧版根目录文件先保留。等 v2 主线稳定后，再考虑把旧版 Qt Widgets 工程整体归档到 `legacy/`。
+旧版 Qt Widgets 源码已从 `v2-ai-pet` 分支移除。根目录只保留新版聚合入口、文档和可复用素材；需要参考旧版行为时回看仓库历史或旧分支。
 
 ## 4. Qt Desktop 职责
 
