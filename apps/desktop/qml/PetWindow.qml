@@ -55,6 +55,11 @@ Window {
         }
 
         Platform.MenuItem {
+            text: "测试转身"
+            onTriggered: App.PetRuntime.testTurn()
+        }
+
+        Platform.MenuItem {
             text: "测试鞠躬"
             onTriggered: App.PetRuntime.testBow()
         }
@@ -84,7 +89,7 @@ Window {
 
         interval: 7000
         repeat: true
-        running: petWindow.visible
+        running: petWindow.visible && App.PetRuntime.currentRecipeId === ""
         onTriggered: App.PetRuntime.triggerIdle()
     }
 

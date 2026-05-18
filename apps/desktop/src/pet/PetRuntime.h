@@ -53,10 +53,12 @@ public:
     Q_INVOKABLE void playRecipe(const QString &recipeId);
     Q_INVOKABLE void playActionFromPool(const QString &poolId);
     Q_INVOKABLE void triggerIdle();
+    Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
     Q_INVOKABLE void testThinking();
     Q_INVOKABLE void testSpeaking();
     Q_INVOKABLE void testObjecting();
+    Q_INVOKABLE void testTurn();
     Q_INVOKABLE void testBow();
     Q_INVOKABLE void testTea();
     Q_INVOKABLE void testSleep();
@@ -89,6 +91,7 @@ private:
         int priority = 0;
         QStringList tags;
         QHash<QString, QUrl> variants;
+        QHash<QString, QString> facingAfter;
         QString initialPhase;
         QString exitPhase;
         QHash<QString, PhaseDefinition> phases;
@@ -133,6 +136,7 @@ private:
     void playNextRecipeStep();
     void playRecipeStep(const RecipeStep &step);
     ActionPoolEntry selectActionPoolEntry(const ActionPoolDefinition &pool) const;
+    void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void playPhase(const QString &actionId, const QString &phaseId);
     void setCurrentAction(const QString &actionId, const ActionDefinition &action);
     void setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase);

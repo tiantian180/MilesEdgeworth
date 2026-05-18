@@ -22,6 +22,7 @@ PetRuntime::PetRuntime(QObject *parent)
     }
 
     setState("idle");
+    startStartupSequence();
 }
 
 QString PetRuntime::currentState() const
@@ -185,6 +186,11 @@ void PetRuntime::triggerIdle()
     playActionFromPool("idle.random");
 }
 
+void PetRuntime::startStartupSequence()
+{
+    playRecipe("startup.briefcase");
+}
+
 void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
 {
     QString nextActionId = actionId.trimmed();
@@ -232,6 +238,11 @@ void PetRuntime::testObjecting()
     setState("speaking");
 }
 
+void PetRuntime::testTurn()
+{
+    playRecipe("turn.once");
+}
+
 void PetRuntime::testBow()
 {
     playRecipe("bow.once");
@@ -255,6 +266,8 @@ void PetRuntime::handleAnimationFinished()
         playPhase(m_currentActionId, phase.nextPhase);
         return;
     }
+
+    applyFacingAfterCurrentAction(action);
 
     if (!m_currentRecipeId.isEmpty()) {
         const RecipeDefinition recipe = m_recipes.value(m_currentRecipeId);
@@ -332,6 +345,14 @@ void PetRuntime::loadManifest()
             const QString animation = variantIt.value().toObject().value("animation").toString();
             if (!animation.isEmpty()) {
                 action.variants.insert(variantIt.key(), QUrl(animation));
+            }
+        }
+
+        const QJsonObject facingAfter = actionObject.value("facingAfter").toObject();
+        for (auto facingIt = facingAfter.constBegin(); facingIt != facingAfter.constEnd(); ++facingIt) {
+            const QString nextFacing = facingIt.value().toString();
+            if (!nextFacing.isEmpty()) {
+                action.facingAfter.insert(facingIt.key(), nextFacing);
             }
         }
 
@@ -561,6 +582,23 @@ PetRuntime::ActionPoolEntry PetRuntime::selectActionPoolEntry(const ActionPoolDe
     }
 
     return pool.entries.constLast();
+}
+
+void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)
+{
+    if (action.facingAfter.isEmpty()) {
+        return;
+    }
+
+    const QString nextFacing = action.facingAfter.value(m_currentFacing);
+    if (nextFacing.isEmpty() || nextFacing == m_currentFacing || !m_facings.contains(nextFacing)) {
+        return;
+    }
+
+    // 转身动画的朝向变化要发生在动画自然结束后。
+    // 这里直接更新状态，不调用 setFacing，避免在最后一帧重新加载当前转身动画。
+    m_currentFacing = nextFacing;
+    emit currentFacingChanged();
 }
 
 void PetRuntime::playPhase(const QString &actionId, const QString &phaseId)

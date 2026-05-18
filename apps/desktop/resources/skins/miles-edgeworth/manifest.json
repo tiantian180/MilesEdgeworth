@@ -32,6 +32,49 @@
         }
       }
     },
+    "briefcase_in": {
+      "label": "公文包入场",
+      "category": "startup",
+      "loopMode": "once",
+      "priority": 80,
+      "tags": ["startup", "briefcase", "walking"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/briefcase-in-right.gif"
+        }
+      }
+    },
+    "briefcase_stop": {
+      "label": "公文包停下",
+      "category": "startup",
+      "loopMode": "once",
+      "priority": 80,
+      "tags": ["startup", "briefcase", "standing"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/briefcase-stop-right.gif"
+        }
+      }
+    },
+    "turn_around": {
+      "label": "转身",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 15,
+      "tags": ["idle", "turn"],
+      "facingAfter": {
+        "right": "left",
+        "left": "right"
+      },
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/turn-right-to-left.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/turn-left-to-right.gif"
+        }
+      }
+    },
     "thinking": {
       "label": "抱胸思考",
       "category": "cognitive",
@@ -44,6 +87,81 @@
         },
         "left": {
           "animation": "qrc:/pet/thinking-left.gif"
+        }
+      }
+    },
+    "idle_thinking_once": {
+      "label": "随机抱胸思考",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 12,
+      "tags": ["idle", "thinking", "cognitive"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-thinking-once-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-thinking-once-left.gif"
+        }
+      }
+    },
+    "idle_tapping_head": {
+      "label": "轻敲脑袋",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "tapping_head"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-tapping-head-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-tapping-head-left.gif"
+        }
+      }
+    },
+    "idle_shrug": {
+      "label": "耸肩摊手",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "shrug", "confident"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-shrug-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-shrug-left.gif"
+        }
+      }
+    },
+    "idle_check_watch": {
+      "label": "看手表",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "watch", "waiting"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-check-watch-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-check-watch-left.gif"
+        }
+      }
+    },
+    "idle_pointing": {
+      "label": "指指点点",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "pointing", "lecture"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-pointing-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-pointing-left.gif"
         }
       }
     },
@@ -138,6 +256,21 @@
     }
   },
   "recipes": {
+    "startup.briefcase": {
+      "label": "公文包启动入场",
+      "scope": "startup",
+      "steps": [
+        {
+          "action": "briefcase_in"
+        },
+        {
+          "action": "briefcase_stop"
+        },
+        {
+          "action": "idle_stand"
+        }
+      ]
+    },
     "idle.stand": {
       "label": "待机站立",
       "scope": "state",
@@ -146,7 +279,32 @@
     "idle.randomThinking": {
       "label": "随机思考",
       "scope": "idle",
-      "action": "thinking"
+      "action": "idle_thinking_once"
+    },
+    "turn.once": {
+      "label": "转身一次",
+      "scope": "idle",
+      "action": "turn_around"
+    },
+    "idle.tappingHead": {
+      "label": "随机轻敲脑袋",
+      "scope": "idle",
+      "action": "idle_tapping_head"
+    },
+    "idle.shrug": {
+      "label": "随机耸肩",
+      "scope": "idle",
+      "action": "idle_shrug"
+    },
+    "idle.checkWatch": {
+      "label": "随机看表",
+      "scope": "idle",
+      "action": "idle_check_watch"
+    },
+    "idle.pointing": {
+      "label": "随机指点",
+      "scope": "idle",
+      "action": "idle_pointing"
     },
     "objecting.once": {
       "label": "异议一次",
@@ -186,6 +344,26 @@
         {
           "recipe": "idle.randomThinking",
           "weight": 3
+        },
+        {
+          "recipe": "turn.once",
+          "weight": 2
+        },
+        {
+          "recipe": "idle.tappingHead",
+          "weight": 3
+        },
+        {
+          "recipe": "idle.shrug",
+          "weight": 3
+        },
+        {
+          "recipe": "idle.checkWatch",
+          "weight": 2
+        },
+        {
+          "recipe": "idle.pointing",
+          "weight": 2
         },
         {
           "recipe": "bow.once",

@@ -54,5 +54,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_8_recipe_runtime.py
         )
+
+        # Phase 0.9 的启动和随机 idle 检查：守住旧版“公文包入场”
+        # 以及站立时随机转身 / 小动作的最小手感骨架。
+        add_test(
+            NAME check_phase_0_9_startup_idle_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_9_startup_idle_runtime.py
+        )
     endif()
 endif()
