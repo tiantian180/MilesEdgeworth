@@ -563,6 +563,177 @@ flowchart TD
 
 定制交互不能绕过 Pet Runtime 直接抢夺主动画状态。它应该通过 ActionRequest 请求身体动作，通过 SideEffect 或 Overlay 管理额外对象。
 
+## Interaction Pipeline 与高级交互代码
+
+普通 BehaviorRule 面向“配置就能完成”的交互。Custom Interaction 面向“必须写代码”
+的高级玩法，例如检察官徽章、眼睛追随鼠标、复杂道具和多对象协作。
+
+### 三个概念
+
+```text
+InteractionHookPoint
+  代码插入的位置，例如 beforeDefault / default / afterDefault / observer。
+
+InteractionHandler
+  挂到某个 hook point 上的一段处理逻辑。它可以来自 behavior 配置、项目内置代码，
+  也可以来自未来可信皮肤包里的 JS/TS 脚本。
+
+InteractionHost API
+  handler 能调用的受控能力，例如播放动作、生成道具、播放音效、显示气泡、发事件。
+```
+
+Hook point 是“插在哪里”，handler 是“插进去的代码”，Host API 是“这段代码能安全调用
+系统做什么”。
+
+### 事件流程
+
+```mermaid
+sequenceDiagram
+    participant Source as Event Source
+    participant Pipeline as Interaction Pipeline
+    participant Before as beforeDefault handlers
+    participant Default as default behavior
+    participant After as afterDefault handlers
+    participant Host as InteractionHost API
+    participant Runtime as Pet Runtime / Prop Runtime
+
+    Source->>Pipeline: pointer.doubleClick
+    Pipeline->>Before: run handlers by priority
+    Before->>Host: optional ctx calls
+    alt default not skipped
+        Pipeline->>Default: run behavior.json default rule
+        Default->>Host: emit ActionRequest / SideEffect
+    end
+    Pipeline->>After: run follow-up handlers
+    After->>Host: optional ctx calls
+    Host->>Runtime: ActionRequest / PropCommand / SideEffect
+```
+
+### flow 和动作命令要解耦
+
+“做了某件事”和“要不要阻止默认逻辑”是两件事。handler 可以先做一点事，再继续执行
+默认双击；也可以完全替代默认双击。
+
+对脚本作者来说，不需要写死一个 `commands + flow` 配置块。脚本直接调用 Host API：
+
+```ts
+ctx.sound.play("takethat")
+ctx.pet.playAction("takethat", { recipe: "once" })
+ctx.skipDefault()
+```
+
+系统内部可以把这些 API 调用转换成标准命令：
+
+```text
+ctx.pet.playAction() => ActionRequest
+ctx.props.spawn()    => PropCommand
+ctx.sound.play()     => SideEffect
+ctx.skipDefault()    => InteractionFlow
+```
+
+也就是说：
+
+```text
+用户写的是代码。
+commands / flow 是系统内部记录和调度的结果，不要求用户像配置一样填写。
+```
+
+### 检察官徽章案例
+
+Miles 的“看招丢徽章”适合作为第一个官方高级交互样例。它覆盖了概率触发、跳过默认
+行为、道具生命周期、道具事件和后续动画请求。
+
+```ts
+export default defineInteraction({
+  id: "miles.takethat",
+  on: "pointer.doubleClick",
+  phase: "beforeDefault",
+  priority: 100,
+
+  async handle(ctx) {
+    if (Math.random() >= 0.3) {
+      return
+    }
+
+    ctx.skipDefault()
+
+    await ctx.sound.play("takethat")
+    await ctx.pet.playAction("takethat", {
+      recipe: "once",
+      interruptHint: "replace"
+    })
+
+    const badge = await ctx.props.spawn("prosecutor_badge", {
+      from: ctx.pet.anchor("hand"),
+      velocity: { x: 420, y: -180 },
+      gravity: 900,
+      ttlMs: 3000
+    })
+
+    badge.on("clicked", async () => {
+      await badge.remove()
+      await ctx.pet.playAction("bow", {
+        recipe: "once",
+        interruptHint: "afterCurrent"
+      })
+    })
+
+    badge.on("expired", async () => {
+      await ctx.pet.playAction("pick_badge", {
+        recipe: "once",
+        interruptHint: "afterCurrent"
+      })
+    })
+  }
+})
+```
+
+上面是未来开放脚本的形态示意，不代表 Phase 0.8 必须立即支持 TS 运行时。
+MVP 可以先把这个玩法作为 Miles 内置 interaction，用 C++ / QML 实现，但仍然走同一套
+事件、ActionRequest、PropCommand 和 SideEffect 边界。
+
+### 语言选择
+
+核心框架仍然用 C++ / QML：
+
+```text
+窗口能力
+Pet Runtime
+Prop Runtime
+动画播放器
+跨平台输入事件
+```
+
+高级用户脚本未来更适合 JS/TS：
+
+```text
+概率逻辑
+事件监听
+道具生命周期
+简单状态机
+组合已有动作和音效
+```
+
+原因是 C++ 插件要求用户安装编译器、Qt、CMake，并分别处理 Windows / macOS / Linux
+动态库兼容；普通换肤用户很难承受。JS/TS 脚本可以随皮肤包分发，不需要重新编译整个
+应用。
+
+安全边界必须明确：
+
+- 普通皮肤只允许 manifest / behavior 配置。
+- 高级脚本必须标记为 trusted interaction，用户明确启用。
+- 脚本不能直接访问 Pet Runtime 内部对象，只能通过 `ctx` Host API。
+- 未来如果支持第三方脚本，必须显示权限声明，例如需要音频、文件、网络或外部命令时单独确认。
+
+### 第一版落地边界
+
+Phase 0.8 / 0.9 不需要马上实现完整脚本系统。建议顺序：
+
+1. 先实现 InteractionEvent、Default BehaviorRule 和 ActionRequest 的路径。
+2. 再实现 Prop Runtime 的最小能力：spawn、clicked、expired、remove。
+3. 把检察官徽章作为内置 C++ / QML interaction 接入，验证事件和 prop 生命周期。
+4. 等边界稳定后，再设计 JS/TS 脚本加载、权限声明和 trusted skin package。
+
 ## Canvas、Anchor 和窗口要求
 
 每个皮肤必须声明逻辑画布：

@@ -258,6 +258,70 @@ sound: objection
 accessory: prosecutor_badge_throw
 ```
 
+### Prop
+
+Prop 是桌宠身体以外的临时对象，例如飞出去的检察官徽章、掉落物、漂浮特效或未来的
+鼠标跟随眼睛光标。
+
+Prop 不应该强行塞进主体 GIF，也不应该为了某个飞出物无限放大桌宠本体窗口。它应该由
+Prop Runtime / Overlay 管理生命周期：
+
+```text
+spawn     生成
+update    更新位置、速度、透明度、帧动画
+clicked   被用户点击
+expired   自然到期
+remove    移除
+```
+
+Prop 自己可以产生事件。例如检察官徽章：
+
+```text
+prop.prosecutor_badge.clicked
+=> 请求播放 bow
+
+prop.prosecutor_badge.expired
+=> 请求播放 pick_badge
+```
+
+### InteractionEvent
+
+InteractionEvent 是“发生了什么”的统一描述。来源可以是鼠标、菜单、agent、动画、
+道具或系统计时器。
+
+例子：
+
+```text
+pointer.doubleClick
+pointer.singleClick
+pointer.shake
+menu.drinkTea
+agent.thinking.started
+prop.prosecutor_badge.clicked
+prop.prosecutor_badge.expired
+```
+
+### InteractionHandler
+
+InteractionHandler 是挂在某个事件 hook point 上的一段处理逻辑。它可以是普通
+behavior 配置生成的默认处理器，也可以是项目内置代码，未来也可以是可信皮肤包里的
+JS/TS 脚本。
+
+它不应该直接修改 Pet Runtime 内部字段，而是通过受控 Host API 请求系统做事：
+
+```text
+ctx.pet.playAction()
+ctx.props.spawn()
+ctx.sound.play()
+ctx.bubble.show()
+ctx.events.emit()
+ctx.skipDefault()
+ctx.stopPropagation()
+```
+
+这样高级交互可以写任意逻辑，但仍然通过 ActionRequest、Prop、SideEffect 等标准通道
+进入系统。
+
 ### BehaviorProfile
 
 BehaviorProfile 描述某个皮肤或角色的行为习惯。
@@ -282,6 +346,7 @@ Miles 默认 behavior profile 用来还原旧版手感。
 ```text
 manifest.json：素材、Action、Clip、ExpressionTag、ExpressionMapping、Facing、fallback
 behavior.json：随机行为、点击映射、菜单动作映射
+interactions/：可信高级交互脚本，可选，不是普通换肤必需项
 ```
 
 示例：

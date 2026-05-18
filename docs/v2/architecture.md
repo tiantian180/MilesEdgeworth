@@ -78,6 +78,7 @@ MilesEdgeworth/
         animations/
         sounds/
         icons/
+        interactions/
 
   schemas/
     skin-manifest.schema.json
@@ -240,8 +241,11 @@ Dashboard
 
 - `manifest.json`：描述这个皮肤有哪些素材、动作、表达标签、朝向变体和 fallback。
 - `behavior.json`：描述这个角色平时怎么动，例如随机动作概率、点击区域映射、右键菜单动作映射。
+- `interactions/`：可选，高级可信交互代码，例如检察官徽章、复杂道具和多对象协作。
 
 这样做可以把“素材能力”和“角色行为”分开。
+普通换肤不需要写代码；高级交互可以写代码，但只能通过受控 Host API 发 ActionRequest、
+PropCommand 和 SideEffect，不能直接改 Pet Runtime 内部状态。
 
 模型不应该直接生成固定项目内置的情绪词，也不应该直接点名 GIF 文件。可用表达标签由当前皮肤 manifest 动态声明：
 
