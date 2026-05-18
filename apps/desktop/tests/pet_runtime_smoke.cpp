@@ -29,9 +29,17 @@ int main(int argc, char *argv[])
     // 启动时应进入旧版公文包入场序列，而不是直接静止站立。
     require(runtime.currentRecipeId() == "startup.briefcase", "启动时应播放 startup.briefcase recipe");
     require(runtime.currentActionId() == "briefcase_in", "启动第一步应是 briefcase_in");
+    require(!runtime.pointerInteractionEnabled(), "briefcase_in 期间应禁用鼠标交互");
+
+    runtime.handlePrimaryClick(145, 40, 240, 240);
+    require(runtime.currentActionId() == "briefcase_in", "启动入场期间单击不应打断 briefcase_in");
+
+    runtime.handleDoubleClick();
+    require(runtime.currentActionId() == "briefcase_in", "启动入场期间双击不应打断 briefcase_in");
 
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "briefcase_stop", "公文包入场结束后应进入 briefcase_stop");
+    require(runtime.pointerInteractionEnabled(), "briefcase_in 结束后应恢复鼠标交互");
 
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "公文包停下后应进入 idle_stand");

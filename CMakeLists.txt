@@ -158,5 +158,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_22_polygon_hit_zones.py
         )
+
+        # Phase 0.23 的启动入场交互保护检查：守住旧版公文包入场时
+        # 不响应点击、双击和拖拽的节奏。
+        add_test(
+            NAME check_phase_0_23_startup_interaction_guard
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_23_startup_interaction_guard.py
+        )
     endif()
 endif()

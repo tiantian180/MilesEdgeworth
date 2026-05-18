@@ -224,6 +224,11 @@ bool PetRuntime::autoMovementEnabled() const
     return m_autoMovementEnabled;
 }
 
+bool PetRuntime::pointerInteractionEnabled() const
+{
+    return acceptsPointerInteraction();
+}
+
 bool PetRuntime::sleeping() const
 {
     return m_currentActionId == "sleep" && m_currentPhaseId == "loop";
@@ -406,6 +411,10 @@ QVariantMap PetRuntime::consumeFrameMovementDelta() const
 
 void PetRuntime::handlePrimaryClick(double x, double y, double width, double height)
 {
+    if (!acceptsPointerInteraction()) {
+        return;
+    }
+
     // 旧版在睡眠中单击无反应；在其它非站立动作中单击会先回到站立。
     // v2 先保留这个交互节奏，后续双击和高级交互再共用 Interaction Pipeline。
     if (m_currentActionId == "sleep") {
@@ -426,6 +435,10 @@ void PetRuntime::handlePrimaryClick(double x, double y, double width, double hei
 
 void PetRuntime::handleDoubleClick()
 {
+    if (!acceptsPointerInteraction()) {
+        return;
+    }
+
     // 旧版睡眠中双击等同于唤醒；其它状态下随机触发语音动作。
     if (m_currentActionId == "sleep" || m_currentPhaseId == "loop") {
         returnToIdle();
@@ -437,6 +450,10 @@ void PetRuntime::handleDoubleClick()
 
 void PetRuntime::handleDragStarted(double globalX)
 {
+    if (!acceptsPointerInteraction()) {
+        return;
+    }
+
     if (m_currentActionId == "sleep") {
         return;
     }
@@ -453,6 +470,10 @@ void PetRuntime::handleDragStarted(double globalX)
 
 void PetRuntime::handleDragMoved(double globalX)
 {
+    if (!acceptsPointerInteraction()) {
+        return;
+    }
+
     if (!m_dragShakeTracking || m_currentActionId == "sleep") {
         return;
     }
@@ -483,6 +504,13 @@ void PetRuntime::handleDragMoved(double globalX)
 
 void PetRuntime::handleDragEnded()
 {
+    if (!acceptsPointerInteraction()) {
+        m_dragShakeTracking = false;
+        m_dragShakeTurns = 0;
+        m_dragHoldAnimationCompleted = false;
+        return;
+    }
+
     m_dragShakeTracking = false;
     m_dragShakeTurns = 0;
 
@@ -1116,6 +1144,13 @@ QUrl PetRuntime::soundUrlForRecipe(const RecipeDefinition &recipe) const
     return recipe.soundUrl;
 }
 
+bool PetRuntime::acceptsPointerInteraction() const
+{
+    // 旧版 BRIEFCASEIN 阶段直接忽略鼠标事件。
+    // 这里把同一条边界放进运行时，QML 和未来其它入口都能复用。
+    return m_currentActionId != "briefcase_in";
+}
+
 void PetRuntime::playSoundForRecipe(const RecipeDefinition &recipe)
 {
     if (m_audioMuted) {
@@ -1399,6 +1434,7 @@ void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinitio
 
 void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase)
 {
+    const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
     const bool wasSleeping = sleeping();
     const bool wasSleepTransitioning = sleepTransitioning();
     const bool wasTeaEnabled = teaEnabled();
@@ -1432,6 +1468,9 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     }
     if (autoReturnChanged) {
         emit currentAutoReturnToIdleChanged();
+    }
+    if (wasPointerInteractionEnabled != pointerInteractionEnabled()) {
+        emit pointerInteractionEnabledChanged();
     }
     if (animationChanged) {
         emit currentAnimationUrlChanged();

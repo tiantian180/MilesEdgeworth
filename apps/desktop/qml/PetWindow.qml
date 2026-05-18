@@ -331,6 +331,10 @@ Window {
         property bool dragMoved: false
 
         onPressed: function(mouse) {
+            if (!App.PetRuntime.pointerInteractionEnabled) {
+                return
+            }
+
             if (mouse.button === Qt.RightButton) {
                 contextMenu.open()
                 return
@@ -343,6 +347,10 @@ Window {
         }
 
         onPositionChanged: function(mouse) {
+            if (!App.PetRuntime.pointerInteractionEnabled) {
+                return
+            }
+
             if ((mouse.buttons & Qt.LeftButton) === 0) {
                 return
             }
@@ -356,6 +364,10 @@ Window {
         }
 
         onReleased: function(mouse) {
+            if (!App.PetRuntime.pointerInteractionEnabled) {
+                return
+            }
+
             if (mouse.button !== Qt.LeftButton) {
                 return
             }
@@ -372,6 +384,10 @@ Window {
         }
 
         onDoubleClicked: function(mouse) {
+            if (!App.PetRuntime.pointerInteractionEnabled) {
+                return
+            }
+
             if (mouse.button !== Qt.LeftButton) {
                 return
             }

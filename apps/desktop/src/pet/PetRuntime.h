@@ -38,6 +38,7 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool audioMuted READ audioMuted NOTIFY audioMutedChanged)
     Q_PROPERTY(QString voiceLanguage READ voiceLanguage NOTIFY voiceLanguageChanged)
     Q_PROPERTY(bool autoMovementEnabled READ autoMovementEnabled NOTIFY autoMovementEnabledChanged)
+    Q_PROPERTY(bool pointerInteractionEnabled READ pointerInteractionEnabled NOTIFY pointerInteractionEnabledChanged)
     Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)
     Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)
     Q_PROPERTY(bool teaEnabled READ teaEnabled NOTIFY sleepStateChanged)
@@ -71,6 +72,7 @@ public:
     bool audioMuted() const;
     QString voiceLanguage() const;
     bool autoMovementEnabled() const;
+    bool pointerInteractionEnabled() const;
     bool sleeping() const;
     bool sleepTransitioning() const;
     bool teaEnabled() const;
@@ -138,6 +140,7 @@ signals:
     void audioMutedChanged();
     void voiceLanguageChanged();
     void autoMovementEnabledChanged();
+    void pointerInteractionEnabledChanged();
     void sleepStateChanged();
     void currentAnimationUrlChanged();
     void currentSoundUrlChanged();
@@ -236,6 +239,7 @@ private:
     bool hitZoneContainsPoint(const HitZoneDefinition &zone, const QPointF &point) const;
     QString clickPoolForPoint(double x, double y, double width, double height) const;
     QUrl soundUrlForRecipe(const RecipeDefinition &recipe) const;
+    bool acceptsPointerInteraction() const;
     void playSoundForRecipe(const RecipeDefinition &recipe);
     void schedulePropForRecipe(const RecipeDefinition &recipe);
     void spawnPropForRecipe(const QString &propId, const QString &facing);
