@@ -1,6 +1,10 @@
 #include "DesktopShellController.h"
 
+#include <QGuiApplication>
+#include <QRect>
+#include <QScreen>
 #include <QWindow>
+#include <QtGlobal>
 
 #ifdef Q_OS_MACOS
 #include "platform/MacPetWindowBehavior.h"
@@ -49,6 +53,26 @@ void DesktopShellController::toggleAlwaysOnTop()
     setAlwaysOnTop(!m_alwaysOnTop);
 }
 
+void DesktopShellController::movePetWindowBy(double dx, double dy)
+{
+    if (m_petWindow == nullptr) {
+        return;
+    }
+
+    const QPointF currentPosition = QPointF(m_petWindow->position());
+    movePetWindowTo(currentPosition.x() + dx, currentPosition.y() + dy);
+}
+
+void DesktopShellController::movePetWindowTo(double x, double y)
+{
+    if (m_petWindow == nullptr) {
+        return;
+    }
+
+    const QPointF clampedPosition = clampedPetWindowPosition(QPointF(x, y));
+    m_petWindow->setPosition(clampedPosition.toPoint());
+}
+
 void DesktopShellController::applyCurrentLayerMode()
 {
     if (m_petWindow == nullptr) {
@@ -64,4 +88,42 @@ void DesktopShellController::applyCurrentLayerMode()
     m_petWindow->setFlag(Qt::WindowStaysOnTopHint, m_alwaysOnTop);
     m_petWindow->show();
 #endif
+}
+
+QPointF DesktopShellController::clampedPetWindowPosition(const QPointF &candidatePosition) const
+{
+    if (m_petWindow == nullptr) {
+        return candidatePosition;
+    }
+
+    // 旧版在 moveEvent 里限制窗口，避免自动走路/跑步把桌宠带出屏幕。
+    // v2 先按窗口外壳做保守夹取；后续如果引入 alpha mask / body bounds，
+    // 可以把这里的 margin 改成由皮肤 manifest 提供。
+    const QSize windowSize = m_petWindow->size();
+    const QPointF windowCenter(
+        candidatePosition.x() + windowSize.width() / 2.0,
+        candidatePosition.y() + windowSize.height() / 2.0
+    );
+
+    QScreen *targetScreen = QGuiApplication::screenAt(windowCenter.toPoint());
+    if (targetScreen == nullptr) {
+        targetScreen = m_petWindow->screen();
+    }
+    if (targetScreen == nullptr) {
+        targetScreen = QGuiApplication::primaryScreen();
+    }
+    if (targetScreen == nullptr) {
+        return candidatePosition;
+    }
+
+    const QRect availableGeometry = targetScreen->availableGeometry();
+    const double minX = availableGeometry.x();
+    const double minY = availableGeometry.y();
+    const double maxX = availableGeometry.x() + availableGeometry.width() - windowSize.width();
+    const double maxY = availableGeometry.y() + availableGeometry.height() - windowSize.height();
+
+    const double clampedX = (maxX >= minX) ? qBound(minX, candidatePosition.x(), maxX) : minX;
+    const double clampedY = (maxY >= minY) ? qBound(minY, candidatePosition.y(), maxY) : minY;
+
+    return QPointF(clampedX, clampedY);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QPointF>
 #include <QJSEngine>
 #include <QQmlEngine>
 #include <QtQml/qqmlregistration.h>
@@ -24,12 +25,15 @@ public:
 public slots:
     void setAlwaysOnTop(bool alwaysOnTop);
     void toggleAlwaysOnTop();
+    Q_INVOKABLE void movePetWindowBy(double dx, double dy);
+    Q_INVOKABLE void movePetWindowTo(double x, double y);
 
 signals:
     void alwaysOnTopChanged();
 
 private:
     void applyCurrentLayerMode();
+    QPointF clampedPetWindowPosition(const QPointF &candidatePosition) const;
 
     QWindow *m_petWindow = nullptr;
     bool m_alwaysOnTop = true;

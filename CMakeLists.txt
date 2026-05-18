@@ -126,5 +126,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_17_core_handfeel_coverage.py
         )
+
+        # Phase 0.19 的窗口移动边界检查：守住旧版“走路/跑步不会把
+        # 桌宠带出屏幕”的基础手感。
+        add_test(
+            NAME check_phase_0_19_window_movement_bounds
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_19_window_movement_bounds.py
+        )
     endif()
 endif()

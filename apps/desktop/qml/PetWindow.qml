@@ -253,8 +253,7 @@ Window {
         onCurrentFrameChanged: {
             const movementDelta = App.PetRuntime.consumeFrameMovementDelta()
             if (movementDelta.dx !== 0 || movementDelta.dy !== 0) {
-                petWindow.x += movementDelta.dx
-                petWindow.y += movementDelta.dy
+                App.DesktopShell.movePetWindowBy(movementDelta.dx, movementDelta.dy)
             }
 
             if (App.PetRuntime.currentLoopMode === "hold"
@@ -353,8 +352,7 @@ Window {
             }
 
             App.PetRuntime.handleDragMoved(petWindow.x + mouse.x)
-            petWindow.x += mouse.x - pressX
-            petWindow.y += mouse.y - pressY
+            App.DesktopShell.movePetWindowBy(mouse.x - pressX, mouse.y - pressY)
         }
 
         onReleased: function(mouse) {

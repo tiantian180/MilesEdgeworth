@@ -107,8 +107,7 @@ def main() -> int:
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
         "App.PetRuntime.consumeFrameMovementDelta()",
-        "petWindow.x += movementDelta.dx",
-        "petWindow.y += movementDelta.dy",
+        "App.DesktopShell.movePetWindowBy(movementDelta.dx, movementDelta.dy)",
         "App.PetRuntime.testWalk()",
         "App.PetRuntime.testRun()",
     ]:
