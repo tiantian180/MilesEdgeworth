@@ -60,6 +60,11 @@ Window {
         }
 
         Platform.MenuItem {
+            text: "测试喝茶"
+            onTriggered: App.PetRuntime.testTea()
+        }
+
+        Platform.MenuItem {
             text: "测试睡觉"
             onTriggered: App.PetRuntime.testSleep()
         }
@@ -70,6 +75,17 @@ Window {
             text: "退出"
             onTriggered: Qt.quit()
         }
+    }
+
+    // Phase 0.8 先用一个轻量 Timer 模拟旧版“待机时偶尔做点小动作”。
+    // 真正能不能触发由 PetRuntime 决定，避免 Timer 打断正在播放的交互动作。
+    Timer {
+        id: idleRandomTimer
+
+        interval: 7000
+        repeat: true
+        running: petWindow.visible
+        onTriggered: App.PetRuntime.triggerIdle()
     }
 
     // QML 只负责播放当前动画，具体 state/action 到资源的选择交给 PetRuntime。

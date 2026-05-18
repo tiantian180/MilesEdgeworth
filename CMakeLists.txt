@@ -46,5 +46,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_7_phase_runtime.py
         )
+
+        # Phase 0.8 的 recipe / actionPool 检查：守住“动作编排”和
+        # “候选池抽取”这两个入口，后续随机 idle、菜单动作、交互事件都走这里。
+        add_test(
+            NAME check_phase_0_8_recipe_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_8_recipe_runtime.py
+        )
     endif()
 endif()

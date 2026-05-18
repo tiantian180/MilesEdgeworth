@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QRandomGenerator>
 
 namespace {
 constexpr auto kManifestPath = ":/pet/manifest.json";
@@ -31,6 +32,11 @@ QString PetRuntime::currentState() const
 QString PetRuntime::currentActionId() const
 {
     return m_currentActionId;
+}
+
+QString PetRuntime::currentRecipeId() const
+{
+    return m_currentRecipeId;
 }
 
 QString PetRuntime::currentPhaseId() const
@@ -107,7 +113,7 @@ void PetRuntime::setFacing(const QString &facing)
         if (!m_currentPhaseId.isEmpty() && action.phases.contains(m_currentPhaseId)) {
             playPhase(m_currentActionId, m_currentPhaseId);
         } else {
-            playAction(m_currentActionId);
+            playActionInternal(m_currentActionId, false);
         }
     }
 }
@@ -124,6 +130,63 @@ void PetRuntime::toggleFacing()
 
 void PetRuntime::playAction(const QString &actionId)
 {
+    playActionInternal(actionId, true);
+}
+
+void PetRuntime::playRecipe(const QString &recipeId)
+{
+    const QString nextRecipeId = recipeId.trimmed();
+    if (!m_recipes.contains(nextRecipeId)) {
+        return;
+    }
+
+    const bool recipeChanged = (m_currentRecipeId != nextRecipeId);
+    m_currentRecipeId = nextRecipeId;
+    m_currentRecipeStepIndex = -1;
+
+    if (recipeChanged) {
+        emit currentRecipeChanged();
+    }
+
+    playNextRecipeStep();
+}
+
+void PetRuntime::playActionFromPool(const QString &poolId)
+{
+    const QString normalizedPoolId = poolId.trimmed();
+    if (!m_actionPools.contains(normalizedPoolId)) {
+        return;
+    }
+
+    const ActionPoolEntry entry = selectActionPoolEntry(m_actionPools.value(normalizedPoolId));
+    if (!entry.recipeId.isEmpty() && m_recipes.contains(entry.recipeId)) {
+        playRecipe(entry.recipeId);
+        return;
+    }
+
+    if (!entry.actionId.isEmpty()) {
+        playAction(entry.actionId);
+    }
+}
+
+void PetRuntime::triggerIdle()
+{
+    // 随机 idle 只在“真正待机站立”时触发，避免打断睡觉、喝茶或交互动作。
+    // 之后接入更完整的调度器时，这里会变成 IdleController 的入口。
+    if (m_currentState != "idle" || !m_currentRecipeId.isEmpty()) {
+        return;
+    }
+
+    const QString idleAction = actionForState("idle");
+    if (idleAction.isEmpty() || m_currentActionId != idleAction) {
+        return;
+    }
+
+    playActionFromPool("idle.random");
+}
+
+void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
+{
     QString nextActionId = actionId.trimmed();
     if (!m_actions.contains(nextActionId)) {
         nextActionId = m_fallbackAction;
@@ -134,11 +197,17 @@ void PetRuntime::playAction(const QString &actionId)
         nextActionId = kFallbackActionId;
     }
 
+    if (resetRecipe) {
+        clearActiveRecipe();
+    }
+
     setCurrentAction(nextActionId, m_actions.value(nextActionId));
 }
 
 void PetRuntime::returnToIdle()
 {
+    clearActiveRecipe();
+
     const ActionDefinition action = m_actions.value(m_currentActionId);
     if (!action.exitPhase.isEmpty() && m_currentPhaseId != action.exitPhase) {
         playPhase(m_currentActionId, action.exitPhase);
@@ -165,17 +234,17 @@ void PetRuntime::testObjecting()
 
 void PetRuntime::testBow()
 {
-    playAction("bow");
+    playRecipe("bow.once");
 }
 
 void PetRuntime::testTea()
 {
-    playAction("tea");
+    playRecipe("tea.drinkThenBow");
 }
 
 void PetRuntime::testSleep()
 {
-    playAction("sleep");
+    playRecipe("sleep.enterLoopExit");
 }
 
 void PetRuntime::handleAnimationFinished()
@@ -185,6 +254,16 @@ void PetRuntime::handleAnimationFinished()
     if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
         playPhase(m_currentActionId, phase.nextPhase);
         return;
+    }
+
+    if (!m_currentRecipeId.isEmpty()) {
+        const RecipeDefinition recipe = m_recipes.value(m_currentRecipeId);
+        if (m_currentRecipeStepIndex + 1 < recipe.steps.size()) {
+            playNextRecipeStep();
+            return;
+        }
+
+        clearActiveRecipe();
     }
 
     if (m_currentAutoReturnToIdle) {
@@ -287,6 +366,72 @@ void PetRuntime::loadManifest()
             m_actions.insert(it.key(), action);
         }
     }
+
+    const QJsonObject recipes = root.value("recipes").toObject();
+    for (auto it = recipes.constBegin(); it != recipes.constEnd(); ++it) {
+        const QJsonObject recipeObject = it.value().toObject();
+
+        RecipeDefinition recipe;
+        recipe.label = recipeObject.value("label").toString(it.key());
+        recipe.scope = recipeObject.value("scope").toString();
+        recipe.actionId = recipeObject.value("action").toString();
+
+        const QJsonArray steps = recipeObject.value("steps").toArray();
+        for (const QJsonValue &stepValue : steps) {
+            const QJsonObject stepObject = stepValue.toObject();
+
+            RecipeStep step;
+            step.actionId = stepObject.value("action").toString(recipe.actionId);
+            step.phaseId = stepObject.value("phase").toString();
+            step.recipeId = stepObject.value("recipe").toString();
+            step.repeat = stepObject.value("repeat").toInt(1);
+            step.durationMs = stepObject.value("durationMs").toInt(0);
+
+            if (!step.actionId.isEmpty() || !step.phaseId.isEmpty() || !step.recipeId.isEmpty()) {
+                recipe.steps.append(step);
+            }
+        }
+
+        // 允许最简单的 recipe 只写 action，不必为了一个动作再包一层 steps。
+        if (recipe.steps.isEmpty() && !recipe.actionId.isEmpty()) {
+            RecipeStep singleStep;
+            singleStep.actionId = recipe.actionId;
+            recipe.steps.append(singleStep);
+        }
+
+        if (!recipe.steps.isEmpty()) {
+            m_recipes.insert(it.key(), recipe);
+        }
+    }
+
+    const QJsonObject actionPools = root.value("actionPools").toObject();
+    for (auto it = actionPools.constBegin(); it != actionPools.constEnd(); ++it) {
+        const QJsonObject poolObject = it.value().toObject();
+
+        ActionPoolDefinition pool;
+        pool.label = poolObject.value("label").toString(it.key());
+
+        const QJsonArray entries = poolObject.value("entries").toArray();
+        for (const QJsonValue &entryValue : entries) {
+            const QJsonObject entryObject = entryValue.toObject();
+
+            ActionPoolEntry entry;
+            entry.recipeId = entryObject.value("recipe").toString();
+            entry.actionId = entryObject.value("action").toString();
+            entry.weight = entryObject.value("weight").toInt(1);
+            if (entry.weight < 1) {
+                entry.weight = 1;
+            }
+
+            if (!entry.recipeId.isEmpty() || !entry.actionId.isEmpty()) {
+                pool.entries.append(entry);
+            }
+        }
+
+        if (!pool.entries.isEmpty()) {
+            m_actionPools.insert(it.key(), pool);
+        }
+    }
 }
 
 void PetRuntime::loadFallbackManifest()
@@ -294,6 +439,8 @@ void PetRuntime::loadFallbackManifest()
     m_fallbackAction = kFallbackActionId;
     m_stateToAction.clear();
     m_actions.clear();
+    m_recipes.clear();
+    m_actionPools.clear();
     m_facings = {"right", "left"};
     m_defaultFacing = "right";
     m_currentFacing = m_defaultFacing;
@@ -304,6 +451,14 @@ void PetRuntime::loadFallbackManifest()
     fallbackAction.loopMode = "loop";
     fallbackAction.variants.insert("right", QUrl(QString::fromUtf8(kFallbackAnimationUrl)));
     m_actions.insert(kFallbackActionId, fallbackAction);
+
+    RecipeDefinition idleRecipe;
+    idleRecipe.scope = "state";
+    idleRecipe.actionId = kFallbackActionId;
+    RecipeStep idleStep;
+    idleStep.actionId = kFallbackActionId;
+    idleRecipe.steps.append(idleStep);
+    m_recipes.insert("idle.stand", idleRecipe);
 }
 
 QString PetRuntime::actionForState(const QString &state) const
@@ -326,6 +481,86 @@ QUrl PetRuntime::variantForFacing(const QHash<QString, QUrl> &variants, const QS
     }
 
     return QUrl(QString::fromUtf8(kFallbackAnimationUrl));
+}
+
+void PetRuntime::clearActiveRecipe()
+{
+    if (m_currentRecipeId.isEmpty() && m_currentRecipeStepIndex == -1) {
+        return;
+    }
+
+    m_currentRecipeId.clear();
+    m_currentRecipeStepIndex = -1;
+    emit currentRecipeChanged();
+}
+
+void PetRuntime::playNextRecipeStep()
+{
+    if (m_currentRecipeId.isEmpty() || !m_recipes.contains(m_currentRecipeId)) {
+        clearActiveRecipe();
+        return;
+    }
+
+    const RecipeDefinition recipe = m_recipes.value(m_currentRecipeId);
+    ++m_currentRecipeStepIndex;
+
+    if (m_currentRecipeStepIndex < 0 || m_currentRecipeStepIndex >= recipe.steps.size()) {
+        clearActiveRecipe();
+        return;
+    }
+
+    const bool isLastStep = (m_currentRecipeStepIndex == recipe.steps.size() - 1);
+    playRecipeStep(recipe.steps.at(m_currentRecipeStepIndex));
+
+    // 如果 recipe 的最后一步是站立、睡眠循环这类持续态，它已经接管画面了。
+    // 此时清掉 recipe 标记，避免 idle timer 误以为还有一段编排没结束。
+    if (isLastStep && (m_currentLoopMode == "loop" || m_currentLoopMode == "hold")) {
+        clearActiveRecipe();
+    }
+}
+
+void PetRuntime::playRecipeStep(const RecipeStep &step)
+{
+    if (!step.recipeId.isEmpty() && m_recipes.contains(step.recipeId)) {
+        playRecipe(step.recipeId);
+        return;
+    }
+
+    if (!step.phaseId.isEmpty() && !step.actionId.isEmpty()) {
+        playPhase(step.actionId, step.phaseId);
+        return;
+    }
+
+    if (!step.actionId.isEmpty()) {
+        playActionInternal(step.actionId, false);
+    }
+}
+
+PetRuntime::ActionPoolEntry PetRuntime::selectActionPoolEntry(const ActionPoolDefinition &pool) const
+{
+    ActionPoolEntry fallbackEntry;
+    if (pool.entries.isEmpty()) {
+        return fallbackEntry;
+    }
+
+    int totalWeight = 0;
+    for (const ActionPoolEntry &entry : pool.entries) {
+        totalWeight += entry.weight;
+    }
+
+    if (totalWeight <= 0) {
+        return pool.entries.constFirst();
+    }
+
+    int cursor = QRandomGenerator::global()->bounded(totalWeight);
+    for (const ActionPoolEntry &entry : pool.entries) {
+        cursor -= entry.weight;
+        if (cursor < 0) {
+            return entry;
+        }
+    }
+
+    return pool.entries.constLast();
 }
 
 void PetRuntime::playPhase(const QString &actionId, const QString &phaseId)

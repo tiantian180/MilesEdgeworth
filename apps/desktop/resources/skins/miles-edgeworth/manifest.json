@@ -80,7 +80,7 @@
     "tea": {
       "label": "喝茶",
       "category": "idle",
-      "loopMode": "hold",
+      "loopMode": "onceThenIdle",
       "priority": 10,
       "tags": ["tea", "rest"],
       "variants": {
@@ -135,6 +135,85 @@
           }
         }
       }
+    }
+  },
+  "recipes": {
+    "idle.stand": {
+      "label": "待机站立",
+      "scope": "state",
+      "action": "idle_stand"
+    },
+    "idle.randomThinking": {
+      "label": "随机思考",
+      "scope": "idle",
+      "action": "thinking"
+    },
+    "objecting.once": {
+      "label": "异议一次",
+      "scope": "interaction",
+      "action": "objecting"
+    },
+    "bow.once": {
+      "label": "鞠躬一次",
+      "scope": "interaction",
+      "action": "bow"
+    },
+    "tea.drinkThenBow": {
+      "label": "喝茶后鞠躬",
+      "scope": "scenario",
+      "steps": [
+        {
+          "action": "tea"
+        },
+        {
+          "action": "bow"
+        },
+        {
+          "action": "idle_stand"
+        }
+      ]
+    },
+    "sleep.enterLoopExit": {
+      "label": "睡觉",
+      "scope": "state",
+      "action": "sleep"
+    }
+  },
+  "actionPools": {
+    "idle.random": {
+      "label": "随机待机动作",
+      "entries": [
+        {
+          "recipe": "idle.randomThinking",
+          "weight": 3
+        },
+        {
+          "recipe": "bow.once",
+          "weight": 1
+        },
+        {
+          "recipe": "objecting.once",
+          "weight": 1
+        }
+      ]
+    },
+    "menu.tea": {
+      "label": "菜单喝茶",
+      "entries": [
+        {
+          "recipe": "tea.drinkThenBow",
+          "weight": 1
+        }
+      ]
+    },
+    "ai.thinking": {
+      "label": "模型思考",
+      "entries": [
+        {
+          "recipe": "idle.randomThinking",
+          "weight": 1
+        }
+      ]
     }
   },
   "fallbackAction": "idle_stand"

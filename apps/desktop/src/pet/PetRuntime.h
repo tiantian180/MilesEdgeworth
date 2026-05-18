@@ -2,6 +2,7 @@
 
 #include <QHash>
 #include <QJSEngine>
+#include <QList>
 #include <QObject>
 #include <QQmlEngine>
 #include <QStringList>
@@ -24,6 +25,7 @@ class PetRuntime : public QObject
     Q_OBJECT
     Q_PROPERTY(QString currentState READ currentState NOTIFY currentStateChanged)
     Q_PROPERTY(QString currentActionId READ currentActionId NOTIFY currentActionChanged)
+    Q_PROPERTY(QString currentRecipeId READ currentRecipeId NOTIFY currentRecipeChanged)
     Q_PROPERTY(QString currentPhaseId READ currentPhaseId NOTIFY currentPhaseChanged)
     Q_PROPERTY(QString currentFacing READ currentFacing NOTIFY currentFacingChanged)
     Q_PROPERTY(QString currentLoopMode READ currentLoopMode NOTIFY currentLoopModeChanged)
@@ -36,6 +38,7 @@ public:
 
     QString currentState() const;
     QString currentActionId() const;
+    QString currentRecipeId() const;
     QString currentPhaseId() const;
     QString currentFacing() const;
     QString currentLoopMode() const;
@@ -47,6 +50,9 @@ public:
     Q_INVOKABLE void setFacing(const QString &facing);
     Q_INVOKABLE void toggleFacing();
     Q_INVOKABLE void playAction(const QString &actionId);
+    Q_INVOKABLE void playRecipe(const QString &recipeId);
+    Q_INVOKABLE void playActionFromPool(const QString &poolId);
+    Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void returnToIdle();
     Q_INVOKABLE void testThinking();
     Q_INVOKABLE void testSpeaking();
@@ -59,6 +65,7 @@ public:
 signals:
     void currentStateChanged();
     void currentActionChanged();
+    void currentRecipeChanged();
     void currentPhaseChanged();
     void currentFacingChanged();
     void currentLoopModeChanged();
@@ -87,21 +94,60 @@ private:
         QHash<QString, PhaseDefinition> phases;
     };
 
+    struct RecipeStep
+    {
+        QString actionId;
+        QString phaseId;
+        QString recipeId;
+        int repeat = 1;
+        int durationMs = 0;
+    };
+
+    struct RecipeDefinition
+    {
+        QString label;
+        QString scope;
+        QString actionId;
+        QList<RecipeStep> steps;
+    };
+
+    struct ActionPoolEntry
+    {
+        QString recipeId;
+        QString actionId;
+        int weight = 1;
+    };
+
+    struct ActionPoolDefinition
+    {
+        QString label;
+        QList<ActionPoolEntry> entries;
+    };
+
     void loadManifest();
     void loadFallbackManifest();
     QString actionForState(const QString &state) const;
     QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
+    void clearActiveRecipe();
+    void playActionInternal(const QString &actionId, bool resetRecipe);
+    void playNextRecipeStep();
+    void playRecipeStep(const RecipeStep &step);
+    ActionPoolEntry selectActionPoolEntry(const ActionPoolDefinition &pool) const;
     void playPhase(const QString &actionId, const QString &phaseId);
     void setCurrentAction(const QString &actionId, const ActionDefinition &action);
     void setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase);
 
     QHash<QString, QString> m_stateToAction;
     QHash<QString, ActionDefinition> m_actions;
+    QHash<QString, RecipeDefinition> m_recipes;
+    QHash<QString, ActionPoolDefinition> m_actionPools;
     QString m_fallbackAction = "idle_stand";
     QStringList m_facings = {"right", "left"};
     QString m_defaultFacing = "right";
     QString m_currentState = "idle";
     QString m_currentActionId;
+    QString m_currentRecipeId;
+    int m_currentRecipeStepIndex = -1;
     QString m_currentPhaseId;
     QString m_currentFacing = "right";
     QString m_currentLoopMode = "loop";
