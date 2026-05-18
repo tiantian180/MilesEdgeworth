@@ -51,6 +51,44 @@ QRectF rectFromJsonObject(const QJsonObject &object)
         object.value("height").toDouble(0)
     );
 }
+
+QList<QPointF> polygonFromJsonArray(const QJsonArray &array)
+{
+    QList<QPointF> polygon;
+    for (const QJsonValue &value : array) {
+        const QJsonObject pointObject = value.toObject();
+        if (pointObject.contains("x") && pointObject.contains("y")) {
+            polygon.append(QPointF(pointObject.value("x").toDouble(0), pointObject.value("y").toDouble(0)));
+        }
+    }
+    return polygon;
+}
+
+bool pointInPolygon(const QList<QPointF> &polygon, const QPointF &point)
+{
+    if (polygon.size() < 3) {
+        return false;
+    }
+
+    bool inside = false;
+    int previousIndex = polygon.size() - 1;
+    for (int currentIndex = 0; currentIndex < polygon.size(); ++currentIndex) {
+        const QPointF current = polygon.at(currentIndex);
+        const QPointF previous = polygon.at(previousIndex);
+        const bool yCrosses = ((current.y() > point.y()) != (previous.y() > point.y()));
+        if (yCrosses) {
+            const double xAtPointY = (previous.x() - current.x()) * (point.y() - current.y())
+                / (previous.y() - current.y()) + current.x();
+            if (point.x() < xAtPointY) {
+                inside = !inside;
+            }
+        }
+
+        previousIndex = currentIndex;
+    }
+
+    return inside;
+}
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -710,23 +748,31 @@ void PetRuntime::loadManifest()
     const QJsonObject hitZones = root.value("hitZones").toObject();
     for (auto it = hitZones.constBegin(); it != hitZones.constEnd(); ++it) {
         const QJsonObject zoneObject = it.value().toObject();
-        if (zoneObject.value("type").toString() != "rect") {
+        const QString zoneType = zoneObject.value("type").toString("rect");
+        if (zoneType != "rect" && zoneType != "polygon") {
             continue;
         }
 
         HitZoneDefinition zone;
         zone.id = it.key();
         zone.rect = rectFromJsonObject(zoneObject);
+        zone.polygon = polygonFromJsonArray(zoneObject.value("polygon").toArray());
 
         const QJsonObject zoneVariants = zoneObject.value("variants").toObject();
         for (auto variantIt = zoneVariants.constBegin(); variantIt != zoneVariants.constEnd(); ++variantIt) {
-            const QRectF variantRect = rectFromJsonObject(variantIt.value().toObject());
+            const QJsonObject variantObject = variantIt.value().toObject();
+            const QRectF variantRect = rectFromJsonObject(variantObject);
             if (variantRect.isValid()) {
                 zone.facingRects.insert(variantIt.key(), variantRect);
             }
+
+            const QList<QPointF> variantPolygon = polygonFromJsonArray(variantObject.value("polygon").toArray());
+            if (variantPolygon.size() >= 3) {
+                zone.facingPolygons.insert(variantIt.key(), variantPolygon);
+            }
         }
 
-        if (zone.rect.isValid() || !zone.facingRects.isEmpty()) {
+        if (zone.rect.isValid() || zone.polygon.size() >= 3 || !zone.facingRects.isEmpty() || !zone.facingPolygons.isEmpty()) {
             m_hitZones.insert(zone.id, zone);
         }
     }
@@ -1010,6 +1056,29 @@ QRectF PetRuntime::rectForHitZone(const HitZoneDefinition &zone) const
     return zone.facingRects.value(m_defaultFacing, QRectF());
 }
 
+QList<QPointF> PetRuntime::polygonForHitZone(const HitZoneDefinition &zone) const
+{
+    if (zone.facingPolygons.contains(m_currentFacing)) {
+        return zone.facingPolygons.value(m_currentFacing);
+    }
+
+    if (zone.polygon.size() >= 3) {
+        return zone.polygon;
+    }
+
+    return zone.facingPolygons.value(m_defaultFacing);
+}
+
+bool PetRuntime::hitZoneContainsPoint(const HitZoneDefinition &zone, const QPointF &point) const
+{
+    const QList<QPointF> polygon = polygonForHitZone(zone);
+    if (polygon.size() >= 3) {
+        return pointInPolygon(polygon, point);
+    }
+
+    return rectForHitZone(zone).contains(point);
+}
+
 QString PetRuntime::clickPoolForPoint(double x, double y, double width, double height) const
 {
     if (width <= 0 || height <= 0) {
@@ -1022,8 +1091,7 @@ QString PetRuntime::clickPoolForPoint(double x, double y, double width, double h
     for (const QString &poolId : m_singleClickPools) {
         const QString zoneId = hitZoneIdForClickPool(poolId);
         const HitZoneDefinition zone = m_hitZones.value(zoneId);
-        const QRectF zoneRect = rectForHitZone(zone);
-        if (!zone.id.isEmpty() && zoneRect.contains(logicalPoint)) {
+        if (!zone.id.isEmpty() && hitZoneContainsPoint(zone, logicalPoint)) {
             return poolId;
         }
     }

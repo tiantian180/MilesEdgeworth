@@ -92,9 +92,19 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "scared", "右朝向点击脸部应触发 scared");
 
     runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(90, 40, 240, 240);
+    require(runtime.currentActionId() != "scared", "右朝向左上头部区域不应触发 scared");
+
+    runtime.returnToIdle();
     runtime.setFacing("left");
     runtime.handlePrimaryClick(85, 40, 240, 240);
     require(runtime.currentActionId() == "scared", "左朝向点击脸部应触发 scared");
+
+    runtime.returnToIdle();
+    runtime.setFacing("left");
+    runtime.handlePrimaryClick(150, 40, 240, 240);
+    require(runtime.currentActionId() != "scared", "左朝向右上头部区域不应触发 scared");
 
     runtime.toggleAudioMuted();
     runtime.playRecipe("doubleClick.holdIt");

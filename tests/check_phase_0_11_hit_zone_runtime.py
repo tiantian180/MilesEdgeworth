@@ -50,7 +50,7 @@ def main() -> int:
     for zone_id in HIT_ZONES:
         zone = hit_zones.get(zone_id, {})
         require(zone, f"hitZones 缺少 {zone_id}")
-        require(zone.get("type") == "rect", f"{zone_id} 当前应使用 rect hit zone")
+        require(zone.get("type") in {"rect", "polygon"}, f"{zone_id} 应使用已支持的 hit zone 类型")
         for key in ["x", "y", "width", "height"]:
             require(key in zone, f"{zone_id} 缺少 {key}")
 

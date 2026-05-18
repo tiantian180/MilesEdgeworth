@@ -221,7 +221,9 @@ private:
     {
         QString id;
         QRectF rect;
+        QList<QPointF> polygon;
         QHash<QString, QRectF> facingRects;
+        QHash<QString, QList<QPointF>> facingPolygons;
     };
 
     void loadManifest();
@@ -230,6 +232,8 @@ private:
     QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
     QUrl variantForAction(const ActionDefinition &action) const;
     QRectF rectForHitZone(const HitZoneDefinition &zone) const;
+    QList<QPointF> polygonForHitZone(const HitZoneDefinition &zone) const;
+    bool hitZoneContainsPoint(const HitZoneDefinition &zone, const QPointF &point) const;
     QString clickPoolForPoint(double x, double y, double width, double height) const;
     QUrl soundUrlForRecipe(const RecipeDefinition &recipe) const;
     void playSoundForRecipe(const RecipeDefinition &recipe);

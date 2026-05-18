@@ -150,5 +150,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_21_facing_hit_zones.py
         )
+
+        # Phase 0.22 的 polygon hit zone 检查：把旧版点击脸部使用的
+        # 斜线区域表达进 manifest，避免只能用粗矩形近似。
+        add_test(
+            NAME check_phase_0_22_polygon_hit_zones
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_22_polygon_hit_zones.py
+        )
     endif()
 endif()
