@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Widgets Multimedia)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia)
 
 qt_standard_project_setup(REQUIRES 6.5)
 if(Qt6_VERSION VERSION_GREATER_EQUAL "6.8.0")
@@ -69,3 +69,29 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 )
 
 qt_finalize_executable(MilesEdgeworthDesktop)
+
+if(BUILD_TESTING)
+    qt_add_executable(PetRuntimeSmoke
+        tests/pet_runtime_smoke.cpp
+        src/pet/PetRuntime.cpp
+        src/pet/PetRuntime.h
+        resources/pet_assets.qrc
+    )
+
+    target_include_directories(PetRuntimeSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
+    )
+
+    target_link_libraries(PetRuntimeSmoke
+        PRIVATE
+            Qt6::Core
+            Qt6::Qml
+    )
+
+    add_test(
+        NAME pet_runtime_smoke
+        COMMAND PetRuntimeSmoke
+    )
+endif()
