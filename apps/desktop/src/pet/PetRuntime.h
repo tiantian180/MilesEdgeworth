@@ -38,6 +38,9 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool audioMuted READ audioMuted NOTIFY audioMutedChanged)
     Q_PROPERTY(QString voiceLanguage READ voiceLanguage NOTIFY voiceLanguageChanged)
     Q_PROPERTY(bool autoMovementEnabled READ autoMovementEnabled NOTIFY autoMovementEnabledChanged)
+    Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)
+    Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)
+    Q_PROPERTY(bool teaEnabled READ teaEnabled NOTIFY sleepStateChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
     Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
     Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
@@ -68,6 +71,9 @@ public:
     bool audioMuted() const;
     QString voiceLanguage() const;
     bool autoMovementEnabled() const;
+    bool sleeping() const;
+    bool sleepTransitioning() const;
+    bool teaEnabled() const;
     QUrl currentAnimationUrl() const;
     QUrl currentSoundUrl() const;
     bool currentPropVisible() const;
@@ -103,6 +109,8 @@ public:
     Q_INVOKABLE void toggleAudioMuted();
     Q_INVOKABLE void setVoiceLanguage(const QString &voiceLanguage);
     Q_INVOKABLE void toggleAutoMovementEnabled();
+    Q_INVOKABLE void requestTea();
+    Q_INVOKABLE void toggleSleep();
     Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
@@ -130,6 +138,7 @@ signals:
     void audioMutedChanged();
     void voiceLanguageChanged();
     void autoMovementEnabledChanged();
+    void sleepStateChanged();
     void currentAnimationUrlChanged();
     void currentSoundUrlChanged();
     void currentPropChanged();

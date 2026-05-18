@@ -176,6 +176,21 @@ bool PetRuntime::autoMovementEnabled() const
     return m_autoMovementEnabled;
 }
 
+bool PetRuntime::sleeping() const
+{
+    return m_currentActionId == "sleep" && m_currentPhaseId == "loop";
+}
+
+bool PetRuntime::sleepTransitioning() const
+{
+    return m_currentActionId == "sleep" && m_currentPhaseId != "loop";
+}
+
+bool PetRuntime::teaEnabled() const
+{
+    return m_currentActionId != "sleep";
+}
+
 int PetRuntime::playbackSerial() const
 {
     return m_playbackSerial;
@@ -493,6 +508,32 @@ void PetRuntime::toggleAutoMovementEnabled()
 {
     m_autoMovementEnabled = !m_autoMovementEnabled;
     emit autoMovementEnabledChanged();
+}
+
+void PetRuntime::requestTea()
+{
+    // 旧版睡觉时会禁用“喂食红茶”。这里把判断放在运行时，
+    // 避免 QML 菜单之外的未来入口绕过这条规则。
+    if (!teaEnabled()) {
+        return;
+    }
+
+    playActionFromPool("menu.tea");
+}
+
+void PetRuntime::toggleSleep()
+{
+    // 入睡或醒来的过渡动画期间不重复切换，避免一个 GIF 尚未播完又重入。
+    if (sleepTransitioning()) {
+        return;
+    }
+
+    if (sleeping()) {
+        returnToIdle();
+        return;
+    }
+
+    playRecipe("sleep.enterLoopExit");
 }
 
 void PetRuntime::startStartupSequence()
@@ -1227,6 +1268,10 @@ void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinitio
 
 void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase)
 {
+    const bool wasSleeping = sleeping();
+    const bool wasSleepTransitioning = sleepTransitioning();
+    const bool wasTeaEnabled = teaEnabled();
+
     const QUrl nextAnimationUrl = variantForFacing(phase.variants, m_currentFacing);
     const QString nextLoopMode = phase.loopMode.isEmpty() ? "loop" : phase.loopMode;
     const QString nextPhaseId = phaseId.isEmpty() ? "single" : phaseId;
@@ -1259,6 +1304,11 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     }
     if (animationChanged) {
         emit currentAnimationUrlChanged();
+    }
+    if (wasSleeping != sleeping()
+            || wasSleepTransitioning != sleepTransitioning()
+            || wasTeaEnabled != teaEnabled()) {
+        emit sleepStateChanged();
     }
     emit playbackSerialChanged();
 }

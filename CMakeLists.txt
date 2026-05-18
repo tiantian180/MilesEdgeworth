@@ -110,5 +110,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_15_menu_audio_movement_settings.py
         )
+
+        # Phase 0.16 的旧版菜单动作检查：守住“喂食红茶”
+        # 和“睡觉 / 唤醒”从测试入口进入正式右键菜单的链路。
+        add_test(
+            NAME check_phase_0_16_menu_tea_sleep_wake
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_16_menu_tea_sleep_wake.py
+        )
     endif()
 endif()

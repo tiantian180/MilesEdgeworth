@@ -68,6 +68,20 @@ Window {
         Platform.MenuSeparator {}
 
         Platform.MenuItem {
+            text: "喂食红茶"
+            enabled: App.PetRuntime.teaEnabled
+            onTriggered: App.PetRuntime.requestTea()
+        }
+
+        Platform.MenuItem {
+            text: App.PetRuntime.sleeping ? "唤醒" : "睡觉"
+            enabled: !App.PetRuntime.sleepTransitioning
+            onTriggered: App.PetRuntime.toggleSleep()
+        }
+
+        Platform.MenuSeparator {}
+
+        Platform.MenuItem {
             text: "回到待机"
             onTriggered: App.PetRuntime.returnToIdle()
         }
