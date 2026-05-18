@@ -37,6 +37,17 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool currentAutoReturnToIdle READ currentAutoReturnToIdle NOTIFY currentAutoReturnToIdleChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
     Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
+    Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
+    Q_PROPERTY(QString currentPropId READ currentPropId NOTIFY currentPropChanged)
+    Q_PROPERTY(QUrl currentPropImageUrl READ currentPropImageUrl NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropStartOffsetX READ currentPropStartOffsetX NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropStartOffsetY READ currentPropStartOffsetY NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropEndOffsetX READ currentPropEndOffsetX NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropEndOffsetY READ currentPropEndOffsetY NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropWidth READ currentPropWidth NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropHeight READ currentPropHeight NOTIFY currentPropChanged)
+    Q_PROPERTY(int currentPropDurationMs READ currentPropDurationMs NOTIFY currentPropChanged)
+    Q_PROPERTY(int currentPropPlaybackSerial READ currentPropPlaybackSerial NOTIFY currentPropPlaybackSerialChanged)
     Q_PROPERTY(int playbackSerial READ playbackSerial NOTIFY playbackSerialChanged)
     Q_PROPERTY(int soundPlaybackSerial READ soundPlaybackSerial NOTIFY soundPlaybackSerialChanged)
 
@@ -53,6 +64,17 @@ public:
     bool currentAutoReturnToIdle() const;
     QUrl currentAnimationUrl() const;
     QUrl currentSoundUrl() const;
+    bool currentPropVisible() const;
+    QString currentPropId() const;
+    QUrl currentPropImageUrl() const;
+    double currentPropStartOffsetX() const;
+    double currentPropStartOffsetY() const;
+    double currentPropEndOffsetX() const;
+    double currentPropEndOffsetY() const;
+    double currentPropWidth() const;
+    double currentPropHeight() const;
+    int currentPropDurationMs() const;
+    int currentPropPlaybackSerial() const;
     int playbackSerial() const;
     int soundPlaybackSerial() const;
 
@@ -70,6 +92,8 @@ public:
     Q_INVOKABLE void handleDragMoved(double globalX);
     Q_INVOKABLE void handleDragEnded();
     Q_INVOKABLE void handleHoldAnimationReachedEnd();
+    Q_INVOKABLE void handlePropClicked();
+    Q_INVOKABLE void handlePropExpired();
     Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
@@ -82,6 +106,7 @@ public:
     Q_INVOKABLE void testBow();
     Q_INVOKABLE void testTea();
     Q_INVOKABLE void testSleep();
+    Q_INVOKABLE void testProsecutorBadge();
     Q_INVOKABLE void handleAnimationFinished();
 
 signals:
@@ -95,6 +120,8 @@ signals:
     void currentAutoReturnToIdleChanged();
     void currentAnimationUrlChanged();
     void currentSoundUrlChanged();
+    void currentPropChanged();
+    void currentPropPlaybackSerialChanged();
     void playbackSerialChanged();
     void soundPlaybackSerialChanged();
 
@@ -137,7 +164,22 @@ private:
         QString scope;
         QString actionId;
         QUrl soundUrl;
+        QString propId;
         QList<RecipeStep> steps;
+    };
+
+    struct PropDefinition
+    {
+        QString id;
+        QUrl assetUrl;
+        double width = 0;
+        double height = 0;
+        int delayMs = 0;
+        int durationMs = 0;
+        QString clickedRecipeId;
+        QString expiredRecipeId;
+        QHash<QString, QPointF> startOffsets;
+        QHash<QString, QPointF> travelDeltas;
     };
 
     struct ActionPoolEntry
@@ -166,6 +208,9 @@ private:
     QUrl variantForAction(const ActionDefinition &action) const;
     QString clickPoolForPoint(double x, double y, double width, double height) const;
     void playSoundForRecipe(const RecipeDefinition &recipe);
+    void schedulePropForRecipe(const RecipeDefinition &recipe);
+    void spawnPropForRecipe(const QString &propId, const QString &facing);
+    void hideCurrentProp();
     void clearActiveRecipe();
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
@@ -181,6 +226,7 @@ private:
     QHash<QString, ActionDefinition> m_actions;
     QHash<QString, RecipeDefinition> m_recipes;
     QHash<QString, ActionPoolDefinition> m_actionPools;
+    QHash<QString, PropDefinition> m_props;
     QHash<QString, HitZoneDefinition> m_hitZones;
     QStringList m_singleClickPools;
     QString m_fallbackAction = "idle_stand";
@@ -198,6 +244,18 @@ private:
     bool m_currentAutoReturnToIdle = false;
     QUrl m_currentAnimationUrl;
     QUrl m_currentSoundUrl;
+    bool m_currentPropVisible = false;
+    QString m_currentPropId;
+    QUrl m_currentPropImageUrl;
+    QPointF m_currentPropStartOffset;
+    QPointF m_currentPropEndOffset;
+    double m_currentPropWidth = 0;
+    double m_currentPropHeight = 0;
+    int m_currentPropDurationMs = 0;
+    QString m_currentPropClickedRecipeId;
+    QString m_currentPropExpiredRecipeId;
+    int m_currentPropPlaybackSerial = 0;
+    int m_propRequestSerial = 0;
     int m_playbackSerial = 0;
     int m_soundPlaybackSerial = 0;
     QElapsedTimer m_dragShakeClock;

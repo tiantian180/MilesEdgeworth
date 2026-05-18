@@ -71,6 +71,25 @@
   "clickBehaviors": {
     "singleClick": ["click.face", "click.head", "click.upperArm", "click.forearm", "click.chest", "click.belly", "click.legs"]
   },
+  "props": {
+    "prosecutor_badge": {
+      "asset": "qrc:/pet/prosecutor-badge.png",
+      "width": 94,
+      "height": 94,
+      "delayMs": 700,
+      "durationMs": 1500,
+      "clickedRecipe": "bow.once",
+      "expiredRecipe": "pickup.once",
+      "startOffsets": {
+        "right": { "x": 172, "y": 32 },
+        "left": { "x": 2, "y": 32 }
+      },
+      "travel": {
+        "right": { "x": 900, "y": 0 },
+        "left": { "x": -900, "y": 0 }
+      }
+    }
+  },
   "actions": {
     "idle_stand": {
       "label": "站立",
@@ -453,6 +472,21 @@
         }
       }
     },
+    "pickup_badge": {
+      "label": "捡起检察官徽章",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 35,
+      "tags": ["prop", "badge", "pickup"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/pickup-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/pickup-left.gif"
+        }
+      }
+    },
     "tea": {
       "label": "喝茶",
       "category": "idle",
@@ -715,7 +749,8 @@
       "label": "看招",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "qrc:/audio/takethat0.wav"
+      "sound": "qrc:/audio/takethat0.wav",
+      "prop": "prosecutor_badge"
     },
     "doubleClick.objection": {
       "label": "异议",
@@ -738,6 +773,11 @@
       "label": "鞠躬一次",
       "scope": "interaction",
       "action": "bow"
+    },
+    "pickup.once": {
+      "label": "捡起检察官徽章",
+      "scope": "prop",
+      "action": "pickup_badge"
     },
     "tea.drinkThenBow": {
       "label": "喝茶后鞠躬",

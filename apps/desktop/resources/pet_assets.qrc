@@ -62,6 +62,9 @@
     <file alias="sleeping-left.gif">../../../gifs/special/sleeping1.gif</file>
     <file alias="wake-right.gif">../../../gifs/special/wake0.gif</file>
     <file alias="wake-left.gif">../../../gifs/special/wake1.gif</file>
+    <file alias="pickup-right.gif">../../../gifs/special/pickup0.gif</file>
+    <file alias="pickup-left.gif">../../../gifs/special/pickup1.gif</file>
+    <file alias="prosecutor-badge.png">../../../prosbadge.png</file>
     <file alias="manifest.json">skins/miles-edgeworth/manifest.json</file>
   </qresource>
   <qresource prefix="/audio">

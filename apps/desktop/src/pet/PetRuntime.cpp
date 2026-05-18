@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRandomGenerator>
+#include <QTimer>
 #include <QtGlobal>
 #include <QVariantMap>
 
@@ -83,6 +84,61 @@ QUrl PetRuntime::currentAnimationUrl() const
 QUrl PetRuntime::currentSoundUrl() const
 {
     return m_currentSoundUrl;
+}
+
+bool PetRuntime::currentPropVisible() const
+{
+    return m_currentPropVisible;
+}
+
+QString PetRuntime::currentPropId() const
+{
+    return m_currentPropId;
+}
+
+QUrl PetRuntime::currentPropImageUrl() const
+{
+    return m_currentPropImageUrl;
+}
+
+double PetRuntime::currentPropStartOffsetX() const
+{
+    return m_currentPropStartOffset.x();
+}
+
+double PetRuntime::currentPropStartOffsetY() const
+{
+    return m_currentPropStartOffset.y();
+}
+
+double PetRuntime::currentPropEndOffsetX() const
+{
+    return m_currentPropEndOffset.x();
+}
+
+double PetRuntime::currentPropEndOffsetY() const
+{
+    return m_currentPropEndOffset.y();
+}
+
+double PetRuntime::currentPropWidth() const
+{
+    return m_currentPropWidth;
+}
+
+double PetRuntime::currentPropHeight() const
+{
+    return m_currentPropHeight;
+}
+
+int PetRuntime::currentPropDurationMs() const
+{
+    return m_currentPropDurationMs;
+}
+
+int PetRuntime::currentPropPlaybackSerial() const
+{
+    return m_currentPropPlaybackSerial;
 }
 
 QString PetRuntime::currentFacing() const
@@ -210,6 +266,7 @@ void PetRuntime::playRecipe(const QString &recipeId)
     }
 
     playSoundForRecipe(m_recipes.value(nextRecipeId));
+    schedulePropForRecipe(m_recipes.value(nextRecipeId));
     playNextRecipeStep();
 }
 
@@ -364,6 +421,34 @@ void PetRuntime::handleHoldAnimationReachedEnd()
     }
 }
 
+void PetRuntime::handlePropClicked()
+{
+    if (!m_currentPropVisible) {
+        return;
+    }
+
+    const QString nextRecipeId = m_currentPropClickedRecipeId;
+    hideCurrentProp();
+
+    if (!nextRecipeId.isEmpty()) {
+        playRecipe(nextRecipeId);
+    }
+}
+
+void PetRuntime::handlePropExpired()
+{
+    if (!m_currentPropVisible) {
+        return;
+    }
+
+    const QString nextRecipeId = m_currentPropExpiredRecipeId;
+    hideCurrentProp();
+
+    if (!nextRecipeId.isEmpty()) {
+        playRecipe(nextRecipeId);
+    }
+}
+
 void PetRuntime::startStartupSequence()
 {
     playRecipe("startup.briefcase");
@@ -444,6 +529,11 @@ void PetRuntime::testTea()
 void PetRuntime::testSleep()
 {
     playRecipe("sleep.enterLoopExit");
+}
+
+void PetRuntime::testProsecutorBadge()
+{
+    playRecipe("doubleClick.takeThat");
 }
 
 void PetRuntime::handleAnimationFinished()
@@ -543,6 +633,37 @@ void PetRuntime::loadManifest()
         }
     }
 
+    const QJsonObject props = root.value("props").toObject();
+    for (auto it = props.constBegin(); it != props.constEnd(); ++it) {
+        const QJsonObject propObject = it.value().toObject();
+
+        PropDefinition prop;
+        prop.id = it.key();
+        prop.assetUrl = QUrl(propObject.value("asset").toString());
+        prop.width = propObject.value("width").toDouble(0);
+        prop.height = propObject.value("height").toDouble(0);
+        prop.delayMs = propObject.value("delayMs").toInt(0);
+        prop.durationMs = propObject.value("durationMs").toInt(0);
+        prop.clickedRecipeId = propObject.value("clickedRecipe").toString();
+        prop.expiredRecipeId = propObject.value("expiredRecipe").toString();
+
+        const QJsonObject startOffsets = propObject.value("startOffsets").toObject();
+        for (auto offsetIt = startOffsets.constBegin(); offsetIt != startOffsets.constEnd(); ++offsetIt) {
+            const QJsonObject offsetObject = offsetIt.value().toObject();
+            prop.startOffsets.insert(offsetIt.key(), QPointF(offsetObject.value("x").toDouble(0), offsetObject.value("y").toDouble(0)));
+        }
+
+        const QJsonObject travel = propObject.value("travel").toObject();
+        for (auto travelIt = travel.constBegin(); travelIt != travel.constEnd(); ++travelIt) {
+            const QJsonObject travelObject = travelIt.value().toObject();
+            prop.travelDeltas.insert(travelIt.key(), QPointF(travelObject.value("x").toDouble(0), travelObject.value("y").toDouble(0)));
+        }
+
+        if (!prop.id.isEmpty() && !prop.assetUrl.isEmpty()) {
+            m_props.insert(prop.id, prop);
+        }
+    }
+
     const QJsonObject states = root.value("states").toObject();
     for (auto it = states.constBegin(); it != states.constEnd(); ++it) {
         const QString action = it.value().toObject().value("action").toString();
@@ -637,6 +758,7 @@ void PetRuntime::loadManifest()
         recipe.scope = recipeObject.value("scope").toString();
         recipe.actionId = recipeObject.value("action").toString();
         recipe.soundUrl = QUrl(recipeObject.value("sound").toString());
+        recipe.propId = recipeObject.value("prop").toString();
 
         const QJsonArray steps = recipeObject.value("steps").toArray();
         for (const QJsonValue &stepValue : steps) {
@@ -705,6 +827,7 @@ void PetRuntime::loadFallbackManifest()
     m_actions.clear();
     m_recipes.clear();
     m_actionPools.clear();
+    m_props.clear();
     m_hitZones.clear();
     m_singleClickPools.clear();
     m_facings = {"right", "left"};
@@ -794,6 +917,85 @@ void PetRuntime::playSoundForRecipe(const RecipeDefinition &recipe)
         emit currentSoundUrlChanged();
     }
     emit soundPlaybackSerialChanged();
+}
+
+void PetRuntime::schedulePropForRecipe(const RecipeDefinition &recipe)
+{
+    if (recipe.propId.isEmpty() || !m_props.contains(recipe.propId)) {
+        // 任何新的非 Prop recipe 都会取消尚未飞出的延迟 Prop。
+        // 这样用户在 700ms 延迟期间触发其它动作时，不会突然冒出上一轮徽章。
+        ++m_propRequestSerial;
+        return;
+    }
+
+    const PropDefinition prop = m_props.value(recipe.propId);
+    const QString propId = recipe.propId;
+    const QString facing = m_currentFacing;
+    const int requestSerial = ++m_propRequestSerial;
+
+    // 旧版 Take that 会先播放出手动作，再延迟飞出徽章。
+    // 这里先把延迟保存在皮肤配置里，后续可迁移到正式 side effect 时间线。
+    QTimer::singleShot(qMax(0, prop.delayMs), this, [this, propId, facing, requestSerial]() {
+        if (requestSerial != m_propRequestSerial) {
+            return;
+        }
+
+        spawnPropForRecipe(propId, facing);
+    });
+}
+
+void PetRuntime::spawnPropForRecipe(const QString &propId, const QString &facing)
+{
+    if (!m_props.contains(propId)) {
+        return;
+    }
+
+    const PropDefinition prop = m_props.value(propId);
+    const QPointF startOffset = prop.startOffsets.value(
+        facing,
+        prop.startOffsets.value(m_defaultFacing, QPointF(0, 0))
+    );
+    const QPointF travelDelta = prop.travelDeltas.value(
+        facing,
+        prop.travelDeltas.value(m_defaultFacing, QPointF(0, 0))
+    );
+
+    m_currentPropVisible = true;
+    m_currentPropId = prop.id;
+    m_currentPropImageUrl = prop.assetUrl;
+    m_currentPropStartOffset = startOffset;
+    m_currentPropEndOffset = startOffset + travelDelta;
+    m_currentPropWidth = prop.width > 0 ? prop.width : 94;
+    m_currentPropHeight = prop.height > 0 ? prop.height : 94;
+    m_currentPropDurationMs = prop.durationMs > 0 ? prop.durationMs : 1500;
+    m_currentPropClickedRecipeId = prop.clickedRecipeId;
+    m_currentPropExpiredRecipeId = prop.expiredRecipeId;
+    ++m_currentPropPlaybackSerial;
+
+    emit currentPropChanged();
+    emit currentPropPlaybackSerialChanged();
+}
+
+void PetRuntime::hideCurrentProp()
+{
+    ++m_propRequestSerial;
+
+    if (!m_currentPropVisible && m_currentPropId.isEmpty()) {
+        return;
+    }
+
+    m_currentPropVisible = false;
+    m_currentPropId.clear();
+    m_currentPropImageUrl = QUrl();
+    m_currentPropStartOffset = QPointF();
+    m_currentPropEndOffset = QPointF();
+    m_currentPropWidth = 0;
+    m_currentPropHeight = 0;
+    m_currentPropDurationMs = 0;
+    m_currentPropClickedRecipeId.clear();
+    m_currentPropExpiredRecipeId.clear();
+
+    emit currentPropChanged();
 }
 
 void PetRuntime::clearActiveRecipe()

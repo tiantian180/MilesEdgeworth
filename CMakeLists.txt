@@ -94,5 +94,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_13_drag_shake_runtime.py
         )
+
+        # Phase 0.14 的检察官徽章检查：守住 Take that 触发 Prop、
+        # 点击徽章鞠躬、自然消失捡徽章的最小链路。
+        add_test(
+            NAME check_phase_0_14_prosecutor_badge_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_14_prosecutor_badge_runtime.py
+        )
     endif()
 endif()

@@ -85,6 +85,11 @@ Window {
             onTriggered: App.PetRuntime.testSleep()
         }
 
+        Platform.MenuItem {
+            text: "测试徽章"
+            onTriggered: App.PetRuntime.testProsecutorBadge()
+        }
+
         Platform.MenuSeparator {}
 
         Platform.MenuItem {
@@ -99,6 +104,60 @@ Window {
         source: App.PetRuntime.currentSoundUrl
         property int soundSerial: App.PetRuntime.soundPlaybackSerial
         volume: 0.8
+    }
+
+    // Phase 0.14 的最小 Prop 窗口：先专门承载检察官徽章。
+    // 它是独立 Window，才能像旧版一样飞出桌宠本体窗口范围。
+    Window {
+        id: prosecutorBadgeWindow
+
+        width: Math.max(1, App.PetRuntime.currentPropWidth)
+        height: Math.max(1, App.PetRuntime.currentPropHeight)
+        visible: App.PetRuntime.currentPropVisible
+        color: "transparent"
+        title: "Prosecutor Badge"
+
+        flags: Qt.FramelessWindowHint
+               | Qt.NoDropShadowWindowHint
+               | Qt.WindowStaysOnTopHint
+               | Qt.Tool
+
+        Image {
+            id: prosecutorBadgeImage
+
+            anchors.centerIn: parent
+            source: App.PetRuntime.currentPropImageUrl
+            fillMode: Image.PreserveAspectFit
+            width: Math.min(parent.width, 70)
+            height: Math.min(parent.height, 70)
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            onClicked: {
+                badgeFlyAnimation.stop()
+                badgeExpireTimer.stop()
+                App.PetRuntime.handlePropClicked()
+            }
+        }
+    }
+
+    NumberAnimation {
+        id: badgeFlyAnimation
+
+        target: prosecutorBadgeWindow
+        property: "x"
+        duration: Math.max(1, App.PetRuntime.currentPropDurationMs)
+        easing.type: Easing.OutSine
+    }
+
+    Timer {
+        id: badgeExpireTimer
+
+        interval: Math.max(1, App.PetRuntime.currentPropDurationMs)
+        repeat: false
+        onTriggered: App.PetRuntime.handlePropExpired()
     }
 
     // Phase 0.8 先用一个轻量 Timer 模拟旧版“待机时偶尔做点小动作”。
@@ -179,6 +238,30 @@ Window {
 
             voiceEffect.stop()
             voiceEffect.play()
+        }
+
+        function onCurrentPropPlaybackSerialChanged() {
+            if (!App.PetRuntime.currentPropVisible) {
+                return
+            }
+
+            prosecutorBadgeWindow.x = petWindow.x + App.PetRuntime.currentPropStartOffsetX
+            prosecutorBadgeWindow.y = petWindow.y + App.PetRuntime.currentPropStartOffsetY
+            badgeFlyAnimation.from = prosecutorBadgeWindow.x
+            badgeFlyAnimation.to = petWindow.x + App.PetRuntime.currentPropEndOffsetX
+            badgeFlyAnimation.duration = Math.max(1, App.PetRuntime.currentPropDurationMs)
+            badgeExpireTimer.interval = Math.max(1, App.PetRuntime.currentPropDurationMs)
+            badgeFlyAnimation.restart()
+            badgeExpireTimer.restart()
+        }
+
+        function onCurrentPropChanged() {
+            if (App.PetRuntime.currentPropVisible) {
+                return
+            }
+
+            badgeFlyAnimation.stop()
+            badgeExpireTimer.stop()
         }
     }
 
