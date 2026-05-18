@@ -4,6 +4,12 @@
 
 这部分是 v2 的核心复杂点。目标不是简单把旧版 `setFileName(":/gifs/once/4.gif")` 搬到新项目里，而是把旧版手感抽象成可维护、可换肤、可被 AI/Agent 驱动的运行时系统。
 
+文档分工：
+
+- 本文是 Pet Runtime 总体设计，负责讲清运行时职责、状态、调度和 AI/Agent 接入。
+- 皮肤包、Clip、Action、Recipe、ActionPool、BehaviorRule 和 Custom Interaction 的详细层级模型，以 `docs/v2/skin-pack-playback-behavior-design.md` 为准。
+- `docs/v2/animation-assets-inventory.md` 是旧 GIF 素材盘点和迁移线索，不是 manifest schema 规范。
+
 ## 1. 设计目标
 
 Pet Runtime 要满足以下目标：
@@ -339,7 +345,9 @@ BehaviorProfile 描述某个皮肤或角色的行为习惯。
 
 Miles 默认 behavior profile 用来还原旧版手感。
 
-## 4. Manifest 建议结构
+## 4. Skin Pack 结构概览
+
+本节只做总览。详细 schema 和层级模型见 `docs/v2/skin-pack-playback-behavior-design.md`。
 
 皮肤能力建议拆成两个文件：
 

@@ -89,6 +89,7 @@ MilesEdgeworth/
     v2/
       architecture.md
       pet-runtime-animation-design.md
+      skin-pack-playback-behavior-design.md
       animation-taxonomy.md
       provider-and-chat-design.md
       packaging.md
@@ -272,6 +273,8 @@ Pet Runtime 是 Qt 侧的核心。它统一处理：
 所有来源都发 `ActionRequest`，不直接播放动画文件。Pet Runtime 根据当前状态、优先级、切换规则、皮肤能力和朝向选择最终动画。
 
 详细方案见 `docs/v2/pet-runtime-animation-design.md`。
+皮肤包、Recipe、ActionPool、BehaviorRule 和 Custom Interaction 的详细层级模型见
+`docs/v2/skin-pack-playback-behavior-design.md`。
 
 ## 11. 阶段计划
 
