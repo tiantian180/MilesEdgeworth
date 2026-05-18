@@ -743,26 +743,46 @@
       "label": "等等",
       "scope": "doubleClick",
       "action": "crossed",
-      "sound": "qrc:/audio/holdit0.wav"
+      "sound": "qrc:/audio/holdit0.wav",
+      "sounds": {
+        "jp": "qrc:/audio/holdit0.wav",
+        "en": "qrc:/audio/holdit1.wav",
+        "zh": "qrc:/audio/holdit2.wav"
+      }
     },
     "doubleClick.takeThat": {
       "label": "看招",
       "scope": "doubleClick",
       "action": "objecting",
       "sound": "qrc:/audio/takethat0.wav",
+      "sounds": {
+        "jp": "qrc:/audio/takethat0.wav",
+        "en": "qrc:/audio/takethat1.wav",
+        "zh": "qrc:/audio/takethat2.wav"
+      },
       "prop": "prosecutor_badge"
     },
     "doubleClick.objection": {
       "label": "异议",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "qrc:/audio/objection0.wav"
+      "sound": "qrc:/audio/objection0.wav",
+      "sounds": {
+        "jp": "qrc:/audio/objection0.wav",
+        "en": "qrc:/audio/objection1.wav",
+        "zh": "qrc:/audio/objection2.wav"
+      }
     },
     "doubleClick.eureka": {
       "label": "就是这个",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "qrc:/audio/eureka0.wav"
+      "sound": "qrc:/audio/eureka0.wav",
+      "sounds": {
+        "jp": "qrc:/audio/eureka0.wav",
+        "en": "qrc:/audio/eureka1.wav",
+        "zh": "qrc:/audio/objection2.wav"
+      }
     },
     "objecting.once": {
       "label": "异议一次",

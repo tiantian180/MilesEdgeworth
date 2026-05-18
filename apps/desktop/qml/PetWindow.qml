@@ -26,6 +26,45 @@ Window {
             onTriggered: App.DesktopShell.toggleAlwaysOnTop()
         }
 
+        Platform.MenuItem {
+            text: "禁止走动"
+            checkable: true
+            checked: !App.PetRuntime.autoMovementEnabled
+            onTriggered: App.PetRuntime.toggleAutoMovementEnabled()
+        }
+
+        Platform.MenuItem {
+            text: "静音"
+            checkable: true
+            checked: App.PetRuntime.audioMuted
+            onTriggered: App.PetRuntime.toggleAudioMuted()
+        }
+
+        Platform.Menu {
+            title: "语音语言"
+
+            Platform.MenuItem {
+                text: "日语"
+                checkable: true
+                checked: App.PetRuntime.voiceLanguage === "jp"
+                onTriggered: App.PetRuntime.setVoiceLanguage("jp")
+            }
+
+            Platform.MenuItem {
+                text: "英语"
+                checkable: true
+                checked: App.PetRuntime.voiceLanguage === "en"
+                onTriggered: App.PetRuntime.setVoiceLanguage("en")
+            }
+
+            Platform.MenuItem {
+                text: "汉语"
+                checkable: true
+                checked: App.PetRuntime.voiceLanguage === "zh"
+                onTriggered: App.PetRuntime.setVoiceLanguage("zh")
+            }
+        }
+
         Platform.MenuSeparator {}
 
         Platform.MenuItem {

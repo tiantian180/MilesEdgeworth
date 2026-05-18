@@ -102,5 +102,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_14_prosecutor_badge_runtime.py
         )
+
+        # Phase 0.15 的旧版菜单设置检查：守住静音、语音语言
+        # 和禁止自动移动这三个核心体验开关。
+        add_test(
+            NAME check_phase_0_15_menu_audio_movement_settings
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_15_menu_audio_movement_settings.py
+        )
     endif()
 endif()

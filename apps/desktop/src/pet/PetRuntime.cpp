@@ -161,6 +161,21 @@ bool PetRuntime::currentAutoReturnToIdle() const
     return m_currentAutoReturnToIdle;
 }
 
+bool PetRuntime::audioMuted() const
+{
+    return m_audioMuted;
+}
+
+QString PetRuntime::voiceLanguage() const
+{
+    return m_voiceLanguage;
+}
+
+bool PetRuntime::autoMovementEnabled() const
+{
+    return m_autoMovementEnabled;
+}
+
 int PetRuntime::playbackSerial() const
 {
     return m_playbackSerial;
@@ -310,6 +325,10 @@ QVariantMap PetRuntime::consumeFrameMovementDelta() const
     delta.insert("dx", 0.0);
     delta.insert("dy", 0.0);
 
+    if (!m_autoMovementEnabled) {
+        return delta;
+    }
+
     const ActionDefinition action = m_actions.value(m_currentActionId);
     if (action.movementDeltas.isEmpty()) {
         return delta;
@@ -447,6 +466,33 @@ void PetRuntime::handlePropExpired()
     if (!nextRecipeId.isEmpty()) {
         playRecipe(nextRecipeId);
     }
+}
+
+void PetRuntime::toggleAudioMuted()
+{
+    m_audioMuted = !m_audioMuted;
+    emit audioMutedChanged();
+}
+
+void PetRuntime::setVoiceLanguage(const QString &voiceLanguage)
+{
+    const QString normalizedLanguage = voiceLanguage.trimmed();
+    if (normalizedLanguage.isEmpty() || normalizedLanguage == m_voiceLanguage) {
+        return;
+    }
+
+    if (normalizedLanguage != "jp" && normalizedLanguage != "en" && normalizedLanguage != "zh") {
+        return;
+    }
+
+    m_voiceLanguage = normalizedLanguage;
+    emit voiceLanguageChanged();
+}
+
+void PetRuntime::toggleAutoMovementEnabled()
+{
+    m_autoMovementEnabled = !m_autoMovementEnabled;
+    emit autoMovementEnabledChanged();
 }
 
 void PetRuntime::startStartupSequence()
@@ -760,6 +806,14 @@ void PetRuntime::loadManifest()
         recipe.soundUrl = QUrl(recipeObject.value("sound").toString());
         recipe.propId = recipeObject.value("prop").toString();
 
+        const QJsonObject sounds = recipeObject.value("sounds").toObject();
+        for (auto soundIt = sounds.constBegin(); soundIt != sounds.constEnd(); ++soundIt) {
+            const QString soundUrl = soundIt.value().toString();
+            if (!soundUrl.isEmpty()) {
+                recipe.soundUrls.insert(soundIt.key(), QUrl(soundUrl));
+            }
+        }
+
         const QJsonArray steps = recipeObject.value("steps").toArray();
         for (const QJsonValue &stepValue : steps) {
             const QJsonObject stepObject = stepValue.toObject();
@@ -903,14 +957,36 @@ QString PetRuntime::clickPoolForPoint(double x, double y, double width, double h
     return {};
 }
 
+QUrl PetRuntime::soundUrlForRecipe(const RecipeDefinition &recipe) const
+{
+    if (recipe.soundUrls.contains(m_voiceLanguage)) {
+        return recipe.soundUrls.value(m_voiceLanguage);
+    }
+
+    if (recipe.soundUrls.contains("jp")) {
+        return recipe.soundUrls.value("jp");
+    }
+
+    if (!recipe.soundUrls.isEmpty()) {
+        return recipe.soundUrls.constBegin().value();
+    }
+
+    return recipe.soundUrl;
+}
+
 void PetRuntime::playSoundForRecipe(const RecipeDefinition &recipe)
 {
-    if (recipe.soundUrl.isEmpty()) {
+    if (m_audioMuted) {
         return;
     }
 
-    const bool soundChanged = (m_currentSoundUrl != recipe.soundUrl);
-    m_currentSoundUrl = recipe.soundUrl;
+    const QUrl nextSoundUrl = soundUrlForRecipe(recipe);
+    if (nextSoundUrl.isEmpty()) {
+        return;
+    }
+
+    const bool soundChanged = (m_currentSoundUrl != nextSoundUrl);
+    m_currentSoundUrl = nextSoundUrl;
     ++m_soundPlaybackSerial;
 
     if (soundChanged) {

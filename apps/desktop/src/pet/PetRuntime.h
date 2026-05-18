@@ -35,6 +35,9 @@ class PetRuntime : public QObject
     Q_PROPERTY(QString currentMovementDirection READ currentMovementDirection NOTIFY currentMovementDirectionChanged)
     Q_PROPERTY(QString currentLoopMode READ currentLoopMode NOTIFY currentLoopModeChanged)
     Q_PROPERTY(bool currentAutoReturnToIdle READ currentAutoReturnToIdle NOTIFY currentAutoReturnToIdleChanged)
+    Q_PROPERTY(bool audioMuted READ audioMuted NOTIFY audioMutedChanged)
+    Q_PROPERTY(QString voiceLanguage READ voiceLanguage NOTIFY voiceLanguageChanged)
+    Q_PROPERTY(bool autoMovementEnabled READ autoMovementEnabled NOTIFY autoMovementEnabledChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
     Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
     Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
@@ -62,6 +65,9 @@ public:
     QString currentMovementDirection() const;
     QString currentLoopMode() const;
     bool currentAutoReturnToIdle() const;
+    bool audioMuted() const;
+    QString voiceLanguage() const;
+    bool autoMovementEnabled() const;
     QUrl currentAnimationUrl() const;
     QUrl currentSoundUrl() const;
     bool currentPropVisible() const;
@@ -94,6 +100,9 @@ public:
     Q_INVOKABLE void handleHoldAnimationReachedEnd();
     Q_INVOKABLE void handlePropClicked();
     Q_INVOKABLE void handlePropExpired();
+    Q_INVOKABLE void toggleAudioMuted();
+    Q_INVOKABLE void setVoiceLanguage(const QString &voiceLanguage);
+    Q_INVOKABLE void toggleAutoMovementEnabled();
     Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
@@ -118,6 +127,9 @@ signals:
     void currentMovementDirectionChanged();
     void currentLoopModeChanged();
     void currentAutoReturnToIdleChanged();
+    void audioMutedChanged();
+    void voiceLanguageChanged();
+    void autoMovementEnabledChanged();
     void currentAnimationUrlChanged();
     void currentSoundUrlChanged();
     void currentPropChanged();
@@ -164,6 +176,7 @@ private:
         QString scope;
         QString actionId;
         QUrl soundUrl;
+        QHash<QString, QUrl> soundUrls;
         QString propId;
         QList<RecipeStep> steps;
     };
@@ -207,6 +220,7 @@ private:
     QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
     QUrl variantForAction(const ActionDefinition &action) const;
     QString clickPoolForPoint(double x, double y, double width, double height) const;
+    QUrl soundUrlForRecipe(const RecipeDefinition &recipe) const;
     void playSoundForRecipe(const RecipeDefinition &recipe);
     void schedulePropForRecipe(const RecipeDefinition &recipe);
     void spawnPropForRecipe(const QString &propId, const QString &facing);
@@ -242,6 +256,9 @@ private:
     QString m_currentMovementDirection = "east";
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
+    bool m_audioMuted = false;
+    QString m_voiceLanguage = "jp";
+    bool m_autoMovementEnabled = true;
     QUrl m_currentAnimationUrl;
     QUrl m_currentSoundUrl;
     bool m_currentPropVisible = false;

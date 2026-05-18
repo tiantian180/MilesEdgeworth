@@ -69,8 +69,15 @@
   </qresource>
   <qresource prefix="/audio">
     <file alias="holdit0.wav">../../../audios/holdit0.wav</file>
+    <file alias="holdit1.wav">../../../audios/holdit1.wav</file>
+    <file alias="holdit2.wav">../../../audios/holdit2.wav</file>
     <file alias="takethat0.wav">../../../audios/takethat0.wav</file>
+    <file alias="takethat1.wav">../../../audios/takethat1.wav</file>
+    <file alias="takethat2.wav">../../../audios/takethat2.wav</file>
     <file alias="objection0.wav">../../../audios/objection0.wav</file>
+    <file alias="objection1.wav">../../../audios/objection1.wav</file>
+    <file alias="objection2.wav">../../../audios/objection2.wav</file>
     <file alias="eureka0.wav">../../../audios/eureka0.wav</file>
+    <file alias="eureka1.wav">../../../audios/eureka1.wav</file>
   </qresource>
 </RCC>
