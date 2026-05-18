@@ -10,6 +10,12 @@
     <file alias="bow-left.gif">../../../gifs/special/bow1.gif</file>
     <file alias="tea-right.gif">../../../gifs/special/tea0.gif</file>
     <file alias="tea-left.gif">../../../gifs/special/tea1.gif</file>
+    <file alias="sleep-right.gif">../../../gifs/special/sleep0.gif</file>
+    <file alias="sleep-left.gif">../../../gifs/special/sleep1.gif</file>
+    <file alias="sleeping-right.gif">../../../gifs/special/sleeping0.gif</file>
+    <file alias="sleeping-left.gif">../../../gifs/special/sleeping1.gif</file>
+    <file alias="wake-right.gif">../../../gifs/special/wake0.gif</file>
+    <file alias="wake-left.gif">../../../gifs/special/wake1.gif</file>
     <file alias="manifest.json">skins/miles-edgeworth/manifest.json</file>
   </qresource>
 </RCC>

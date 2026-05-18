@@ -59,6 +59,11 @@ Window {
             onTriggered: App.PetRuntime.testBow()
         }
 
+        Platform.MenuItem {
+            text: "测试睡觉"
+            onTriggered: App.PetRuntime.testSleep()
+        }
+
         Platform.MenuSeparator {}
 
         Platform.MenuItem {
@@ -81,7 +86,8 @@ Window {
         height: 200
 
         onCurrentFrameChanged: {
-            if (App.PetRuntime.currentAutoReturnToIdle
+            if ((App.PetRuntime.currentAutoReturnToIdle
+                    || App.PetRuntime.currentLoopMode === "once")
                     && frameCount > 0
                     && currentFrame >= frameCount - 1) {
                 App.PetRuntime.handleAnimationFinished()

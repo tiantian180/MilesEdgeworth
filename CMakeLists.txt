@@ -38,5 +38,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_6_animation_runtime.py
         )
+
+        # Phase 0.7 的 phase-aware 动画运行时检查：守住 enter/loop/exit
+        # 这种多阶段 action 的最小结构。
+        add_test(
+            NAME check_phase_0_7_phase_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_7_phase_runtime.py
+        )
     endif()
 endif()

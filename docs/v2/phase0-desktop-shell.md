@@ -70,6 +70,13 @@ ctest --test-dir build --output-on-failure
 - QML 会在 `AnimatedImage` 到达最后一帧时通知 `PetRuntime.handleAnimationFinished()`。
 - `docs/v2/animation-assets-inventory.md` 已记录初始素材语义和待复核项。
 
+`check_phase_0_7_phase_runtime` 会额外检查：
+
+- 内置 skin manifest 已支持 `Action -> Phase -> Variant -> Clip` 的多阶段动作结构。
+- `sleep` action 已拆成 `enter`、`loop`、`exit` 三个 phase，分别对应入睡、睡眠循环和醒来。
+- `PetRuntime` 暴露 `currentPhaseId`，并提供 `playPhase()` 与 `testSleep()` 骨架。
+- QML 菜单中已接入“测试睡觉”，并会让 `once` / `onceThenIdle` 阶段在播到末帧后回调运行时。
+
 ## Manual Checks
 
 手动验证时，先完成对应架构的 Build，再使用 Run 命令启动应用。启动后检查以下桌面壳层行为：
@@ -86,12 +93,14 @@ ctest --test-dir build --output-on-failure
 - 动画资源 alias：运行态确认 `qrc:/pet/stand-right.gif` 可以解析并显示。`stand-left` 已注册 alias，但 Phase 0 还没有切换朝向的运行时入口，后续由 Pet Runtime 验证。
 - Phase 0.5 / 0.6 动作测试：右键菜单中的“回到待机”“切到朝左/朝右”“测试思考”“测试异议”“测试鞠躬”应能在站立、思考、异议/强调、鞠躬动画之间切换。
 - 一次性动作回 idle：`objecting` 和 `bow` 的 `loopMode` 为 `onceThenIdle`，播到最后一帧后应自动回到当前朝向的站立动画。
+- Phase 0.7 睡觉动作：右键“测试睡觉”后，应先播放入睡动作，再进入睡眠循环；睡眠时右键“回到待机”，应先播放醒来动作，再回到当前朝向的站立动画。
+- Phase 0.7 睡眠朝向：睡眠循环中点击“切到朝左/朝右”时，应保持在睡眠 phase，只切换到对应朝向的睡眠资源，而不是重新从入睡动作开始。
 
 ## Known Limits
 
 - Phase 0 点击区域仍是矩形，尚未按透明像素或角色轮廓裁剪命中区域。
 - Phase 0 只有最小平台右键菜单，包含置顶开关和退出入口；尚未实现旧版完整右键菜单或系统托盘菜单。
-- Pet Runtime 目前只实现最小 state/action/animation/facing 映射，还没有完整动画编排器、优先级队列、enter/loop/exit 阶段或移动驱动动画。
+- Pet Runtime 目前只实现最小 state/action/animation/facing 映射，以及一个 `sleep.enter -> sleep.loop -> sleep.exit` 的多阶段样例；还没有完整动画编排器、优先级队列或移动驱动动画。
 - 当前只注册 `stand`、`thinking`、`objecting`、`bow`、`tea` 的左右朝向验证资源；行走和奔跑的 8 方向素材已盘点，但还没有接入移动系统。
 - macOS 普通置顶开关使用标准 AppKit 窗口层级：置顶时切到 screen saver level 并加入所有 Space，取消置顶时降回普通窗口层级。这样比 SkyLight 私有 Space 更适合做可逆开关。
 - SkyLight 私有 Space 暂不作为普通置顶开关的实现。它可以作为未来“固定在屏幕最上层”的实验模式单独设计，但需要接受私有 API、不稳定、退出时可能要重建窗口等代价。

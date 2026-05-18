@@ -24,6 +24,7 @@ class PetRuntime : public QObject
     Q_OBJECT
     Q_PROPERTY(QString currentState READ currentState NOTIFY currentStateChanged)
     Q_PROPERTY(QString currentActionId READ currentActionId NOTIFY currentActionChanged)
+    Q_PROPERTY(QString currentPhaseId READ currentPhaseId NOTIFY currentPhaseChanged)
     Q_PROPERTY(QString currentFacing READ currentFacing NOTIFY currentFacingChanged)
     Q_PROPERTY(QString currentLoopMode READ currentLoopMode NOTIFY currentLoopModeChanged)
     Q_PROPERTY(bool currentAutoReturnToIdle READ currentAutoReturnToIdle NOTIFY currentAutoReturnToIdleChanged)
@@ -35,6 +36,7 @@ public:
 
     QString currentState() const;
     QString currentActionId() const;
+    QString currentPhaseId() const;
     QString currentFacing() const;
     QString currentLoopMode() const;
     bool currentAutoReturnToIdle() const;
@@ -51,11 +53,13 @@ public:
     Q_INVOKABLE void testObjecting();
     Q_INVOKABLE void testBow();
     Q_INVOKABLE void testTea();
+    Q_INVOKABLE void testSleep();
     Q_INVOKABLE void handleAnimationFinished();
 
 signals:
     void currentStateChanged();
     void currentActionChanged();
+    void currentPhaseChanged();
     void currentFacingChanged();
     void currentLoopModeChanged();
     void currentAutoReturnToIdleChanged();
@@ -63,6 +67,13 @@ signals:
     void playbackSerialChanged();
 
 private:
+    struct PhaseDefinition
+    {
+        QString loopMode = "loop";
+        QString nextPhase;
+        QHash<QString, QUrl> variants;
+    };
+
     struct ActionDefinition
     {
         QString label;
@@ -72,13 +83,18 @@ private:
         QString interruptPolicy = "replace";
         QStringList tags;
         QHash<QString, QUrl> variants;
+        QString initialPhase;
+        QString exitPhase;
+        QHash<QString, PhaseDefinition> phases;
     };
 
     void loadManifest();
     void loadFallbackManifest();
     QString actionForState(const QString &state) const;
-    QUrl variantForFacing(const ActionDefinition &action, const QString &facing) const;
+    QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
+    void playPhase(const QString &actionId, const QString &phaseId);
     void setCurrentAction(const QString &actionId, const ActionDefinition &action);
+    void setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase);
 
     QHash<QString, QString> m_stateToAction;
     QHash<QString, ActionDefinition> m_actions;
@@ -87,6 +103,7 @@ private:
     QString m_defaultFacing = "right";
     QString m_currentState = "idle";
     QString m_currentActionId;
+    QString m_currentPhaseId;
     QString m_currentFacing = "right";
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;

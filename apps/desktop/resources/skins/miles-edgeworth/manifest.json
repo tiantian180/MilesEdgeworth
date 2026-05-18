@@ -96,6 +96,51 @@
           "animation": "qrc:/pet/tea-left.gif"
         }
       }
+    },
+    "sleep": {
+      "label": "睡觉",
+      "category": "idle",
+      "priority": 10,
+      "interruptPolicy": "replace",
+      "tags": ["sleep", "idle"],
+      "initialPhase": "enter",
+      "exitPhase": "exit",
+      "phases": {
+        "enter": {
+          "loopMode": "once",
+          "nextPhase": "loop",
+          "variants": {
+            "right": {
+              "animation": "qrc:/pet/sleep-right.gif"
+            },
+            "left": {
+              "animation": "qrc:/pet/sleep-left.gif"
+            }
+          }
+        },
+        "loop": {
+          "loopMode": "loop",
+          "variants": {
+            "right": {
+              "animation": "qrc:/pet/sleeping-right.gif"
+            },
+            "left": {
+              "animation": "qrc:/pet/sleeping-left.gif"
+            }
+          }
+        },
+        "exit": {
+          "loopMode": "onceThenIdle",
+          "variants": {
+            "right": {
+              "animation": "qrc:/pet/wake-right.gif"
+            },
+            "left": {
+              "animation": "qrc:/pet/wake-left.gif"
+            }
+          }
+        }
+      }
     }
   },
   "fallbackAction": "idle_stand"

@@ -33,6 +33,11 @@ QString PetRuntime::currentActionId() const
     return m_currentActionId;
 }
 
+QString PetRuntime::currentPhaseId() const
+{
+    return m_currentPhaseId;
+}
+
 QUrl PetRuntime::currentAnimationUrl() const
 {
     return m_currentAnimationUrl;
@@ -98,7 +103,12 @@ void PetRuntime::setFacing(const QString &facing)
     // 朝向变化后，当前 action 立即换成同动作的对应朝向 variant。
     // 这样移动系统以后只需要先更新 facing，再继续播放动作即可。
     if (!m_currentActionId.isEmpty()) {
-        playAction(m_currentActionId);
+        const ActionDefinition action = m_actions.value(m_currentActionId);
+        if (!m_currentPhaseId.isEmpty() && action.phases.contains(m_currentPhaseId)) {
+            playPhase(m_currentActionId, m_currentPhaseId);
+        } else {
+            playAction(m_currentActionId);
+        }
     }
 }
 
@@ -129,6 +139,12 @@ void PetRuntime::playAction(const QString &actionId)
 
 void PetRuntime::returnToIdle()
 {
+    const ActionDefinition action = m_actions.value(m_currentActionId);
+    if (!action.exitPhase.isEmpty() && m_currentPhaseId != action.exitPhase) {
+        playPhase(m_currentActionId, action.exitPhase);
+        return;
+    }
+
     setState("idle");
 }
 
@@ -157,8 +173,20 @@ void PetRuntime::testTea()
     playAction("tea");
 }
 
+void PetRuntime::testSleep()
+{
+    playAction("sleep");
+}
+
 void PetRuntime::handleAnimationFinished()
 {
+    const ActionDefinition action = m_actions.value(m_currentActionId);
+    const PhaseDefinition phase = action.phases.value(m_currentPhaseId);
+    if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
+        playPhase(m_currentActionId, phase.nextPhase);
+        return;
+    }
+
     if (m_currentAutoReturnToIdle) {
         setState("idle");
     }
@@ -210,6 +238,8 @@ void PetRuntime::loadManifest()
         action.loopMode = actionObject.value("loopMode").toString(actionObject.value("loop").toBool(true) ? "loop" : "onceThenIdle");
         action.priority = actionObject.value("priority").toInt(0);
         action.interruptPolicy = actionObject.value("interruptPolicy").toString("replace");
+        action.initialPhase = actionObject.value("initialPhase").toString();
+        action.exitPhase = actionObject.value("exitPhase").toString();
 
         const QJsonArray tags = actionObject.value("tags").toArray();
         for (const QJsonValue &tag : tags) {
@@ -234,7 +264,27 @@ void PetRuntime::loadManifest()
             action.variants.insert(m_defaultFacing, QUrl(legacyAnimation));
         }
 
-        if (!action.variants.isEmpty()) {
+        const QJsonObject phases = actionObject.value("phases").toObject();
+        for (auto phaseIt = phases.constBegin(); phaseIt != phases.constEnd(); ++phaseIt) {
+            const QJsonObject phaseObject = phaseIt.value().toObject();
+            PhaseDefinition phase;
+            phase.loopMode = phaseObject.value("loopMode").toString("loop");
+            phase.nextPhase = phaseObject.value("nextPhase").toString();
+
+            const QJsonObject phaseVariants = phaseObject.value("variants").toObject();
+            for (auto variantIt = phaseVariants.constBegin(); variantIt != phaseVariants.constEnd(); ++variantIt) {
+                const QString animation = variantIt.value().toObject().value("animation").toString();
+                if (!animation.isEmpty()) {
+                    phase.variants.insert(variantIt.key(), QUrl(animation));
+                }
+            }
+
+            if (!phase.variants.isEmpty()) {
+                action.phases.insert(phaseIt.key(), phase);
+            }
+        }
+
+        if (!action.variants.isEmpty() || !action.phases.isEmpty()) {
             m_actions.insert(it.key(), action);
         }
     }
@@ -262,35 +312,66 @@ QString PetRuntime::actionForState(const QString &state) const
     return m_stateToAction.value(state);
 }
 
-QUrl PetRuntime::variantForFacing(const ActionDefinition &action, const QString &facing) const
+QUrl PetRuntime::variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const
 {
-    if (action.variants.contains(facing)) {
-        return action.variants.value(facing);
+    if (variants.contains(facing)) {
+        return variants.value(facing);
     }
 
-    if (action.variants.contains(m_defaultFacing)) {
-        return action.variants.value(m_defaultFacing);
+    if (variants.contains(m_defaultFacing)) {
+        return variants.value(m_defaultFacing);
     }
 
-    if (!action.variants.isEmpty()) {
-        return action.variants.constBegin().value();
+    if (!variants.isEmpty()) {
+        return variants.constBegin().value();
     }
 
     return QUrl(QString::fromUtf8(kFallbackAnimationUrl));
 }
 
+void PetRuntime::playPhase(const QString &actionId, const QString &phaseId)
+{
+    const ActionDefinition action = m_actions.value(actionId);
+    if (!action.phases.contains(phaseId)) {
+        return;
+    }
+
+    setCurrentPhase(actionId, phaseId, action.phases.value(phaseId));
+}
+
 void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinition &action)
 {
-    const QUrl nextAnimationUrl = variantForFacing(action, m_currentFacing);
-    const QString nextLoopMode = action.loopMode.isEmpty() ? "loop" : action.loopMode;
+    if (!action.phases.isEmpty()) {
+        QString phaseId = action.initialPhase;
+        if (phaseId.isEmpty() || !action.phases.contains(phaseId)) {
+            phaseId = action.phases.constBegin().key();
+        }
+
+        playPhase(actionId, phaseId);
+        return;
+    }
+
+    PhaseDefinition singlePhase;
+    singlePhase.loopMode = action.loopMode;
+    singlePhase.variants = action.variants;
+    setCurrentPhase(actionId, "single", singlePhase);
+}
+
+void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase)
+{
+    const QUrl nextAnimationUrl = variantForFacing(phase.variants, m_currentFacing);
+    const QString nextLoopMode = phase.loopMode.isEmpty() ? "loop" : phase.loopMode;
+    const QString nextPhaseId = phaseId.isEmpty() ? "single" : phaseId;
     const bool nextAutoReturnToIdle = (nextLoopMode == "onceThenIdle");
 
     const bool actionChanged = (m_currentActionId != actionId);
+    const bool phaseChanged = (m_currentPhaseId != nextPhaseId);
     const bool loopModeChanged = (m_currentLoopMode != nextLoopMode);
     const bool autoReturnChanged = (m_currentAutoReturnToIdle != nextAutoReturnToIdle);
     const bool animationChanged = (m_currentAnimationUrl != nextAnimationUrl);
 
     m_currentActionId = actionId;
+    m_currentPhaseId = nextPhaseId;
     m_currentLoopMode = nextLoopMode;
     m_currentAutoReturnToIdle = nextAutoReturnToIdle;
     m_currentAnimationUrl = nextAnimationUrl;
@@ -298,6 +379,9 @@ void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinitio
 
     if (actionChanged) {
         emit currentActionChanged();
+    }
+    if (phaseChanged) {
+        emit currentPhaseChanged();
     }
     if (loopModeChanged) {
         emit currentLoopModeChanged();
