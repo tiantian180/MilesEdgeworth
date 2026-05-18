@@ -1,8 +1,10 @@
 {
+  "schemaVersion": 2,
   "id": "miles-edgeworth",
   "name": "Miles Edgeworth",
   "version": 1,
   "defaultFacing": "right",
+  "facings": ["right", "left"],
   "states": {
     "idle": {
       "action": "idle_stand"
@@ -16,16 +18,84 @@
   },
   "actions": {
     "idle_stand": {
-      "animation": "qrc:/pet/stand-right.gif",
-      "loop": true
+      "label": "站立",
+      "category": "idle",
+      "loopMode": "loop",
+      "priority": 0,
+      "interruptPolicy": "replace",
+      "tags": ["idle", "standing"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/stand-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/stand-left.gif"
+        }
+      }
     },
     "thinking": {
-      "animation": "qrc:/pet/thinking-right.gif",
-      "loop": true
+      "label": "抱胸思考",
+      "category": "cognitive",
+      "loopMode": "loop",
+      "priority": 20,
+      "interruptPolicy": "replace",
+      "tags": ["thinking", "cognitive"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/thinking-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/thinking-left.gif"
+        }
+      }
     },
     "objecting": {
-      "animation": "qrc:/pet/objecting-right.gif",
-      "loop": false
+      "label": "异议",
+      "category": "gesture",
+      "loopMode": "onceThenIdle",
+      "priority": 40,
+      "interruptPolicy": "replace",
+      "tags": ["objecting", "speaking", "emphasis"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/objecting-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/objecting-left.gif"
+        }
+      }
+    },
+    "bow": {
+      "label": "鞠躬",
+      "category": "gesture",
+      "loopMode": "onceThenIdle",
+      "priority": 30,
+      "interruptPolicy": "replace",
+      "tags": ["bow", "polite"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/bow-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/bow-left.gif"
+        }
+      }
+    },
+    "tea": {
+      "label": "喝茶",
+      "category": "idle",
+      "loopMode": "hold",
+      "priority": 10,
+      "interruptPolicy": "replace",
+      "tags": ["tea", "rest"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/tea-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/tea-left.gif"
+        }
+      }
     }
   },
   "fallbackAction": "idle_stand"

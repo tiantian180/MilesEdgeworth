@@ -30,5 +30,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_5_pet_runtime.py
         )
+
+        # Phase 0.6 的动画运行时检查：守住 manifest v2、左右朝向、
+        # 一次性动作回 idle 和 QML 帧完成通知的最小骨架。
+        add_test(
+            NAME check_phase_0_6_animation_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_6_animation_runtime.py
+        )
     endif()
 endif()

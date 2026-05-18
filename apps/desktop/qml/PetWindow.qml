@@ -33,6 +33,13 @@ Window {
         }
 
         Platform.MenuItem {
+            text: App.PetRuntime.currentFacing === "right" ? "切到朝左" : "切到朝右"
+            onTriggered: App.PetRuntime.toggleFacing()
+        }
+
+        Platform.MenuSeparator {}
+
+        Platform.MenuItem {
             text: "测试思考"
             onTriggered: App.PetRuntime.testThinking()
         }
@@ -40,6 +47,16 @@ Window {
         Platform.MenuItem {
             text: "测试说话"
             onTriggered: App.PetRuntime.testSpeaking()
+        }
+
+        Platform.MenuItem {
+            text: "测试异议"
+            onTriggered: App.PetRuntime.testObjecting()
+        }
+
+        Platform.MenuItem {
+            text: "测试鞠躬"
+            onTriggered: App.PetRuntime.testBow()
         }
 
         Platform.MenuSeparator {}
@@ -62,6 +79,26 @@ Window {
         fillMode: Image.PreserveAspectFit
         width: 200
         height: 200
+
+        onCurrentFrameChanged: {
+            if (App.PetRuntime.currentAutoReturnToIdle
+                    && frameCount > 0
+                    && currentFrame >= frameCount - 1) {
+                App.PetRuntime.handleAnimationFinished()
+            }
+        }
+    }
+
+    Connections {
+        target: App.PetRuntime
+
+        function onPlaybackSerialChanged() {
+            // 同一个 action 连续触发时，source URL 可能不变。
+            // playbackSerial 变化代表“这次要重新播放”，所以这里手动回到第 0 帧。
+            pet.currentFrame = 0
+            pet.playing = false
+            pet.playing = true
+        }
     }
 
     // Phase 0 先用最容易读懂的拖拽逻辑。

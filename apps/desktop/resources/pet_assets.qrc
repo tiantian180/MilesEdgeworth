@@ -6,6 +6,10 @@
     <file alias="thinking-left.gif">../../../gifs/once/5.gif</file>
     <file alias="objecting-right.gif">../../../gifs/special/object0.gif</file>
     <file alias="objecting-left.gif">../../../gifs/special/object1.gif</file>
+    <file alias="bow-right.gif">../../../gifs/special/bow0.gif</file>
+    <file alias="bow-left.gif">../../../gifs/special/bow1.gif</file>
+    <file alias="tea-right.gif">../../../gifs/special/tea0.gif</file>
+    <file alias="tea-left.gif">../../../gifs/special/tea1.gif</file>
     <file alias="manifest.json">skins/miles-edgeworth/manifest.json</file>
   </qresource>
 </RCC>
