@@ -145,6 +145,13 @@ Window {
                 petWindow.y += movementDelta.dy
             }
 
+            if (App.PetRuntime.currentLoopMode === "hold"
+                    && frameCount > 0
+                    && currentFrame >= frameCount - 1) {
+                App.PetRuntime.handleHoldAnimationReachedEnd()
+                pet.playing = false
+            }
+
             if ((App.PetRuntime.currentAutoReturnToIdle
                     || App.PetRuntime.currentLoopMode === "once")
                     && frameCount > 0
@@ -197,6 +204,7 @@ Window {
             pressX = mouse.x
             pressY = mouse.y
             dragMoved = false
+            App.PetRuntime.handleDragStarted(petWindow.x + mouse.x)
         }
 
         onPositionChanged: function(mouse) {
@@ -208,12 +216,19 @@ Window {
                 dragMoved = true
             }
 
+            App.PetRuntime.handleDragMoved(petWindow.x + mouse.x)
             petWindow.x += mouse.x - pressX
             petWindow.y += mouse.y - pressY
         }
 
         onReleased: function(mouse) {
-            if (mouse.button !== Qt.LeftButton || dragMoved) {
+            if (mouse.button !== Qt.LeftButton) {
+                return
+            }
+
+            App.PetRuntime.handleDragEnded()
+
+            if (dragMoved) {
                 return
             }
 

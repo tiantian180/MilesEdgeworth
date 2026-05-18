@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QElapsedTimer>
 #include <QHash>
 #include <QJSEngine>
 #include <QList>
@@ -65,6 +66,10 @@ public:
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void handlePrimaryClick(double x, double y, double width, double height);
     Q_INVOKABLE void handleDoubleClick();
+    Q_INVOKABLE void handleDragStarted(double globalX);
+    Q_INVOKABLE void handleDragMoved(double globalX);
+    Q_INVOKABLE void handleDragEnded();
+    Q_INVOKABLE void handleHoldAnimationReachedEnd();
     Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
@@ -195,6 +200,12 @@ private:
     QUrl m_currentSoundUrl;
     int m_playbackSerial = 0;
     int m_soundPlaybackSerial = 0;
+    QElapsedTimer m_dragShakeClock;
+    double m_dragShakeX = 0;
+    int m_dragShakeDirection = 1;
+    int m_dragShakeTurns = 0;
+    bool m_dragShakeTracking = false;
+    bool m_dragHoldAnimationCompleted = false;
 };
 
 // 与 DesktopShellControllerForeign 一样，这个 wrapper 让 QML 看到一个名为

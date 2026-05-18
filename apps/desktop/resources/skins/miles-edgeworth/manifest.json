@@ -363,6 +363,51 @@
         }
       }
     },
+    "drag_crouch": {
+      "label": "拖拽晃动后蹲下",
+      "category": "interaction",
+      "loopMode": "hold",
+      "priority": 45,
+      "tags": ["drag", "shake", "crouch", "scared"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/crouch-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/crouch-left.gif"
+        }
+      }
+    },
+    "drag_stand_up_full": {
+      "label": "蹲下后完整站起",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 45,
+      "tags": ["drag", "shake", "recover"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/stand-up-full-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/stand-up-full-left.gif"
+        }
+      }
+    },
+    "drag_stand_up_quick": {
+      "label": "受惊未蹲下时快速站起",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 45,
+      "tags": ["drag", "shake", "recover", "quick"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/stand-up-quick-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/stand-up-quick-left.gif"
+        }
+      }
+    },
     "crossed": {
       "label": "抱臂等待",
       "category": "interaction",

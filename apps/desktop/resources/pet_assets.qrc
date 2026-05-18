@@ -42,6 +42,12 @@
     <file alias="scared-left.gif">../../../gifs/special/scared1.gif</file>
     <file alias="back-right.gif">../../../gifs/special/back0.gif</file>
     <file alias="back-left.gif">../../../gifs/special/back1.gif</file>
+    <file alias="crouch-right.gif">../../../gifs/special/crouch0.gif</file>
+    <file alias="crouch-left.gif">../../../gifs/special/crouch1.gif</file>
+    <file alias="stand-up-full-right.gif">../../../gifs/special/standup0.gif</file>
+    <file alias="stand-up-full-left.gif">../../../gifs/special/standup1.gif</file>
+    <file alias="stand-up-quick-right.gif">../../../gifs/special/standup2.gif</file>
+    <file alias="stand-up-quick-left.gif">../../../gifs/special/standup3.gif</file>
     <file alias="crossed-right.gif">../../../gifs/special/crossed0.gif</file>
     <file alias="crossed-left.gif">../../../gifs/special/crossed1.gif</file>
     <file alias="objecting-right.gif">../../../gifs/special/object0.gif</file>

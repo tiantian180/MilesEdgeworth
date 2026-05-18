@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRandomGenerator>
+#include <QtGlobal>
 #include <QVariantMap>
 
 namespace {
@@ -293,6 +294,74 @@ void PetRuntime::handleDoubleClick()
     }
 
     playActionFromPool("doubleClick.random");
+}
+
+void PetRuntime::handleDragStarted(double globalX)
+{
+    if (m_currentActionId == "sleep") {
+        return;
+    }
+
+    // 旧版在按住拖动时统计横向来回改变方向的次数。
+    // 这里记录全局 X，QML 负责把窗口坐标和鼠标局部坐标合成后传进来。
+    m_dragShakeTracking = true;
+    m_dragShakeX = globalX;
+    m_dragShakeDirection = 1;
+    m_dragShakeTurns = 0;
+    m_dragHoldAnimationCompleted = false;
+    m_dragShakeClock.restart();
+}
+
+void PetRuntime::handleDragMoved(double globalX)
+{
+    if (!m_dragShakeTracking || m_currentActionId == "sleep") {
+        return;
+    }
+
+    if (m_dragShakeClock.isValid() && m_dragShakeClock.elapsed() > 1000) {
+        m_dragShakeClock.restart();
+        m_dragShakeTurns = 0;
+    }
+
+    const double movement = globalX - m_dragShakeX;
+    if (qFuzzyIsNull(movement)) {
+        return;
+    }
+
+    if (movement * m_dragShakeDirection < 0) {
+        ++m_dragShakeTurns;
+        m_dragShakeDirection = -m_dragShakeDirection;
+        m_dragShakeX = globalX;
+    }
+
+    if (m_dragShakeTurns >= 5) {
+        m_dragShakeTracking = false;
+        m_dragShakeTurns = 0;
+        m_dragHoldAnimationCompleted = false;
+        playAction("drag_crouch");
+    }
+}
+
+void PetRuntime::handleDragEnded()
+{
+    m_dragShakeTracking = false;
+    m_dragShakeTurns = 0;
+
+    if (m_currentActionId == "drag_crouch") {
+        const QString recoverAction = m_dragHoldAnimationCompleted ? "drag_stand_up_full" : "drag_stand_up_quick";
+        m_dragHoldAnimationCompleted = false;
+        playAction(recoverAction);
+        return;
+    }
+
+    m_dragHoldAnimationCompleted = false;
+}
+
+void PetRuntime::handleHoldAnimationReachedEnd()
+{
+    if (m_currentActionId == "drag_crouch" && m_currentLoopMode == "hold") {
+        m_dragHoldAnimationCompleted = true;
+    }
 }
 
 void PetRuntime::startStartupSequence()

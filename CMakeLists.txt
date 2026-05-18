@@ -86,5 +86,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_12_double_click_sound_runtime.py
         )
+
+        # Phase 0.13 的拖拽晃动检查：守住旧版“左右快速晃动触发蹲下，
+        # 松手后站起”的最小交互链路。
+        add_test(
+            NAME check_phase_0_13_drag_shake_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_13_drag_shake_runtime.py
+        )
     endif()
 endif()
