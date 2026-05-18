@@ -70,5 +70,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_10_locomotion_runtime.py
         )
+
+        # Phase 0.11 的单击分区检查：守住 hitZones、click pools
+        # 和 QML 左键点击入口。
+        add_test(
+            NAME check_phase_0_11_hit_zone_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_11_hit_zone_runtime.py
+        )
     endif()
 endif()

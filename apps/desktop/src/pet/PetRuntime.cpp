@@ -11,6 +11,34 @@ namespace {
 constexpr auto kManifestPath = ":/pet/manifest.json";
 constexpr auto kFallbackActionId = "idle_stand";
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
+
+QString hitZoneIdForClickPool(const QString &poolId)
+{
+    if (poolId == "click.upperArm") {
+        return "upper_arm";
+    }
+
+    if (poolId == "click.face") {
+        return "face";
+    }
+    if (poolId == "click.head") {
+        return "head";
+    }
+    if (poolId == "click.forearm") {
+        return "forearm";
+    }
+    if (poolId == "click.chest") {
+        return "chest";
+    }
+    if (poolId == "click.belly") {
+        return "belly";
+    }
+    if (poolId == "click.legs") {
+        return "legs";
+    }
+
+    return {};
+}
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -225,6 +253,26 @@ QVariantMap PetRuntime::consumeFrameMovementDelta() const
     return delta;
 }
 
+void PetRuntime::handlePrimaryClick(double x, double y, double width, double height)
+{
+    // 旧版在睡眠中单击无反应；在其它非站立动作中单击会先回到站立。
+    // v2 先保留这个交互节奏，后续双击和高级交互再共用 Interaction Pipeline。
+    if (m_currentActionId == "sleep") {
+        return;
+    }
+
+    const QString idleAction = actionForState("idle");
+    if (!idleAction.isEmpty() && m_currentActionId != idleAction) {
+        returnToIdle();
+        return;
+    }
+
+    const QString poolId = clickPoolForPoint(x, y, width, height);
+    if (!poolId.isEmpty()) {
+        playActionFromPool(poolId);
+    }
+}
+
 void PetRuntime::startStartupSequence()
 {
     playRecipe("startup.briefcase");
@@ -372,6 +420,35 @@ void PetRuntime::loadManifest()
         }
         if (!m_movementDirections.isEmpty()) {
             m_currentMovementDirection = m_movementDirections.constFirst();
+        }
+    }
+
+    const QJsonObject hitZones = root.value("hitZones").toObject();
+    for (auto it = hitZones.constBegin(); it != hitZones.constEnd(); ++it) {
+        const QJsonObject zoneObject = it.value().toObject();
+        if (zoneObject.value("type").toString() != "rect") {
+            continue;
+        }
+
+        HitZoneDefinition zone;
+        zone.id = it.key();
+        zone.rect = QRectF(
+            zoneObject.value("x").toDouble(0),
+            zoneObject.value("y").toDouble(0),
+            zoneObject.value("width").toDouble(0),
+            zoneObject.value("height").toDouble(0)
+        );
+
+        if (zone.rect.isValid()) {
+            m_hitZones.insert(zone.id, zone);
+        }
+    }
+
+    const QJsonArray singleClickPools = root.value("clickBehaviors").toObject().value("singleClick").toArray();
+    for (const QJsonValue &value : singleClickPools) {
+        const QString poolId = value.toString();
+        if (!poolId.isEmpty()) {
+            m_singleClickPools.append(poolId);
         }
     }
 
@@ -536,6 +613,8 @@ void PetRuntime::loadFallbackManifest()
     m_actions.clear();
     m_recipes.clear();
     m_actionPools.clear();
+    m_hitZones.clear();
+    m_singleClickPools.clear();
     m_facings = {"right", "left"};
     m_movementDirections = {"east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"};
     m_defaultFacing = "right";
@@ -587,6 +666,26 @@ QUrl PetRuntime::variantForAction(const ActionDefinition &action) const
     }
 
     return variantForFacing(action.variants, m_currentFacing);
+}
+
+QString PetRuntime::clickPoolForPoint(double x, double y, double width, double height) const
+{
+    if (width <= 0 || height <= 0) {
+        return {};
+    }
+
+    // hitZones 以 240x240 逻辑画布描述，QML 可按实际窗口尺寸传入坐标。
+    // 这样后续皮肤改 canvas 或窗口缩放时，只需要统一做一次坐标归一化。
+    const QPointF logicalPoint(x * 240.0 / width, y * 240.0 / height);
+    for (const QString &poolId : m_singleClickPools) {
+        const QString zoneId = hitZoneIdForClickPool(poolId);
+        const HitZoneDefinition zone = m_hitZones.value(zoneId);
+        if (!zone.id.isEmpty() && zone.rect.contains(logicalPoint)) {
+            return poolId;
+        }
+    }
+
+    return {};
 }
 
 void PetRuntime::clearActiveRecipe()

@@ -17,6 +17,60 @@
       "action": "objecting"
     }
   },
+  "hitZones": {
+    "face": {
+      "type": "rect",
+      "x": 122,
+      "y": 24,
+      "width": 42,
+      "height": 44
+    },
+    "head": {
+      "type": "rect",
+      "x": 78,
+      "y": 20,
+      "width": 84,
+      "height": 50
+    },
+    "upper_arm": {
+      "type": "rect",
+      "x": 42,
+      "y": 70,
+      "width": 54,
+      "height": 44
+    },
+    "forearm": {
+      "type": "rect",
+      "x": 42,
+      "y": 96,
+      "width": 64,
+      "height": 46
+    },
+    "chest": {
+      "type": "rect",
+      "x": 92,
+      "y": 72,
+      "width": 62,
+      "height": 62
+    },
+    "belly": {
+      "type": "rect",
+      "x": 86,
+      "y": 126,
+      "width": 74,
+      "height": 44
+    },
+    "legs": {
+      "type": "rect",
+      "x": 74,
+      "y": 166,
+      "width": 92,
+      "height": 58
+    }
+  },
+  "clickBehaviors": {
+    "singleClick": ["click.face", "click.head", "click.upperArm", "click.forearm", "click.chest", "click.belly", "click.legs"]
+  },
   "actions": {
     "idle_stand": {
       "label": "站立",
@@ -246,6 +300,66 @@
         },
         "left": {
           "animation": "qrc:/pet/idle-pointing-left.gif"
+        }
+      }
+    },
+    "idle_look_up": {
+      "label": "抬头看",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "look_up", "head"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-look-up-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-look-up-left.gif"
+        }
+      }
+    },
+    "idle_look_down": {
+      "label": "低头看",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "look_down", "legs"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-look-down-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-look-down-left.gif"
+        }
+      }
+    },
+    "scared": {
+      "label": "受惊",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 35,
+      "tags": ["click", "face", "scared"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/scared-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/scared-left.gif"
+        }
+      }
+    },
+    "back_away": {
+      "label": "后退",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 25,
+      "tags": ["click", "legs", "back"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/back-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/back-left.gif"
         }
       }
     },
@@ -486,6 +600,51 @@
       "scope": "idle",
       "action": "idle_pointing"
     },
+    "click.faceScared": {
+      "label": "点脸受惊",
+      "scope": "click",
+      "action": "scared"
+    },
+    "click.headTap": {
+      "label": "点头轻敲脑袋",
+      "scope": "click",
+      "action": "idle_tapping_head"
+    },
+    "click.headLookUp": {
+      "label": "点头抬头看",
+      "scope": "click",
+      "action": "idle_look_up"
+    },
+    "click.forearmWatch": {
+      "label": "点小臂看表",
+      "scope": "click",
+      "action": "idle_check_watch"
+    },
+    "click.forearmShrug": {
+      "label": "点小臂耸肩",
+      "scope": "click",
+      "action": "idle_shrug"
+    },
+    "click.chestThinking": {
+      "label": "点胸口思考",
+      "scope": "click",
+      "action": "idle_thinking_once"
+    },
+    "click.bellyPointing": {
+      "label": "点肚子指点",
+      "scope": "click",
+      "action": "idle_pointing"
+    },
+    "click.legsBack": {
+      "label": "点腿后退",
+      "scope": "click",
+      "action": "back_away"
+    },
+    "click.legsLookDown": {
+      "label": "点腿低头看",
+      "scope": "click",
+      "action": "idle_look_down"
+    },
     "objecting.once": {
       "label": "异议一次",
       "scope": "interaction",
@@ -615,6 +774,85 @@
         },
         {
           "recipe": "objecting.once",
+          "weight": 1
+        }
+      ]
+    },
+    "click.face": {
+      "label": "点击脸部",
+      "entries": [
+        {
+          "recipe": "click.faceScared",
+          "weight": 1
+        }
+      ]
+    },
+    "click.head": {
+      "label": "点击头部",
+      "entries": [
+        {
+          "recipe": "click.headTap",
+          "weight": 1
+        },
+        {
+          "recipe": "click.headLookUp",
+          "weight": 1
+        }
+      ]
+    },
+    "click.upperArm": {
+      "label": "点击大臂",
+      "entries": [
+        {
+          "recipe": "turn.once",
+          "weight": 1
+        }
+      ]
+    },
+    "click.forearm": {
+      "label": "点击小臂",
+      "entries": [
+        {
+          "recipe": "click.forearmWatch",
+          "weight": 1
+        },
+        {
+          "recipe": "click.forearmShrug",
+          "weight": 1
+        }
+      ]
+    },
+    "click.chest": {
+      "label": "点击胸口",
+      "entries": [
+        {
+          "recipe": "click.chestThinking",
+          "weight": 1
+        }
+      ]
+    },
+    "click.belly": {
+      "label": "点击肚子",
+      "entries": [
+        {
+          "recipe": "click.bellyPointing",
+          "weight": 1
+        },
+        {
+          "recipe": "bow.once",
+          "weight": 1
+        }
+      ]
+    },
+    "click.legs": {
+      "label": "点击腿部",
+      "entries": [
+        {
+          "recipe": "click.legsBack",
+          "weight": 1
+        },
+        {
+          "recipe": "click.legsLookDown",
           "weight": 1
         }
       ]

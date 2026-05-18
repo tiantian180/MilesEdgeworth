@@ -155,6 +155,7 @@ Window {
 
         property real pressX: 0
         property real pressY: 0
+        property bool dragMoved: false
 
         onPressed: function(mouse) {
             if (mouse.button === Qt.RightButton) {
@@ -164,6 +165,7 @@ Window {
 
             pressX = mouse.x
             pressY = mouse.y
+            dragMoved = false
         }
 
         onPositionChanged: function(mouse) {
@@ -171,8 +173,20 @@ Window {
                 return
             }
 
+            if (Math.abs(mouse.x - pressX) > 3 || Math.abs(mouse.y - pressY) > 3) {
+                dragMoved = true
+            }
+
             petWindow.x += mouse.x - pressX
             petWindow.y += mouse.y - pressY
+        }
+
+        onReleased: function(mouse) {
+            if (mouse.button !== Qt.LeftButton || dragMoved) {
+                return
+            }
+
+            App.PetRuntime.handlePrimaryClick(mouse.x, mouse.y, width, height)
         }
     }
 }

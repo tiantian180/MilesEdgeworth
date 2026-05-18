@@ -34,6 +34,14 @@
     <file alias="idle-check-watch-left.gif">../../../gifs/once/9.gif</file>
     <file alias="idle-pointing-right.gif">../../../gifs/once/10.gif</file>
     <file alias="idle-pointing-left.gif">../../../gifs/once/11.gif</file>
+    <file alias="idle-look-down-right.gif">../../../gifs/once/16.gif</file>
+    <file alias="idle-look-down-left.gif">../../../gifs/once/17.gif</file>
+    <file alias="idle-look-up-right.gif">../../../gifs/once/18.gif</file>
+    <file alias="idle-look-up-left.gif">../../../gifs/once/19.gif</file>
+    <file alias="scared-right.gif">../../../gifs/special/scared0.gif</file>
+    <file alias="scared-left.gif">../../../gifs/special/scared1.gif</file>
+    <file alias="back-right.gif">../../../gifs/special/back0.gif</file>
+    <file alias="back-left.gif">../../../gifs/special/back1.gif</file>
     <file alias="objecting-right.gif">../../../gifs/special/object0.gif</file>
     <file alias="objecting-left.gif">../../../gifs/special/object1.gif</file>
     <file alias="bow-right.gif">../../../gifs/special/bow0.gif</file>

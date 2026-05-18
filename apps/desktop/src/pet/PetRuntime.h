@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QPointF>
 #include <QQmlEngine>
+#include <QRectF>
 #include <QStringList>
 #include <QString>
 #include <QUrl>
@@ -58,6 +59,7 @@ public:
     Q_INVOKABLE void playRecipe(const QString &recipeId);
     Q_INVOKABLE void playActionFromPool(const QString &poolId);
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
+    Q_INVOKABLE void handlePrimaryClick(double x, double y, double width, double height);
     Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
@@ -138,11 +140,18 @@ private:
         QList<ActionPoolEntry> entries;
     };
 
+    struct HitZoneDefinition
+    {
+        QString id;
+        QRectF rect;
+    };
+
     void loadManifest();
     void loadFallbackManifest();
     QString actionForState(const QString &state) const;
     QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
     QUrl variantForAction(const ActionDefinition &action) const;
+    QString clickPoolForPoint(double x, double y, double width, double height) const;
     void clearActiveRecipe();
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
@@ -158,6 +167,8 @@ private:
     QHash<QString, ActionDefinition> m_actions;
     QHash<QString, RecipeDefinition> m_recipes;
     QHash<QString, ActionPoolDefinition> m_actionPools;
+    QHash<QString, HitZoneDefinition> m_hitZones;
+    QStringList m_singleClickPools;
     QString m_fallbackAction = "idle_stand";
     QStringList m_facings = {"right", "left"};
     QStringList m_movementDirections;
