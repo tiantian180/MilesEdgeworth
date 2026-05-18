@@ -583,6 +583,18 @@
       "scope": "state",
       "action": "idle_stand"
     },
+    "walk.current": {
+      "label": "沿当前方向继续走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "$current"
+    },
+    "run.current": {
+      "label": "沿当前方向继续跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "$current"
+    },
     "idle.randomThinking": {
       "label": "随机思考",
       "scope": "idle",
@@ -949,6 +961,104 @@
         {
           "recipe": "objecting.once",
           "weight": 1
+        }
+      ]
+    },
+    "walk.finished": {
+      "label": "走路结束后的续行动作",
+      "entries": [
+        {
+          "recipe": "run.current",
+          "weight": 20
+        },
+        {
+          "recipe": "walk.current",
+          "weight": 10
+        },
+        {
+          "recipe": "walk.east",
+          "weight": 4
+        },
+        {
+          "recipe": "walk.west",
+          "weight": 4
+        },
+        {
+          "recipe": "walk.northEast",
+          "weight": 4
+        },
+        {
+          "recipe": "walk.northWest",
+          "weight": 4
+        },
+        {
+          "recipe": "walk.southEast",
+          "weight": 4
+        },
+        {
+          "recipe": "walk.southWest",
+          "weight": 4
+        },
+        {
+          "recipe": "walk.north",
+          "weight": 4
+        },
+        {
+          "recipe": "walk.south",
+          "weight": 4
+        },
+        {
+          "recipe": "idle.stand",
+          "weight": 50
+        }
+      ]
+    },
+    "run.finished": {
+      "label": "跑步结束后的续行动作",
+      "entries": [
+        {
+          "recipe": "walk.current",
+          "weight": 20
+        },
+        {
+          "recipe": "run.current",
+          "weight": 10
+        },
+        {
+          "recipe": "run.east",
+          "weight": 3
+        },
+        {
+          "recipe": "run.west",
+          "weight": 3
+        },
+        {
+          "recipe": "run.northEast",
+          "weight": 3
+        },
+        {
+          "recipe": "run.northWest",
+          "weight": 3
+        },
+        {
+          "recipe": "run.southEast",
+          "weight": 3
+        },
+        {
+          "recipe": "run.southWest",
+          "weight": 3
+        },
+        {
+          "recipe": "run.north",
+          "weight": 3
+        },
+        {
+          "recipe": "run.south",
+          "weight": 3
+        },
+        {
+          "recipe": "idle.stand",
+          "weight": 60
         }
       ]
     },

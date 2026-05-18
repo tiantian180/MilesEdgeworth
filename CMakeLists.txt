@@ -134,5 +134,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_19_window_movement_bounds.py
         )
+
+        # Phase 0.20 的移动续行检查：守住旧版 walk/run 播完后
+        # 可能继续移动、换方向或停下的生命感。
+        add_test(
+            NAME check_phase_0_20_locomotion_followup
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_20_locomotion_followup.py
+        )
     endif()
 endif()

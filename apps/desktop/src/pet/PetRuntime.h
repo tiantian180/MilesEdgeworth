@@ -239,6 +239,8 @@ private:
     void playNextRecipeStep();
     void playRecipeStep(const RecipeStep &step);
     ActionPoolEntry selectActionPoolEntry(const ActionPoolDefinition &pool) const;
+    QString followUpPoolForCompletedAction(const ActionDefinition &action) const;
+    QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
     void playPhase(const QString &actionId, const QString &phaseId);

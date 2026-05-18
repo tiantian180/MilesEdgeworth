@@ -645,6 +645,12 @@ void PetRuntime::handleAnimationFinished()
     }
 
     if (m_currentAutoReturnToIdle) {
+        const QString followUpPoolId = followUpPoolForCompletedAction(action);
+        if (!followUpPoolId.isEmpty()) {
+            playActionFromPool(followUpPoolId);
+            return;
+        }
+
         setState("idle");
     }
 }
@@ -1153,10 +1159,11 @@ void PetRuntime::playNextRecipeStep()
 
 void PetRuntime::playRecipeStep(const RecipeStep &step)
 {
-    if (!step.movementDirection.isEmpty() && m_movementDirections.contains(step.movementDirection)) {
-        const bool movementDirectionChanged = (m_currentMovementDirection != step.movementDirection);
-        m_currentMovementDirection = step.movementDirection;
-        updateFacingFromMovementDirection(step.movementDirection);
+    const QString movementDirection = resolveRecipeMovementDirection(step.movementDirection);
+    if (!movementDirection.isEmpty() && m_movementDirections.contains(movementDirection)) {
+        const bool movementDirectionChanged = (m_currentMovementDirection != movementDirection);
+        m_currentMovementDirection = movementDirection;
+        updateFacingFromMovementDirection(movementDirection);
         if (movementDirectionChanged) {
             emit currentMovementDirectionChanged();
         }
@@ -1202,6 +1209,35 @@ PetRuntime::ActionPoolEntry PetRuntime::selectActionPoolEntry(const ActionPoolDe
     }
 
     return pool.entries.constLast();
+}
+
+QString PetRuntime::followUpPoolForCompletedAction(const ActionDefinition &action) const
+{
+    if (action.category != "locomotion") {
+        return {};
+    }
+
+    // 旧版走路 / 跑步播完后会继续走、继续跑、换方向或停下。
+    // 这里只把“完成后去哪个候选池”写在运行时，具体概率仍交给 manifest。
+    if (m_currentActionId == "walk" && m_actionPools.contains("walk.finished")) {
+        return "walk.finished";
+    }
+
+    if (m_currentActionId == "run" && m_actionPools.contains("run.finished")) {
+        return "run.finished";
+    }
+
+    return {};
+}
+
+QString PetRuntime::resolveRecipeMovementDirection(const QString &movementDirection) const
+{
+    const QString normalizedDirection = movementDirection.trimmed();
+    if (normalizedDirection == "$current") {
+        return m_currentMovementDirection;
+    }
+
+    return normalizedDirection;
 }
 
 void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)

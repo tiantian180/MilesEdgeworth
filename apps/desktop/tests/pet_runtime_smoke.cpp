@@ -49,6 +49,14 @@ int main(int argc, char *argv[])
     require(walkDelta.value("dx").toDouble() > 0, "walk.east 应推动窗口向右移动");
     require(runtime.currentFacing() == "right", "walk.east 应让桌宠朝右");
 
+    runtime.playLocomotion("walk", "northEast");
+    runtime.playRecipe("run.current");
+    require(runtime.currentActionId() == "run", "run.current 应切到跑步动作");
+    require(runtime.currentMovementDirection() == "northEast", "walk/run current recipe 应沿用当前方向");
+    runtime.playRecipe("walk.current");
+    require(runtime.currentActionId() == "walk", "walk.current 应切回走路动作");
+    require(runtime.currentMovementDirection() == "northEast", "walk/run current recipe 应沿用当前方向");
+
     runtime.toggleAutoMovementEnabled();
     walkDelta = runtime.consumeFrameMovementDelta();
     require(walkDelta.value("dx").toDouble() == 0.0 && walkDelta.value("dy").toDouble() == 0.0, "禁止走动后移动增量应为 0");
