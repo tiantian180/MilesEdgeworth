@@ -48,7 +48,6 @@ def main() -> int:
         action = actions[action_id]
         require("loopMode" in action, f"{action_id} 缺少 loopMode")
         require("priority" in action, f"{action_id} 缺少 priority")
-        require("interruptPolicy" in action, f"{action_id} 缺少 interruptPolicy")
         require("tags" in action, f"{action_id} 缺少 tags")
         variants = action.get("variants", {})
         require("right" in variants and "left" in variants, f"{action_id} 缺少左右朝向 variant")

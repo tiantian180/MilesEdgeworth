@@ -283,7 +283,8 @@ Pet Runtime 是 Qt 侧的核心。它统一处理：
 ### Phase 1：旧版手感还原
 
 - Pet Runtime 最小版。
-- `currentAction + pendingRequest` 调度模型。
+- `currentAction + currentRecipe + pendingRequest` 调度模型。
+- 请求级 `interruptHint = replace / afterCurrent`，不把复杂中断策略写进皮肤 manifest。
 - `loop / oneshot` 播放。
 - 左右朝向和 8 方向移动动画。
 - 随机待机、走路、跑步。

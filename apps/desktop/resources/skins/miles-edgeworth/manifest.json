@@ -22,7 +22,6 @@
       "category": "idle",
       "loopMode": "loop",
       "priority": 0,
-      "interruptPolicy": "replace",
       "tags": ["idle", "standing"],
       "variants": {
         "right": {
@@ -38,7 +37,6 @@
       "category": "cognitive",
       "loopMode": "loop",
       "priority": 20,
-      "interruptPolicy": "replace",
       "tags": ["thinking", "cognitive"],
       "variants": {
         "right": {
@@ -54,7 +52,6 @@
       "category": "gesture",
       "loopMode": "onceThenIdle",
       "priority": 40,
-      "interruptPolicy": "replace",
       "tags": ["objecting", "speaking", "emphasis"],
       "variants": {
         "right": {
@@ -70,7 +67,6 @@
       "category": "gesture",
       "loopMode": "onceThenIdle",
       "priority": 30,
-      "interruptPolicy": "replace",
       "tags": ["bow", "polite"],
       "variants": {
         "right": {
@@ -86,7 +82,6 @@
       "category": "idle",
       "loopMode": "hold",
       "priority": 10,
-      "interruptPolicy": "replace",
       "tags": ["tea", "rest"],
       "variants": {
         "right": {
@@ -101,7 +96,6 @@
       "label": "睡觉",
       "category": "idle",
       "priority": 10,
-      "interruptPolicy": "replace",
       "tags": ["sleep", "idle"],
       "initialPhase": "enter",
       "exitPhase": "exit",

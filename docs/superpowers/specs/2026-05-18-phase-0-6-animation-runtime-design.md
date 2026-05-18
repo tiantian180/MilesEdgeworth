@@ -15,7 +15,6 @@ Phase 0.6 不做完整动画编排器，只建立下一层骨架，让后续接�
   - `category`
   - `loopMode`
   - `priority`
-  - `interruptPolicy`
   - `tags`
   - `variants.right.animation`
   - `variants.left.animation`
@@ -53,7 +52,6 @@ Phase 0.6 不做完整动画编排器，只建立下一层骨架，让后续接�
       "category": "cognitive",
       "loopMode": "loop",
       "priority": 20,
-      "interruptPolicy": "replace",
       "tags": ["thinking", "cognitive"],
       "variants": {
         "right": { "animation": "qrc:/pet/thinking-right.gif" },

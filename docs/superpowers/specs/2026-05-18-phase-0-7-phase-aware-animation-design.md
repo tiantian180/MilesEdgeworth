@@ -44,7 +44,6 @@ Phase-aware action 示例：
     "label": "睡觉",
     "category": "idle",
     "priority": 10,
-    "interruptPolicy": "replace",
     "tags": ["sleep", "idle"],
     "initialPhase": "enter",
     "exitPhase": "exit",

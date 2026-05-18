@@ -80,7 +80,6 @@ private:
         QString category;
         QString loopMode = "loop";
         int priority = 0;
-        QString interruptPolicy = "replace";
         QStringList tags;
         QHash<QString, QUrl> variants;
         QString initialPhase;

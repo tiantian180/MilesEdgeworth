@@ -237,7 +237,6 @@ void PetRuntime::loadManifest()
         action.category = actionObject.value("category").toString();
         action.loopMode = actionObject.value("loopMode").toString(actionObject.value("loop").toBool(true) ? "loop" : "onceThenIdle");
         action.priority = actionObject.value("priority").toInt(0);
-        action.interruptPolicy = actionObject.value("interruptPolicy").toString("replace");
         action.initialPhase = actionObject.value("initialPhase").toString();
         action.exitPhase = actionObject.value("exitPhase").toString();
 

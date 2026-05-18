@@ -220,6 +220,54 @@ Scenario Recipe 用来表达“多个动作必须按顺序发生”。例如“�
 
 这里不需要再定义一个 “Action 之上的动画编排层”。Scenario Recipe 本身就是编排层。
 
+#### 运行时参数
+
+Recipe 可以写默认 repeat / duration，也可以把某些值留给运行时请求决定。
+适合 agent thinking、speaking、临时表演和后续工具调用状态。
+
+```json
+{
+  "recipes": {
+    "thinking.hold": {
+      "scope": "action",
+      "action": "thinking",
+      "pattern": "enterLoopExit",
+      "steps": [
+        { "phase": "enter", "repeat": 1 },
+        { "phase": "loop", "repeat": { "param": "loopRepeat", "default": "untilCancelled" } },
+        { "phase": "exit", "repeat": 1 }
+      ]
+    },
+    "tea.loopForDuration": {
+      "scope": "action",
+      "action": "drink_tea",
+      "pattern": "enterLoopExit",
+      "steps": [
+        { "phase": "enter", "repeat": 1 },
+        { "phase": "loop", "durationMs": { "param": "durationMs", "default": 5000 } },
+        { "phase": "exit", "repeat": 1 }
+      ]
+    }
+  }
+}
+```
+
+运行时请求可以覆盖参数：
+
+```json
+{
+  "action": "drink_tea",
+  "recipe": "tea.loopForDuration",
+  "recipeParams": {
+    "durationMs": 12000
+  },
+  "interruptHint": "afterCurrent"
+}
+```
+
+MVP 可以先只支持 manifest 里的固定 `repeat` / `durationMs` 和
+`repeat: "untilCancelled"`。`recipeParams` 是为后续保留的接口形状，避免未来再推翻 recipe 结构。
+
 #### Recipe 引用规则
 
 - Action Recipe 可以直接引用当前 Action 的 phase。
@@ -265,7 +313,7 @@ BehaviorRule 把事件映射为 ActionRequest。事件来源包括鼠标、菜�
       {
         "pool": "ai.thinking",
         "priority": 70,
-        "interrupt": "phaseExit"
+        "interruptHint": "afterCurrent"
       }
     ],
     "menu.drinkTea": [
@@ -296,12 +344,43 @@ sequenceDiagram
     else behavior references recipe directly
         Behavior->>Runtime: ActionRequest(recipe, priority)
     end
-    Runtime->>Runtime: resolve interrupt policy
+    Runtime->>Runtime: apply interruptHint
     Runtime->>Player: play recipe steps
     Runtime->>Effects: play sound / bubble / prop overlay
     Player-->>Runtime: phase finished
     Runtime->>Player: next phase or idle
 ```
+
+## 运行时切换策略
+
+皮肤 manifest 不配置复杂 interrupt policy。它只描述素材、action、phase、recipe 和
+behavior 怎么映射；“新请求来了要不要立刻打断”由事件请求携带一个很小的提示：
+
+```json
+{
+  "action": "thinking",
+  "recipe": "thinking.holdUntilCancelled",
+  "priority": 70,
+  "interruptHint": "afterCurrent"
+}
+```
+
+`interruptHint` 只保留两个值：
+
+| 值 | 含义 | 典型场景 |
+| --- | --- | --- |
+| `replace` | 立刻切换，清空 pending request。默认值。 | 用户拖拽、错误提示、明确点击反馈 |
+| `afterCurrent` | 等当前 recipe 到达自然边界后切换，只保留一个 pending request。 | thinking 收尾后 speaking、喝茶结束后鞠躬 |
+
+运行时只维护一个 `pendingRequest`，不维护全局动画队列。新的 `afterCurrent` 请求会覆盖旧的
+pending；新的 `replace` 请求会清空 pending 并立即播放。
+
+自然边界包括 clip 播完、loop cycle 播完、phase 播完或 recipe 播完。对于
+`repeat: "untilCancelled"` 这类无限循环 recipe，loop 的每个周期都是可退出边界；
+如果有 exit phase，就先进入 exit，再播放 pending。
+
+空闲随机动作是否丢弃，由 IdleScheduler 在发请求前判断。权限拒绝、状态不合法等情况，
+由 Behavior / Permission / Runtime fallback 处理，不把 `discard`、`reject` 暴露给普通皮肤配置。
 
 ## 素材目录策略
 

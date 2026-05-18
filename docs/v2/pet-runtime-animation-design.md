@@ -144,6 +144,9 @@ MVP 优先实现 `first_available` 和 `weighted_random`。`round_robin` 和 `co
   "state": "speaking",
   "expression": "objection",
   "desiredAction": "emphasis",
+  "recipe": "once",
+  "recipeParams": {},
+  "interruptHint": "replace",
   "priority": 60,
   "expiresInMs": 2000,
   "sideEffects": [
@@ -151,6 +154,10 @@ MVP 优先实现 `first_available` 和 `weighted_random`。`round_robin` 和 `co
   ]
 }
 ```
+
+`interruptHint` 是“这次新请求希望如何切换”的提示，不写时默认为 `replace`。
+它属于运行时请求，不写进皮肤 manifest。皮肤 manifest 只描述素材、动作和 recipe
+能怎么播放，不决定所有场景下是否打断当前动画。
 
 ### Action
 
@@ -411,6 +418,7 @@ MVP 不做全局动画队列。
 
 ```text
 currentAction
+currentRecipe
 pendingRequest，最多一个
 currentAction 内部 phase/sequence
 ```
@@ -421,53 +429,73 @@ currentAction 内部 phase/sequence
 - 新的高优先级事件到来时，很难解释队列该保留还是清空。
 - 桌宠更需要即时反应，而不是严格执行历史动作列表。
 
-### TransitionDecision
+### InterruptHint
 
-当新的 ActionRequest 到来时，调度器做一次仲裁：
-
-```text
-decideTransition(currentAction, newRequest) -> TransitionDecision
-```
-
-TransitionDecision 描述这次冲突如何处理，而不是描述单个动画的属性。
-
-建议决策：
+第一版只暴露两个切换提示：
 
 ```text
-switch_now          立即切换，清空 pendingRequest
-wait_current_done   当前动作播完后切换到 newRequest
-exit_then_switch    当前 phased 动作先走 exit，再切换到 newRequest
-drop_new_request    丢弃新请求
-reject              拒绝请求，例如权限不允许或状态不合法
+replace       立即切换。默认值。
+afterCurrent  等当前 recipe 到达自然边界后切换。
 ```
 
 示例：
 
-```text
-speaking_loop + idle_random_tea => drop_new_request
-thinking_loop + speaking => exit_then_switch
-objecting_oneshot + user_dragging => switch_now
-drink_tea_oneshot + sleep => wait_current_done
+```json
+{ "action": "objecting", "recipe": "once", "interruptHint": "replace" }
+{ "action": "bow", "recipe": "once", "interruptHint": "afterCurrent" }
 ```
 
-`pendingRequest` 只有一个槽位。新请求如果更重要，可以覆盖旧的 pendingRequest。
+`interruptHint` 的主语是“即将进入的新请求”。它不是当前动画的属性，也不是皮肤素材
+的属性。这样用户写皮肤时不需要理解复杂调度策略；只有事件来源在发请求时说明：
+这次是要立刻响应，还是等当前动作自然收尾。
+
+### pendingRequest
+
+`pendingRequest` 只有一个槽位，不是队列。
+
+当新请求到来时：
 
 ```text
-switch_now:
-  停止 currentAction
+interruptHint = replace:
+  立刻停止 currentRecipe
   清空 pendingRequest
   播放新请求
 
-wait_current_done:
+interruptHint = afterCurrent:
   pendingRequest = newRequest
-  currentAction 播完后播放 pendingRequest
+  覆盖旧 pendingRequest
+  当前 recipe 到达自然边界后播放 pendingRequest
+```
 
-exit_then_switch:
-  currentAction 进入 exit phase
-  pendingRequest = newRequest
+自然边界按从细到粗理解：
 
-drop_new_request:
-  什么也不做
+```text
+当前 clip 播完
+当前 loop 周期播完
+当前 phase 播完
+当前 recipe 播完
+```
+
+如果当前 recipe 有 exit phase，`afterCurrent` 可以在最近的自然边界进入 exit，
+再切换到 pendingRequest。如果没有 exit phase，就在最近边界直接切。
+
+如果当前 recipe 是无限循环，例如 agent thinking，不能真的等到永远。
+运行时要把每次 loop cycle 视为可退出边界。后续可以加内部兜底 `maxWaitMs`，
+但不作为普通皮肤配置项暴露。
+
+### 丢弃和拒绝在哪里处理
+
+不把 `discard`、`reject` 做成 manifest 级 interrupt 策略。
+
+```text
+空闲随机动作：
+  由 IdleScheduler 判断当前忙不忙。忙就不发请求。
+
+权限不允许：
+  由 Permission / Behavior 层拒绝事件，不进入动画调度。
+
+状态不合法：
+  由 Runtime 解析 action/expression 时 fallback 或忽略。
 ```
 
 后续如果真的需要连续动作，例如“转身 -> 跑到目标 -> 异议 -> 丢徽章”，应设计成一个 Action 内部的 `sequence`，而不是全局队列。
@@ -489,23 +517,13 @@ drop_new_request:
 
 优先级不是唯一规则，还需要结合：
 
-- 当前动作是否可打断。
 - 当前动作是否有 exit 阶段。
 - 新请求是否过期。
-- 新请求是否允许等待。
+- 新请求的 `interruptHint` 是 `replace` 还是 `afterCurrent`。
 - 当前状态是否允许该 action。
 
-Action 可以声明自身可打断能力：
-
-```json
-{
-  "interruptibility": {
-    "canInterrupt": true,
-    "minPlayMs": 300,
-    "preferExitPhase": true
-  }
-}
-```
+MVP 不让 Action 声明复杂可打断能力。等真正遇到“某个动作至少要播 300ms”
+这类强需求，再增加 Runtime 内部保护字段，而不是一开始把复杂度暴露给普通皮肤作者。
 
 ## 8. 移动系统
 
@@ -709,7 +727,8 @@ Phase 0 / 1 只实现必要能力：
 - `oneshot`
 - 左右朝向变体。
 - 8 方向移动动画。
-- `currentAction + pendingRequest`。
+- `currentAction + currentRecipe + pendingRequest`。
+- `interruptHint = replace / afterCurrent`。
 - 空闲随机动作。
 - 鼠标交互。
 - 检察官徽章和音效。
