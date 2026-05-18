@@ -41,6 +41,16 @@ QString hitZoneIdForClickPool(const QString &poolId)
 
     return {};
 }
+
+QRectF rectFromJsonObject(const QJsonObject &object)
+{
+    return QRectF(
+        object.value("x").toDouble(0),
+        object.value("y").toDouble(0),
+        object.value("width").toDouble(0),
+        object.value("height").toDouble(0)
+    );
+}
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -706,14 +716,17 @@ void PetRuntime::loadManifest()
 
         HitZoneDefinition zone;
         zone.id = it.key();
-        zone.rect = QRectF(
-            zoneObject.value("x").toDouble(0),
-            zoneObject.value("y").toDouble(0),
-            zoneObject.value("width").toDouble(0),
-            zoneObject.value("height").toDouble(0)
-        );
+        zone.rect = rectFromJsonObject(zoneObject);
 
-        if (zone.rect.isValid()) {
+        const QJsonObject zoneVariants = zoneObject.value("variants").toObject();
+        for (auto variantIt = zoneVariants.constBegin(); variantIt != zoneVariants.constEnd(); ++variantIt) {
+            const QRectF variantRect = rectFromJsonObject(variantIt.value().toObject());
+            if (variantRect.isValid()) {
+                zone.facingRects.insert(variantIt.key(), variantRect);
+            }
+        }
+
+        if (zone.rect.isValid() || !zone.facingRects.isEmpty()) {
             m_hitZones.insert(zone.id, zone);
         }
     }
@@ -984,6 +997,19 @@ QUrl PetRuntime::variantForAction(const ActionDefinition &action) const
     return variantForFacing(action.variants, m_currentFacing);
 }
 
+QRectF PetRuntime::rectForHitZone(const HitZoneDefinition &zone) const
+{
+    if (zone.facingRects.contains(m_currentFacing)) {
+        return zone.facingRects.value(m_currentFacing);
+    }
+
+    if (zone.rect.isValid()) {
+        return zone.rect;
+    }
+
+    return zone.facingRects.value(m_defaultFacing, QRectF());
+}
+
 QString PetRuntime::clickPoolForPoint(double x, double y, double width, double height) const
 {
     if (width <= 0 || height <= 0) {
@@ -996,7 +1022,8 @@ QString PetRuntime::clickPoolForPoint(double x, double y, double width, double h
     for (const QString &poolId : m_singleClickPools) {
         const QString zoneId = hitZoneIdForClickPool(poolId);
         const HitZoneDefinition zone = m_hitZones.value(zoneId);
-        if (!zone.id.isEmpty() && zone.rect.contains(logicalPoint)) {
+        const QRectF zoneRect = rectForHitZone(zone);
+        if (!zone.id.isEmpty() && zoneRect.contains(logicalPoint)) {
             return poolId;
         }
     }

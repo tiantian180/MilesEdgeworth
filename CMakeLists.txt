@@ -142,5 +142,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_20_locomotion_followup.py
         )
+
+        # Phase 0.21 的单击分区检查：守住旧版“不同朝向下点击
+        # 脸、手臂、腿等部位仍能触发对应反应”的手感。
+        add_test(
+            NAME check_phase_0_21_facing_hit_zones
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_21_facing_hit_zones.py
+        )
     endif()
 endif()

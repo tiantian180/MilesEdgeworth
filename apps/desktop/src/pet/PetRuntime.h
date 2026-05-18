@@ -221,6 +221,7 @@ private:
     {
         QString id;
         QRectF rect;
+        QHash<QString, QRectF> facingRects;
     };
 
     void loadManifest();
@@ -228,6 +229,7 @@ private:
     QString actionForState(const QString &state) const;
     QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
     QUrl variantForAction(const ActionDefinition &action) const;
+    QRectF rectForHitZone(const HitZoneDefinition &zone) const;
     QString clickPoolForPoint(double x, double y, double width, double height) const;
     QUrl soundUrlForRecipe(const RecipeDefinition &recipe) const;
     void playSoundForRecipe(const RecipeDefinition &recipe);

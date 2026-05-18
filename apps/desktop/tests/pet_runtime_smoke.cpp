@@ -86,6 +86,16 @@ int main(int argc, char *argv[])
     runtime.playRecipe("doubleClick.objection");
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/objection2.wav", "中文语音应选择 objection2.wav");
 
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(145, 40, 240, 240);
+    require(runtime.currentActionId() == "scared", "右朝向点击脸部应触发 scared");
+
+    runtime.returnToIdle();
+    runtime.setFacing("left");
+    runtime.handlePrimaryClick(85, 40, 240, 240);
+    require(runtime.currentActionId() == "scared", "左朝向点击脸部应触发 scared");
+
     runtime.toggleAudioMuted();
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/objection2.wav", "静音时不应发出新的声音播放请求");

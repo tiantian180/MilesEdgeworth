@@ -23,49 +23,147 @@
       "x": 122,
       "y": 24,
       "width": 42,
-      "height": 44
+      "height": 44,
+      "variants": {
+        "right": {
+          "x": 122,
+          "y": 24,
+          "width": 42,
+          "height": 44
+        },
+        "left": {
+          "x": 76,
+          "y": 24,
+          "width": 42,
+          "height": 44
+        }
+      }
     },
     "head": {
       "type": "rect",
       "x": 78,
       "y": 20,
       "width": 84,
-      "height": 50
+      "height": 50,
+      "variants": {
+        "right": {
+          "x": 78,
+          "y": 20,
+          "width": 84,
+          "height": 50
+        },
+        "left": {
+          "x": 78,
+          "y": 20,
+          "width": 84,
+          "height": 50
+        }
+      }
     },
     "upper_arm": {
       "type": "rect",
       "x": 42,
       "y": 70,
       "width": 54,
-      "height": 44
+      "height": 44,
+      "variants": {
+        "right": {
+          "x": 42,
+          "y": 70,
+          "width": 54,
+          "height": 44
+        },
+        "left": {
+          "x": 144,
+          "y": 70,
+          "width": 54,
+          "height": 44
+        }
+      }
     },
     "forearm": {
       "type": "rect",
       "x": 42,
       "y": 96,
       "width": 64,
-      "height": 46
+      "height": 46,
+      "variants": {
+        "right": {
+          "x": 42,
+          "y": 96,
+          "width": 64,
+          "height": 46
+        },
+        "left": {
+          "x": 134,
+          "y": 96,
+          "width": 64,
+          "height": 46
+        }
+      }
     },
     "chest": {
       "type": "rect",
       "x": 92,
       "y": 72,
       "width": 62,
-      "height": 62
+      "height": 62,
+      "variants": {
+        "right": {
+          "x": 92,
+          "y": 72,
+          "width": 62,
+          "height": 62
+        },
+        "left": {
+          "x": 86,
+          "y": 72,
+          "width": 62,
+          "height": 62
+        }
+      }
     },
     "belly": {
       "type": "rect",
       "x": 86,
       "y": 126,
       "width": 74,
-      "height": 44
+      "height": 44,
+      "variants": {
+        "right": {
+          "x": 86,
+          "y": 126,
+          "width": 74,
+          "height": 44
+        },
+        "left": {
+          "x": 80,
+          "y": 126,
+          "width": 74,
+          "height": 44
+        }
+      }
     },
     "legs": {
       "type": "rect",
       "x": 74,
       "y": 166,
       "width": 92,
-      "height": 58
+      "height": 58,
+      "variants": {
+        "right": {
+          "x": 74,
+          "y": 166,
+          "width": 92,
+          "height": 58
+        },
+        "left": {
+          "x": 74,
+          "y": 166,
+          "width": 92,
+          "height": 58
+        }
+      }
     }
   },
   "clickBehaviors": {
