@@ -5,7 +5,7 @@ MilesEdgeworth 正在从旧版 Qt Widgets 桌宠，升级为 Qt 6 / QML 驱动�
 当前 `v2-ai-pet` 分支只保留新版主线代码和可复用素材：
 
 - `apps/desktop/`：Qt 6 / QML 桌面壳层。
-- `docs/v2/`：新版架构、动画系统和阶段验证文档。
+- `docs/v2/`：新版文档，按设计方案、参考资料、阶段记录分类。
 - `gifs/`：Miles 桌宠动画素材。
 - `audios/`：旧版语音素材，后续可按皮肤 / 动作系统重新接入。
 - `icon/`：图标素材。
@@ -74,8 +74,11 @@ Phase 0 已完成最小桌面壳层验证：
 
 ## 文档
 
-- [v2 架构设计](docs/v2/architecture.md)
-- [Pet Runtime 动画系统设计](docs/v2/pet-runtime-animation-design.md)
-- [Phase 0 桌面壳层验证](docs/v2/phase0-desktop-shell.md)
+- [v2 文档索引](docs/v2/文档索引.md)
+- [总体架构设计](docs/v2/设计方案/总体架构设计.md)
+- [桌宠运行时与动画调度设计](docs/v2/设计方案/桌宠运行时与动画调度设计.md)
+- [皮肤包播放行为设计](docs/v2/设计方案/皮肤包播放行为设计.md)
+- [动画素材盘点](docs/v2/参考资料/动画素材盘点.md)
+- [第0阶段桌面壳验证](docs/v2/阶段记录/第0阶段桌面壳验证.md)
 
 图片素材和音频素材来自游戏《逆转裁判》和《逆转检事》。本项目仅用于个人学习和技术验证。
