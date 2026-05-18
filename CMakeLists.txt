@@ -62,5 +62,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_9_startup_idle_runtime.py
         )
+
+        # Phase 0.10 的移动检查：守住旧版 8 方向 walk/run 资源、
+        # 每帧移动增量和 QML 窗口移动入口。
+        add_test(
+            NAME check_phase_0_10_locomotion_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_10_locomotion_runtime.py
+        )
     endif()
 endif()

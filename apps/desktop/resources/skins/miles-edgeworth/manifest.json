@@ -5,6 +5,7 @@
   "version": 1,
   "defaultFacing": "right",
   "facings": ["right", "left"],
+  "movementDirections": ["east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"],
   "states": {
     "idle": {
       "action": "idle_stand"
@@ -40,7 +41,8 @@
       "tags": ["startup", "briefcase", "walking"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/briefcase-in-right.gif"
+          "animation": "qrc:/pet/briefcase-in-right.gif",
+          "movement": { "dx": 11.2, "dy": 0 }
         }
       }
     },
@@ -72,6 +74,88 @@
         },
         "left": {
           "animation": "qrc:/pet/turn-left-to-right.gif"
+        }
+      }
+    },
+    "walk": {
+      "label": "走路",
+      "category": "locomotion",
+      "loopMode": "onceThenIdle",
+      "priority": 8,
+      "tags": ["walk", "moving"],
+      "variants": {
+        "east": {
+          "animation": "qrc:/pet/walk-east.gif",
+          "movement": { "dx": 8.4, "dy": 0 }
+        },
+        "west": {
+          "animation": "qrc:/pet/walk-west.gif",
+          "movement": { "dx": -8.4, "dy": 0 }
+        },
+        "northEast": {
+          "animation": "qrc:/pet/walk-northEast.gif",
+          "movement": { "dx": 6, "dy": -6 }
+        },
+        "northWest": {
+          "animation": "qrc:/pet/walk-northWest.gif",
+          "movement": { "dx": -6, "dy": -6 }
+        },
+        "southEast": {
+          "animation": "qrc:/pet/walk-southEast.gif",
+          "movement": { "dx": 6, "dy": 6 }
+        },
+        "southWest": {
+          "animation": "qrc:/pet/walk-southWest.gif",
+          "movement": { "dx": -6, "dy": 6 }
+        },
+        "north": {
+          "animation": "qrc:/pet/walk-north.gif",
+          "movement": { "dx": 0, "dy": -6 }
+        },
+        "south": {
+          "animation": "qrc:/pet/walk-south.gif",
+          "movement": { "dx": 0, "dy": 6 }
+        }
+      }
+    },
+    "run": {
+      "label": "跑步",
+      "category": "locomotion",
+      "loopMode": "onceThenIdle",
+      "priority": 8,
+      "tags": ["run", "moving"],
+      "variants": {
+        "east": {
+          "animation": "qrc:/pet/run-east.gif",
+          "movement": { "dx": 11.2, "dy": 0 }
+        },
+        "west": {
+          "animation": "qrc:/pet/run-west.gif",
+          "movement": { "dx": -11.2, "dy": 0 }
+        },
+        "northEast": {
+          "animation": "qrc:/pet/run-northEast.gif",
+          "movement": { "dx": 8, "dy": -8 }
+        },
+        "northWest": {
+          "animation": "qrc:/pet/run-northWest.gif",
+          "movement": { "dx": -8, "dy": -8 }
+        },
+        "southEast": {
+          "animation": "qrc:/pet/run-southEast.gif",
+          "movement": { "dx": 8, "dy": 8 }
+        },
+        "southWest": {
+          "animation": "qrc:/pet/run-southWest.gif",
+          "movement": { "dx": -8, "dy": 8 }
+        },
+        "north": {
+          "animation": "qrc:/pet/run-north.gif",
+          "movement": { "dx": 0, "dy": -8 }
+        },
+        "south": {
+          "animation": "qrc:/pet/run-south.gif",
+          "movement": { "dx": 0, "dy": 8 }
         }
       }
     },
@@ -286,6 +370,102 @@
       "scope": "idle",
       "action": "turn_around"
     },
+    "walk.east": {
+      "label": "向右走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "east"
+    },
+    "walk.west": {
+      "label": "向左走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "west"
+    },
+    "walk.northEast": {
+      "label": "向右上走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "northEast"
+    },
+    "walk.northWest": {
+      "label": "向左上走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "northWest"
+    },
+    "walk.southEast": {
+      "label": "向右下走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "southEast"
+    },
+    "walk.southWest": {
+      "label": "向左下走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "southWest"
+    },
+    "walk.north": {
+      "label": "向上走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "north"
+    },
+    "walk.south": {
+      "label": "向下走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "south"
+    },
+    "run.east": {
+      "label": "向右跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "east"
+    },
+    "run.west": {
+      "label": "向左跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "west"
+    },
+    "run.northEast": {
+      "label": "向右上跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "northEast"
+    },
+    "run.northWest": {
+      "label": "向左上跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "northWest"
+    },
+    "run.southEast": {
+      "label": "向右下跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "southEast"
+    },
+    "run.southWest": {
+      "label": "向左下跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "southWest"
+    },
+    "run.north": {
+      "label": "向上跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "north"
+    },
+    "run.south": {
+      "label": "向下跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "south"
+    },
     "idle.tappingHead": {
       "label": "随机轻敲脑袋",
       "scope": "idle",
@@ -364,6 +544,70 @@
         {
           "recipe": "idle.pointing",
           "weight": 2
+        },
+        {
+          "recipe": "walk.east",
+          "weight": 1
+        },
+        {
+          "recipe": "walk.west",
+          "weight": 1
+        },
+        {
+          "recipe": "walk.northEast",
+          "weight": 1
+        },
+        {
+          "recipe": "walk.northWest",
+          "weight": 1
+        },
+        {
+          "recipe": "walk.southEast",
+          "weight": 1
+        },
+        {
+          "recipe": "walk.southWest",
+          "weight": 1
+        },
+        {
+          "recipe": "walk.north",
+          "weight": 1
+        },
+        {
+          "recipe": "walk.south",
+          "weight": 1
+        },
+        {
+          "recipe": "run.east",
+          "weight": 1
+        },
+        {
+          "recipe": "run.west",
+          "weight": 1
+        },
+        {
+          "recipe": "run.northEast",
+          "weight": 1
+        },
+        {
+          "recipe": "run.northWest",
+          "weight": 1
+        },
+        {
+          "recipe": "run.southEast",
+          "weight": 1
+        },
+        {
+          "recipe": "run.southWest",
+          "weight": 1
+        },
+        {
+          "recipe": "run.north",
+          "weight": 1
+        },
+        {
+          "recipe": "run.south",
+          "weight": 1
         },
         {
           "recipe": "bow.once",

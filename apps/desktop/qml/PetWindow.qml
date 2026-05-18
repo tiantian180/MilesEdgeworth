@@ -60,6 +60,16 @@ Window {
         }
 
         Platform.MenuItem {
+            text: "测试走路"
+            onTriggered: App.PetRuntime.testWalk()
+        }
+
+        Platform.MenuItem {
+            text: "测试跑步"
+            onTriggered: App.PetRuntime.testRun()
+        }
+
+        Platform.MenuItem {
             text: "测试鞠躬"
             onTriggered: App.PetRuntime.testBow()
         }
@@ -107,6 +117,12 @@ Window {
         height: 200
 
         onCurrentFrameChanged: {
+            const movementDelta = App.PetRuntime.consumeFrameMovementDelta()
+            if (movementDelta.dx !== 0 || movementDelta.dy !== 0) {
+                petWindow.x += movementDelta.dx
+                petWindow.y += movementDelta.dy
+            }
+
             if ((App.PetRuntime.currentAutoReturnToIdle
                     || App.PetRuntime.currentLoopMode === "once")
                     && frameCount > 0

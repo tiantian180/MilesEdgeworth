@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRandomGenerator>
+#include <QVariantMap>
 
 namespace {
 constexpr auto kManifestPath = ":/pet/manifest.json";
@@ -53,6 +54,11 @@ QUrl PetRuntime::currentAnimationUrl() const
 QString PetRuntime::currentFacing() const
 {
     return m_currentFacing;
+}
+
+QString PetRuntime::currentMovementDirection() const
+{
+    return m_currentMovementDirection;
 }
 
 QString PetRuntime::currentLoopMode() const
@@ -134,6 +140,21 @@ void PetRuntime::playAction(const QString &actionId)
     playActionInternal(actionId, true);
 }
 
+void PetRuntime::playLocomotion(const QString &actionId, const QString &movementDirection)
+{
+    const QString nextMovementDirection = movementDirection.trimmed();
+    if (!nextMovementDirection.isEmpty() && m_movementDirections.contains(nextMovementDirection)) {
+        const bool movementDirectionChanged = (m_currentMovementDirection != nextMovementDirection);
+        m_currentMovementDirection = nextMovementDirection;
+        updateFacingFromMovementDirection(nextMovementDirection);
+        if (movementDirectionChanged) {
+            emit currentMovementDirectionChanged();
+        }
+    }
+
+    playAction(actionId);
+}
+
 void PetRuntime::playRecipe(const QString &recipeId)
 {
     const QString nextRecipeId = recipeId.trimmed();
@@ -184,6 +205,24 @@ void PetRuntime::triggerIdle()
     }
 
     playActionFromPool("idle.random");
+}
+
+QVariantMap PetRuntime::consumeFrameMovementDelta() const
+{
+    QVariantMap delta;
+    delta.insert("dx", 0.0);
+    delta.insert("dy", 0.0);
+
+    const ActionDefinition action = m_actions.value(m_currentActionId);
+    if (action.movementDeltas.isEmpty()) {
+        return delta;
+    }
+
+    const QString movementKey = (action.category == "locomotion") ? m_currentMovementDirection : m_currentFacing;
+    const QPointF movementDelta = action.movementDeltas.value(movementKey, QPointF(0, 0));
+    delta.insert("dx", movementDelta.x());
+    delta.insert("dy", movementDelta.y());
+    return delta;
 }
 
 void PetRuntime::startStartupSequence()
@@ -241,6 +280,16 @@ void PetRuntime::testObjecting()
 void PetRuntime::testTurn()
 {
     playRecipe("turn.once");
+}
+
+void PetRuntime::testWalk()
+{
+    playLocomotion("walk", "east");
+}
+
+void PetRuntime::testRun()
+{
+    playLocomotion("run", "east");
 }
 
 void PetRuntime::testBow()
@@ -312,6 +361,20 @@ void PetRuntime::loadManifest()
         }
     }
 
+    const QJsonArray movementDirections = root.value("movementDirections").toArray();
+    if (!movementDirections.isEmpty()) {
+        m_movementDirections.clear();
+        for (const QJsonValue &value : movementDirections) {
+            const QString movementDirection = value.toString();
+            if (!movementDirection.isEmpty()) {
+                m_movementDirections.append(movementDirection);
+            }
+        }
+        if (!m_movementDirections.isEmpty()) {
+            m_currentMovementDirection = m_movementDirections.constFirst();
+        }
+    }
+
     const QJsonObject states = root.value("states").toObject();
     for (auto it = states.constBegin(); it != states.constEnd(); ++it) {
         const QString action = it.value().toObject().value("action").toString();
@@ -342,9 +405,18 @@ void PetRuntime::loadManifest()
 
         const QJsonObject variants = actionObject.value("variants").toObject();
         for (auto variantIt = variants.constBegin(); variantIt != variants.constEnd(); ++variantIt) {
-            const QString animation = variantIt.value().toObject().value("animation").toString();
+            const QJsonObject variantObject = variantIt.value().toObject();
+            const QString animation = variantObject.value("animation").toString();
             if (!animation.isEmpty()) {
                 action.variants.insert(variantIt.key(), QUrl(animation));
+            }
+
+            const QJsonObject movementObject = variantObject.value("movement").toObject();
+            if (movementObject.contains("dx") || movementObject.contains("dy")) {
+                action.movementDeltas.insert(
+                    variantIt.key(),
+                    QPointF(movementObject.value("dx").toDouble(0), movementObject.value("dy").toDouble(0))
+                );
             }
         }
 
@@ -405,6 +477,7 @@ void PetRuntime::loadManifest()
             step.actionId = stepObject.value("action").toString(recipe.actionId);
             step.phaseId = stepObject.value("phase").toString();
             step.recipeId = stepObject.value("recipe").toString();
+            step.movementDirection = stepObject.value("movementDirection").toString(recipeObject.value("movementDirection").toString());
             step.repeat = stepObject.value("repeat").toInt(1);
             step.durationMs = stepObject.value("durationMs").toInt(0);
 
@@ -417,6 +490,7 @@ void PetRuntime::loadManifest()
         if (recipe.steps.isEmpty() && !recipe.actionId.isEmpty()) {
             RecipeStep singleStep;
             singleStep.actionId = recipe.actionId;
+            singleStep.movementDirection = recipeObject.value("movementDirection").toString();
             recipe.steps.append(singleStep);
         }
 
@@ -463,8 +537,10 @@ void PetRuntime::loadFallbackManifest()
     m_recipes.clear();
     m_actionPools.clear();
     m_facings = {"right", "left"};
+    m_movementDirections = {"east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"};
     m_defaultFacing = "right";
     m_currentFacing = m_defaultFacing;
+    m_currentMovementDirection = "east";
 
     m_stateToAction.insert("idle", kFallbackActionId);
 
@@ -502,6 +578,15 @@ QUrl PetRuntime::variantForFacing(const QHash<QString, QUrl> &variants, const QS
     }
 
     return QUrl(QString::fromUtf8(kFallbackAnimationUrl));
+}
+
+QUrl PetRuntime::variantForAction(const ActionDefinition &action) const
+{
+    if (action.category == "locomotion") {
+        return variantForFacing(action.variants, m_currentMovementDirection);
+    }
+
+    return variantForFacing(action.variants, m_currentFacing);
 }
 
 void PetRuntime::clearActiveRecipe()
@@ -542,6 +627,15 @@ void PetRuntime::playNextRecipeStep()
 
 void PetRuntime::playRecipeStep(const RecipeStep &step)
 {
+    if (!step.movementDirection.isEmpty() && m_movementDirections.contains(step.movementDirection)) {
+        const bool movementDirectionChanged = (m_currentMovementDirection != step.movementDirection);
+        m_currentMovementDirection = step.movementDirection;
+        updateFacingFromMovementDirection(step.movementDirection);
+        if (movementDirectionChanged) {
+            emit currentMovementDirectionChanged();
+        }
+    }
+
     if (!step.recipeId.isEmpty() && m_recipes.contains(step.recipeId)) {
         playRecipe(step.recipeId);
         return;
@@ -601,6 +695,23 @@ void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)
     emit currentFacingChanged();
 }
 
+void PetRuntime::updateFacingFromMovementDirection(const QString &movementDirection)
+{
+    QString nextFacing;
+    if (movementDirection == "east" || movementDirection == "northEast" || movementDirection == "southEast") {
+        nextFacing = "right";
+    } else if (movementDirection == "west" || movementDirection == "northWest" || movementDirection == "southWest") {
+        nextFacing = "left";
+    }
+
+    if (nextFacing.isEmpty() || nextFacing == m_currentFacing || !m_facings.contains(nextFacing)) {
+        return;
+    }
+
+    m_currentFacing = nextFacing;
+    emit currentFacingChanged();
+}
+
 void PetRuntime::playPhase(const QString &actionId, const QString &phaseId)
 {
     const ActionDefinition action = m_actions.value(actionId);
@@ -625,7 +736,7 @@ void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinitio
 
     PhaseDefinition singlePhase;
     singlePhase.loopMode = action.loopMode;
-    singlePhase.variants = action.variants;
+    singlePhase.variants.insert(m_defaultFacing, variantForAction(action));
     setCurrentPhase(actionId, "single", singlePhase);
 }
 

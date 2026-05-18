@@ -4,10 +4,12 @@
 #include <QJSEngine>
 #include <QList>
 #include <QObject>
+#include <QPointF>
 #include <QQmlEngine>
 #include <QStringList>
 #include <QString>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
 // PetRuntime 是 v2 桌宠动画系统的最小入口。
@@ -28,6 +30,7 @@ class PetRuntime : public QObject
     Q_PROPERTY(QString currentRecipeId READ currentRecipeId NOTIFY currentRecipeChanged)
     Q_PROPERTY(QString currentPhaseId READ currentPhaseId NOTIFY currentPhaseChanged)
     Q_PROPERTY(QString currentFacing READ currentFacing NOTIFY currentFacingChanged)
+    Q_PROPERTY(QString currentMovementDirection READ currentMovementDirection NOTIFY currentMovementDirectionChanged)
     Q_PROPERTY(QString currentLoopMode READ currentLoopMode NOTIFY currentLoopModeChanged)
     Q_PROPERTY(bool currentAutoReturnToIdle READ currentAutoReturnToIdle NOTIFY currentAutoReturnToIdleChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
@@ -41,6 +44,7 @@ public:
     QString currentRecipeId() const;
     QString currentPhaseId() const;
     QString currentFacing() const;
+    QString currentMovementDirection() const;
     QString currentLoopMode() const;
     bool currentAutoReturnToIdle() const;
     QUrl currentAnimationUrl() const;
@@ -50,8 +54,10 @@ public:
     Q_INVOKABLE void setFacing(const QString &facing);
     Q_INVOKABLE void toggleFacing();
     Q_INVOKABLE void playAction(const QString &actionId);
+    Q_INVOKABLE void playLocomotion(const QString &actionId, const QString &movementDirection);
     Q_INVOKABLE void playRecipe(const QString &recipeId);
     Q_INVOKABLE void playActionFromPool(const QString &poolId);
+    Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
@@ -59,6 +65,8 @@ public:
     Q_INVOKABLE void testSpeaking();
     Q_INVOKABLE void testObjecting();
     Q_INVOKABLE void testTurn();
+    Q_INVOKABLE void testWalk();
+    Q_INVOKABLE void testRun();
     Q_INVOKABLE void testBow();
     Q_INVOKABLE void testTea();
     Q_INVOKABLE void testSleep();
@@ -70,6 +78,7 @@ signals:
     void currentRecipeChanged();
     void currentPhaseChanged();
     void currentFacingChanged();
+    void currentMovementDirectionChanged();
     void currentLoopModeChanged();
     void currentAutoReturnToIdleChanged();
     void currentAnimationUrlChanged();
@@ -91,6 +100,7 @@ private:
         int priority = 0;
         QStringList tags;
         QHash<QString, QUrl> variants;
+        QHash<QString, QPointF> movementDeltas;
         QHash<QString, QString> facingAfter;
         QString initialPhase;
         QString exitPhase;
@@ -102,6 +112,7 @@ private:
         QString actionId;
         QString phaseId;
         QString recipeId;
+        QString movementDirection;
         int repeat = 1;
         int durationMs = 0;
     };
@@ -131,12 +142,14 @@ private:
     void loadFallbackManifest();
     QString actionForState(const QString &state) const;
     QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
+    QUrl variantForAction(const ActionDefinition &action) const;
     void clearActiveRecipe();
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
     void playRecipeStep(const RecipeStep &step);
     ActionPoolEntry selectActionPoolEntry(const ActionPoolDefinition &pool) const;
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
+    void updateFacingFromMovementDirection(const QString &movementDirection);
     void playPhase(const QString &actionId, const QString &phaseId);
     void setCurrentAction(const QString &actionId, const ActionDefinition &action);
     void setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase);
@@ -147,6 +160,7 @@ private:
     QHash<QString, ActionPoolDefinition> m_actionPools;
     QString m_fallbackAction = "idle_stand";
     QStringList m_facings = {"right", "left"};
+    QStringList m_movementDirections;
     QString m_defaultFacing = "right";
     QString m_currentState = "idle";
     QString m_currentActionId;
@@ -154,6 +168,7 @@ private:
     int m_currentRecipeStepIndex = -1;
     QString m_currentPhaseId;
     QString m_currentFacing = "right";
+    QString m_currentMovementDirection = "east";
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
     QUrl m_currentAnimationUrl;
