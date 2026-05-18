@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Window
 import Qt.labs.platform as Platform
+import QtMultimedia
 import MilesEdgeworth as App
 
 Window {
@@ -92,6 +93,14 @@ Window {
         }
     }
 
+    SoundEffect {
+        id: voiceEffect
+
+        source: App.PetRuntime.currentSoundUrl
+        property int soundSerial: App.PetRuntime.soundPlaybackSerial
+        volume: 0.8
+    }
+
     // Phase 0.8 先用一个轻量 Timer 模拟旧版“待机时偶尔做点小动作”。
     // 真正能不能触发由 PetRuntime 决定，避免 Timer 打断正在播放的交互动作。
     Timer {
@@ -101,6 +110,19 @@ Window {
         repeat: true
         running: petWindow.visible && App.PetRuntime.currentRecipeId === ""
         onTriggered: App.PetRuntime.triggerIdle()
+    }
+
+    // 和旧版一样，单击需要等一小段时间才能确认不是双击。
+    // 这样双击不会先误触发一次单击分区反应。
+    Timer {
+        id: singleClickTimer
+
+        interval: 260
+        repeat: false
+        property real clickX: 0
+        property real clickY: 0
+
+        onTriggered: App.PetRuntime.handlePrimaryClick(clickX, clickY, petWindow.width, petWindow.height)
     }
 
     // QML 只负责播放当前动画，具体 state/action 到资源的选择交给 PetRuntime。
@@ -141,6 +163,15 @@ Window {
             pet.currentFrame = 0
             pet.playing = false
             pet.playing = true
+        }
+
+        function onSoundPlaybackSerialChanged() {
+            if (App.PetRuntime.currentSoundUrl.toString().length === 0) {
+                return
+            }
+
+            voiceEffect.stop()
+            voiceEffect.play()
         }
     }
 
@@ -186,7 +217,18 @@ Window {
                 return
             }
 
-            App.PetRuntime.handlePrimaryClick(mouse.x, mouse.y, width, height)
+            singleClickTimer.clickX = mouse.x
+            singleClickTimer.clickY = mouse.y
+            singleClickTimer.restart()
+        }
+
+        onDoubleClicked: function(mouse) {
+            if (mouse.button !== Qt.LeftButton) {
+                return
+            }
+
+            singleClickTimer.stop()
+            App.PetRuntime.handleDoubleClick()
         }
     }
 }

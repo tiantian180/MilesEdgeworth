@@ -42,6 +42,8 @@
     <file alias="scared-left.gif">../../../gifs/special/scared1.gif</file>
     <file alias="back-right.gif">../../../gifs/special/back0.gif</file>
     <file alias="back-left.gif">../../../gifs/special/back1.gif</file>
+    <file alias="crossed-right.gif">../../../gifs/special/crossed0.gif</file>
+    <file alias="crossed-left.gif">../../../gifs/special/crossed1.gif</file>
     <file alias="objecting-right.gif">../../../gifs/special/object0.gif</file>
     <file alias="objecting-left.gif">../../../gifs/special/object1.gif</file>
     <file alias="bow-right.gif">../../../gifs/special/bow0.gif</file>
@@ -55,5 +57,11 @@
     <file alias="wake-right.gif">../../../gifs/special/wake0.gif</file>
     <file alias="wake-left.gif">../../../gifs/special/wake1.gif</file>
     <file alias="manifest.json">skins/miles-edgeworth/manifest.json</file>
+  </qresource>
+  <qresource prefix="/audio">
+    <file alias="holdit0.wav">../../../audios/holdit0.wav</file>
+    <file alias="takethat0.wav">../../../audios/takethat0.wav</file>
+    <file alias="objection0.wav">../../../audios/objection0.wav</file>
+    <file alias="eureka0.wav">../../../audios/eureka0.wav</file>
   </qresource>
 </RCC>

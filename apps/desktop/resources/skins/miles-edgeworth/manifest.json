@@ -363,6 +363,21 @@
         }
       }
     },
+    "crossed": {
+      "label": "抱臂等待",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 40,
+      "tags": ["double_click", "hold_it", "crossed"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/crossed-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/crossed-left.gif"
+        }
+      }
+    },
     "objecting": {
       "label": "异议",
       "category": "gesture",
@@ -645,6 +660,30 @@
       "scope": "click",
       "action": "idle_look_down"
     },
+    "doubleClick.holdIt": {
+      "label": "等等",
+      "scope": "doubleClick",
+      "action": "crossed",
+      "sound": "qrc:/audio/holdit0.wav"
+    },
+    "doubleClick.takeThat": {
+      "label": "看招",
+      "scope": "doubleClick",
+      "action": "objecting",
+      "sound": "qrc:/audio/takethat0.wav"
+    },
+    "doubleClick.objection": {
+      "label": "异议",
+      "scope": "doubleClick",
+      "action": "objecting",
+      "sound": "qrc:/audio/objection0.wav"
+    },
+    "doubleClick.eureka": {
+      "label": "就是这个",
+      "scope": "doubleClick",
+      "action": "objecting",
+      "sound": "qrc:/audio/eureka0.wav"
+    },
     "objecting.once": {
       "label": "异议一次",
       "scope": "interaction",
@@ -853,6 +892,27 @@
         },
         {
           "recipe": "click.legsLookDown",
+          "weight": 1
+        }
+      ]
+    },
+    "doubleClick.random": {
+      "label": "双击随机语音动作",
+      "entries": [
+        {
+          "recipe": "doubleClick.holdIt",
+          "weight": 1
+        },
+        {
+          "recipe": "doubleClick.takeThat",
+          "weight": 1
+        },
+        {
+          "recipe": "doubleClick.objection",
+          "weight": 1
+        },
+        {
+          "recipe": "doubleClick.eureka",
           "weight": 1
         }
       ]

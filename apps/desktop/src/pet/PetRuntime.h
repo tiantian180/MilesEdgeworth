@@ -35,7 +35,9 @@ class PetRuntime : public QObject
     Q_PROPERTY(QString currentLoopMode READ currentLoopMode NOTIFY currentLoopModeChanged)
     Q_PROPERTY(bool currentAutoReturnToIdle READ currentAutoReturnToIdle NOTIFY currentAutoReturnToIdleChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
+    Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
     Q_PROPERTY(int playbackSerial READ playbackSerial NOTIFY playbackSerialChanged)
+    Q_PROPERTY(int soundPlaybackSerial READ soundPlaybackSerial NOTIFY soundPlaybackSerialChanged)
 
 public:
     explicit PetRuntime(QObject *parent = nullptr);
@@ -49,7 +51,9 @@ public:
     QString currentLoopMode() const;
     bool currentAutoReturnToIdle() const;
     QUrl currentAnimationUrl() const;
+    QUrl currentSoundUrl() const;
     int playbackSerial() const;
+    int soundPlaybackSerial() const;
 
     Q_INVOKABLE void setState(const QString &state);
     Q_INVOKABLE void setFacing(const QString &facing);
@@ -60,6 +64,7 @@ public:
     Q_INVOKABLE void playActionFromPool(const QString &poolId);
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void handlePrimaryClick(double x, double y, double width, double height);
+    Q_INVOKABLE void handleDoubleClick();
     Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
@@ -84,7 +89,9 @@ signals:
     void currentLoopModeChanged();
     void currentAutoReturnToIdleChanged();
     void currentAnimationUrlChanged();
+    void currentSoundUrlChanged();
     void playbackSerialChanged();
+    void soundPlaybackSerialChanged();
 
 private:
     struct PhaseDefinition
@@ -124,6 +131,7 @@ private:
         QString label;
         QString scope;
         QString actionId;
+        QUrl soundUrl;
         QList<RecipeStep> steps;
     };
 
@@ -152,6 +160,7 @@ private:
     QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
     QUrl variantForAction(const ActionDefinition &action) const;
     QString clickPoolForPoint(double x, double y, double width, double height) const;
+    void playSoundForRecipe(const RecipeDefinition &recipe);
     void clearActiveRecipe();
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
@@ -183,7 +192,9 @@ private:
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
     QUrl m_currentAnimationUrl;
+    QUrl m_currentSoundUrl;
     int m_playbackSerial = 0;
+    int m_soundPlaybackSerial = 0;
 };
 
 // 与 DesktopShellControllerForeign 一样，这个 wrapper 让 QML 看到一个名为

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Quick Widgets Multimedia)
 
 qt_standard_project_setup(REQUIRES 6.5)
 if(Qt6_VERSION VERSION_GREATER_EQUAL "6.8.0")
@@ -56,6 +56,7 @@ target_link_libraries(MilesEdgeworthDesktop
     PRIVATE
         Qt6::Quick
         Qt6::Widgets
+        Qt6::Multimedia
 )
 
 set_target_properties(MilesEdgeworthDesktop PROPERTIES

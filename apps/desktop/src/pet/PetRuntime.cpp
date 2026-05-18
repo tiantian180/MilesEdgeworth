@@ -79,6 +79,11 @@ QUrl PetRuntime::currentAnimationUrl() const
     return m_currentAnimationUrl;
 }
 
+QUrl PetRuntime::currentSoundUrl() const
+{
+    return m_currentSoundUrl;
+}
+
 QString PetRuntime::currentFacing() const
 {
     return m_currentFacing;
@@ -102,6 +107,11 @@ bool PetRuntime::currentAutoReturnToIdle() const
 int PetRuntime::playbackSerial() const
 {
     return m_playbackSerial;
+}
+
+int PetRuntime::soundPlaybackSerial() const
+{
+    return m_soundPlaybackSerial;
 }
 
 void PetRuntime::setState(const QString &state)
@@ -198,6 +208,7 @@ void PetRuntime::playRecipe(const QString &recipeId)
         emit currentRecipeChanged();
     }
 
+    playSoundForRecipe(m_recipes.value(nextRecipeId));
     playNextRecipeStep();
 }
 
@@ -271,6 +282,17 @@ void PetRuntime::handlePrimaryClick(double x, double y, double width, double hei
     if (!poolId.isEmpty()) {
         playActionFromPool(poolId);
     }
+}
+
+void PetRuntime::handleDoubleClick()
+{
+    // 旧版睡眠中双击等同于唤醒；其它状态下随机触发语音动作。
+    if (m_currentActionId == "sleep" || m_currentPhaseId == "loop") {
+        returnToIdle();
+        return;
+    }
+
+    playActionFromPool("doubleClick.random");
 }
 
 void PetRuntime::startStartupSequence()
@@ -545,6 +567,7 @@ void PetRuntime::loadManifest()
         recipe.label = recipeObject.value("label").toString(it.key());
         recipe.scope = recipeObject.value("scope").toString();
         recipe.actionId = recipeObject.value("action").toString();
+        recipe.soundUrl = QUrl(recipeObject.value("sound").toString());
 
         const QJsonArray steps = recipeObject.value("steps").toArray();
         for (const QJsonValue &stepValue : steps) {
@@ -686,6 +709,22 @@ QString PetRuntime::clickPoolForPoint(double x, double y, double width, double h
     }
 
     return {};
+}
+
+void PetRuntime::playSoundForRecipe(const RecipeDefinition &recipe)
+{
+    if (recipe.soundUrl.isEmpty()) {
+        return;
+    }
+
+    const bool soundChanged = (m_currentSoundUrl != recipe.soundUrl);
+    m_currentSoundUrl = recipe.soundUrl;
+    ++m_soundPlaybackSerial;
+
+    if (soundChanged) {
+        emit currentSoundUrlChanged();
+    }
+    emit soundPlaybackSerialChanged();
 }
 
 void PetRuntime::clearActiveRecipe()

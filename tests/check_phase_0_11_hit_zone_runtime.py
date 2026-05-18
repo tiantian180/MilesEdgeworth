@@ -112,7 +112,7 @@ def main() -> int:
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
         "dragMoved",
-        "App.PetRuntime.handlePrimaryClick(mouse.x, mouse.y, width, height)",
+        "App.PetRuntime.handlePrimaryClick(clickX, clickY, petWindow.width, petWindow.height)",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
 

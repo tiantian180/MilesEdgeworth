@@ -78,5 +78,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_11_hit_zone_runtime.py
         )
+
+        # Phase 0.12 的双击音效检查：守住 doubleClick action pool、
+        # 语音资源、SoundEffect 和运行时声音播放入口。
+        add_test(
+            NAME check_phase_0_12_double_click_sound_runtime
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_12_double_click_sound_runtime.py
+        )
     endif()
 endif()
