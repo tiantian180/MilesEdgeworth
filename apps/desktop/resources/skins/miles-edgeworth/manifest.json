@@ -502,6 +502,21 @@
         }
       }
     },
+    "tea_alt": {
+      "label": "喝茶候选动作",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["tea", "rest"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/tea-alt-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/tea-alt-left.gif"
+        }
+      }
+    },
     "sleep": {
       "label": "睡觉",
       "category": "idle",
@@ -814,6 +829,21 @@
         }
       ]
     },
+    "teaAlt.drinkThenBow": {
+      "label": "喝茶后鞠躬候选动作",
+      "scope": "scenario",
+      "steps": [
+        {
+          "action": "tea_alt"
+        },
+        {
+          "action": "bow"
+        },
+        {
+          "action": "idle_stand"
+        }
+      ]
+    },
     "sleep.enterLoopExit": {
       "label": "睡觉",
       "scope": "state",
@@ -1027,6 +1057,10 @@
       "entries": [
         {
           "recipe": "tea.drinkThenBow",
+          "weight": 1
+        },
+        {
+          "recipe": "teaAlt.drinkThenBow",
           "weight": 1
         }
       ]

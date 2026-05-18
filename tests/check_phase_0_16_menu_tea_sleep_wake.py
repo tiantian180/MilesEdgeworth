@@ -32,11 +32,28 @@ def main() -> int:
     require(tea_recipe.get("scope") == "scenario", "tea.drinkThenBow 应继续作为 scenario recipe")
     require([step.get("action") for step in tea_recipe.get("steps", [])] == ["tea", "bow", "idle_stand"], "喝茶应按 tea -> bow -> idle_stand 编排")
 
+    tea_alt_recipe = recipes.get("teaAlt.drinkThenBow", {})
+    require(tea_alt_recipe.get("scope") == "scenario", "teaAlt.drinkThenBow 应作为第二组喝茶 scenario recipe")
+    require([step.get("action") for step in tea_alt_recipe.get("steps", [])] == ["tea_alt", "bow", "idle_stand"], "第二组喝茶应按 tea_alt -> bow -> idle_stand 编排")
+
     sleep_recipe = recipes.get("sleep.enterLoopExit", {})
     require(sleep_recipe.get("action") == "sleep", "sleep.enterLoopExit 应播放 sleep action")
 
     menu_tea = action_pools.get("menu.tea", {})
     require(any(entry.get("recipe") == "tea.drinkThenBow" for entry in menu_tea.get("entries", [])), "menu.tea 应能触发喝茶 recipe")
+    require(any(entry.get("recipe") == "teaAlt.drinkThenBow" for entry in menu_tea.get("entries", [])), "menu.tea 应能触发第二组喝茶 recipe")
+    require(len(menu_tea.get("entries", [])) >= 2, "menu.tea 应保留旧版两组喝茶动作的随机候选")
+
+    actions = manifest.get("actions", {})
+    tea_alt = actions.get("tea_alt", {})
+    require(tea_alt.get("loopMode") == "onceThenIdle", "tea_alt 应播放一次后回 idle")
+    variants = tea_alt.get("variants", {})
+    require(variants.get("right", {}).get("animation") == "qrc:/pet/tea-alt-right.gif", "tea_alt.right 应使用 tea2")
+    require(variants.get("left", {}).get("animation") == "qrc:/pet/tea-alt-left.gif", "tea_alt.left 应使用 tea3")
+
+    qrc = read("apps/desktop/resources/pet_assets.qrc")
+    for alias in ["tea-alt-right.gif", "tea-alt-left.gif"]:
+        require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     for token in [

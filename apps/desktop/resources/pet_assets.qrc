@@ -56,6 +56,8 @@
     <file alias="bow-left.gif">../../../gifs/special/bow1.gif</file>
     <file alias="tea-right.gif">../../../gifs/special/tea0.gif</file>
     <file alias="tea-left.gif">../../../gifs/special/tea1.gif</file>
+    <file alias="tea-alt-right.gif">../../../gifs/special/tea2.gif</file>
+    <file alias="tea-alt-left.gif">../../../gifs/special/tea3.gif</file>
     <file alias="sleep-right.gif">../../../gifs/special/sleep0.gif</file>
     <file alias="sleep-left.gif">../../../gifs/special/sleep1.gif</file>
     <file alias="sleeping-right.gif">../../../gifs/special/sleeping0.gif</file>

@@ -118,5 +118,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_16_menu_tea_sleep_wake.py
         )
+
+        # Phase 0.17 的核心手感覆盖检查：集中守住 active goal
+        # 明确列出的随机 idle、移动、点击、双击、喝茶、睡眠、晃动、徽章和音效。
+        add_test(
+            NAME check_phase_0_17_core_handfeel_coverage
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_17_core_handfeel_coverage.py
+        )
     endif()
 endif()
