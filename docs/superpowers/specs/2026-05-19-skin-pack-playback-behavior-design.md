@@ -43,7 +43,7 @@ flowchart TD
     Assets["Assets 素材正本"]
     Clips["Clips 素材片段"]
     Actions["Actions 语义动作"]
-    Recipes["Playback Recipes 播放配方"]
+    Recipes["Recipes 播放计划 / 唯一编排层"]
     Pools["Action Pools 动作池"]
     Behaviors["Behavior Rules 行为规则"]
     Custom["Custom Interactions 定制交互"]
@@ -117,30 +117,116 @@ Action 可以是单段，也可以由 phase 组成：
 }
 ```
 
-### PlaybackRecipe
+### Recipe
 
-PlaybackRecipe 描述某个场景下如何播放同一个 Action。
+Recipe 是动画系统里唯一的时间线编排层。它既可以描述一个 Action 内部的 phase 怎么播放，也可以描述某个场景下多个 Action、等待、条件和副作用如何串联。
 
-同一个 `thinking` 动作在不同场景可以有不同 recipe：
+Recipe 有两种 scope：
+
+| Scope | 用途 | 典型例子 |
+| --- | --- | --- |
+| `action` | 编排一个 Action 内部的 phase | `thinking.enter -> thinking.loop -> thinking.exit` |
+| `scenario` | 编排多个 Action / SideEffect / Wait / Condition | `drink_tea -> bow -> idle_stand` |
+
+```mermaid
+flowchart TD
+    Recipe["Recipe 唯一编排层"]
+    ActionRecipe["Action Recipe<br/>编排当前 action 的 phases"]
+    ScenarioRecipe["Scenario Recipe<br/>编排多个 actions / effects / waits"]
+    Action["Action"]
+    Phase["Phase"]
+    Effect["SideEffect"]
+    Wait["Wait / Duration"]
+
+    Recipe --> ActionRecipe
+    Recipe --> ScenarioRecipe
+    ActionRecipe --> Phase
+    ScenarioRecipe --> Action
+    ScenarioRecipe --> Effect
+    ScenarioRecipe --> Wait
+```
+
+#### Action Recipe
+
+Action Recipe 只编排当前 Action 内部的 phases。比如同一个 `thinking` 动作在不同场景可以有不同 recipe：
 
 ```json
 {
   "recipes": {
-    "thinking.idleOnce": [
-      { "phase": "enter", "repeat": 1 },
-      { "phase": "loop", "repeat": 10 },
-      { "phase": "exit", "repeat": 1 }
-    ],
-    "thinking.holdUntilCancelled": [
-      { "phase": "enter", "repeat": 1 },
-      { "phase": "loop", "repeat": "untilCancelled" },
-      { "phase": "exit", "repeat": 1 }
-    ]
+    "thinking.idleOnce": {
+      "scope": "action",
+      "action": "thinking",
+      "pattern": "enterLoopExit",
+      "steps": [
+        { "phase": "enter", "repeat": 1 },
+        { "phase": "loop", "repeat": 10 },
+        { "phase": "exit", "repeat": 1 }
+      ]
+    },
+    "thinking.holdUntilCancelled": {
+      "scope": "action",
+      "action": "thinking",
+      "pattern": "enterLoopExit",
+      "steps": [
+        { "phase": "enter", "repeat": 1 },
+        { "phase": "loop", "repeat": "untilCancelled" },
+        { "phase": "exit", "repeat": 1 }
+      ]
+    }
   }
 }
 ```
 
 因此，随机 idle 不需要维护一份完整 thinking GIF，agent thinking 也不需要维护另一份 phase GIF。它们共用同一组 Clip 和 Action，只是 Recipe 不同。
+
+#### Scenario Recipe
+
+Scenario Recipe 用来表达“多个动作必须按顺序发生”。例如“喝红茶循环一段时间后鞠躬”：
+
+```json
+{
+  "recipes": {
+    "tea.loopForAWhile": {
+      "scope": "action",
+      "action": "drink_tea",
+      "pattern": "enterLoopExit",
+      "steps": [
+        { "phase": "enter", "repeat": 1 },
+        { "phase": "loop", "durationMs": 5000 },
+        { "phase": "exit", "repeat": 1 }
+      ]
+    },
+    "tea.drinkThenBow": {
+      "scope": "scenario",
+      "pattern": "sequence",
+      "steps": [
+        {
+          "action": "drink_tea",
+          "recipe": "tea.loopForAWhile"
+        },
+        {
+          "action": "bow",
+          "recipe": "once"
+        },
+        {
+          "action": "idle_stand",
+          "recipe": "loop"
+        }
+      ]
+    }
+  }
+}
+```
+
+这里不需要再定义一个 “Action 之上的动画编排层”。Scenario Recipe 本身就是编排层。
+
+#### Recipe 引用规则
+
+- Action Recipe 可以直接引用当前 Action 的 phase。
+- Scenario Recipe 推荐引用 Action 和它的 Recipe，而不是直接引用别的 Action 的内部 phase。
+- 如果某个 phase 需要被外部反复复用，优先把它提升成独立 Action 或共享 Clip。
+- 高级皮肤可以支持 `phaseRef: "thinking.loop"` 这类跨 Action phase 引用，但这会增加耦合，不作为推荐写法。
+- 强顺序关系用 Recipe 表达；弱关系、用户再次触发、状态通知用 BehaviorRule / Event 表达。
 
 ### ActionPool
 
@@ -184,8 +270,7 @@ BehaviorRule 把事件映射为 ActionRequest。事件来源包括鼠标、菜�
     ],
     "menu.drinkTea": [
       {
-        "action": "drink_tea",
-        "recipe": "once",
+        "recipe": "tea.drinkThenBow",
         "priority": 60
       }
     ]
@@ -205,10 +290,14 @@ sequenceDiagram
     participant Effects as Side Effects
 
     Event->>Behavior: pointer.doubleClick / agent.thinking / menu.drinkTea
-    Behavior->>Pool: select action or pool
-    Pool->>Runtime: ActionRequest(action, recipe, priority)
+    alt behavior references action pool
+        Behavior->>Pool: select action from pool
+        Pool->>Runtime: ActionRequest(action, recipe, priority)
+    else behavior references recipe directly
+        Behavior->>Runtime: ActionRequest(recipe, priority)
+    end
     Runtime->>Runtime: resolve interrupt policy
-    Runtime->>Player: play recipe phases
+    Runtime->>Player: play recipe steps
     Runtime->>Effects: play sound / bubble / prop overlay
     Player-->>Runtime: phase finished
     Runtime->>Player: next phase or idle
@@ -304,7 +393,9 @@ flowchart LR
     Exit --> AgentRecipe
 ```
 
-## 播放模式分类
+## Recipe Pattern 分类
+
+Recipe Pattern 不是独立架构层，而是 Recipe 的常见模板和执行语义。运行时最终执行的是 Recipe 的 `steps`；`pattern` 只帮助人和工具理解这个 Recipe 属于哪类播放计划。
 
 ### loop
 
@@ -333,6 +424,23 @@ flowchart LR
 ### scriptedSequence
 
 多个 action、side effect、延迟、条件分支组合在一起。适合启动公文包、丢检察官徽章。
+
+### 事件与 Recipe 的边界
+
+强顺序关系不要依赖“播放结束后发事件再触发下一个动作”。如果 A 播完必须立刻接 B，应写成 Scenario Recipe。事件更适合表达松散关系，例如用户再次点击、agent 状态变化、某个动作完成后通知日志系统。
+
+```mermaid
+flowchart LR
+    Must["A 后必须接 B"]
+    Loose["A 结束后只是通知外部"]
+    User["用户之后再触发 B"]
+    Recipe["Scenario Recipe"]
+    Event["Event / BehaviorRule"]
+
+    Must --> Recipe
+    Loose --> Event
+    User --> Event
+```
 
 ## 普通交互与定制交互
 
@@ -471,27 +579,29 @@ LLM 不应该直接选择 GIF，也不应该强制使用项目写死的情绪枚
 | 看招丢徽章 | `throw_badge` custom interaction |
 | 睡觉/唤醒 | `sleep.enter -> sleep.loop -> sleep.exit` |
 | 晃动触发蹲下 | `shake` gesture recognizer + `holdUntilReleased` recipe |
-| 喂红茶 | `menu.drinkTea` behavior |
-| 启动公文包 | startup scripted sequence |
+| 喂红茶 | `tea.drinkThenBow` scenario recipe |
+| 启动公文包 | `briefcase_arrival` action 的 phase / recipe |
 
 ## 阶段性落地建议
 
 Phase 0.8 不应该一次实现全部系统。推荐只做文档到代码的第一条细线：
 
 1. manifest 增加 `recipes` 和 `actionPools`。
-2. 把当前已接入的 `idle_stand`、`thinking`、`objecting`、`bow`、`tea`、`sleep` 映射到 recipe。
-3. 添加 `idle.random` pool，但先只放少量动作。
-4. 添加静态测试，确保 manifest 中 actions、recipes、pools 的引用关系不悬空。
-5. 运行时只实现 `once`、`loop`、`enterLoopExit` 的最小子集。
+2. 把当前已接入的 `idle_stand`、`thinking`、`objecting`、`bow`、`tea`、`sleep` 映射到 action recipe。
+3. 添加一个最小 scenario recipe，例如 `tea.drinkThenBow`，用来验证跨 action 编排。
+4. 添加 `idle.random` pool，但先只放少量动作。
+5. 添加静态测试，确保 manifest 中 actions、recipes、pools 的引用关系不悬空。
+6. 运行时只实现 `once`、`loop`、`enterLoopExit` 和最小 `sequence`。
 
 鼠标 hitZone、晃动识别、custom interaction 可以作为后续阶段，避免一次引入过多复杂度。
 
 ## 明确决策
 
 - 素材正本按资源语义组织，不按触发来源组织。
-- 触发来源通过 BehaviorRule、ActionPool 和 PlaybackRecipe 表达。
+- Recipe 是唯一动画编排层；不额外引入 Action 之上的第二套编排概念。
+- Recipe 分为 action scope 和 scenario scope：前者编排当前 action 的 phases，后者编排多个 actions / waits / side effects。
+- 触发来源通过 BehaviorRule、ActionPool 和 Recipe 表达。
 - 完整 GIF 保留为 source/raw；phase clip 可以从完整 GIF 的帧区间派生。
 - 手工重复素材不是推荐路径；`quick/` 目录可以作为普通用户导入便利。
 - Miles 专属玩法作为官方高级示例，不写死进框架核心。
 - 主体窗口尺寸由 canvas 控制，桌宠位置由 anchor 控制，复杂道具走 overlay/custom interaction。
-
