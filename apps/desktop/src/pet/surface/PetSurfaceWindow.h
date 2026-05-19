@@ -47,6 +47,10 @@ private:
     void syncSizeFromRuntime();
     void restartMovieFromRuntime();
     void handleMovieFrameChanged(int frame);
+    void scheduleAnimationCompletion(int playbackSerial, int delayMs);
+    void completeAnimationIfStillCurrent(int playbackSerial);
+    void scheduleIdleLoopFinished(int playbackSerial, int delayMs);
+    void submitIdleLoopFinishedIfStillCurrent(int playbackSerial);
     void applyCurrentFrameMask();
     QRegion regionFromCurrentFrame() const;
     void showContextMenuAt(const QPoint &globalPosition);

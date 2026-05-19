@@ -70,16 +70,6 @@ void PetContextMenu::show(
     muteAction->setChecked(runtime->audioMuted());
     QObject::connect(muteAction, &QAction::triggered, runtime, &PetRuntime::toggleAudioMuted);
 
-    QMenu *voiceMenu = menu.addMenu(QStringLiteral("语音语言"));
-    auto *voiceGroup = new QActionGroup(voiceMenu);
-    voiceGroup->setExclusive(true);
-    QAction *jpAction = addCheckedAction(voiceMenu, voiceGroup, QStringLiteral("日语"), runtime->voiceLanguage() == "jp");
-    QAction *enAction = addCheckedAction(voiceMenu, voiceGroup, QStringLiteral("英语"), runtime->voiceLanguage() == "en");
-    QAction *zhAction = addCheckedAction(voiceMenu, voiceGroup, QStringLiteral("汉语"), runtime->voiceLanguage() == "zh");
-    QObject::connect(jpAction, &QAction::triggered, parent, [runtime]() { runtime->setVoiceLanguage(QStringLiteral("jp")); });
-    QObject::connect(enAction, &QAction::triggered, parent, [runtime]() { runtime->setVoiceLanguage(QStringLiteral("en")); });
-    QObject::connect(zhAction, &QAction::triggered, parent, [runtime]() { runtime->setVoiceLanguage(QStringLiteral("zh")); });
-
     const QVariantList skinCommands = eventBridge->enabledSkinCommands();
     if (!skinCommands.isEmpty()) {
         menu.addSeparator();
@@ -99,17 +89,6 @@ void PetContextMenu::show(
     sleepAction->setEnabled(!runtime->sleepTransitioning());
     QObject::connect(sleepAction, &QAction::triggered, parent, [eventBridge]() {
         eventBridge->submitMenuCommand(QStringLiteral("runtime.sleep.toggle"));
-    });
-
-    menu.addSeparator();
-    QAction *idleAction = menu.addAction(QStringLiteral("回到待机"));
-    QObject::connect(idleAction, &QAction::triggered, parent, [eventBridge]() {
-        eventBridge->submitMenuCommand(QStringLiteral("runtime.returnToIdle"));
-    });
-
-    QAction *facingAction = menu.addAction(runtime->currentFacing() == "right" ? QStringLiteral("切到朝左") : QStringLiteral("切到朝右"));
-    QObject::connect(facingAction, &QAction::triggered, parent, [eventBridge]() {
-        eventBridge->submitMenuCommand(QStringLiteral("runtime.facing.toggle"));
     });
 
     menu.addSeparator();

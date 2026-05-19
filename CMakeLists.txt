@@ -470,5 +470,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_63_native_pet_surface.py
         )
+
+        # Phase 0.64 的回归检查：原生 QWidget surface 修复了透明点击区域，
+        # 但菜单样式和动画完成时机也必须保持正确，避免回退到透明菜单或跳帧。
+        add_test(
+            NAME check_phase_0_64_surface_menu_regressions
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_64_surface_menu_regressions.py
+        )
     endif()
 endif()

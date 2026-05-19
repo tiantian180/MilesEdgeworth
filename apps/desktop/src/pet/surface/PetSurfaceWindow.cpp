@@ -49,13 +49,12 @@ PetSurfaceWindow::PetSurfaceWindow(
     setAttribute(Qt::WA_NoSystemBackground, true);
     setWindowFlags(Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint | Qt::Tool);
     setAutoFillBackground(false);
-    setStyleSheet(QStringLiteral("background: transparent;"));
     setMouseTracking(true);
     setCursor(Qt::PointingHandCursor);
 
     m_petLabel->setAttribute(Qt::WA_TranslucentBackground, true);
+    m_petLabel->setAttribute(Qt::WA_NoSystemBackground, true);
     m_petLabel->setAutoFillBackground(false);
-    m_petLabel->setStyleSheet(QStringLiteral("background: transparent;"));
     m_petLabel->setAlignment(Qt::AlignCenter);
     m_petLabel->setScaledContents(true);
     m_petLabel->setMovie(m_movie);
@@ -269,6 +268,9 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
         return;
     }
 
+    const int playbackSerial = m_runtime->playbackSerial();
+    const int currentFrameDelayMs = qMax(1, m_movie->nextFrameDelay());
+
     if (m_runtime->currentLoopMode() == QStringLiteral("hold")) {
         m_runtime->handleHoldAnimationReachedEnd();
         m_movie->setPaused(true);
@@ -277,15 +279,54 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
 
     if (m_runtime->currentAutoReturnToIdle()
             || m_runtime->currentLoopMode() == QStringLiteral("once")) {
-        m_runtime->handleAnimationFinished();
+        // frameChanged 触发时 QLabel 还没有完成当前帧绘制。
+        // 先暂停在最后一帧，再等这一帧的显示时长结束后切换动作，
+        // 避免走路 / 跑步这类一次性 GIF 的最后一帧被立即覆盖。
+        m_movie->setPaused(true);
+        scheduleAnimationCompletion(playbackSerial, currentFrameDelayMs);
         return;
     }
 
     if (m_runtime->currentActionId() == QStringLiteral("idle_stand")
             && m_runtime->currentLoopMode() == QStringLiteral("loop")
             && m_runtime->currentRecipeId().isEmpty()) {
-        m_eventBridge->submitIdleLoopFinished();
+        scheduleIdleLoopFinished(playbackSerial, currentFrameDelayMs);
     }
+}
+
+void PetSurfaceWindow::scheduleAnimationCompletion(int playbackSerial, int delayMs)
+{
+    QTimer::singleShot(qMax(1, delayMs), this, [this, playbackSerial]() {
+        completeAnimationIfStillCurrent(playbackSerial);
+    });
+}
+
+void PetSurfaceWindow::completeAnimationIfStillCurrent(int playbackSerial)
+{
+    if (m_runtime->playbackSerial() != playbackSerial) {
+        return;
+    }
+
+    m_runtime->handleAnimationFinished();
+}
+
+void PetSurfaceWindow::scheduleIdleLoopFinished(int playbackSerial, int delayMs)
+{
+    QTimer::singleShot(qMax(1, delayMs), this, [this, playbackSerial]() {
+        submitIdleLoopFinishedIfStillCurrent(playbackSerial);
+    });
+}
+
+void PetSurfaceWindow::submitIdleLoopFinishedIfStillCurrent(int playbackSerial)
+{
+    if (m_runtime->playbackSerial() != playbackSerial
+            || m_runtime->currentActionId() != QStringLiteral("idle_stand")
+            || m_runtime->currentLoopMode() != QStringLiteral("loop")
+            || !m_runtime->currentRecipeId().isEmpty()) {
+        return;
+    }
+
+    m_eventBridge->submitIdleLoopFinished();
 }
 
 void PetSurfaceWindow::applyCurrentFrameMask()
