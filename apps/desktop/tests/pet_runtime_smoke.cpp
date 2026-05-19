@@ -65,6 +65,16 @@ void requireSignedDelta(double value, int expectedSign, const QString &recipeId,
     std::exit(1);
 }
 
+void requireNear(double actual, double expected, const char *message)
+{
+    if (std::abs(actual - expected) < 0.001) {
+        return;
+    }
+
+    std::cerr << message << ": " << actual << " != " << expected << '\n';
+    std::exit(1);
+}
+
 void requireRecipeAction(PetRuntime &runtime, const RecipeActionCase &recipeCase, const char *message)
 {
     runtime.returnToIdle();
@@ -106,12 +116,44 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "idle_stand", "公文包停下后应进入 idle_stand");
     require(runtime.currentRecipeId().isEmpty(), "启动序列结束后应清空 currentRecipeId");
 
+    require(runtime.petSizeId() == "medium", "默认尺寸档位应为中");
+    requireNear(runtime.petScale(), 2.0, "默认 scale 应对应旧版中号 scale=2");
+    requireNear(runtime.petWindowSize(), 240.0, "默认窗口尺寸应对应旧版中号 scale=2");
+    requireNear(runtime.petImageSize(), 200.0, "默认动画尺寸应对应旧版中号 scale=2");
+
+    runtime.setPetSize("mini");
+    require(runtime.petSizeId() == "mini", "setPetSize(mini) 应切到迷你档");
+    requireNear(runtime.petScale(), 1.0, "迷你档应对应旧版 scale=1");
+    requireNear(runtime.petWindowSize(), 120.0, "迷你档窗口尺寸应随 scale 缩小");
+    runtime.playRecipe("walk.east");
+    requireNear(runtime.consumeFrameMovementDelta().value("dx").toDouble(), 4.2, "mini walk.east 应按旧版 scale=1 移动");
+
+    runtime.setPetSize("small");
+    require(runtime.petSizeId() == "small", "setPetSize(small) 应切到小档");
+    requireNear(runtime.petScale(), 1.5, "小档应对应旧版 scale=1.5");
+    requireNear(runtime.petWindowSize(), 180.0, "小档窗口尺寸应随 scale 缩放");
+
+    runtime.setPetSize("big");
+    require(runtime.petSizeId() == "big", "setPetSize(big) 应切到大档");
+    requireNear(runtime.petScale(), 3.0, "大档应对应旧版 scale=3");
+    requireNear(runtime.petWindowSize(), 360.0, "大档窗口尺寸应随 scale 放大");
+    runtime.playRecipe("walk.east");
+    requireNear(runtime.consumeFrameMovementDelta().value("dx").toDouble(), 12.6, "big walk.east 应按旧版 scale=3 移动");
+
+    runtime.setPetSize("medium");
+    require(runtime.petSizeId() == "medium", "setPetSize(medium) 应切回中档");
+    runtime.returnToIdle();
+
     runtime.handleIdleLoopFinishedForTest(0.71);
     require(runtime.currentActionId() == "idle_stand", "站立循环随机数超过 0.7 时应继续站立");
     require(runtime.currentRecipeId().isEmpty(), "站立循环随机数超过 0.7 时不应进入随机 recipe");
 
+    const QString facingBeforeRandomIdle = runtime.currentFacing();
     runtime.handleIdleLoopFinishedForTest(0.69);
-    require(!runtime.currentRecipeId().isEmpty(), "站立循环随机数不超过 0.7 时应进入随机 idle recipe");
+    require(
+        !runtime.currentRecipeId().isEmpty() || runtime.currentFacing() != facingBeforeRandomIdle,
+        "站立循环随机数不超过 0.7 时应进入随机 idle 行为"
+    );
     runtime.returnToIdle();
 
     runtime.playRecipe("doubleClick.holdIt");

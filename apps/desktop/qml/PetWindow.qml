@@ -7,8 +7,8 @@ import MilesEdgeworth as App
 Window {
     id: petWindow
 
-    width: 240
-    height: 240
+    width: App.PetRuntime.petWindowSize
+    height: App.PetRuntime.petWindowSize
     visible: true
     color: "transparent"
     title: "MilesEdgeworth v2"
@@ -20,6 +20,40 @@ Window {
     // 这样菜单的 hover、外部点击关闭、阴影和系统质感都交给 Qt/系统处理。
     Platform.Menu {
         id: contextMenu
+
+        Platform.Menu {
+            title: "调整大小"
+
+            Platform.MenuItem {
+                text: "迷你"
+                checkable: true
+                checked: App.PetRuntime.petSizeId === "mini"
+                onTriggered: App.PetRuntime.setPetSize("mini")
+            }
+
+            Platform.MenuItem {
+                text: "小"
+                checkable: true
+                checked: App.PetRuntime.petSizeId === "small"
+                onTriggered: App.PetRuntime.setPetSize("small")
+            }
+
+            Platform.MenuItem {
+                text: "中"
+                checkable: true
+                checked: App.PetRuntime.petSizeId === "medium"
+                onTriggered: App.PetRuntime.setPetSize("medium")
+            }
+
+            Platform.MenuItem {
+                text: "大"
+                checkable: true
+                checked: App.PetRuntime.petSizeId === "big"
+                onTriggered: App.PetRuntime.setPetSize("big")
+            }
+        }
+
+        Platform.MenuSeparator {}
 
         Platform.MenuItem {
             text: App.DesktopShell.alwaysOnTop ? "取消置顶" : "始终置顶"
@@ -236,8 +270,8 @@ Window {
         cache: false
         playing: true
         fillMode: Image.PreserveAspectFit
-        width: 200
-        height: 200
+        width: App.PetRuntime.petImageSize
+        height: App.PetRuntime.petImageSize
 
         onCurrentFrameChanged: {
             const movementDelta = App.PetRuntime.consumeFrameMovementDelta()

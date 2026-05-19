@@ -38,6 +38,10 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool audioMuted READ audioMuted NOTIFY audioMutedChanged)
     Q_PROPERTY(QString voiceLanguage READ voiceLanguage NOTIFY voiceLanguageChanged)
     Q_PROPERTY(bool autoMovementEnabled READ autoMovementEnabled NOTIFY autoMovementEnabledChanged)
+    Q_PROPERTY(QString petSizeId READ petSizeId NOTIFY petScaleChanged)
+    Q_PROPERTY(double petScale READ petScale NOTIFY petScaleChanged)
+    Q_PROPERTY(double petWindowSize READ petWindowSize NOTIFY petScaleChanged)
+    Q_PROPERTY(double petImageSize READ petImageSize NOTIFY petScaleChanged)
     Q_PROPERTY(bool pointerInteractionEnabled READ pointerInteractionEnabled NOTIFY pointerInteractionEnabledChanged)
     Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)
     Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)
@@ -72,6 +76,10 @@ public:
     bool audioMuted() const;
     QString voiceLanguage() const;
     bool autoMovementEnabled() const;
+    QString petSizeId() const;
+    double petScale() const;
+    double petWindowSize() const;
+    double petImageSize() const;
     bool pointerInteractionEnabled() const;
     bool sleeping() const;
     bool sleepTransitioning() const;
@@ -111,6 +119,7 @@ public:
     Q_INVOKABLE void toggleAudioMuted();
     Q_INVOKABLE void setVoiceLanguage(const QString &voiceLanguage);
     Q_INVOKABLE void toggleAutoMovementEnabled();
+    Q_INVOKABLE void setPetSize(const QString &sizeId);
     Q_INVOKABLE void requestTea();
     Q_INVOKABLE void toggleSleep();
     Q_INVOKABLE void triggerIdle();
@@ -142,6 +151,7 @@ signals:
     void audioMutedChanged();
     void voiceLanguageChanged();
     void autoMovementEnabledChanged();
+    void petScaleChanged();
     void pointerInteractionEnabledChanged();
     void sleepStateChanged();
     void currentAnimationUrlChanged();
@@ -256,6 +266,7 @@ private:
     QString followUpPoolForCompletedAction(const ActionDefinition &action) const;
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
+    double movementScaleFactor() const;
     void handleIdleLoopFinishedWithRoll(double randomValue);
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
@@ -286,6 +297,8 @@ private:
     bool m_audioMuted = false;
     QString m_voiceLanguage = "jp";
     bool m_autoMovementEnabled = true;
+    QString m_petSizeId = "medium";
+    double m_petScale = 2.0;
     QUrl m_currentAnimationUrl;
     QUrl m_currentSoundUrl;
     bool m_currentPropVisible = false;

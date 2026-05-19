@@ -106,6 +106,7 @@ bool pointInPolygon(const QList<QPointF> &polygon, const QPointF &point)
 PetRuntime::PetRuntime(QObject *parent)
     : QObject(parent)
 {
+    setPetSize("medium");
     loadManifest();
 
     if (m_actions.isEmpty()) {
@@ -234,6 +235,26 @@ QString PetRuntime::voiceLanguage() const
 bool PetRuntime::autoMovementEnabled() const
 {
     return m_autoMovementEnabled;
+}
+
+QString PetRuntime::petSizeId() const
+{
+    return m_petSizeId;
+}
+
+double PetRuntime::petScale() const
+{
+    return m_petScale;
+}
+
+double PetRuntime::petWindowSize() const
+{
+    return 120.0 * m_petScale;
+}
+
+double PetRuntime::petImageSize() const
+{
+    return 100.0 * m_petScale;
 }
 
 bool PetRuntime::pointerInteractionEnabled() const
@@ -426,8 +447,9 @@ QVariantMap PetRuntime::consumeFrameMovementDelta() const
 
     const QString movementKey = (action.category == "locomotion") ? m_currentMovementDirection : m_currentFacing;
     const QPointF movementDelta = action.movementDeltas.value(movementKey, QPointF(0, 0));
-    delta.insert("dx", movementDelta.x());
-    delta.insert("dy", movementDelta.y());
+    const QPointF scaledMovementDelta = movementDelta * movementScaleFactor();
+    delta.insert("dx", scaledMovementDelta.x());
+    delta.insert("dy", scaledMovementDelta.y());
     return delta;
 }
 
@@ -606,6 +628,32 @@ void PetRuntime::toggleAutoMovementEnabled()
 {
     m_autoMovementEnabled = !m_autoMovementEnabled;
     emit autoMovementEnabledChanged();
+}
+
+void PetRuntime::setPetSize(const QString &sizeId)
+{
+    const QString normalizedSizeId = sizeId.trimmed();
+    double nextScale = m_petScale;
+
+    if (sizeId == "mini") {
+        nextScale = 1.0;
+    } else if (sizeId == "small") {
+        nextScale = 1.5;
+    } else if (sizeId == "medium") {
+        nextScale = 2.0;
+    } else if (sizeId == "big") {
+        nextScale = 3.0;
+    } else {
+        return;
+    }
+
+    if (normalizedSizeId == m_petSizeId && qFuzzyCompare(nextScale, m_petScale)) {
+        return;
+    }
+
+    m_petSizeId = normalizedSizeId;
+    m_petScale = nextScale;
+    emit petScaleChanged();
 }
 
 void PetRuntime::requestTea()
@@ -1452,6 +1500,13 @@ QString PetRuntime::resolveRecipeFacing(const QString &facing) const
     }
 
     return {};
+}
+
+double PetRuntime::movementScaleFactor() const
+{
+    // manifest 里的移动增量按旧版默认“中”尺寸 scale=2 记录。
+    // 用户切换迷你/小/大时，窗口移动步长也跟着缩放，保持旧版手感。
+    return m_petScale / 2.0;
 }
 
 void PetRuntime::handleIdleLoopFinishedWithRoll(double randomValue)

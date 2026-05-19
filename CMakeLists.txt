@@ -310,5 +310,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_41_split_click_subzones.py
         )
+
+        # Phase 0.42 的旧版尺寸菜单检查：确保迷你/小/中/大
+        # 四档 scale 同时影响窗口尺寸、动画尺寸和移动步长。
+        add_test(
+            NAME check_phase_0_42_legacy_size_menu
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_42_legacy_size_menu.py
+        )
     endif()
 endif()
