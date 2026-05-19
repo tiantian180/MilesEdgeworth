@@ -12,7 +12,7 @@ PetEventBridge::PetEventBridge(PetRuntime *runtime, QObject *parent)
 {
     Q_ASSERT(m_runtime != nullptr);
 
-    // 皮肤命令可用性目前只受当前动作和 sleep phase 影响。
+    // 皮肤命令可用性目前只受当前动作和 rest phase 影响。
     // 后续菜单能力迁入 manifest 后，这个信号可以由 MenuController 统一发出。
     connect(m_runtime, &PetRuntime::currentActionChanged, this, &PetEventBridge::skinCommandAvailabilityChanged);
     connect(m_runtime, &PetRuntime::currentPhaseChanged, this, &PetEventBridge::skinCommandAvailabilityChanged);
@@ -53,7 +53,7 @@ void PetEventBridge::submitDragStarted(double globalX)
     }
 
     const RuntimeSnapshot snapshot = m_runtime->snapshot();
-    if (!snapshot.pointerInteractionEnabled || snapshot.currentActionId == "sleep") {
+    if (!snapshot.pointerInteractionEnabled || snapshot.sleeping || snapshot.sleepTransitioning) {
         m_gestureTracker.reset();
         return;
     }

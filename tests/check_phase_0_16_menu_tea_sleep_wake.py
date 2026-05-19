@@ -40,6 +40,9 @@ def main() -> int:
 
     sleep_recipe = recipes.get("sleep.enterLoopExit", {})
     require(sleep_recipe.get("action") == "sleep", "sleep.enterLoopExit 应播放 sleep action")
+    rest = manifest.get("capabilities", {}).get("rest", {})
+    require(rest.get("enterRecipe") == "sleep.enterLoopExit", "sleep/rest 能力应声明 enterRecipe")
+    require(rest.get("loopAction") == "sleep", "sleep/rest 能力应声明 loopAction")
 
     skin_command = manifest.get("skinCommands", {}).get("miles.feedTea", {})
     require(skin_command.get("label") == "喂食红茶", "红茶入口应由 Miles 皮肤命令提供中文标签")
@@ -85,8 +88,8 @@ def main() -> int:
     resolver_cpp = read("apps/desktop/src/pet/commands/SkinCommandResolver.cpp")
     pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     for token in [
-        'm_currentActionId == "sleep"',
-        'm_currentPhaseId == "loop"',
+        "m_manifest.capabilities.rest",
+        'm_currentPhaseId == QStringLiteral("loop")',
         "emit sleepStateChanged()",
     ]:
         require(token in pet_runtime_cpp + pet_runtime_h, f"PetRuntime 缺少睡眠状态语义：{token}")
@@ -102,7 +105,8 @@ def main() -> int:
         "command.request",
     ]:
         require(token in resolver_cpp, f"SkinCommandResolver.cpp 缺少 {token}")
-    require('ActionRequest::recipe("sleep.enterLoopExit")' in pipeline_cpp, "睡眠菜单事件应转成 sleep recipe 请求")
+    require("manifest.capabilities.rest.enterRecipeId" in pipeline_cpp, "睡眠菜单事件应读取 rest capability")
+    require("ActionRequest::recipe(manifest.capabilities.rest.enterRecipeId)" in pipeline_cpp, "睡眠菜单事件应转成 rest recipe 请求")
     require("SkinCommandResolver::resolveCommand" in pipeline_cpp, "皮肤菜单命令应由 SkinCommandResolver 转成 ActionRequest")
 
     menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
@@ -111,6 +115,7 @@ def main() -> int:
         'menu.addMenu(QStringLiteral("皮肤动作"))',
         "eventBridge->submitMenuCommand(commandId)",
         'runtime->sleeping() ? QStringLiteral("唤醒") : QStringLiteral("睡觉")',
+        "runtime->restCapabilityEnabled()",
         "enabled: !App.PetRuntime.sleepTransitioning",
     ]:
         if token.startswith("enabled:"):

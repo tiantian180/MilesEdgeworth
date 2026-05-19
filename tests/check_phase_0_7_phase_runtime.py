@@ -69,7 +69,8 @@ def main() -> int:
         'playPhase(m_currentActionId, action.exitPhase)',
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
-    require('ActionRequest::recipe("sleep.enterLoopExit")' in pipeline_cpp, "睡觉事件应由 InteractionPipeline 转成 sleep recipe 请求")
+    require("manifest.capabilities.rest.enterRecipeId" in pipeline_cpp, "睡觉事件应读取 rest capability 的 enterRecipe")
+    require("ActionRequest::recipe(manifest.capabilities.rest.enterRecipeId)" in pipeline_cpp, "睡觉事件应由 InteractionPipeline 转成 rest recipe 请求")
 
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")

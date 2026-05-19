@@ -20,5 +20,9 @@ class BehaviorTriggerEngine
 {
 public:
     static bool matches(const BehaviorTriggerDefinition &trigger, const BehaviorTriggerContext &context);
-    static BehaviorTriggerEntry selectEntry(const BehaviorTriggerDefinition &trigger, double randomValue);
+    static BehaviorTriggerEntry selectEntry(
+        const BehaviorTriggerDefinition &trigger,
+        const BehaviorTriggerContext &context,
+        double randomValue
+    );
 };

@@ -506,5 +506,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_67_gesture_tracker_extracted.py
         )
+
+        # Phase 0.68 的运行时去定制化检查：sleep/startup/action.completed、
+        # 移动方向到朝向和启动交互屏蔽都应来自 manifest。
+        add_test(
+            NAME check_phase_0_68_runtime_decoupling
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_68_runtime_decoupling.py
+        )
     endif()
 endif()

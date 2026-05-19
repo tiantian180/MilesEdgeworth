@@ -105,6 +105,12 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
     manifest.fallbackAction = root.value("fallbackAction").toString(kFallbackActionId);
     manifest.defaultFacing = root.value("defaultFacing").toString("right");
 
+    const QJsonObject capabilities = root.value("capabilities").toObject();
+    const QJsonObject rest = capabilities.value("rest").toObject();
+    manifest.capabilities.rest.enterRecipeId = rest.value("enterRecipe").toString();
+    manifest.capabilities.rest.exitRecipeId = rest.value("exitRecipe").toString();
+    manifest.capabilities.rest.loopActionId = rest.value("loopAction").toString();
+
     const QJsonArray facings = root.value("facings").toArray();
     if (!facings.isEmpty()) {
         manifest.facings.clear();
@@ -124,6 +130,14 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
             if (!movementDirection.isEmpty()) {
                 manifest.movementDirections.append(movementDirection);
             }
+        }
+    }
+
+    const QJsonObject movementFacingMap = root.value("movementFacingMap").toObject();
+    for (auto it = movementFacingMap.constBegin(); it != movementFacingMap.constEnd(); ++it) {
+        const QString facing = it.value().toString();
+        if (!it.key().isEmpty() && !facing.isEmpty()) {
+            manifest.movementFacingMap.insert(it.key(), facing);
         }
     }
 
@@ -272,6 +286,7 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
         action.category = actionObject.value("category").toString();
         action.loopMode = actionObject.value("loopMode").toString(actionObject.value("loop").toBool(true) ? "loop" : "onceThenIdle");
         action.priority = actionObject.value("priority").toInt(0);
+        action.blocksPointerInteraction = actionObject.value("blocksPointerInteraction").toBool(false);
         action.initialPhase = actionObject.value("initialPhase").toString();
         action.exitPhase = actionObject.value("exitPhase").toString();
 
@@ -438,6 +453,7 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
 
             BehaviorTriggerEntry entry;
             entry.type = entryObject.value("type").toString();
+            entry.when = behaviorRuleConditionFromJsonObject(entryObject.value("when").toObject());
             entry.poolId = entryObject.value("pool").toString();
             entry.recipeId = entryObject.value("recipe").toString();
             entry.actionId = entryObject.value("action").toString();
@@ -466,6 +482,12 @@ SkinManifest SkinManifestLoader::fallbackManifest()
     manifest.facings = {"right", "left"};
     manifest.movementDirections = {"east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"};
     manifest.defaultFacing = "right";
+    manifest.movementFacingMap.insert("east", "right");
+    manifest.movementFacingMap.insert("northEast", "right");
+    manifest.movementFacingMap.insert("southEast", "right");
+    manifest.movementFacingMap.insert("west", "left");
+    manifest.movementFacingMap.insert("northWest", "left");
+    manifest.movementFacingMap.insert("southWest", "left");
     manifest.stateToAction.insert("idle", kFallbackActionId);
 
     ActionDefinition fallbackAction;

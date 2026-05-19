@@ -33,6 +33,7 @@ def main() -> int:
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
     action_pools = manifest.get("actionPools", {})
+    behavior_triggers = manifest.get("behaviorTriggers", {})
 
     for action_id in [
         "briefcase_in",
@@ -61,6 +62,8 @@ def main() -> int:
     require(startup.get("scope") == "startup", "startup.briefcase 应声明为 startup recipe")
     startup_steps = startup.get("steps", [])
     require([step.get("action") for step in startup_steps] == ["briefcase_in", "briefcase_stop", "idle_stand"], "启动 recipe 应按 briefcase_in -> briefcase_stop -> idle_stand 编排")
+    runtime_started_entries = behavior_triggers.get("runtime.started", {}).get("entries", [])
+    require(any(entry.get("recipe") == "startup.briefcase" for entry in runtime_started_entries), "runtime.started trigger 应选择 startup.briefcase")
 
     require(recipes.get("idle.randomThinking", {}).get("action") == "idle_thinking_once", "idle.randomThinking 应使用一次性思考动作")
     require(recipes.get("turn.once", {}).get("action") == "turn_around", "turn.once 应映射到 turn_around")
@@ -108,7 +111,8 @@ def main() -> int:
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     for token in [
-        'playRecipe("startup.briefcase")',
+        "PetEvent::runtimeStarted()",
+        "submitRuntimeEvent",
         "startStartupSequence",
         "applyFacingAfterCurrentAction",
         "action.facingAfter",

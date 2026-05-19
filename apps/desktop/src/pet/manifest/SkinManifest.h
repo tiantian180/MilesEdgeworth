@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pet/commands/SkinCommand.h"
+#include "pet/requests/ActionRequest.h"
 
 #include <QHash>
 #include <QList>
@@ -28,6 +29,7 @@ struct ActionDefinition
     QString category;
     QString loopMode = "loop";
     int priority = 0;
+    bool blocksPointerInteraction = false;
     QStringList tags;
     QHash<QString, QUrl> variants;
     QHash<QString, QPointF> movementDeltas;
@@ -90,9 +92,17 @@ struct ActionPoolDefinition
     QList<ActionPoolEntry> entries;
 };
 
+struct BehaviorRuleCondition
+{
+    QString actionId;
+    bool hasHoldCompleted = false;
+    bool holdCompleted = false;
+};
+
 struct BehaviorTriggerEntry
 {
     QString type;
+    BehaviorRuleCondition when;
     QString poolId;
     QString recipeId;
     QString actionId;
@@ -108,18 +118,28 @@ struct BehaviorTriggerDefinition
     QList<BehaviorTriggerEntry> entries;
 };
 
-struct BehaviorRuleCondition
-{
-    QString actionId;
-    bool hasHoldCompleted = false;
-    bool holdCompleted = false;
-};
-
 struct BehaviorRuleDefinition
 {
     QString event;
     BehaviorRuleCondition when;
     ActionRequest request;
+};
+
+struct RestCapabilityDefinition
+{
+    QString enterRecipeId;
+    QString exitRecipeId;
+    QString loopActionId;
+
+    bool enabled() const
+    {
+        return !enterRecipeId.isEmpty() && !loopActionId.isEmpty();
+    }
+};
+
+struct CapabilityDefinition
+{
+    RestCapabilityDefinition rest;
 };
 
 struct HitZoneDefinition
@@ -147,6 +167,7 @@ struct ClickBehaviorDefinition
 
 struct SkinManifest
 {
+    CapabilityDefinition capabilities;
     QHash<QString, QString> stateToAction;
     QHash<QString, ActionDefinition> actions;
     QHash<QString, RecipeDefinition> recipes;
@@ -157,6 +178,7 @@ struct SkinManifest
     QHash<QString, HitZoneDefinition> hitZones;
     QHash<QString, SkinCommandDefinition> skinCommands;
     ClickBehaviorDefinition clickBehaviors;
+    QHash<QString, QString> movementFacingMap;
     QString fallbackAction = "idle_stand";
     QStringList facings = {"right", "left"};
     QStringList movementDirections;

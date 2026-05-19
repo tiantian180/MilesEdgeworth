@@ -11,6 +11,9 @@ constexpr auto kReturnToIdleCommandId = "runtime.returnToIdle";
 constexpr auto kFacingToggleCommandId = "runtime.facing.toggle";
 constexpr auto kDragShakeEventName = "pointer.dragShake";
 constexpr auto kDragReleasedEventName = "pointer.dragReleased";
+constexpr auto kIdleLoopFinishedTriggerId = "idle.loopFinished";
+constexpr auto kRuntimeStartedTriggerId = "runtime.started";
+constexpr auto kActionCompletedTriggerId = "action.completed";
 
 void appendIfPlayable(QList<ActionRequest> &requests, const ActionRequest &request)
 {
@@ -39,6 +42,20 @@ QString behaviorRuleEventName(const PetEvent &event)
         return QString::fromUtf8(kDragShakeEventName);
     case PetEventType::PointerDragReleased:
         return QString::fromUtf8(kDragReleasedEventName);
+    default:
+        return {};
+    }
+}
+
+QString behaviorTriggerIdForEvent(const PetEvent &event)
+{
+    switch (event.type) {
+    case PetEventType::IdleLoopFinished:
+        return QString::fromUtf8(kIdleLoopFinishedTriggerId);
+    case PetEventType::RuntimeStarted:
+        return QString::fromUtf8(kRuntimeStartedTriggerId);
+    case PetEventType::ActionCompleted:
+        return QString::fromUtf8(kActionCompletedTriggerId);
     default:
         return {};
     }
@@ -80,6 +97,39 @@ void appendBehaviorRuleRequests(
         }
     }
 }
+
+void appendBehaviorTriggerRequests(
+    QList<ActionRequest> &requests,
+    const SkinManifest &manifest,
+    const RuntimeSnapshot &snapshot,
+    const PetEvent &event
+)
+{
+    const QString triggerId = behaviorTriggerIdForEvent(event);
+    if (triggerId.isEmpty() || !manifest.behaviorTriggers.contains(triggerId)) {
+        return;
+    }
+
+    const BehaviorTriggerDefinition trigger = manifest.behaviorTriggers.value(triggerId);
+    const BehaviorTriggerContext context {
+        snapshot.currentState,
+        snapshot.currentActionId,
+        !snapshot.currentRecipeId.isEmpty(),
+    };
+
+    if (!BehaviorTriggerEngine::matches(trigger, context)) {
+        return;
+    }
+
+    const BehaviorTriggerEntry entry = BehaviorTriggerEngine::selectEntry(trigger, context, event.randomValue);
+    if (entry.type == "pool" && !entry.poolId.isEmpty()) {
+        appendIfPlayable(requests, ActionRequest::actionPool(entry.poolId));
+    } else if (entry.type == "recipe" && !entry.recipeId.isEmpty()) {
+        appendIfPlayable(requests, ActionRequest::recipe(entry.recipeId));
+    } else if (entry.type == "action" && !entry.actionId.isEmpty()) {
+        appendIfPlayable(requests, ActionRequest::action(entry.actionId));
+    }
+}
 } // namespace
 
 QList<ActionRequest> InteractionPipeline::handleEvent(
@@ -98,7 +148,7 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
 
     switch (event.type) {
     case PetEventType::PointerSingleClick: {
-        if (!snapshot.pointerInteractionEnabled || snapshot.currentActionId == "sleep") {
+        if (!snapshot.pointerInteractionEnabled || snapshot.sleeping || snapshot.sleepTransitioning) {
             return requests;
         }
 
@@ -136,7 +186,10 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
         if (!snapshot.pointerInteractionEnabled) {
             return requests;
         }
-        if (snapshot.currentActionId == "sleep" || snapshot.currentPhaseId == "loop") {
+        if (snapshot.sleepTransitioning) {
+            return requests;
+        }
+        if (snapshot.sleeping) {
             requests.append(ActionRequest::returnToIdle());
             return requests;
         }
@@ -152,7 +205,7 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
 
     case PetEventType::PointerDragShake:
     case PetEventType::PointerDragReleased:
-        if (!snapshot.pointerInteractionEnabled || snapshot.currentActionId == "sleep") {
+        if (!snapshot.pointerInteractionEnabled || snapshot.sleeping || snapshot.sleepTransitioning) {
             return requests;
         }
         appendBehaviorRuleRequests(requests, manifest, snapshot, event);
@@ -160,13 +213,22 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
 
     case PetEventType::MenuCommand:
         if (event.commandId == QString::fromUtf8(kSleepToggleCommandId)) {
+            const bool restCapabilityReady = !manifest.capabilities.rest.enterRecipeId.isEmpty()
+                && !manifest.capabilities.rest.loopActionId.isEmpty();
+            if (!restCapabilityReady) {
+                return requests;
+            }
             if (snapshot.sleepTransitioning) {
                 return requests;
             }
             if (snapshot.sleeping) {
-                requests.append(ActionRequest::returnToIdle());
+                if (!manifest.capabilities.rest.exitRecipeId.isEmpty()) {
+                    requests.append(ActionRequest::recipe(manifest.capabilities.rest.exitRecipeId));
+                } else {
+                    requests.append(ActionRequest::returnToIdle());
+                }
             } else {
-                requests.append(ActionRequest::recipe("sleep.enterLoopExit"));
+                requests.append(ActionRequest::recipe(manifest.capabilities.rest.enterRecipeId));
             }
         } else if (event.commandId == QString::fromUtf8(kReturnToIdleCommandId)) {
             requests.append(ActionRequest::returnToIdle());
@@ -177,32 +239,11 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
         }
         return requests;
 
-    case PetEventType::IdleLoopFinished: {
-        if (!manifest.behaviorTriggers.contains("idle.loopFinished")) {
-            return requests;
-        }
-
-        const BehaviorTriggerDefinition trigger = manifest.behaviorTriggers.value("idle.loopFinished");
-        const BehaviorTriggerContext context {
-            snapshot.currentState,
-            snapshot.currentActionId,
-            !snapshot.currentRecipeId.isEmpty(),
-        };
-
-        if (!BehaviorTriggerEngine::matches(trigger, context)) {
-            return requests;
-        }
-
-        const BehaviorTriggerEntry entry = BehaviorTriggerEngine::selectEntry(trigger, event.randomValue);
-        if (entry.type == "pool" && !entry.poolId.isEmpty()) {
-            appendIfPlayable(requests, ActionRequest::actionPool(entry.poolId));
-        } else if (entry.type == "recipe" && !entry.recipeId.isEmpty()) {
-            appendIfPlayable(requests, ActionRequest::recipe(entry.recipeId));
-        } else if (entry.type == "action" && !entry.actionId.isEmpty()) {
-            appendIfPlayable(requests, ActionRequest::action(entry.actionId));
-        }
+    case PetEventType::IdleLoopFinished:
+    case PetEventType::RuntimeStarted:
+    case PetEventType::ActionCompleted:
+        appendBehaviorTriggerRequests(requests, manifest, snapshot, event);
         return requests;
-    }
 
     case PetEventType::PropClicked:
         if (snapshot.currentPropVisible && !snapshot.currentPropClickedRecipeId.isEmpty()) {

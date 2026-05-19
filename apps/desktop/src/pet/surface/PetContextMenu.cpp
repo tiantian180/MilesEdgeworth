@@ -85,11 +85,13 @@ void PetContextMenu::show(
         }
     }
 
-    QAction *sleepAction = menu.addAction(runtime->sleeping() ? QStringLiteral("唤醒") : QStringLiteral("睡觉"));
-    sleepAction->setEnabled(!runtime->sleepTransitioning());
-    QObject::connect(sleepAction, &QAction::triggered, parent, [eventBridge]() {
-        eventBridge->submitMenuCommand(QStringLiteral("runtime.sleep.toggle"));
-    });
+    if (runtime->restCapabilityEnabled()) {
+        QAction *sleepAction = menu.addAction(runtime->sleeping() ? QStringLiteral("唤醒") : QStringLiteral("睡觉"));
+        sleepAction->setEnabled(!runtime->sleepTransitioning());
+        QObject::connect(sleepAction, &QAction::triggered, parent, [eventBridge]() {
+            eventBridge->submitMenuCommand(QStringLiteral("runtime.sleep.toggle"));
+        });
+    }
 
     menu.addSeparator();
     QAction *quitAction = menu.addAction(QStringLiteral("退出"));

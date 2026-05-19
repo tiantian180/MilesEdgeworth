@@ -65,7 +65,7 @@ def main() -> int:
 
     idle_body = function_body(pipeline_cpp, "QList<ActionRequest> InteractionPipeline::handleEvent(")
     require(
-        'manifest.behaviorTriggers.contains("idle.loopFinished")' in idle_body,
+        "behaviorTriggerIdForEvent" in pipeline_cpp and "kIdleLoopFinishedTriggerId" in pipeline_cpp,
         "idle.loopFinished 应由 InteractionPipeline 读取 manifest behavior trigger",
     )
     require("randomValue <= 0.7" not in idle_body, "idle loop 概率不应继续硬编码在 C++ 函数里")

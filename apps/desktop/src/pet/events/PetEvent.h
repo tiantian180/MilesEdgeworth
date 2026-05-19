@@ -15,6 +15,8 @@ enum class PetEventType
     PointerDragReleased,
     MenuCommand,
     IdleLoopFinished,
+    RuntimeStarted,
+    ActionCompleted,
     PropClicked,
     PropExpired,
 };
@@ -77,6 +79,22 @@ struct PetEvent
     {
         PetEvent event;
         event.type = PetEventType::IdleLoopFinished;
+        event.randomValue = random;
+        event.hasRandomValue = true;
+        return event;
+    }
+
+    static PetEvent runtimeStarted()
+    {
+        PetEvent event;
+        event.type = PetEventType::RuntimeStarted;
+        return event;
+    }
+
+    static PetEvent actionCompleted(double random)
+    {
+        PetEvent event;
+        event.type = PetEventType::ActionCompleted;
         event.randomValue = random;
         event.hasRandomValue = true;
         return event;

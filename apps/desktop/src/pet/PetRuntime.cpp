@@ -1,14 +1,15 @@
 #include "pet/PetRuntime.h"
 
+#include "pet/interaction/InteractionPipeline.h"
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/selection/ActionPoolSelector.h"
 
+#include <QRandomGenerator>
 #include <QtGlobal>
 #include <QVariantMap>
 
 namespace {
 constexpr auto kManifestPath = ":/pet/manifest.json";
-constexpr auto kFallbackActionId = "idle_stand";
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
 } // namespace
 
@@ -52,6 +53,22 @@ RuntimeSnapshot PetRuntime::snapshot() const
     snapshot.sleeping = sleeping();
     snapshot.sleepTransitioning = sleepTransitioning();
     return snapshot;
+}
+
+bool PetRuntime::sleeping() const
+{
+    const RestCapabilityDefinition rest = m_manifest.capabilities.rest;
+    return rest.enabled()
+        && m_currentActionId == rest.loopActionId
+        && m_currentPhaseId == QStringLiteral("loop");
+}
+
+bool PetRuntime::sleepTransitioning() const
+{
+    const RestCapabilityDefinition rest = m_manifest.capabilities.rest;
+    return rest.enabled()
+        && m_currentActionId == rest.loopActionId
+        && m_currentPhaseId != QStringLiteral("loop");
 }
 
 void PetRuntime::setState(const QString &state)
@@ -276,7 +293,7 @@ void PetRuntime::setPetSize(const QString &sizeId)
 
 void PetRuntime::startStartupSequence()
 {
-    playRecipe("startup.briefcase");
+    submitRuntimeEvent(PetEvent::runtimeStarted());
 }
 
 void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
@@ -337,9 +354,7 @@ void PetRuntime::handleAnimationFinished()
     }
 
     if (m_currentAutoReturnToIdle) {
-        const QString followUpPoolId = followUpPoolForCompletedAction(action);
-        if (!followUpPoolId.isEmpty()) {
-            playActionFromPool(followUpPoolId);
+        if (submitRuntimeEvent(PetEvent::actionCompleted(QRandomGenerator::global()->generateDouble()))) {
             return;
         }
 
@@ -397,9 +412,8 @@ QUrl PetRuntime::soundUrlForRecipe(const RecipeDefinition &recipe) const
 
 bool PetRuntime::acceptsPointerInteraction() const
 {
-    // 旧版 BRIEFCASEIN 阶段直接忽略鼠标事件。
-    // 这里把同一条边界放进运行时，QML 和未来其它入口都能复用。
-    return m_currentActionId != "briefcase_in";
+    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
+    return !action.blocksPointerInteraction;
 }
 
 void PetRuntime::playSoundForRecipe(const RecipeDefinition &recipe)
@@ -496,25 +510,6 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
     }
 }
 
-QString PetRuntime::followUpPoolForCompletedAction(const ActionDefinition &action) const
-{
-    if (action.category != "locomotion") {
-        return {};
-    }
-
-    // 旧版走路 / 跑步播完后会继续走、继续跑、换方向或停下。
-    // 这里只把“完成后去哪个候选池”写在运行时，具体概率仍交给 manifest。
-    if (m_currentActionId == "walk" && m_manifest.actionPools.contains("walk.finished")) {
-        return "walk.finished";
-    }
-
-    if (m_currentActionId == "run" && m_manifest.actionPools.contains("run.finished")) {
-        return "run.finished";
-    }
-
-    return {};
-}
-
 QString PetRuntime::resolveRecipeMovementDirection(const QString &movementDirection) const
 {
     const QString normalizedDirection = movementDirection.trimmed();
@@ -569,6 +564,15 @@ double PetRuntime::movementScaleFactor() const
     return m_petScale / 2.0;
 }
 
+bool PetRuntime::submitRuntimeEvent(const PetEvent &event)
+{
+    const QList<ActionRequest> requests = InteractionPipeline::handleEvent(m_manifest, snapshot(), event);
+    for (const ActionRequest &request : requests) {
+        submitActionRequest(request);
+    }
+    return !requests.isEmpty();
+}
+
 void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)
 {
     if (action.facingAfter.isEmpty()) {
@@ -588,12 +592,7 @@ void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)
 
 void PetRuntime::updateFacingFromMovementDirection(const QString &movementDirection)
 {
-    QString nextFacing;
-    if (movementDirection == "east" || movementDirection == "northEast" || movementDirection == "southEast") {
-        nextFacing = "right";
-    } else if (movementDirection == "west" || movementDirection == "northWest" || movementDirection == "southWest") {
-        nextFacing = "left";
-    }
+    const QString nextFacing = m_manifest.movementFacingMap.value(movementDirection);
 
     if (nextFacing.isEmpty() || nextFacing == m_currentFacing || !m_manifest.facings.contains(nextFacing)) {
         return;

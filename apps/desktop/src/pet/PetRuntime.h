@@ -2,6 +2,7 @@
 
 #include "pet/manifest/SkinManifest.h"
 #include "pet/effects/PropController.h"
+#include "pet/events/PetEvent.h"
 #include "pet/requests/ActionRequest.h"
 #include "pet/runtime/RuntimeSnapshot.h"
 
@@ -86,8 +87,9 @@ public:
     double petWindowSize() const { return 120.0 * m_petScale; }
     double petImageSize() const { return 100.0 * m_petScale; }
     bool pointerInteractionEnabled() const { return acceptsPointerInteraction(); }
-    bool sleeping() const { return m_currentActionId == "sleep" && m_currentPhaseId == "loop"; }
-    bool sleepTransitioning() const { return m_currentActionId == "sleep" && m_currentPhaseId != "loop"; }
+    bool restCapabilityEnabled() const { return m_manifest.capabilities.rest.enabled(); }
+    bool sleeping() const;
+    bool sleepTransitioning() const;
     QUrl currentAnimationUrl() const { return m_currentAnimationUrl; }
     QUrl currentSoundUrl() const { return m_currentSoundUrl; }
     bool currentPropVisible() const { return m_propController.current().visible; }
@@ -159,10 +161,10 @@ private:
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
     void playRecipeStep(const RecipeStep &step);
-    QString followUpPoolForCompletedAction(const ActionDefinition &action) const;
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
     double movementScaleFactor() const;
+    bool submitRuntimeEvent(const PetEvent &event);
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
     void playPhase(const QString &actionId, const QString &phaseId);
@@ -176,7 +178,7 @@ private:
     int m_currentRecipeStepIndex = -1;
     QString m_currentPhaseId;
     QString m_currentFacing = "right";
-    QString m_currentMovementDirection = "east";
+    QString m_currentMovementDirection;
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
     bool m_audioMuted = false;

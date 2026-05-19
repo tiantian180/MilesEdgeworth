@@ -6,6 +6,20 @@
   "defaultFacing": "right",
   "facings": ["right", "left"],
   "movementDirections": ["east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"],
+  "movementFacingMap": {
+    "east": "right",
+    "northEast": "right",
+    "southEast": "right",
+    "west": "left",
+    "northWest": "left",
+    "southWest": "left"
+  },
+  "capabilities": {
+    "rest": {
+      "enterRecipe": "sleep.enterLoopExit",
+      "loopAction": "sleep"
+    }
+  },
   "states": {
     "idle": {
       "action": "idle_stand"
@@ -298,6 +312,7 @@
       "category": "startup",
       "loopMode": "once",
       "priority": 80,
+      "blocksPointerInteraction": true,
       "tags": ["startup", "briefcase", "walking"],
       "variants": {
         "right": {
@@ -1106,6 +1121,16 @@
     }
   },
   "behaviorTriggers": {
+    "runtime.started": {
+      "label": "运行时启动后的入场动作",
+      "entries": [
+        {
+          "type": "recipe",
+          "recipe": "startup.briefcase",
+          "weight": 1
+        }
+      ]
+    },
     "idle.loopFinished": {
       "label": "站立循环完成后的待机调度",
       "when": {
@@ -1122,6 +1147,27 @@
         {
           "type": "none",
           "weight": 30
+        }
+      ]
+    },
+    "action.completed": {
+      "label": "动作完成后的续接调度",
+      "entries": [
+        {
+          "when": {
+            "action": "walk"
+          },
+          "type": "pool",
+          "pool": "walk.finished",
+          "weight": 1
+        },
+        {
+          "when": {
+            "action": "run"
+          },
+          "type": "pool",
+          "pool": "run.finished",
+          "weight": 1
         }
       ]
     }

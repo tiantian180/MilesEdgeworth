@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
@@ -19,6 +20,12 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
+    manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
+    require(
+        manifest.get("actions", {}).get("briefcase_in", {}).get("blocksPointerInteraction") is True,
+        "briefcase_in 应通过 manifest blocksPointerInteraction 禁用启动交互",
+    )
+
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     for token in [
         "Q_PROPERTY(bool pointerInteractionEnabled READ pointerInteractionEnabled NOTIFY pointerInteractionEnabledChanged)",
@@ -30,7 +37,7 @@ def main() -> int:
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [
-        'm_currentActionId != "briefcase_in"',
+        "action.blocksPointerInteraction",
         "wasPointerInteractionEnabled",
         "pointerInteractionEnabledChanged",
     ]:
