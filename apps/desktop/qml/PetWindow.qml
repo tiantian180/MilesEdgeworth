@@ -217,7 +217,9 @@ Window {
 
         source: App.PetRuntime.currentSoundUrl
         property int soundSerial: App.PetRuntime.soundPlaybackSerial
-        volume: 0.8
+        // 旧版静音是直接把 QSoundEffect 音量设为 0。
+        // 这里保持同样语义：正在播放的语音也会随菜单开关立即变静音。
+        volume: App.PetRuntime.audioMuted ? 0 : 0.8
     }
 
     // Phase 0.14 的最小 Prop 窗口：先专门承载检察官徽章。

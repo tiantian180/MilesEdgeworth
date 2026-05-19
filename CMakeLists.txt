@@ -374,5 +374,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_49_double_click_release_guard.py
         )
+
+        # Phase 0.50 的旧版静音音量检查：旧版会直接 setVolume(0)，
+        # v2 的 QML SoundEffect 也要跟随 audioMuted 立即变为 0。
+        add_test(
+            NAME check_phase_0_50_mute_volume_binding
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_50_mute_volume_binding.py
+        )
     endif()
 endif()
