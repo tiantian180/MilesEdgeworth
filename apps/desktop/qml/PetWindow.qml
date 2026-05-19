@@ -218,7 +218,7 @@ Window {
     Timer {
         id: singleClickTimer
 
-        interval: 260
+        interval: 300
         repeat: false
         property real clickX: 0
         property real clickY: 0

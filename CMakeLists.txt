@@ -286,5 +286,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_38_locomotion_followup_legacy_weights.py
         )
+
+        # Phase 0.39 的双击判定窗口检查：确保单击延迟确认
+        # 使用旧版 300ms，避免双击体感偏紧。
+        add_test(
+            NAME check_phase_0_39_double_click_window
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_39_double_click_window.py
+        )
     endif()
 endif()
