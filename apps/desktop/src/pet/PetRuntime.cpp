@@ -192,6 +192,16 @@ double PetRuntime::currentPropHeight() const
     return m_currentPropHeight;
 }
 
+double PetRuntime::currentPropVisualWidth() const
+{
+    return m_currentPropVisualWidth;
+}
+
+double PetRuntime::currentPropVisualHeight() const
+{
+    return m_currentPropVisualHeight;
+}
+
 int PetRuntime::currentPropDurationMs() const
 {
     return m_currentPropDurationMs;
@@ -892,6 +902,8 @@ void PetRuntime::loadManifest()
         prop.assetUrl = QUrl(propObject.value("asset").toString());
         prop.width = propObject.value("width").toDouble(0);
         prop.height = propObject.value("height").toDouble(0);
+        prop.visualWidth = propObject.value("visualWidth").toDouble(0);
+        prop.visualHeight = propObject.value("visualHeight").toDouble(0);
         prop.delayMs = propObject.value("delayMs").toInt(0);
         prop.durationMs = propObject.value("durationMs").toInt(0);
         prop.clickedRecipeId = propObject.value("clickedRecipe").toString();
@@ -907,6 +919,18 @@ void PetRuntime::loadManifest()
         for (auto travelIt = travel.constBegin(); travelIt != travel.constEnd(); ++travelIt) {
             const QJsonObject travelObject = travelIt.value().toObject();
             prop.travelDeltas.insert(travelIt.key(), QPointF(travelObject.value("x").toDouble(0), travelObject.value("y").toDouble(0)));
+        }
+
+        const QJsonObject travelBase = propObject.value("travelBase").toObject();
+        for (auto travelIt = travelBase.constBegin(); travelIt != travelBase.constEnd(); ++travelIt) {
+            const QJsonObject travelObject = travelIt.value().toObject();
+            prop.travelBaseDeltas.insert(travelIt.key(), QPointF(travelObject.value("x").toDouble(0), travelObject.value("y").toDouble(0)));
+        }
+
+        const QJsonObject travelPerScale = propObject.value("travelPerScale").toObject();
+        for (auto travelIt = travelPerScale.constBegin(); travelIt != travelPerScale.constEnd(); ++travelIt) {
+            const QJsonObject travelObject = travelIt.value().toObject();
+            prop.travelPerScaleDeltas.insert(travelIt.key(), QPointF(travelObject.value("x").toDouble(0), travelObject.value("y").toDouble(0)));
         }
 
         if (!prop.id.isEmpty() && !prop.assetUrl.isEmpty()) {
@@ -1276,22 +1300,18 @@ void PetRuntime::spawnPropForRecipe(const QString &propId, const QString &facing
     }
 
     const PropDefinition prop = m_props.value(propId);
-    const QPointF startOffset = prop.startOffsets.value(
-        facing,
-        prop.startOffsets.value(m_defaultFacing, QPointF(0, 0))
-    );
-    const QPointF travelDelta = prop.travelDeltas.value(
-        facing,
-        prop.travelDeltas.value(m_defaultFacing, QPointF(0, 0))
-    );
+    const QPointF startOffset = scaledPropPoint(propPointForFacing(prop.startOffsets, facing));
+    const QPointF travelDelta = propTravelDelta(prop, facing);
 
     m_currentPropVisible = true;
     m_currentPropId = prop.id;
     m_currentPropImageUrl = prop.assetUrl;
     m_currentPropStartOffset = startOffset;
     m_currentPropEndOffset = startOffset + travelDelta;
-    m_currentPropWidth = prop.width > 0 ? prop.width : 94;
-    m_currentPropHeight = prop.height > 0 ? prop.height : 94;
+    m_currentPropWidth = scaledPropLength(prop.width > 0 ? prop.width : 94);
+    m_currentPropHeight = scaledPropLength(prop.height > 0 ? prop.height : 94);
+    m_currentPropVisualWidth = scaledPropLength(prop.visualWidth > 0 ? prop.visualWidth : (prop.width > 0 ? prop.width : 94));
+    m_currentPropVisualHeight = scaledPropLength(prop.visualHeight > 0 ? prop.visualHeight : (prop.height > 0 ? prop.height : 94));
     m_currentPropDurationMs = prop.durationMs > 0 ? prop.durationMs : 1500;
     m_currentPropClickedRecipeId = prop.clickedRecipeId;
     m_currentPropExpiredRecipeId = prop.expiredRecipeId;
@@ -1316,6 +1336,8 @@ void PetRuntime::hideCurrentProp()
     m_currentPropEndOffset = QPointF();
     m_currentPropWidth = 0;
     m_currentPropHeight = 0;
+    m_currentPropVisualWidth = 0;
+    m_currentPropVisualHeight = 0;
     m_currentPropDurationMs = 0;
     m_currentPropClickedRecipeId.clear();
     m_currentPropExpiredRecipeId.clear();
@@ -1507,6 +1529,34 @@ double PetRuntime::movementScaleFactor() const
     // manifest 里的移动增量按旧版默认“中”尺寸 scale=2 记录。
     // 用户切换迷你/小/大时，窗口移动步长也跟着缩放，保持旧版手感。
     return m_petScale / 2.0;
+}
+
+double PetRuntime::scaledPropLength(double length) const
+{
+    // Prop manifest 中的尺寸按旧版默认“中”尺寸 scale=2 记录。
+    // 视觉尺寸和透明点击窗口一起缩放，避免大号/迷你桌宠下徽章显得突兀。
+    return length * movementScaleFactor();
+}
+
+QPointF PetRuntime::propPointForFacing(const QHash<QString, QPointF> &points, const QString &facing) const
+{
+    return points.value(facing, points.value(m_defaultFacing, QPointF(0, 0)));
+}
+
+QPointF PetRuntime::scaledPropPoint(const QPointF &point) const
+{
+    return point * movementScaleFactor();
+}
+
+QPointF PetRuntime::propTravelDelta(const PropDefinition &prop, const QString &facing) const
+{
+    if (!prop.travelBaseDeltas.isEmpty() || !prop.travelPerScaleDeltas.isEmpty()) {
+        const QPointF base = propPointForFacing(prop.travelBaseDeltas, facing);
+        const QPointF perScale = propPointForFacing(prop.travelPerScaleDeltas, facing);
+        return base + perScale * m_petScale;
+    }
+
+    return scaledPropPoint(propPointForFacing(prop.travelDeltas, facing));
 }
 
 void PetRuntime::handleIdleLoopFinishedWithRoll(double randomValue)

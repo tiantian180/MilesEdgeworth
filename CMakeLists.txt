@@ -318,5 +318,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_42_legacy_size_menu.py
         )
+
+        # Phase 0.43 的徽章缩放检查：旧版调整大小时，检察官徽章的
+        # 起点、飞行距离和视觉尺寸也会跟随 scale。
+        add_test(
+            NAME check_phase_0_43_scaled_prosecutor_badge
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_43_scaled_prosecutor_badge.py
+        )
     endif()
 endif()

@@ -215,8 +215,8 @@ Window {
             anchors.centerIn: parent
             source: App.PetRuntime.currentPropImageUrl
             fillMode: Image.PreserveAspectFit
-            width: Math.min(parent.width, 70)
-            height: Math.min(parent.height, 70)
+            width: Math.max(1, App.PetRuntime.currentPropVisualWidth)
+            height: Math.max(1, App.PetRuntime.currentPropVisualHeight)
         }
 
         MouseArea {

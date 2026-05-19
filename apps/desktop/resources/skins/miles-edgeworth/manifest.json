@@ -238,6 +238,8 @@
       "asset": "qrc:/pet/prosecutor-badge.png",
       "width": 94,
       "height": 94,
+      "visualWidth": 70,
+      "visualHeight": 70,
       "delayMs": 700,
       "durationMs": 1500,
       "clickedRecipe": "bow.once",
@@ -249,6 +251,14 @@
       "travel": {
         "right": { "x": 900, "y": 0 },
         "left": { "x": -900, "y": 0 }
+      },
+      "travelBase": {
+        "right": { "x": 600, "y": 0 },
+        "left": { "x": -600, "y": 0 }
+      },
+      "travelPerScale": {
+        "right": { "x": 150, "y": 0 },
+        "left": { "x": -150, "y": 0 }
       }
     }
   },

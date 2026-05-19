@@ -428,6 +428,33 @@ int main(int argc, char *argv[])
     require(runtime.currentSoundUrl().toString() == soundBeforeMutedPlay, "静音时不应发出新的声音播放请求");
 
     runtime.returnToIdle();
+    runtime.setPetSize("big");
+    runtime.setFacing("right");
+    runtime.playRecipe("doubleClick.takeThat");
+    waitForMilliseconds(750);
+    require(runtime.currentPropVisible(), "大号 Take that 延迟后应飞出检察官徽章");
+    requireNear(runtime.currentPropStartOffsetX(), 258.0, "大号徽章右向起点应按旧版 scale=3 缩放");
+    requireNear(runtime.currentPropStartOffsetY(), 48.0, "大号徽章右向纵向起点应按旧版 scale=3 缩放");
+    requireNear(runtime.currentPropEndOffsetX(), 1308.0, "大号徽章右向终点应按旧版 600 + 150 * scale 计算");
+    requireNear(runtime.currentPropVisualWidth(), 105.0, "大号徽章视觉尺寸应按旧版 scale=3 缩放");
+    runtime.handlePropExpired();
+    runtime.handleAnimationFinished();
+
+    runtime.returnToIdle();
+    runtime.setPetSize("mini");
+    runtime.setFacing("left");
+    runtime.playRecipe("doubleClick.takeThat");
+    waitForMilliseconds(750);
+    require(runtime.currentPropVisible(), "迷你 Take that 延迟后应飞出检察官徽章");
+    requireNear(runtime.currentPropStartOffsetX(), 1.0, "迷你徽章左向起点应按旧版 scale=1 缩放");
+    requireNear(runtime.currentPropStartOffsetY(), 16.0, "迷你徽章左向纵向起点应按旧版 scale=1 缩放");
+    requireNear(runtime.currentPropEndOffsetX(), -749.0, "迷你徽章左向终点应按旧版 -(600 + 150 * scale) 计算");
+    requireNear(runtime.currentPropVisualWidth(), 35.0, "迷你徽章视觉尺寸应按旧版 scale=1 缩放");
+    runtime.handlePropExpired();
+    runtime.handleAnimationFinished();
+
+    runtime.returnToIdle();
+    runtime.setPetSize("medium");
     runtime.playRecipe("doubleClick.takeThat");
     require(runtime.currentActionId() == "objecting", "Take that 应播放 objecting 动作");
     require(!runtime.currentPropVisible(), "Take that 刚触发时徽章应先等待延迟");

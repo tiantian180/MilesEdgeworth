@@ -57,6 +57,8 @@ class PetRuntime : public QObject
     Q_PROPERTY(double currentPropEndOffsetY READ currentPropEndOffsetY NOTIFY currentPropChanged)
     Q_PROPERTY(double currentPropWidth READ currentPropWidth NOTIFY currentPropChanged)
     Q_PROPERTY(double currentPropHeight READ currentPropHeight NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropVisualWidth READ currentPropVisualWidth NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropVisualHeight READ currentPropVisualHeight NOTIFY currentPropChanged)
     Q_PROPERTY(int currentPropDurationMs READ currentPropDurationMs NOTIFY currentPropChanged)
     Q_PROPERTY(int currentPropPlaybackSerial READ currentPropPlaybackSerial NOTIFY currentPropPlaybackSerialChanged)
     Q_PROPERTY(int playbackSerial READ playbackSerial NOTIFY playbackSerialChanged)
@@ -95,6 +97,8 @@ public:
     double currentPropEndOffsetY() const;
     double currentPropWidth() const;
     double currentPropHeight() const;
+    double currentPropVisualWidth() const;
+    double currentPropVisualHeight() const;
     int currentPropDurationMs() const;
     int currentPropPlaybackSerial() const;
     int playbackSerial() const;
@@ -212,12 +216,16 @@ private:
         QUrl assetUrl;
         double width = 0;
         double height = 0;
+        double visualWidth = 0;
+        double visualHeight = 0;
         int delayMs = 0;
         int durationMs = 0;
         QString clickedRecipeId;
         QString expiredRecipeId;
         QHash<QString, QPointF> startOffsets;
         QHash<QString, QPointF> travelDeltas;
+        QHash<QString, QPointF> travelBaseDeltas;
+        QHash<QString, QPointF> travelPerScaleDeltas;
     };
 
     struct ActionPoolEntry
@@ -267,6 +275,10 @@ private:
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
     double movementScaleFactor() const;
+    double scaledPropLength(double length) const;
+    QPointF propPointForFacing(const QHash<QString, QPointF> &points, const QString &facing) const;
+    QPointF scaledPropPoint(const QPointF &point) const;
+    QPointF propTravelDelta(const PropDefinition &prop, const QString &facing) const;
     void handleIdleLoopFinishedWithRoll(double randomValue);
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
@@ -308,6 +320,8 @@ private:
     QPointF m_currentPropEndOffset;
     double m_currentPropWidth = 0;
     double m_currentPropHeight = 0;
+    double m_currentPropVisualWidth = 0;
+    double m_currentPropVisualHeight = 0;
     int m_currentPropDurationMs = 0;
     QString m_currentPropClickedRecipeId;
     QString m_currentPropExpiredRecipeId;
