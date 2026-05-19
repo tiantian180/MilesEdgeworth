@@ -254,5 +254,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_34_locomotion_direction_smoke.py
         )
+
+        # Phase 0.35 的随机 idle recipe smoke 检查：确保非移动
+        # idle 候选都能从 recipe 走到预期 action。
+        add_test(
+            NAME check_phase_0_35_idle_random_recipe_smoke
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_35_idle_random_recipe_smoke.py
+        )
     endif()
 endif()

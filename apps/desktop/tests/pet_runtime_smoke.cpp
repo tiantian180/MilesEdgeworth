@@ -41,6 +41,12 @@ struct MovementCase
     bool preserveFacing = false;
 };
 
+struct RecipeActionCase
+{
+    const char *recipeId;
+    const char *actionId;
+};
+
 void requireSignedDelta(double value, int expectedSign, const QString &recipeId, const char *axis)
 {
     if (expectedSign > 0 && value > 0) {
@@ -57,6 +63,13 @@ void requireSignedDelta(double value, int expectedSign, const QString &recipeId,
 
     std::cerr << recipeId.toStdString() << ' ' << axis << " 移动方向不符合预期: " << value << '\n';
     std::exit(1);
+}
+
+void requireRecipeAction(PetRuntime &runtime, const RecipeActionCase &recipeCase, const char *message)
+{
+    runtime.returnToIdle();
+    runtime.playRecipe(QString::fromUtf8(recipeCase.recipeId));
+    require(runtime.currentActionId() == QString::fromUtf8(recipeCase.actionId), message);
 }
 
 void waitForMilliseconds(int milliseconds)
@@ -108,6 +121,26 @@ int main(int argc, char *argv[])
     runtime.playRecipe("idle.flipStand");
     require(runtime.currentActionId() == "idle_stand", "idle.flipStand 应保持站立动作");
     require(runtime.currentFacing() == "right", "idle.flipStand 应从 left 直接切到 right");
+
+    const RecipeActionCase idleRecipeCases[] = {
+        {"idle.randomThinking", "idle_thinking_once"},
+        {"turn.once", "turn_around"},
+        {"idle.tappingHead", "idle_tapping_head"},
+        {"idle.shrug", "idle_shrug"},
+        {"idle.checkWatch", "idle_check_watch"},
+        {"idle.pointing", "idle_pointing"},
+        {"idle.sittingTea", "idle_sitting_tea"},
+        {"idle.phoneCall", "idle_phone_call"},
+        {"idle.lookBack", "idle_look_back"},
+        {"idle.lookDown", "idle_look_down"},
+        {"idle.lookUp", "idle_look_up"},
+        {"bow.once", "bow"},
+        {"objecting.once", "objecting"},
+    };
+
+    for (const RecipeActionCase &recipeCase : idleRecipeCases) {
+        requireRecipeAction(runtime, recipeCase, "随机 idle 非移动候选应播放预期动作");
+    }
 
     runtime.playRecipe("walk.east");
     QVariantMap walkDelta = runtime.consumeFrameMovementDelta();
