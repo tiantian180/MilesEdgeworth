@@ -350,5 +350,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_46_legacy_body_bounds.py
         )
+
+        # Phase 0.47 的旧版双屏选项检查：恢复“单屏 / 主屏幕在左侧 /
+        # 主屏幕在右侧”菜单入口，并让双屏模式使用虚拟桌面横向边界。
+        add_test(
+            NAME check_phase_0_47_legacy_dual_screen_options
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_47_legacy_dual_screen_options.py
+        )
     endif()
 endif()

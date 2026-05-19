@@ -7,6 +7,8 @@
 #include <QMenu>
 #include <QRect>
 #include <QScreen>
+#include <QString>
+#include <QStringList>
 #include <QSystemTrayIcon>
 #include <QWindow>
 #include <QtGlobal>
@@ -19,6 +21,11 @@ DesktopShellController::DesktopShellController(QObject *parent)
     : QObject(parent)
 {
     createTrayIcon();
+
+    // 旧版双屏选项是用户手动设置；v2 仍保留这个入口，
+    // 同时监听屏幕变化，让菜单可用状态跟真实显示器数量同步。
+    connect(qGuiApp, &QGuiApplication::screenAdded, this, &DesktopShellController::screenCountChanged);
+    connect(qGuiApp, &QGuiApplication::screenRemoved, this, &DesktopShellController::screenCountChanged);
 }
 
 DesktopShellController::~DesktopShellController()
@@ -29,6 +36,16 @@ DesktopShellController::~DesktopShellController()
 bool DesktopShellController::alwaysOnTop() const
 {
     return m_alwaysOnTop;
+}
+
+QString DesktopShellController::screenLayoutMode() const
+{
+    return m_screenLayoutMode;
+}
+
+int DesktopShellController::screenCount() const
+{
+    return QGuiApplication::screens().size();
 }
 
 void DesktopShellController::setPetWindow(QWindow *window)
@@ -71,6 +88,27 @@ void DesktopShellController::setPetScale(double petScale)
     if (m_petWindow != nullptr) {
         // 旧版切换尺寸后会轻微 move 一下，借 moveEvent 重新夹住边界。
         // v2 直接复用统一移动入口，让尺寸变化后的角色身体仍在屏幕内。
+        movePetWindowTo(m_petWindow->position().x(), m_petWindow->position().y());
+    }
+}
+
+void DesktopShellController::setScreenLayoutMode(const QString &screenLayoutMode)
+{
+    const QString normalizedMode = screenLayoutMode.trimmed();
+    static const QStringList supportedModes = {
+        QStringLiteral("single"),
+        QStringLiteral("primaryLeft"),
+        QStringLiteral("primaryRight"),
+    };
+
+    if (!supportedModes.contains(normalizedMode) || m_screenLayoutMode == normalizedMode) {
+        return;
+    }
+
+    m_screenLayoutMode = normalizedMode;
+    emit screenLayoutModeChanged();
+
+    if (m_petWindow != nullptr) {
         movePetWindowTo(m_petWindow->position().x(), m_petWindow->position().y());
     }
 }
@@ -185,6 +223,25 @@ QPointF DesktopShellController::legacyStartupPosition(double petScale) const
     );
 }
 
+QRect DesktopShellController::virtualDesktopGeometry() const
+{
+    QRect virtualGeometry;
+    const QList<QScreen *> screens = QGuiApplication::screens();
+    for (QScreen *screen : screens) {
+        if (screen == nullptr) {
+            continue;
+        }
+
+        if (virtualGeometry.isNull()) {
+            virtualGeometry = screen->geometry();
+        } else {
+            virtualGeometry = virtualGeometry.united(screen->geometry());
+        }
+    }
+
+    return virtualGeometry;
+}
+
 QPointF DesktopShellController::clampedPetWindowPosition(const QPointF &candidatePosition) const
 {
     if (m_petWindow == nullptr) {
@@ -211,10 +268,18 @@ QPointF DesktopShellController::clampedPetWindowPosition(const QPointF &candidat
     }
 
     const QRect screenGeometry = targetScreen->geometry();
-    const double minX = screenGeometry.x() - 36.0 * m_petScale;
-    const double minY = screenGeometry.y() - 10.0 * m_petScale;
-    const double maxX = screenGeometry.x() + screenGeometry.width() - 63.0 * m_petScale;
-    const double maxY = screenGeometry.y() + screenGeometry.height() - 90.0 * m_petScale;
+    const QRect virtualGeometry = virtualDesktopGeometry();
+    const bool useVirtualHorizontalBounds = (m_screenLayoutMode != "single"
+        && QGuiApplication::screens().size() > 1
+        && !virtualGeometry.isNull());
+    const QRect movementGeometry = useVirtualHorizontalBounds
+        ? QRect(virtualGeometry.x(), screenGeometry.y(), virtualGeometry.width(), screenGeometry.height())
+        : screenGeometry;
+
+    const double minX = movementGeometry.x() - 36.0 * m_petScale;
+    const double minY = movementGeometry.y() - 10.0 * m_petScale;
+    const double maxX = movementGeometry.x() + movementGeometry.width() - 63.0 * m_petScale;
+    const double maxY = movementGeometry.y() + movementGeometry.height() - 90.0 * m_petScale;
 
     const double clampedX = (maxX >= minX) ? qBound(minX, candidatePosition.x(), maxX) : minX;
     const double clampedY = (maxY >= minY) ? qBound(minY, candidatePosition.y(), maxY) : minY;

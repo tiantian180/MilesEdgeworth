@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QPointF>
+#include <QRect>
 #include <QJSEngine>
 #include <QQmlEngine>
 #include <QtQml/qqmlregistration.h>
@@ -18,17 +19,22 @@ class DesktopShellController : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool alwaysOnTop READ alwaysOnTop WRITE setAlwaysOnTop NOTIFY alwaysOnTopChanged)
+    Q_PROPERTY(QString screenLayoutMode READ screenLayoutMode WRITE setScreenLayoutMode NOTIFY screenLayoutModeChanged)
+    Q_PROPERTY(int screenCount READ screenCount NOTIFY screenCountChanged)
 
 public:
     explicit DesktopShellController(QObject *parent = nullptr);
     ~DesktopShellController() override;
 
     bool alwaysOnTop() const;
+    QString screenLayoutMode() const;
+    int screenCount() const;
     void setPetWindow(QWindow *window);
 
 public slots:
     void setAlwaysOnTop(bool alwaysOnTop);
     void setPetScale(double petScale);
+    void setScreenLayoutMode(const QString &screenLayoutMode);
     void toggleAlwaysOnTop();
     Q_INVOKABLE void revealPetWindow();
     Q_INVOKABLE void placePetWindowForStartup(double petScale);
@@ -37,17 +43,21 @@ public slots:
 
 signals:
     void alwaysOnTopChanged();
+    void screenLayoutModeChanged();
+    void screenCountChanged();
 
 private:
     void createTrayIcon();
     void applyCurrentLayerMode();
     QPointF legacyStartupPosition(double petScale) const;
+    QRect virtualDesktopGeometry() const;
     QPointF clampedPetWindowPosition(const QPointF &candidatePosition) const;
 
     QWindow *m_petWindow = nullptr;
     QSystemTrayIcon *m_trayIcon = nullptr;
     QMenu *m_trayMenu = nullptr;
     QAction *m_exitAction = nullptr;
+    QString m_screenLayoutMode = "single";
     double m_petScale = 2.0;
     bool m_alwaysOnTop = true;
 };

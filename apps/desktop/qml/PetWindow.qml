@@ -53,6 +53,33 @@ Window {
             }
         }
 
+        Platform.Menu {
+            title: "双屏选项"
+
+            Platform.MenuItem {
+                text: "单屏"
+                checkable: true
+                checked: App.DesktopShell.screenLayoutMode === "single"
+                onTriggered: App.DesktopShell.setScreenLayoutMode("single")
+            }
+
+            Platform.MenuItem {
+                text: "主屏幕在左侧"
+                enabled: App.DesktopShell.screenCount > 1
+                checkable: true
+                checked: App.DesktopShell.screenLayoutMode === "primaryLeft"
+                onTriggered: App.DesktopShell.setScreenLayoutMode("primaryLeft")
+            }
+
+            Platform.MenuItem {
+                text: "主屏幕在右侧"
+                enabled: App.DesktopShell.screenCount > 1
+                checkable: true
+                checked: App.DesktopShell.screenLayoutMode === "primaryRight"
+                onTriggered: App.DesktopShell.setScreenLayoutMode("primaryRight")
+            }
+        }
+
         Platform.MenuSeparator {}
 
         Platform.MenuItem {
