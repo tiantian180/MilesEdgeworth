@@ -34,6 +34,12 @@
     <file alias="idle-check-watch-left.gif">../../../gifs/once/9.gif</file>
     <file alias="idle-pointing-right.gif">../../../gifs/once/10.gif</file>
     <file alias="idle-pointing-left.gif">../../../gifs/once/11.gif</file>
+    <file alias="idle-sitting-tea-right.gif">../../../gifs/once/6.gif</file>
+    <file alias="idle-sitting-tea-left.gif">../../../gifs/once/7.gif</file>
+    <file alias="idle-phone-call-right.gif">../../../gifs/once/12.gif</file>
+    <file alias="idle-phone-call-left.gif">../../../gifs/once/13.gif</file>
+    <file alias="idle-look-back-right.gif">../../../gifs/once/14.gif</file>
+    <file alias="idle-look-back-left.gif">../../../gifs/once/15.gif</file>
     <file alias="idle-look-down-right.gif">../../../gifs/once/16.gif</file>
     <file alias="idle-look-down-left.gif">../../../gifs/once/17.gif</file>
     <file alias="idle-look-up-right.gif">../../../gifs/once/18.gif</file>

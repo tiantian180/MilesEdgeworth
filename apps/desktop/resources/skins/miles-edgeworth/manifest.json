@@ -432,6 +432,51 @@
         }
       }
     },
+    "idle_sitting_tea": {
+      "label": "坐下喝茶",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "tea", "rest"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-sitting-tea-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-sitting-tea-left.gif"
+        }
+      }
+    },
+    "idle_phone_call": {
+      "label": "接电话",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "phone", "call"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-phone-call-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-phone-call-left.gif"
+        }
+      }
+    },
+    "idle_look_back": {
+      "label": "回头看",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "look_back"],
+      "variants": {
+        "right": {
+          "animation": "qrc:/pet/idle-look-back-right.gif"
+        },
+        "left": {
+          "animation": "qrc:/pet/idle-look-back-left.gif"
+        }
+      }
+    },
     "idle_look_up": {
       "label": "抬头看",
       "category": "idle",
@@ -831,6 +876,21 @@
       "scope": "idle",
       "action": "idle_pointing"
     },
+    "idle.sittingTea": {
+      "label": "随机坐下喝茶",
+      "scope": "idle",
+      "action": "idle_sitting_tea"
+    },
+    "idle.phoneCall": {
+      "label": "随机接电话",
+      "scope": "idle",
+      "action": "idle_phone_call"
+    },
+    "idle.lookBack": {
+      "label": "随机回头看",
+      "scope": "idle",
+      "action": "idle_look_back"
+    },
     "click.faceScared": {
       "label": "点脸受惊",
       "scope": "click",
@@ -998,6 +1058,18 @@
         },
         {
           "recipe": "idle.pointing",
+          "weight": 2
+        },
+        {
+          "recipe": "idle.sittingTea",
+          "weight": 2
+        },
+        {
+          "recipe": "idle.phoneCall",
+          "weight": 2
+        },
+        {
+          "recipe": "idle.lookBack",
           "weight": 2
         },
         {

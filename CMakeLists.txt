@@ -174,5 +174,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_24_language_double_click_pool.py
         )
+
+        # Phase 0.25 的旧版随机待机动作检查：确保 once/0..19
+        # 里已经确认语义的动作对都进入 v2 idle.random。
+        add_test(
+            NAME check_phase_0_25_legacy_idle_once_pool
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_25_legacy_idle_once_pool.py
+        )
     endif()
 endif()
