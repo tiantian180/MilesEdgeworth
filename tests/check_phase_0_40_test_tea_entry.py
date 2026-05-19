@@ -21,17 +21,19 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    bridge_h = read("apps/desktop/src/pet/events/PetEventBridge.h")
+    custom_cpp = read("apps/desktop/src/pet/interaction/CustomInteractionRegistry.cpp")
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
 
     require("testTea" not in runtime_h + runtime_cpp + smoke_test + pet_window_qml, "测试喝茶入口应移除")
     require("requestTea" not in runtime_h + runtime_cpp + smoke_test + pet_window_qml, "喝茶不应继续暴露 requestTea")
     require("tea.drinkThenBow" not in runtime_cpp, "测试喝茶入口不应引用已废弃的 tea.drinkThenBow")
-    require("triggerSkinCommand" in runtime_h + runtime_cpp + smoke_test + pet_window_qml, "喝茶应通过皮肤命令入口触发")
-    require('"miles.feedTea"' in runtime_cpp + smoke_test + pet_window_qml, "Miles 红茶命令应使用稳定 command id")
-    require('playActionFromPool("menu.tea")' in runtime_cpp, "Miles 红茶命令应继续复用 menu.tea 候选池")
+    require("submitMenuCommand" in bridge_h + smoke_test + pet_window_qml, "喝茶应通过事件桥提交菜单命令")
+    require('"miles.feedTea"' in custom_cpp + smoke_test + pet_window_qml, "Miles 红茶命令应使用稳定 command id")
+    require('ActionRequest::actionPool("menu.tea")' in custom_cpp, "Miles 红茶命令应继续复用 menu.tea 候选池")
 
-    require("runtime.triggerSkinCommand(\"miles.feedTea\");" in smoke_test, "PetRuntimeSmoke 应覆盖红茶皮肤命令")
+    require("bridge.submitMenuCommand(\"miles.feedTea\");" in smoke_test, "PetRuntimeSmoke 应覆盖红茶皮肤命令")
     require("红茶皮肤命令应从两组喝茶 recipe 中选择" in smoke_test, "PetRuntimeSmoke 应验证红茶候选池")
 
     root_cmake = read("CMakeLists.txt")

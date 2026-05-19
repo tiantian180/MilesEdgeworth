@@ -430,5 +430,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_58_menu_custom_boundary.py
         )
+
+        # Phase 0.59 的事件到 ActionRequest 架构检查：QML 只提交事件，
+        # 交互层把事件转换为请求，PetRuntime 只执行最终 ActionRequest。
+        add_test(
+            NAME check_phase_0_59_event_action_request_spine
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_59_event_action_request_spine.py
+        )
     endif()
 endif()

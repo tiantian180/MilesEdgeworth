@@ -38,14 +38,14 @@ def main() -> int:
         "右朝向点击右侧腿部应触发低头看",
         "左朝向点击右侧腿部应触发后退",
         "左朝向点击左侧腿部应触发低头看",
-        "runtime.handlePrimaryClick(100, 40, 240, 240)",
-        "runtime.handlePrimaryClick(60, 85, 240, 240)",
-        "runtime.handlePrimaryClick(60, 130, 240, 240)",
-        "runtime.handlePrimaryClick(120, 85, 240, 240)",
-        "runtime.handlePrimaryClick(120, 138, 240, 240)",
-        "runtime.handlePrimaryClick(120, 158, 240, 240)",
-        "runtime.handlePrimaryClick(95, 200, 240, 240)",
-        "runtime.handlePrimaryClick(145, 200, 240, 240)",
+        "bridge.submitPrimaryClick(100, 40, 240, 240)",
+        "bridge.submitPrimaryClick(60, 85, 240, 240)",
+        "bridge.submitPrimaryClick(60, 130, 240, 240)",
+        "bridge.submitPrimaryClick(120, 85, 240, 240)",
+        "bridge.submitPrimaryClick(120, 138, 240, 240)",
+        "bridge.submitPrimaryClick(120, 158, 240, 240)",
+        "bridge.submitPrimaryClick(95, 200, 240, 240)",
+        "bridge.submitPrimaryClick(145, 200, 240, 240)",
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少单击分区行为覆盖：{token}")
 

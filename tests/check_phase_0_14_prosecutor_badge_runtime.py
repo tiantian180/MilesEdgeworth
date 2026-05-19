@@ -66,23 +66,27 @@ def main() -> None:
         "currentPropEndOffsetX",
         "currentPropDurationMs",
         "currentPropPlaybackSerial",
-        "handlePropClicked",
-        "handlePropExpired",
         "spawnPropForRecipe",
         "PropDefinition",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     for token in [
         "schedulePropForRecipe",
         "spawnPropForRecipe",
-        "handlePropClicked",
-        "handlePropExpired",
         "m_currentPropPlaybackSerial",
         "QTimer::singleShot",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    for token in [
+        "PetEventType::PropClicked",
+        "PetEventType::PropExpired",
+        "currentPropClickedRecipeId",
+        "currentPropExpiredRecipeId",
+    ]:
+        require(token in pipeline_cpp, f"InteractionPipeline.cpp 缺少 Prop 事件处理：{token}")
 
     qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
@@ -92,8 +96,8 @@ def main() -> None:
         "onCurrentPropPlaybackSerialChanged",
         "badgeFlyAnimation",
         "badgeExpireTimer",
-        "App.PetRuntime.handlePropClicked()",
-        "App.PetRuntime.handlePropExpired()",
+        "App.PetEventBridge.submitPropClicked()",
+        "App.PetEventBridge.submitPropExpired()",
     ]:
         require(token in qml, f"PetWindow.qml 缺少 {token}")
 

@@ -88,30 +88,34 @@ def main() -> int:
     require(manifest.get("props", {}).get("prosecutor_badge", {}).get("expiredRecipe") == "pickup.once", "徽章自然消失应触发捡徽章")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    bridge_h = read("apps/desktop/src/pet/events/PetEventBridge.h")
     for token in [
-        "handlePrimaryClick",
-        "handleDoubleClick",
         "handleDragStarted",
         "handleDragMoved",
         "handleDragEnded",
-        "handlePropClicked",
-        "handlePropExpired",
-        "triggerSkinCommand",
-        "toggleSleep",
         "consumeFrameMovementDelta",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少核心交互入口 {token}")
+    for token in [
+        "submitPrimaryClick",
+        "submitDoubleClick",
+        "submitPropClicked",
+        "submitPropExpired",
+        "submitMenuCommand",
+        "submitIdleLoopFinished",
+    ]:
+        require(token in bridge_h, f"PetEventBridge.h 缺少核心事件入口 {token}")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "handleIdleLoopFinished",
+        "submitIdleLoopFinished",
         "SoundEffect",
         "prosecutorBadgeWindow",
         "singleClickTimer",
-        "handleDoubleClick()",
+        "submitDoubleClick()",
         "handleDragMoved",
-        "triggerSkinCommand(\"miles.feedTea\")",
-        "toggleSleep()",
+        'submitMenuCommand("miles.feedTea")',
+        'submitMenuCommand("runtime.sleep.toggle")',
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少核心表现入口 {token}")
 

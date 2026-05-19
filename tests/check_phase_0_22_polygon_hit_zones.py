@@ -62,9 +62,9 @@ def main() -> int:
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [
-        "runtime.handlePrimaryClick(90, 40, 240, 240)",
+        "bridge.submitPrimaryClick(90, 40, 240, 240)",
         "右朝向左上头部区域不应触发 scared",
-        "runtime.handlePrimaryClick(150, 40, 240, 240)",
+        "bridge.submitPrimaryClick(150, 40, 240, 240)",
         "左朝向右上头部区域不应触发 scared",
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少 polygon 边界覆盖：{token}")

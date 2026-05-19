@@ -1,6 +1,8 @@
 #pragma once
 
 #include "pet/manifest/SkinManifest.h"
+#include "pet/requests/ActionRequest.h"
+#include "pet/runtime/RuntimeSnapshot.h"
 
 #include <QElapsedTimer>
 #include <QHash>
@@ -16,12 +18,13 @@
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
-// PetRuntime 是 v2 桌宠动画系统的最小入口。
+// PetRuntime 是 v2 桌宠动画系统的执行入口。
 //
-// 当前阶段它主要负责把 QML 的交互请求转成动画调度结果：
-// 1. 从内置 skin manifest 里读出 state -> action -> animation 的映射。
-// 2. 暴露 currentAnimationUrl 给 QML 的 AnimatedImage 使用。
-// 3. 暂时承接少量皮肤定制命令，后续再迁入 Custom Interaction 层。
+// 它不再理解“单击”“双击”“红茶”这类事件语义；这些语义先进入
+// PetEventBridge / InteractionPipeline，再转换成 ActionRequest。Runtime 只负责：
+// 1. 从 skin manifest 解析 action / recipe / pool。
+// 2. 执行 ActionRequest 并更新当前动画、音效、Prop 和状态信号。
+// 3. 提供 RuntimeSnapshot 给交互层读取当前状态。
 //
 // Phase 0.6 开始引入“朝向”和“动作播放模式”，但仍然不做完整编排器。
 // 后续的 enter/loop/exit、移动驱动动画、点击交互优先级，会继续在
@@ -47,7 +50,6 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool pointerInteractionEnabled READ pointerInteractionEnabled NOTIFY pointerInteractionEnabledChanged)
     Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)
     Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)
-    Q_PROPERTY(QStringList enabledSkinCommandIds READ enabledSkinCommandIds NOTIFY skinCommandAvailabilityChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
     Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
     Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
@@ -87,7 +89,6 @@ public:
     bool pointerInteractionEnabled() const;
     bool sleeping() const;
     bool sleepTransitioning() const;
-    QStringList enabledSkinCommandIds() const;
     QUrl currentAnimationUrl() const;
     QUrl currentSoundUrl() const;
     bool currentPropVisible() const;
@@ -105,6 +106,8 @@ public:
     int currentPropPlaybackSerial() const;
     int playbackSerial() const;
     int soundPlaybackSerial() const;
+    const SkinManifest &manifest() const;
+    RuntimeSnapshot snapshot() const;
 
     Q_INVOKABLE void setState(const QString &state);
     Q_INVOKABLE void setFacing(const QString &facing);
@@ -114,26 +117,18 @@ public:
     Q_INVOKABLE void playRecipe(const QString &recipeId);
     Q_INVOKABLE void playActionFromPool(const QString &poolId);
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
-    Q_INVOKABLE void handlePrimaryClick(double x, double y, double width, double height);
-    Q_INVOKABLE void handleDoubleClick();
     Q_INVOKABLE void handleDragStarted(double globalX);
     Q_INVOKABLE void handleDragMoved(double globalX);
     Q_INVOKABLE void handleDragEnded();
     Q_INVOKABLE void handleHoldAnimationReachedEnd();
-    Q_INVOKABLE void handlePropClicked();
-    Q_INVOKABLE void handlePropExpired();
     Q_INVOKABLE void toggleAudioMuted();
     Q_INVOKABLE void setVoiceLanguage(const QString &voiceLanguage);
     Q_INVOKABLE void toggleAutoMovementEnabled();
     Q_INVOKABLE void setPetSize(const QString &sizeId);
-    Q_INVOKABLE void triggerSkinCommand(const QString &commandId);
-    Q_INVOKABLE void toggleSleep();
-    Q_INVOKABLE void triggerIdle();
-    Q_INVOKABLE void handleIdleLoopFinished();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
     Q_INVOKABLE void handleAnimationFinished();
-    void handleIdleLoopFinishedForTest(double randomValue);
+    void submitActionRequest(const ActionRequest &request);
 
 signals:
     void currentStateChanged();
@@ -150,7 +145,6 @@ signals:
     void petScaleChanged();
     void pointerInteractionEnabledChanged();
     void sleepStateChanged();
-    void skinCommandAvailabilityChanged();
     void currentAnimationUrlChanged();
     void currentSoundUrlChanged();
     void currentPropChanged();
@@ -172,7 +166,6 @@ private:
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
     void playRecipeStep(const RecipeStep &step);
-    void handleBehaviorTriggerWithRoll(const QString &triggerId, double randomValue);
     QString followUpPoolForCompletedAction(const ActionDefinition &action) const;
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
@@ -181,7 +174,6 @@ private:
     QPointF propPointForFacing(const QHash<QString, QPointF> &points, const QString &facing) const;
     QPointF scaledPropPoint(const QPointF &point) const;
     QPointF propTravelDelta(const PropDefinition &prop, const QString &facing) const;
-    void handleIdleLoopFinishedWithRoll(double randomValue);
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
     void playPhase(const QString &actionId, const QString &phaseId);

@@ -48,7 +48,7 @@ def main() -> int:
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [
         "require(!runtime.pointerInteractionEnabled()",
-        "runtime.handlePrimaryClick(145, 40, 240, 240)",
+        "bridge.submitPrimaryClick(145, 40, 240, 240)",
         "启动入场期间单击不应打断 briefcase_in",
         "启动入场期间双击不应打断 briefcase_in",
         "require(runtime.pointerInteractionEnabled()",

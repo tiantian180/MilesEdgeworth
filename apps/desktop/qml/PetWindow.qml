@@ -130,26 +130,26 @@ Window {
 
         Platform.MenuItem {
             text: "喂食红茶"
-            enabled: App.PetRuntime.enabledSkinCommandIds.indexOf("miles.feedTea") >= 0
-            onTriggered: App.PetRuntime.triggerSkinCommand("miles.feedTea")
+            enabled: App.PetEventBridge.enabledSkinCommandIds.indexOf("miles.feedTea") >= 0
+            onTriggered: App.PetEventBridge.submitMenuCommand("miles.feedTea")
         }
 
         Platform.MenuItem {
             text: App.PetRuntime.sleeping ? "唤醒" : "睡觉"
             enabled: !App.PetRuntime.sleepTransitioning
-            onTriggered: App.PetRuntime.toggleSleep()
+            onTriggered: App.PetEventBridge.submitMenuCommand("runtime.sleep.toggle")
         }
 
         Platform.MenuSeparator {}
 
         Platform.MenuItem {
             text: "回到待机"
-            onTriggered: App.PetRuntime.returnToIdle()
+            onTriggered: App.PetEventBridge.submitMenuCommand("runtime.returnToIdle")
         }
 
         Platform.MenuItem {
             text: App.PetRuntime.currentFacing === "right" ? "切到朝左" : "切到朝右"
-            onTriggered: App.PetRuntime.toggleFacing()
+            onTriggered: App.PetEventBridge.submitMenuCommand("runtime.facing.toggle")
         }
 
         Platform.MenuSeparator {}
@@ -202,7 +202,7 @@ Window {
             onClicked: {
                 badgeFlyAnimation.stop()
                 badgeExpireTimer.stop()
-                App.PetRuntime.handlePropClicked()
+                App.PetEventBridge.submitPropClicked()
             }
         }
     }
@@ -221,7 +221,7 @@ Window {
 
         interval: Math.max(1, App.PetRuntime.currentPropDurationMs)
         repeat: false
-        onTriggered: App.PetRuntime.handlePropExpired()
+        onTriggered: App.PetEventBridge.submitPropExpired()
     }
 
     // 和旧版一样，单击需要等一小段时间才能确认不是双击。
@@ -234,7 +234,7 @@ Window {
         property real clickX: 0
         property real clickY: 0
 
-        onTriggered: App.PetRuntime.handlePrimaryClick(clickX, clickY, petWindow.width, petWindow.height)
+        onTriggered: App.PetEventBridge.submitPrimaryClick(clickX, clickY, petWindow.width, petWindow.height)
     }
 
     // QML 只负责播放当前动画，具体 state/action 到资源的选择交给 PetRuntime。
@@ -275,7 +275,7 @@ Window {
                     && App.PetRuntime.currentRecipeId === ""
                     && frameCount > 0
                     && currentFrame >= frameCount - 1) {
-                App.PetRuntime.handleIdleLoopFinished()
+                App.PetEventBridge.submitIdleLoopFinished()
             }
         }
     }
@@ -400,7 +400,7 @@ Window {
 
             if (doubleClickPending) {
                 doubleClickPending = false
-                App.PetRuntime.handleDoubleClick()
+                App.PetEventBridge.submitDoubleClick()
                 return
             }
 

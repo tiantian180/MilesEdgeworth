@@ -58,43 +58,54 @@ def main() -> int:
         require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    bridge_h = read("apps/desktop/src/pet/events/PetEventBridge.h")
     for token in [
         "Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)",
         "Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)",
-        "Q_PROPERTY(QStringList enabledSkinCommandIds READ enabledSkinCommandIds NOTIFY skinCommandAvailabilityChanged)",
         "bool sleeping() const",
         "bool sleepTransitioning() const",
-        "QStringList enabledSkinCommandIds() const",
-        "Q_INVOKABLE void triggerSkinCommand(const QString &commandId)",
-        "Q_INVOKABLE void toggleSleep()",
         "sleepStateChanged",
-        "skinCommandAvailabilityChanged",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
+    for token in [
+        "Q_PROPERTY(QStringList enabledSkinCommandIds READ enabledSkinCommandIds NOTIFY skinCommandAvailabilityChanged)",
+        "QStringList enabledSkinCommandIds() const",
+        "Q_INVOKABLE void submitMenuCommand",
+        "skinCommandAvailabilityChanged",
+    ]:
+        require(token in bridge_h, f"PetEventBridge.h 缺少 {token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    bridge_cpp = read("apps/desktop/src/pet/events/PetEventBridge.cpp")
+    custom_cpp = read("apps/desktop/src/pet/interaction/CustomInteractionRegistry.cpp")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     for token in [
         "bool PetRuntime::sleeping() const",
         "bool PetRuntime::sleepTransitioning() const",
-        "QStringList PetRuntime::enabledSkinCommandIds() const",
-        "void PetRuntime::triggerSkinCommand(const QString &commandId)",
-        '"miles.feedTea"',
-        'playActionFromPool("menu.tea")',
-        "void PetRuntime::toggleSleep()",
-        'playRecipe("sleep.enterLoopExit")',
         "emit sleepStateChanged()",
-        "emit skinCommandAvailabilityChanged()",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    for token in [
+        "QStringList PetEventBridge::enabledSkinCommandIds() const",
+        "void PetEventBridge::submitMenuCommand",
+        "PetEventBridge::skinCommandAvailabilityChanged",
+    ]:
+        require(token in bridge_cpp, f"PetEventBridge.cpp 缺少 {token}")
+    for token in [
+        '"miles.feedTea"',
+        'ActionRequest::actionPool("menu.tea")',
+    ]:
+        require(token in custom_cpp, f"CustomInteractionRegistry.cpp 缺少 {token}")
+    require('ActionRequest::recipe("sleep.enterLoopExit")' in pipeline_cpp, "睡眠菜单事件应转成 sleep recipe 请求")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
         "喂食红茶",
-        "App.PetRuntime.triggerSkinCommand(\"miles.feedTea\")",
-        "App.PetRuntime.enabledSkinCommandIds.indexOf(\"miles.feedTea\")",
+        'App.PetEventBridge.submitMenuCommand("miles.feedTea")',
+        'App.PetEventBridge.enabledSkinCommandIds.indexOf("miles.feedTea")',
         'App.PetRuntime.sleeping ? "唤醒" : "睡觉"',
         "enabled: !App.PetRuntime.sleepTransitioning",
-        "App.PetRuntime.toggleSleep()",
+        'App.PetEventBridge.submitMenuCommand("runtime.sleep.toggle")',
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
 

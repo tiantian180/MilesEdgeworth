@@ -61,7 +61,6 @@ def main() -> int:
         "QString currentRecipeId() const",
         "Q_INVOKABLE void playRecipe",
         "Q_INVOKABLE void playActionFromPool",
-        "Q_INVOKABLE void triggerIdle",
         "currentRecipeChanged",
         "RecipeDefinition",
     ]:
@@ -69,23 +68,23 @@ def main() -> int:
     require("ActionPoolEntry" in manifest_h + selector_h, "ActionPoolEntry 应由 SkinManifest / ActionPoolSelector 承载")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    event_bridge_cpp = read("apps/desktop/src/pet/events/PetEventBridge.cpp")
     for token in [
-        "#include <QRandomGenerator>",
         "m_manifest.recipes",
         "m_manifest.actionPools",
         "ActionPoolSelector::selectEntry",
         "playNextRecipeStep",
         "clearActiveRecipe",
         "playActionFromPool",
-        "triggerIdle",
         "currentRecipeChanged",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    require("#include <QRandomGenerator>" in event_bridge_cpp, "随机 idle 的随机数应由事件桥生成")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "App.PetRuntime.handleIdleLoopFinished()",
-        "App.PetRuntime.triggerSkinCommand(\"miles.feedTea\")",
+        "App.PetEventBridge.submitIdleLoopFinished()",
+        'App.PetEventBridge.submitMenuCommand("miles.feedTea")',
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
 

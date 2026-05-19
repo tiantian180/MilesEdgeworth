@@ -52,27 +52,28 @@ def main() -> int:
     for token in [
         "Q_PROPERTY(QString currentPhaseId",
         "QString currentPhaseId() const",
-        "Q_INVOKABLE void toggleSleep",
         "currentPhaseChanged",
         "PhaseDefinition",
         "playPhase",
+        "void submitActionRequest(const ActionRequest &request)",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     for token in [
         "nextPhase",
         "exitPhase",
         "m_currentPhaseId",
         "playPhase(",
         'playPhase(m_currentActionId, action.exitPhase)',
-        'playRecipe("sleep.enterLoopExit")',
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    require('ActionRequest::recipe("sleep.enterLoopExit")' in pipeline_cpp, "睡觉事件应由 InteractionPipeline 转成 sleep recipe 请求")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "App.PetRuntime.toggleSleep()",
+        'App.PetEventBridge.submitMenuCommand("runtime.sleep.toggle")',
         'App.PetRuntime.currentLoopMode === "once"',
         "App.PetRuntime.handleAnimationFinished()",
     ]:

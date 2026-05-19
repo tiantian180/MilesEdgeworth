@@ -36,7 +36,7 @@ def function_body(source: str, signature: str) -> str:
 
 def main() -> int:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
-    runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     runtime_header = read("apps/desktop/src/pet/PetRuntime.h")
     manifest_header = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     trigger_engine = read("apps/desktop/src/pet/behavior/BehaviorTriggerEngine.h")
@@ -63,10 +63,10 @@ def main() -> int:
         "idle.loopFinished 应通过 manifest 配置 30 权重保持站立",
     )
 
-    idle_body = function_body(runtime_cpp, "void PetRuntime::handleIdleLoopFinishedWithRoll(double randomValue)")
+    idle_body = function_body(pipeline_cpp, "QList<ActionRequest> InteractionPipeline::handleEvent(")
     require(
-        "handleBehaviorTriggerWithRoll(\"idle.loopFinished\", randomValue)" in idle_body,
-        "handleIdleLoopFinishedWithRoll 应委托通用 behavior trigger 执行",
+        'manifest.behaviorTriggers.contains("idle.loopFinished")' in idle_body,
+        "idle.loopFinished 应由 InteractionPipeline 读取 manifest behavior trigger",
     )
     require("randomValue <= 0.7" not in idle_body, "idle loop 概率不应继续硬编码在 C++ 函数里")
     require("playActionFromPool(\"idle.random\")" not in idle_body, "idle loop 目标 pool 不应继续硬编码在 C++ 函数里")
@@ -74,11 +74,10 @@ def main() -> int:
     for token in [
         "BehaviorTriggerEntry",
         "BehaviorTriggerDefinition",
-        "handleBehaviorTriggerWithRoll",
+        "BehaviorTriggerEngine",
     ]:
-        require(token in runtime_header + manifest_header + trigger_engine, f"PetRuntime 应提供通用 behavior trigger 结构：{token}")
-    require("m_manifest.behaviorTriggers" in runtime_cpp, "PetRuntime 应从 SkinManifest 读取 behavior triggers")
-    require("BehaviorTriggerEngine::selectEntry" in runtime_cpp, "PetRuntime 应委托 BehaviorTriggerEngine 抽取触发结果")
+        require(token in runtime_header + manifest_header + trigger_engine + pipeline_cpp, f"运行时应提供通用 behavior trigger 结构：{token}")
+    require("BehaviorTriggerEngine::selectEntry" in pipeline_cpp, "InteractionPipeline 应委托 BehaviorTriggerEngine 抽取触发结果")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_52_manifest_idle_loop_trigger" in root_cmake, "CTest 未注册 Phase 0.52 检查")

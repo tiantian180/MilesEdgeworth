@@ -1,11 +1,8 @@
 #include "pet/PetRuntime.h"
 
-#include "pet/behavior/BehaviorTriggerEngine.h"
-#include "pet/interaction/HitZoneMatcher.h"
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/selection/ActionPoolSelector.h"
 
-#include <QRandomGenerator>
 #include <QTimer>
 #include <QtGlobal>
 #include <QVariantMap>
@@ -14,7 +11,6 @@ namespace {
 constexpr auto kManifestPath = ":/pet/manifest.json";
 constexpr auto kFallbackActionId = "idle_stand";
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
-constexpr auto kFeedTeaCommandId = "miles.feedTea";
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -201,19 +197,6 @@ bool PetRuntime::sleepTransitioning() const
     return m_currentActionId == "sleep" && m_currentPhaseId != "loop";
 }
 
-QStringList PetRuntime::enabledSkinCommandIds() const
-{
-    QStringList commandIds;
-
-    // 红茶是 Miles 皮肤的定制菜单命令，不属于所有桌宠都具备的通用能力。
-    // 这里先用通用 command id 暴露给 QML，后续再迁入正式 Custom Interaction。
-    if (m_currentActionId != "sleep") {
-        commandIds.append(QString::fromUtf8(kFeedTeaCommandId));
-    }
-
-    return commandIds;
-}
-
 int PetRuntime::playbackSerial() const
 {
     return m_playbackSerial;
@@ -222,6 +205,30 @@ int PetRuntime::playbackSerial() const
 int PetRuntime::soundPlaybackSerial() const
 {
     return m_soundPlaybackSerial;
+}
+
+const SkinManifest &PetRuntime::manifest() const
+{
+    return m_manifest;
+}
+
+RuntimeSnapshot PetRuntime::snapshot() const
+{
+    RuntimeSnapshot snapshot;
+    snapshot.currentState = m_currentState;
+    snapshot.currentActionId = m_currentActionId;
+    snapshot.currentRecipeId = m_currentRecipeId;
+    snapshot.currentPhaseId = m_currentPhaseId;
+    snapshot.currentFacing = m_currentFacing;
+    snapshot.voiceLanguage = m_voiceLanguage;
+    snapshot.currentPropId = m_currentPropId;
+    snapshot.currentPropClickedRecipeId = m_currentPropClickedRecipeId;
+    snapshot.currentPropExpiredRecipeId = m_currentPropExpiredRecipeId;
+    snapshot.currentPropVisible = m_currentPropVisible;
+    snapshot.pointerInteractionEnabled = acceptsPointerInteraction();
+    snapshot.sleeping = sleeping();
+    snapshot.sleepTransitioning = sleepTransitioning();
+    return snapshot;
 }
 
 void PetRuntime::setState(const QString &state)
@@ -341,30 +348,31 @@ void PetRuntime::playActionFromPool(const QString &poolId)
     }
 }
 
-void PetRuntime::triggerIdle()
+void PetRuntime::submitActionRequest(const ActionRequest &request)
 {
-    // 随机 idle 只在“真正待机站立”时触发，避免打断睡觉、喝茶或交互动作。
-    // 之后接入更完整的调度器时，这里会变成 IdleController 的入口。
-    if (m_currentState != "idle" || !m_currentRecipeId.isEmpty()) {
-        return;
+    if (request.hideCurrentProp) {
+        hideCurrentProp();
     }
 
-    const QString idleAction = actionForState("idle");
-    if (idleAction.isEmpty() || m_currentActionId != idleAction) {
+    switch (request.kind) {
+    case ActionRequestKind::None:
+        return;
+    case ActionRequestKind::ActionPool:
+        playActionFromPool(request.targetId);
+        return;
+    case ActionRequestKind::Recipe:
+        playRecipe(request.targetId);
+        return;
+    case ActionRequestKind::Action:
+        playAction(request.targetId);
+        return;
+    case ActionRequestKind::ReturnToIdle:
+        returnToIdle();
+        return;
+    case ActionRequestKind::ToggleFacing:
+        toggleFacing();
         return;
     }
-
-    playActionFromPool("idle.random");
-}
-
-void PetRuntime::handleIdleLoopFinished()
-{
-    handleIdleLoopFinishedWithRoll(QRandomGenerator::global()->generateDouble());
-}
-
-void PetRuntime::handleIdleLoopFinishedForTest(double randomValue)
-{
-    handleIdleLoopFinishedWithRoll(randomValue);
 }
 
 QVariantMap PetRuntime::consumeFrameMovementDelta() const
@@ -388,49 +396,6 @@ QVariantMap PetRuntime::consumeFrameMovementDelta() const
     delta.insert("dx", scaledMovementDelta.x());
     delta.insert("dy", scaledMovementDelta.y());
     return delta;
-}
-
-void PetRuntime::handlePrimaryClick(double x, double y, double width, double height)
-{
-    if (!acceptsPointerInteraction()) {
-        return;
-    }
-
-    // 旧版在睡眠中单击无反应；在其它非站立动作中单击会先回到站立。
-    // v2 先保留这个交互节奏，后续双击和高级交互再共用 Interaction Pipeline。
-    if (m_currentActionId == "sleep") {
-        return;
-    }
-
-    const QString idleAction = actionForState("idle");
-    if (!idleAction.isEmpty() && m_currentActionId != idleAction) {
-        returnToIdle();
-        return;
-    }
-
-    const HitZoneMatchContext hitZoneContext {
-        m_currentFacing,
-        m_manifest.defaultFacing,
-    };
-    const QString poolId = HitZoneMatcher::clickPoolForPoint(m_manifest, hitZoneContext, x, y, width, height);
-    if (!poolId.isEmpty()) {
-        playActionFromPool(poolId);
-    }
-}
-
-void PetRuntime::handleDoubleClick()
-{
-    if (!acceptsPointerInteraction()) {
-        return;
-    }
-
-    // 旧版睡眠中双击等同于唤醒；其它状态下随机触发语音动作。
-    if (m_currentActionId == "sleep" || m_currentPhaseId == "loop") {
-        returnToIdle();
-        return;
-    }
-
-    playActionFromPool("doubleClick.random");
 }
 
 void PetRuntime::handleDragStarted(double globalX)
@@ -516,34 +481,6 @@ void PetRuntime::handleHoldAnimationReachedEnd()
     }
 }
 
-void PetRuntime::handlePropClicked()
-{
-    if (!m_currentPropVisible) {
-        return;
-    }
-
-    const QString nextRecipeId = m_currentPropClickedRecipeId;
-    hideCurrentProp();
-
-    if (!nextRecipeId.isEmpty()) {
-        playRecipe(nextRecipeId);
-    }
-}
-
-void PetRuntime::handlePropExpired()
-{
-    if (!m_currentPropVisible) {
-        return;
-    }
-
-    const QString nextRecipeId = m_currentPropExpiredRecipeId;
-    hideCurrentProp();
-
-    if (!nextRecipeId.isEmpty()) {
-        playRecipe(nextRecipeId);
-    }
-}
-
 void PetRuntime::toggleAudioMuted()
 {
     m_audioMuted = !m_audioMuted;
@@ -595,35 +532,6 @@ void PetRuntime::setPetSize(const QString &sizeId)
     m_petSizeId = normalizedSizeId;
     m_petScale = nextScale;
     emit petScaleChanged();
-}
-
-void PetRuntime::triggerSkinCommand(const QString &commandId)
-{
-    const QString normalizedCommandId = commandId.trimmed();
-    if (normalizedCommandId != QString::fromUtf8(kFeedTeaCommandId)) {
-        return;
-    }
-
-    if (!enabledSkinCommandIds().contains(normalizedCommandId)) {
-        return;
-    }
-
-    playActionFromPool("menu.tea");
-}
-
-void PetRuntime::toggleSleep()
-{
-    // 入睡或醒来的过渡动画期间不重复切换，避免一个 GIF 尚未播完又重入。
-    if (sleepTransitioning()) {
-        return;
-    }
-
-    if (sleeping()) {
-        returnToIdle();
-        return;
-    }
-
-    playRecipe("sleep.enterLoopExit");
 }
 
 void PetRuntime::startStartupSequence()
@@ -920,43 +828,6 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
     }
 }
 
-void PetRuntime::handleBehaviorTriggerWithRoll(const QString &triggerId, double randomValue)
-{
-    if (!m_manifest.behaviorTriggers.contains(triggerId)) {
-        return;
-    }
-
-    const BehaviorTriggerDefinition trigger = m_manifest.behaviorTriggers.value(triggerId);
-    const BehaviorTriggerContext context {
-        m_currentState,
-        m_currentActionId,
-        !m_currentRecipeId.isEmpty(),
-    };
-
-    if (!BehaviorTriggerEngine::matches(trigger, context)) {
-        return;
-    }
-
-    const BehaviorTriggerEntry entry = BehaviorTriggerEngine::selectEntry(trigger, randomValue);
-    if (entry.type == "none") {
-        return;
-    }
-
-    if (entry.type == "pool" && !entry.poolId.isEmpty()) {
-        playActionFromPool(entry.poolId);
-        return;
-    }
-
-    if (entry.type == "recipe" && !entry.recipeId.isEmpty()) {
-        playRecipe(entry.recipeId);
-        return;
-    }
-
-    if (entry.type == "action" && !entry.actionId.isEmpty()) {
-        playAction(entry.actionId);
-    }
-}
-
 QString PetRuntime::followUpPoolForCompletedAction(const ActionDefinition &action) const
 {
     if (action.category != "locomotion") {
@@ -1058,13 +929,6 @@ QPointF PetRuntime::propTravelDelta(const PropDefinition &prop, const QString &f
     return scaledPropPoint(propPointForFacing(prop.travelDeltas, facing));
 }
 
-void PetRuntime::handleIdleLoopFinishedWithRoll(double randomValue)
-{
-    // 站立循环完成只是一个事件入口，具体概率和目标动作交给皮肤 manifest。
-    // 这样 Miles 可以保留旧版 70/30 节奏，未来其它皮肤也能配置自己的待机节奏。
-    handleBehaviorTriggerWithRoll("idle.loopFinished", randomValue);
-}
-
 void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)
 {
     if (action.facingAfter.isEmpty()) {
@@ -1132,7 +996,6 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
     const bool wasSleeping = sleeping();
     const bool wasSleepTransitioning = sleepTransitioning();
-    const QStringList previousSkinCommandIds = enabledSkinCommandIds();
 
     const QUrl nextAnimationUrl = variantForFacing(phase.variants, m_currentFacing);
     const QString nextLoopMode = phase.loopMode.isEmpty() ? "loop" : phase.loopMode;
@@ -1173,9 +1036,6 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     if (wasSleeping != sleeping()
             || wasSleepTransitioning != sleepTransitioning()) {
         emit sleepStateChanged();
-    }
-    if (previousSkinCommandIds != enabledSkinCommandIds()) {
-        emit skinCommandAvailabilityChanged();
     }
     emit playbackSerialChanged();
 }

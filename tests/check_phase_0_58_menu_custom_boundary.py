@@ -22,6 +22,9 @@ def main() -> int:
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    bridge_h = read("apps/desktop/src/pet/events/PetEventBridge.h")
+    bridge_cpp = read("apps/desktop/src/pet/events/PetEventBridge.cpp")
+    custom_cpp = read("apps/desktop/src/pet/interaction/CustomInteractionRegistry.cpp")
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     playback_design = read("docs/v2/设计方案/皮肤包播放行为设计.md")
     runtime_split_design = read("docs/v2/设计方案/桌宠运行时职责拆分设计.md")
@@ -54,31 +57,35 @@ def main() -> int:
     for token in [
         "Q_PROPERTY(QStringList enabledSkinCommandIds READ enabledSkinCommandIds NOTIFY skinCommandAvailabilityChanged)",
         "QStringList enabledSkinCommandIds() const",
-        "Q_INVOKABLE void triggerSkinCommand(const QString &commandId)",
+        "Q_INVOKABLE void submitMenuCommand",
         "void skinCommandAvailabilityChanged()",
     ]:
-        require(token in runtime_h, f"PetRuntime.h 缺少 skin command 过渡接口：{token}")
+        require(token in bridge_h, f"PetEventBridge.h 缺少 skin command 过渡接口：{token}")
 
     for token in [
-        "QStringList PetRuntime::enabledSkinCommandIds() const",
-        "void PetRuntime::triggerSkinCommand(const QString &commandId)",
-        '"miles.feedTea"',
-        'playActionFromPool("menu.tea")',
+        "QStringList PetEventBridge::enabledSkinCommandIds() const",
+        "void PetEventBridge::submitMenuCommand",
     ]:
-        require(token in runtime_cpp, f"PetRuntime.cpp 缺少 skin command 实现：{token}")
+        require(token in bridge_cpp, f"PetEventBridge.cpp 缺少 skin command 实现：{token}")
 
     for token in [
-        "App.PetRuntime.enabledSkinCommandIds.indexOf(\"miles.feedTea\")",
-        "App.PetRuntime.triggerSkinCommand(\"miles.feedTea\")",
+        '"miles.feedTea"',
+        'ActionRequest::actionPool("menu.tea")',
+    ]:
+        require(token in custom_cpp, f"CustomInteractionRegistry.cpp 缺少 skin command 实现：{token}")
+
+    for token in [
+        "App.PetEventBridge.enabledSkinCommandIds.indexOf(\"miles.feedTea\")",
+        "App.PetEventBridge.submitMenuCommand(\"miles.feedTea\")",
         'App.PetRuntime.sleeping ? "唤醒" : "睡觉"',
-        "App.PetRuntime.toggleSleep()",
+        'App.PetEventBridge.submitMenuCommand("runtime.sleep.toggle")',
     ]:
         require(token in pet_window_qml, f"QML 菜单缺少正式入口：{token}")
 
     for token in [
-        "runtime.triggerSkinCommand(\"miles.feedTea\")",
+        "bridge.submitMenuCommand(\"miles.feedTea\")",
         "enabledSkinCommandIds().contains(\"miles.feedTea\")",
-        "toggleSleep",
+        "runtime.sleep.toggle",
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 应覆盖正式入口：{token}")
 

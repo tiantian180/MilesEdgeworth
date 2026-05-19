@@ -34,19 +34,20 @@ def main() -> int:
     require("resolvePoolId" in pool_selector_h, "ActionPoolSelector 应声明按上下文解析 action pool 的入口")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
-    require("ActionPoolSelector::resolvePoolId" in pet_runtime_cpp, "PetRuntime 应委托 ActionPoolSelector 解析语言覆盖池")
+    interaction_pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
+    require("ActionPoolSelector::resolvePoolId" in pet_runtime_cpp, "PetRuntime 执行 ActionRequest 时应委托 ActionPoolSelector 解析语言覆盖池")
     for token in [
         "languagePoolId",
         'normalizedPoolId + "." + voiceLanguage',
     ]:
         require(token in pool_selector_cpp, f"ActionPoolSelector.cpp 缺少语言感知 action pool 实现：{token}")
-    require('playActionFromPool("doubleClick.random")' in pet_runtime_cpp, "PetRuntime.cpp 缺少双击随机池入口")
+    require('ActionRequest::actionPool("doubleClick.random")' in interaction_pipeline_cpp, "InteractionPipeline.cpp 缺少双击随机池请求")
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [
         "for (int i = 0; i < 80; ++i)",
         "中文双击不应进入 Eureka 分支",
-        "runtime.handleDoubleClick()",
+        "bridge.submitDoubleClick()",
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少中文双击候选池覆盖：{token}")
 

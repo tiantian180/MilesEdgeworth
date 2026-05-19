@@ -26,7 +26,7 @@ def main() -> int:
     require("id: singleClickTimer" in qml, "QML 应保留单击延迟确认 Timer")
     require("interval: 300" in qml, "singleClickTimer 应使用旧版 300ms 双击判定窗口")
     require("singleClickTimer.stop()" in qml, "双击时应停止待执行的单击 Timer")
-    require("App.PetRuntime.handleDoubleClick()" in qml, "双击应进入 PetRuntime")
+    require("App.PetEventBridge.submitDoubleClick()" in qml, "双击应进入 PetRuntime")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_39_double_click_window" in root_cmake, "CTest 未注册 Phase 0.39 检查")

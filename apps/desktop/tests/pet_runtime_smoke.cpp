@@ -1,4 +1,6 @@
 #include "pet/PetRuntime.h"
+#include "pet/events/PetEventBridge.h"
+#include "pet/requests/ActionRequest.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -96,16 +98,17 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
 
     PetRuntime runtime;
+    PetEventBridge bridge(&runtime);
 
     // 启动时应进入旧版公文包入场序列，而不是直接静止站立。
     require(runtime.currentRecipeId() == "startup.briefcase", "启动时应播放 startup.briefcase recipe");
     require(runtime.currentActionId() == "briefcase_in", "启动第一步应是 briefcase_in");
     require(!runtime.pointerInteractionEnabled(), "briefcase_in 期间应禁用鼠标交互");
 
-    runtime.handlePrimaryClick(145, 40, 240, 240);
+    bridge.submitPrimaryClick(145, 40, 240, 240);
     require(runtime.currentActionId() == "briefcase_in", "启动入场期间单击不应打断 briefcase_in");
 
-    runtime.handleDoubleClick();
+    bridge.submitDoubleClick();
     require(runtime.currentActionId() == "briefcase_in", "启动入场期间双击不应打断 briefcase_in");
 
     runtime.handleAnimationFinished();
@@ -144,12 +147,12 @@ int main(int argc, char *argv[])
     require(runtime.petSizeId() == "medium", "setPetSize(medium) 应切回中档");
     runtime.returnToIdle();
 
-    runtime.handleIdleLoopFinishedForTest(0.71);
+    bridge.submitIdleLoopFinishedForTest(0.71);
     require(runtime.currentActionId() == "idle_stand", "站立循环随机数超过 0.7 时应继续站立");
     require(runtime.currentRecipeId().isEmpty(), "站立循环随机数超过 0.7 时不应进入随机 recipe");
 
     const QString facingBeforeRandomIdle = runtime.currentFacing();
-    runtime.handleIdleLoopFinishedForTest(0.69);
+    bridge.submitIdleLoopFinishedForTest(0.69);
     require(
         !runtime.currentRecipeId().isEmpty() || runtime.currentFacing() != facingBeforeRandomIdle,
         "站立循环随机数不超过 0.7 时应进入随机 idle 行为"
@@ -157,7 +160,7 @@ int main(int argc, char *argv[])
     runtime.returnToIdle();
 
     runtime.playRecipe("doubleClick.holdIt");
-    runtime.handleIdleLoopFinishedForTest(0.0);
+    bridge.submitIdleLoopFinishedForTest(0.0);
     require(runtime.currentRecipeId() == "doubleClick.holdIt", "非待机 recipe 播放中不应被站立循环入口打断");
     runtime.returnToIdle();
 
@@ -198,7 +201,7 @@ int main(int argc, char *argv[])
         requireRecipeAction(runtime, recipeCase, "随机 idle 非移动候选应播放预期动作");
     }
 
-    runtime.playRecipe("walk.east");
+    runtime.submitActionRequest(ActionRequest::recipe("walk.east"));
     QVariantMap walkDelta = runtime.consumeFrameMovementDelta();
     require(walkDelta.value("dx").toDouble() > 0, "walk.east 应推动窗口向右移动");
     require(runtime.currentFacing() == "right", "walk.east 应让桌宠朝右");
@@ -285,39 +288,47 @@ int main(int argc, char *argv[])
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "完整站起播完后应回到 idle_stand");
 
-    require(runtime.enabledSkinCommandIds().contains("miles.feedTea"), "待机状态应允许 Miles 红茶皮肤命令");
-    runtime.triggerSkinCommand("miles.feedTea");
+    require(bridge.enabledSkinCommandIds().contains("miles.feedTea"), "待机状态应允许 Miles 红茶皮肤命令");
+    bridge.submitMenuCommand("miles.feedTea");
     require(runtime.currentRecipeId() == "tea.once" || runtime.currentRecipeId() == "teaAlt.once", "红茶皮肤命令应从两组喝茶 recipe 中选择");
     require(runtime.currentActionId() == "tea" || runtime.currentActionId() == "tea_alt", "喝茶 recipe 应只播放茶杯 GIF 本体");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "喝茶 GIF 播完后应直接回到待机");
 
-    runtime.toggleSleep();
-    require(runtime.currentActionId() == "sleep", "toggleSleep 应进入 sleep action");
-    require(runtime.currentPhaseId() == "enter", "非睡眠状态 toggleSleep 应从 enter phase 开始");
+    bridge.submitMenuCommand("runtime.sleep.toggle");
+    require(runtime.currentActionId() == "sleep", "睡眠菜单命令应进入 sleep action");
+    require(runtime.currentPhaseId() == "enter", "非睡眠状态 sleep toggle 事件应从 enter phase 开始");
     require(runtime.sleepTransitioning(), "sleep.enter 期间应视为睡眠过渡");
-    require(!runtime.enabledSkinCommandIds().contains("miles.feedTea"), "睡眠相关状态中应禁用红茶皮肤命令");
+    require(!bridge.enabledSkinCommandIds().contains("miles.feedTea"), "睡眠相关状态中应禁用红茶皮肤命令");
 
     runtime.handleAnimationFinished();
     require(runtime.sleeping(), "sleep.enter 播完后应进入 sleeping loop");
     require(runtime.currentPhaseId() == "loop", "sleep loop phase 应为 loop");
 
-    runtime.handlePrimaryClick(145, 40, 240, 240);
+    bridge.submitPrimaryClick(145, 40, 240, 240);
     require(runtime.sleeping(), "睡眠中单击不应打断 sleep loop");
-    runtime.handleDoubleClick();
+    bridge.submitDoubleClick();
     require(runtime.currentPhaseId() == "exit", "睡眠中双击应进入 wake/exit phase");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "wake 播完后应回到 idle_stand");
-    require(runtime.enabledSkinCommandIds().contains("miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
+    require(bridge.enabledSkinCommandIds().contains("miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
 
-    runtime.toggleSleep();
+    bridge.submitMenuCommand("runtime.sleep.toggle");
     runtime.handleAnimationFinished();
-    require(runtime.sleeping(), "再次 toggleSleep 后应进入 sleeping loop");
-    runtime.toggleSleep();
-    require(runtime.currentPhaseId() == "exit", "睡眠循环中 toggleSleep 应进入 wake/exit phase");
+    require(runtime.sleeping(), "再次 sleep toggle 事件后应进入 sleeping loop");
+    bridge.submitMenuCommand("runtime.sleep.toggle");
+    require(runtime.currentPhaseId() == "exit", "睡眠循环中 sleep toggle 事件应进入 wake/exit phase");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "wake 播完后应回到 idle_stand");
-    require(runtime.enabledSkinCommandIds().contains("miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
+    require(bridge.enabledSkinCommandIds().contains("miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
+
+    runtime.playAction("click_body");
+    bridge.submitMenuCommand("runtime.returnToIdle");
+    require(runtime.currentActionId() == "idle_stand", "回到待机菜单事件应通过 ActionRequest 回到 idle_stand");
+
+    const QString facingBeforeToggle = runtime.currentFacing();
+    bridge.submitMenuCommand("runtime.facing.toggle");
+    require(runtime.currentFacing() != facingBeforeToggle, "切换朝向菜单事件应通过 ActionRequest 切换 facing");
 
     runtime.setVoiceLanguage("jp");
     runtime.playRecipe("doubleClick.holdIt");
@@ -342,78 +353,78 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < 80; ++i) {
         runtime.returnToIdle();
-        runtime.handleDoubleClick();
+        bridge.submitDoubleClick();
         require(runtime.currentRecipeId() != "doubleClick.eureka", "中文双击不应进入 Eureka 分支");
     }
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(145, 40, 240, 240);
+    bridge.submitPrimaryClick(145, 40, 240, 240);
     require(runtime.currentActionId() == "scared", "右朝向点击脸部应触发 scared");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(90, 40, 240, 240);
+    bridge.submitPrimaryClick(90, 40, 240, 240);
     require(runtime.currentActionId() != "scared", "右朝向左上头部区域不应触发 scared");
 
     runtime.returnToIdle();
     runtime.setFacing("left");
-    runtime.handlePrimaryClick(85, 40, 240, 240);
+    bridge.submitPrimaryClick(85, 40, 240, 240);
     require(runtime.currentActionId() == "scared", "左朝向点击脸部应触发 scared");
 
     runtime.returnToIdle();
     runtime.setFacing("left");
-    runtime.handlePrimaryClick(150, 40, 240, 240);
+    bridge.submitPrimaryClick(150, 40, 240, 240);
     require(runtime.currentActionId() != "scared", "左朝向右上头部区域不应触发 scared");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(100, 40, 240, 240);
+    bridge.submitPrimaryClick(100, 40, 240, 240);
     requireActionIn(runtime.currentActionId(), {"idle_tapping_head", "idle_look_up"}, "点击头部应触发头部候选动作");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(60, 85, 240, 240);
+    bridge.submitPrimaryClick(60, 85, 240, 240);
     require(runtime.currentActionId() == "turn_around", "点击大臂应触发转身");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(60, 130, 240, 240);
+    bridge.submitPrimaryClick(60, 130, 240, 240);
     requireActionIn(runtime.currentActionId(), {"idle_check_watch", "idle_shrug"}, "点击小臂应触发小臂候选动作");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(120, 85, 240, 240);
+    bridge.submitPrimaryClick(120, 85, 240, 240);
     require(runtime.currentActionId() == "idle_thinking_once", "点击胸口应触发抱臂思考");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(120, 138, 240, 240);
+    bridge.submitPrimaryClick(120, 138, 240, 240);
     require(runtime.currentActionId() == "bow", "点击肚子上半应触发鞠躬");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(120, 158, 240, 240);
+    bridge.submitPrimaryClick(120, 158, 240, 240);
     require(runtime.currentActionId() == "idle_pointing", "点击肚子下半应触发指点");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(95, 200, 240, 240);
+    bridge.submitPrimaryClick(95, 200, 240, 240);
     require(runtime.currentActionId() == "back_away", "右朝向点击左侧腿部应触发后退");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(145, 200, 240, 240);
+    bridge.submitPrimaryClick(145, 200, 240, 240);
     require(runtime.currentActionId() == "idle_look_down", "右朝向点击右侧腿部应触发低头看");
 
     runtime.returnToIdle();
     runtime.setFacing("left");
-    runtime.handlePrimaryClick(145, 200, 240, 240);
+    bridge.submitPrimaryClick(145, 200, 240, 240);
     require(runtime.currentActionId() == "back_away", "左朝向点击右侧腿部应触发后退");
 
     runtime.returnToIdle();
     runtime.setFacing("left");
-    runtime.handlePrimaryClick(95, 200, 240, 240);
+    bridge.submitPrimaryClick(95, 200, 240, 240);
     require(runtime.currentActionId() == "idle_look_down", "左朝向点击左侧腿部应触发低头看");
 
     const QString soundBeforeMutedPlay = runtime.currentSoundUrl().toString();
@@ -431,7 +442,7 @@ int main(int argc, char *argv[])
     requireNear(runtime.currentPropStartOffsetY(), 48.0, "大号徽章右向纵向起点应按旧版 scale=3 缩放");
     requireNear(runtime.currentPropEndOffsetX(), 1308.0, "大号徽章右向终点应按旧版 600 + 150 * scale 计算");
     requireNear(runtime.currentPropVisualWidth(), 105.0, "大号徽章视觉尺寸应按旧版 scale=3 缩放");
-    runtime.handlePropExpired();
+    bridge.submitPropExpired();
     runtime.handleAnimationFinished();
 
     runtime.returnToIdle();
@@ -444,7 +455,7 @@ int main(int argc, char *argv[])
     requireNear(runtime.currentPropStartOffsetY(), 16.0, "迷你徽章左向纵向起点应按旧版 scale=1 缩放");
     requireNear(runtime.currentPropEndOffsetX(), -749.0, "迷你徽章左向终点应按旧版 -(600 + 150 * scale) 计算");
     requireNear(runtime.currentPropVisualWidth(), 35.0, "迷你徽章视觉尺寸应按旧版 scale=1 缩放");
-    runtime.handlePropExpired();
+    bridge.submitPropExpired();
     runtime.handleAnimationFinished();
 
     runtime.returnToIdle();
@@ -455,7 +466,7 @@ int main(int argc, char *argv[])
     waitForMilliseconds(750);
     require(runtime.currentPropVisible(), "Take that 延迟后应飞出检察官徽章");
     require(runtime.currentPropId() == "prosecutor_badge", "飞出的 Prop 应是检察官徽章");
-    runtime.handlePropClicked();
+    bridge.submitPropClicked();
     require(!runtime.currentPropVisible(), "点击徽章后应隐藏 Prop");
     require(runtime.currentActionId() == "bow", "点击徽章后应触发鞠躬");
     runtime.handleAnimationFinished();
@@ -465,7 +476,7 @@ int main(int argc, char *argv[])
     runtime.playRecipe("doubleClick.takeThat");
     waitForMilliseconds(750);
     require(runtime.currentPropVisible(), "Take that 延迟后应飞出检察官徽章");
-    runtime.handlePropExpired();
+    bridge.submitPropExpired();
     require(!runtime.currentPropVisible(), "徽章自然消失后应隐藏 Prop");
     require(runtime.currentActionId() == "pickup_badge", "徽章自然消失后应触发捡徽章");
     runtime.handleAnimationFinished();

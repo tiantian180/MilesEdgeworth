@@ -64,7 +64,6 @@ def main() -> int:
     for token in [
         "Q_PROPERTY(QUrl currentSoundUrl",
         "Q_PROPERTY(int soundPlaybackSerial",
-        "Q_INVOKABLE void handleDoubleClick",
         "currentSoundUrl() const",
         "soundPlaybackSerial() const",
         "currentSoundUrlChanged",
@@ -75,14 +74,14 @@ def main() -> int:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     for token in [
-        "handleDoubleClick",
-        "doubleClick.random",
         "playSoundForRecipe",
         "m_currentSoundUrl",
         "m_soundPlaybackSerial",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    require('ActionRequest::actionPool("doubleClick.random")' in pipeline_cpp, "双击事件应由 InteractionPipeline 转成 doubleClick.random 请求")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
@@ -92,7 +91,7 @@ def main() -> int:
         "App.PetRuntime.currentSoundUrl",
         "App.PetRuntime.soundPlaybackSerial",
         "singleClickTimer",
-        "App.PetRuntime.handleDoubleClick()",
+        "App.PetEventBridge.submitDoubleClick()",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
 

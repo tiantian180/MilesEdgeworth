@@ -29,11 +29,11 @@ def main() -> int:
     for token in [
         "睡眠中单击不应打断 sleep loop",
         "睡眠中双击应进入 wake/exit phase",
-        "runtime.handlePrimaryClick(145, 40, 240, 240)",
-        "runtime.handleDoubleClick()",
+        "bridge.submitPrimaryClick(145, 40, 240, 240)",
+        "bridge.submitDoubleClick()",
         'runtime.currentPhaseId() == "exit"',
         "wake 播完后应回到 idle_stand",
-        "睡眠循环中 toggleSleep 应进入 wake/exit phase",
+        "睡眠循环中 sleep toggle 事件应进入 wake/exit phase",
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少睡眠鼠标交互覆盖：{token}")
 

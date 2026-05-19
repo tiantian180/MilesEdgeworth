@@ -20,13 +20,22 @@ set(DESKTOP_SOURCES
     src/main.cpp
     src/pet/behavior/BehaviorTriggerEngine.cpp
     src/pet/behavior/BehaviorTriggerEngine.h
+    src/pet/events/PetEvent.h
+    src/pet/events/PetEventBridge.cpp
+    src/pet/events/PetEventBridge.h
+    src/pet/interaction/CustomInteractionRegistry.cpp
+    src/pet/interaction/CustomInteractionRegistry.h
     src/pet/interaction/HitZoneMatcher.cpp
     src/pet/interaction/HitZoneMatcher.h
+    src/pet/interaction/InteractionPipeline.cpp
+    src/pet/interaction/InteractionPipeline.h
     src/pet/manifest/SkinManifest.h
     src/pet/manifest/SkinManifestLoader.cpp
     src/pet/manifest/SkinManifestLoader.h
     src/pet/PetRuntime.cpp
     src/pet/PetRuntime.h
+    src/pet/requests/ActionRequest.h
+    src/pet/runtime/RuntimeSnapshot.h
     src/pet/selection/ActionPoolSelector.cpp
     src/pet/selection/ActionPoolSelector.h
     resources/pet_assets.qrc
@@ -52,6 +61,7 @@ qt_add_qml_module(MilesEdgeworthDesktop
         qml/PetWindow.qml
     SOURCES
         src/DesktopShellController.h
+        src/pet/events/PetEventBridge.h
         src/pet/PetRuntime.h
 )
 
@@ -59,6 +69,7 @@ target_include_directories(MilesEdgeworthDesktop
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/pet/events
 )
 
 target_link_libraries(MilesEdgeworthDesktop
@@ -84,13 +95,22 @@ if(BUILD_TESTING)
         tests/pet_runtime_smoke.cpp
         src/pet/behavior/BehaviorTriggerEngine.cpp
         src/pet/behavior/BehaviorTriggerEngine.h
+        src/pet/events/PetEvent.h
+        src/pet/events/PetEventBridge.cpp
+        src/pet/events/PetEventBridge.h
+        src/pet/interaction/CustomInteractionRegistry.cpp
+        src/pet/interaction/CustomInteractionRegistry.h
         src/pet/interaction/HitZoneMatcher.cpp
         src/pet/interaction/HitZoneMatcher.h
+        src/pet/interaction/InteractionPipeline.cpp
+        src/pet/interaction/InteractionPipeline.h
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h
         src/pet/PetRuntime.cpp
         src/pet/PetRuntime.h
+        src/pet/requests/ActionRequest.h
+        src/pet/runtime/RuntimeSnapshot.h
         src/pet/selection/ActionPoolSelector.cpp
         src/pet/selection/ActionPoolSelector.h
         resources/pet_assets.qrc
@@ -100,6 +120,7 @@ if(BUILD_TESTING)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/pet/events
     )
 
     target_link_libraries(PetRuntimeSmoke

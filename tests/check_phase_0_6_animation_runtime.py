@@ -88,7 +88,7 @@ def main() -> int:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
 
     for token in [
-        "App.PetRuntime.toggleFacing()",
+        'App.PetEventBridge.submitMenuCommand("runtime.facing.toggle")',
         "onCurrentFrameChanged",
         "App.PetRuntime.handleAnimationFinished()",
         "onPlaybackSerialChanged",

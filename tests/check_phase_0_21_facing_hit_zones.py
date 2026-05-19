@@ -50,9 +50,9 @@ def main() -> int:
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [
-        "runtime.handlePrimaryClick(145, 40, 240, 240)",
+        "bridge.submitPrimaryClick(145, 40, 240, 240)",
         "右朝向点击脸部应触发 scared",
-        "runtime.handlePrimaryClick(85, 40, 240, 240)",
+        "bridge.submitPrimaryClick(85, 40, 240, 240)",
         "左朝向点击脸部应触发 scared",
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少朝向点击分区覆盖：{token}")

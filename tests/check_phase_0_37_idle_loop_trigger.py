@@ -20,16 +20,16 @@ def require(condition: bool, message: str) -> None:
 
 def main() -> int:
     qml = read("apps/desktop/qml/PetWindow.qml")
-    runtime_header = read("apps/desktop/src/pet/PetRuntime.h")
+    bridge_header = read("apps/desktop/src/pet/events/PetEventBridge.h")
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
 
-    require("handleIdleLoopFinished" in runtime_header, "PetRuntime 应提供站立循环完成入口")
-    require("handleIdleLoopFinishedForTest" in runtime_header, "PetRuntime 应提供可测的确定性站立循环入口")
-    require("handleIdleLoopFinished" in qml, "QML 应在站立循环播完时通知 PetRuntime")
+    require("submitIdleLoopFinished" in bridge_header, "PetEventBridge 应提供站立循环完成事件入口")
+    require("submitIdleLoopFinishedForTest" in bridge_header, "PetEventBridge 应提供可测的确定性站立循环入口")
+    require("submitIdleLoopFinished" in qml, "QML 应在站立循环播完时提交 PetEvent")
     require("idleRandomTimer" not in qml, "随机 idle 不应再依赖固定 7 秒 Timer")
     require("interval: 7000" not in qml, "随机 idle 不应保留旧的固定 7 秒触发间隔")
-    require("handleIdleLoopFinishedForTest(0.69)" in smoke_test, "Smoke 应覆盖 70% 内触发随机 idle")
-    require("handleIdleLoopFinishedForTest(0.71)" in smoke_test, "Smoke 应覆盖 70% 外继续站立")
+    require("submitIdleLoopFinishedForTest(0.69)" in smoke_test, "Smoke 应覆盖 70% 内触发随机 idle")
+    require("submitIdleLoopFinishedForTest(0.71)" in smoke_test, "Smoke 应覆盖 70% 外继续站立")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_37_idle_loop_trigger" in root_cmake, "CTest 未注册 Phase 0.37 检查")

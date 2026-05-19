@@ -1,4 +1,5 @@
 #include "DesktopShellController.h"
+#include "pet/events/PetEventBridge.h"
 #include "pet/PetRuntime.h"
 
 #include <QApplication>
@@ -34,6 +35,9 @@ int main(int argc, char *argv[])
 
     PetRuntime petRuntime;
     PetRuntimeForeign::s_instance = &petRuntime;
+    PetEventBridge petEventBridge(&petRuntime);
+    PetEventBridgeForeign::s_instance = &petEventBridge;
+
     shellController.setPetScale(petRuntime.petScale());
     QObject::connect(&petRuntime, &PetRuntime::petScaleChanged, &shellController, [&shellController, &petRuntime]() {
         shellController.setPetScale(petRuntime.petScale());

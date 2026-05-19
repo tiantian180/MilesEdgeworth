@@ -21,6 +21,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     runtime_header = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     root_cmake = read("CMakeLists.txt")
 
@@ -71,8 +72,8 @@ def main() -> int:
     require("SkinManifestLoader::fallbackManifest" in runtime_cpp, "PetRuntime 应调用 SkinManifestLoader fallback")
     require("ActionPoolSelector::resolvePoolId" in runtime_cpp, "PetRuntime 应委托 ActionPoolSelector 解析候选池")
     require("ActionPoolSelector::selectEntry" in runtime_cpp, "PetRuntime 应委托 ActionPoolSelector 权重抽取")
-    require("BehaviorTriggerEngine::matches" in runtime_cpp, "PetRuntime 应委托 BehaviorTriggerEngine 匹配触发条件")
-    require("BehaviorTriggerEngine::selectEntry" in runtime_cpp, "PetRuntime 应委托 BehaviorTriggerEngine 权重抽取")
+    require("BehaviorTriggerEngine::matches" in pipeline_cpp, "InteractionPipeline 应委托 BehaviorTriggerEngine 匹配触发条件")
+    require("BehaviorTriggerEngine::selectEntry" in pipeline_cpp, "InteractionPipeline 应委托 BehaviorTriggerEngine 权重抽取")
     require("src/pet/manifest/SkinManifestLoader.cpp" in desktop_cmake, "桌面 CMake 应编译 SkinManifestLoader.cpp")
     require("src/pet/manifest/SkinManifestLoader.h" in desktop_cmake, "桌面 CMake 应列出 SkinManifestLoader.h")
     require("src/pet/selection/ActionPoolSelector.cpp" in desktop_cmake, "桌面 CMake 应编译 ActionPoolSelector.cpp")

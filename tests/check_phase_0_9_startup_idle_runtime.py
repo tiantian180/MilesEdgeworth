@@ -118,7 +118,7 @@ def main() -> int:
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "App.PetRuntime.toggleFacing()",
+        'App.PetEventBridge.submitMenuCommand("runtime.facing.toggle")',
         "App.PetRuntime.currentRecipeId === \"\"",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")

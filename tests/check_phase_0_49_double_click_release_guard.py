@@ -39,7 +39,7 @@ def main() -> int:
     require("doubleClickPending = true" in qml, "第二次按下时应进入双击待处理状态")
     require("singleClickTimer.stop()" in qml, "第二次按下时应取消第一次单击计时")
 
-    release_branch = "if (doubleClickPending) {\n                doubleClickPending = false\n                App.PetRuntime.handleDoubleClick()\n                return\n            }"
+    release_branch = "if (doubleClickPending) {\n                doubleClickPending = false\n                App.PetEventBridge.submitDoubleClick()\n                return\n            }"
     require(release_branch in qml, "第二次松手时应先处理双击并直接返回")
     require(
         qml.index("if (doubleClickPending)") < qml.index("singleClickTimer.restart()"),

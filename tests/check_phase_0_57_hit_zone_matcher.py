@@ -27,7 +27,7 @@ def main() -> int:
     matcher_h = matcher_h_path.read_text(encoding="utf-8")
     matcher_cpp = matcher_cpp_path.read_text(encoding="utf-8")
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
-    pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
 
     for token in [
@@ -62,9 +62,9 @@ def main() -> int:
         '#include "pet/interaction/HitZoneMatcher.h"',
         "HitZoneMatchContext hitZoneContext",
         "HitZoneMatcher::clickPoolForPoint",
-        "playActionFromPool(poolId)",
+        "ActionRequest::actionPool(poolId)",
     ]:
-        require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少接入标记：{token}")
+        require(token in pipeline_cpp, f"InteractionPipeline.cpp 缺少接入标记：{token}")
 
     for token in [
         "src/pet/interaction/HitZoneMatcher.cpp",

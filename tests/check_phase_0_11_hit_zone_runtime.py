@@ -102,10 +102,10 @@ def main() -> int:
         require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     matcher_h = read("apps/desktop/src/pet/interaction/HitZoneMatcher.h")
     matcher_cpp = read("apps/desktop/src/pet/interaction/HitZoneMatcher.cpp")
     for token in [
-        "Q_INVOKABLE void handlePrimaryClick",
         "SkinManifest m_manifest",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
@@ -115,13 +115,12 @@ def main() -> int:
     ]:
         require(token in matcher_h, f"HitZoneMatcher.h 缺少 {token}")
 
-    pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [
-        "handlePrimaryClick",
+        "PetEventType::PointerSingleClick",
         "HitZoneMatcher::clickPoolForPoint",
-        "playActionFromPool(poolId)",
+        "ActionRequest::actionPool(poolId)",
     ]:
-        require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+        require(token in pipeline_cpp, f"InteractionPipeline.cpp 缺少 {token}")
     for token in [
         "manifest.hitZones",
         "manifest.singleClickPools",
@@ -131,7 +130,7 @@ def main() -> int:
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
         "dragMoved",
-        "App.PetRuntime.handlePrimaryClick(clickX, clickY, petWindow.width, petWindow.height)",
+        "App.PetEventBridge.submitPrimaryClick(clickX, clickY, petWindow.width, petWindow.height)",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
 
