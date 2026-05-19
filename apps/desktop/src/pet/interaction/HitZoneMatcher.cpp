@@ -1,46 +1,6 @@
 #include "pet/interaction/HitZoneMatcher.h"
 
 namespace {
-QString hitZoneIdForClickPool(const QString &poolId)
-{
-    if (poolId == "click.upperArm") {
-        return "upper_arm";
-    }
-
-    if (poolId == "click.face") {
-        return "face";
-    }
-    if (poolId == "click.head") {
-        return "head";
-    }
-    if (poolId == "click.forearm") {
-        return "forearm";
-    }
-    if (poolId == "click.chest") {
-        return "chest";
-    }
-    if (poolId == "click.belly") {
-        return "belly";
-    }
-    if (poolId == "click.legs") {
-        return "legs";
-    }
-    if (poolId == "click.bellyBow") {
-        return "belly_bow";
-    }
-    if (poolId == "click.bellyPointingArea") {
-        return "belly_pointing";
-    }
-    if (poolId == "click.legsBackArea") {
-        return "legs_back";
-    }
-    if (poolId == "click.legsLookDownArea") {
-        return "legs_look_down";
-    }
-
-    return {};
-}
-
 bool pointInPolygon(const QList<QPointF> &polygon, const QPointF &point)
 {
     if (polygon.size() < 3) {
@@ -70,9 +30,10 @@ bool pointInPolygon(const QList<QPointF> &polygon, const QPointF &point)
 }
 } // namespace
 
-QString HitZoneMatcher::clickPoolForPoint(
+QString HitZoneMatcher::hitZoneIdForPoint(
     const SkinManifest &manifest,
     const HitZoneMatchContext &context,
+    const QStringList &candidateZoneIds,
     double x,
     double y,
     double width,
@@ -89,11 +50,14 @@ QString HitZoneMatcher::clickPoolForPoint(
         x * context.canvasWidth / width,
         y * context.canvasHeight / height
     );
-    for (const QString &poolId : manifest.singleClickPools) {
-        const QString zoneId = hitZoneIdForClickPool(poolId);
+
+    const QStringList orderedZoneIds = candidateZoneIds.isEmpty()
+        ? manifest.hitZones.keys()
+        : candidateZoneIds;
+    for (const QString &zoneId : orderedZoneIds) {
         const HitZoneDefinition zone = manifest.hitZones.value(zoneId);
         if (!zone.id.isEmpty() && hitZoneContainsPoint(zone, context, logicalPoint)) {
-            return poolId;
+            return zoneId;
         }
     }
 

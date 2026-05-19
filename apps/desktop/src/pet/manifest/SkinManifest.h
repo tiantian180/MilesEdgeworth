@@ -117,6 +117,20 @@ struct HitZoneDefinition
     QHash<QString, QList<QPointF>> facingPolygons;
 };
 
+struct ClickBehaviorEntry
+{
+    QString zoneId;
+    QString when = "default";
+    ActionRequest request;
+    QString customInteractionId;
+};
+
+struct ClickBehaviorDefinition
+{
+    QList<ClickBehaviorEntry> singleClick;
+    QList<ClickBehaviorEntry> doubleClick;
+};
+
 struct SkinManifest
 {
     QHash<QString, QString> stateToAction;
@@ -127,7 +141,7 @@ struct SkinManifest
     QHash<QString, PropDefinition> props;
     QHash<QString, HitZoneDefinition> hitZones;
     QHash<QString, SkinCommandDefinition> skinCommands;
-    QStringList singleClickPools;
+    ClickBehaviorDefinition clickBehaviors;
     QString fallbackAction = "idle_stand";
     QStringList facings = {"right", "left"};
     QStringList movementDirections;

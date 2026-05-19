@@ -6,6 +6,7 @@
 #include <QPointF>
 #include <QRectF>
 #include <QString>
+#include <QStringList>
 
 // HitZoneMatchContext 描述一次点击命中计算所需的运行时上下文。
 //
@@ -19,7 +20,7 @@ struct HitZoneMatchContext
     double canvasHeight = 240.0;
 };
 
-// HitZoneMatcher 只负责“点中了哪个单击动作池”的纯匹配逻辑。
+// HitZoneMatcher 只负责“点中了哪个 hit zone”的纯匹配逻辑。
 //
 // 它不播放动画、不读取 manifest 文件、不修改 PetRuntime 状态。这样后续把
 // 单击、双击、拖拽等交互统一迁入 InteractionController 时，可以复用这里的
@@ -27,9 +28,10 @@ struct HitZoneMatchContext
 class HitZoneMatcher
 {
 public:
-    static QString clickPoolForPoint(
+    static QString hitZoneIdForPoint(
         const SkinManifest &manifest,
         const HitZoneMatchContext &context,
+        const QStringList &candidateZoneIds,
         double x,
         double y,
         double width,

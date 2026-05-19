@@ -66,7 +66,9 @@ def main() -> int:
         for key in ["x", "y", "width", "height"]:
             require(key in zone, f"{zone_id} 缺少 {key}")
 
-    require(click_behaviors.get("singleClick") == CLICK_POOLS, "singleClick 应按旧版区域优先级映射到 click pools")
+    single_click = click_behaviors.get("singleClick", [])
+    require([entry.get("pool") for entry in single_click] == CLICK_POOLS, "singleClick 应按旧版区域优先级映射到 click pools")
+    require([entry.get("zone") for entry in single_click] == HIT_ZONES, "singleClick 应显式声明 zone 到 pool 的配对")
 
     for pool_id in CLICK_POOLS:
         require(pool_id in action_pools, f"actionPools 缺少 {pool_id}")
@@ -111,19 +113,19 @@ def main() -> int:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
     for token in [
         "HitZoneDefinition",
-        "clickPoolForPoint",
+        "hitZoneIdForPoint",
     ]:
         require(token in matcher_h, f"HitZoneMatcher.h 缺少 {token}")
 
     for token in [
         "PetEventType::PointerSingleClick",
-        "HitZoneMatcher::clickPoolForPoint",
-        "ActionRequest::actionPool(poolId)",
+        "HitZoneMatcher::hitZoneIdForPoint",
+        "manifest.clickBehaviors.singleClick",
     ]:
         require(token in pipeline_cpp, f"InteractionPipeline.cpp 缺少 {token}")
     for token in [
         "manifest.hitZones",
-        "manifest.singleClickPools",
+        "candidateZoneIds",
     ]:
         require(token in matcher_cpp, f"HitZoneMatcher.cpp 缺少 {token}")
 

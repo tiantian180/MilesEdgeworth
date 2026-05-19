@@ -81,7 +81,8 @@ def main() -> int:
         "m_soundPlaybackSerial",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
-    require('ActionRequest::actionPool("doubleClick.random")' in pipeline_cpp, "双击事件应由 InteractionPipeline 转成 doubleClick.random 请求")
+    require("manifest.clickBehaviors.doubleClick" in pipeline_cpp, "双击事件应由 InteractionPipeline 读取 manifest 默认请求")
+    require('"doubleClick.random"' not in pipeline_cpp, "双击默认池不应硬编码在 InteractionPipeline")
 
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")

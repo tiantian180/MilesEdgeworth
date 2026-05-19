@@ -490,5 +490,13 @@ if(BUILD_TESTING)
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_65_architecture_guardrails.cmake
         )
         set_tests_properties(check_phase_0_65_architecture_guardrails PROPERTIES WILL_FAIL TRUE)
+
+        # Phase 0.66 的 ClickBehavior 配置化检查：单击 zone 到动作池、
+        # 双击默认动作池都应来自 manifest，HitZoneMatcher 不再知道 click.* 命名。
+        add_test(
+            NAME check_phase_0_66_click_behavior_pairing
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_66_click_behavior_pairing.py
+        )
     endif()
 endif()

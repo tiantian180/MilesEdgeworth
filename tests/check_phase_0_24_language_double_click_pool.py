@@ -41,7 +41,8 @@ def main() -> int:
         'normalizedPoolId + "." + voiceLanguage',
     ]:
         require(token in pool_selector_cpp, f"ActionPoolSelector.cpp 缺少语言感知 action pool 实现：{token}")
-    require('ActionRequest::actionPool("doubleClick.random")' in interaction_pipeline_cpp, "InteractionPipeline.cpp 缺少双击随机池请求")
+    require("manifest.clickBehaviors.doubleClick" in interaction_pipeline_cpp, "InteractionPipeline.cpp 应从 manifest 读取双击随机池请求")
+    require('"doubleClick.random"' not in interaction_pipeline_cpp, "双击随机池不应硬编码在 InteractionPipeline.cpp")
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

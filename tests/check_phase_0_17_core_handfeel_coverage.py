@@ -62,7 +62,7 @@ def main() -> int:
         require(all("movement" in variants[direction] for direction in movement_directions), f"{action_id} 每个方向都应有 movement 增量")
 
     click_pools = manifest.get("clickBehaviors", {}).get("singleClick", [])
-    require(click_pools == [
+    require([entry.get("pool") for entry in click_pools] == [
         "click.face",
         "click.head",
         "click.upperArm",

@@ -33,6 +33,16 @@ QList<QPointF> polygonFromJsonArray(const QJsonArray &array)
 
 ActionRequest requestFromJsonObject(const QJsonObject &object)
 {
+    if (object.contains("pool")) {
+        return ActionRequest::actionPool(object.value("pool").toString());
+    }
+    if (object.contains("recipe")) {
+        return ActionRequest::recipe(object.value("recipe").toString());
+    }
+    if (object.contains("action")) {
+        return ActionRequest::action(object.value("action").toString());
+    }
+
     const QString type = object.value("type").toString();
     if (type == "pool") {
         return ActionRequest::actionPool(object.value("pool").toString());
@@ -50,6 +60,19 @@ ActionRequest requestFromJsonObject(const QJsonObject &object)
         return ActionRequest::toggleFacing();
     }
     return ActionRequest::none();
+}
+
+ClickBehaviorEntry clickBehaviorEntryFromJsonValue(const QJsonValue &value)
+{
+    const QJsonObject object = value.toObject();
+
+    ClickBehaviorEntry entry;
+    entry.zoneId = object.value("zone").toString();
+    entry.when = object.value("when").toString("default");
+    entry.customInteractionId = object.value("customInteraction").toString();
+    entry.request = requestFromJsonObject(object);
+
+    return entry;
 }
 } // namespace
 
@@ -125,11 +148,23 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
         }
     }
 
-    const QJsonArray singleClickPools = root.value("clickBehaviors").toObject().value("singleClick").toArray();
-    for (const QJsonValue &value : singleClickPools) {
-        const QString poolId = value.toString();
-        if (!poolId.isEmpty()) {
-            manifest.singleClickPools.append(poolId);
+    const QJsonObject clickBehaviors = root.value("clickBehaviors").toObject();
+
+    const QJsonArray singleClickBehaviors = clickBehaviors.value("singleClick").toArray();
+    for (const QJsonValue &value : singleClickBehaviors) {
+        const ClickBehaviorEntry entry = clickBehaviorEntryFromJsonValue(value);
+        if (!entry.zoneId.isEmpty()
+            && manifest.hitZones.contains(entry.zoneId)
+            && entry.request.kind != ActionRequestKind::None) {
+            manifest.clickBehaviors.singleClick.append(entry);
+        }
+    }
+
+    const QJsonArray doubleClickBehaviors = clickBehaviors.value("doubleClick").toArray();
+    for (const QJsonValue &value : doubleClickBehaviors) {
+        const ClickBehaviorEntry entry = clickBehaviorEntryFromJsonValue(value);
+        if (entry.request.kind != ActionRequestKind::None || !entry.customInteractionId.isEmpty()) {
+            manifest.clickBehaviors.doubleClick.append(entry);
         }
     }
 

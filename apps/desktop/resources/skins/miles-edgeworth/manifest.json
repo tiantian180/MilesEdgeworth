@@ -222,15 +222,18 @@
   },
   "clickBehaviors": {
     "singleClick": [
-      "click.face",
-      "click.head",
-      "click.upperArm",
-      "click.forearm",
-      "click.chest",
-      "click.bellyBow",
-      "click.bellyPointingArea",
-      "click.legsBackArea",
-      "click.legsLookDownArea"
+      { "zone": "face", "pool": "click.face" },
+      { "zone": "head", "pool": "click.head" },
+      { "zone": "upper_arm", "pool": "click.upperArm" },
+      { "zone": "forearm", "pool": "click.forearm" },
+      { "zone": "chest", "pool": "click.chest" },
+      { "zone": "belly_bow", "pool": "click.bellyBow" },
+      { "zone": "belly_pointing", "pool": "click.bellyPointingArea" },
+      { "zone": "legs_back", "pool": "click.legsBackArea" },
+      { "zone": "legs_look_down", "pool": "click.legsLookDownArea" }
+    ],
+    "doubleClick": [
+      { "when": "default", "pool": "doubleClick.random" }
     ]
   },
   "skinCommands": {

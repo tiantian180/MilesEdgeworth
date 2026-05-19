@@ -33,7 +33,7 @@ def main() -> int:
     for token in [
         "struct HitZoneMatchContext",
         "class HitZoneMatcher",
-        "static QString clickPoolForPoint",
+        "static QString hitZoneIdForPoint",
         "static QRectF rectForHitZone",
         "static QList<QPointF> polygonForHitZone",
         "static bool hitZoneContainsPoint",
@@ -41,11 +41,10 @@ def main() -> int:
         require(token in matcher_h, f"HitZoneMatcher.h 缺少接口：{token}")
 
     for token in [
-        "hitZoneIdForClickPool",
         "pointInPolygon",
         "context.canvasWidth",
         "context.canvasHeight",
-        "manifest.singleClickPools",
+        "candidateZoneIds",
         "manifest.hitZones",
     ]:
         require(token in matcher_cpp, f"HitZoneMatcher.cpp 缺少实现标记：{token}")
@@ -54,15 +53,16 @@ def main() -> int:
         "QRectF rectForHitZone",
         "QList<QPointF> polygonForHitZone",
         "bool hitZoneContainsPoint",
-        "QString clickPoolForPoint",
+        "QString hitZoneIdForPoint",
     ]:
         require(removed_token not in pet_runtime_h, f"PetRuntime.h 不应继续声明：{removed_token}")
 
     for token in [
         '#include "pet/interaction/HitZoneMatcher.h"',
         "HitZoneMatchContext hitZoneContext",
-        "HitZoneMatcher::clickPoolForPoint",
-        "ActionRequest::actionPool(poolId)",
+        "HitZoneMatcher::hitZoneIdForPoint",
+        "manifest.clickBehaviors.singleClick",
+        "appendIfPlayable(requests, entry.request)",
     ]:
         require(token in pipeline_cpp, f"InteractionPipeline.cpp 缺少接入标记：{token}")
 

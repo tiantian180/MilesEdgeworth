@@ -39,7 +39,7 @@ def main() -> int:
         "click.legsBackArea",
         "click.legsLookDownArea",
     ]
-    require(click_order == expected, "singleClick 应按旧版优先级包含确定性肚子/腿部子区域")
+    require([entry.get("pool") for entry in click_order] == expected, "singleClick 应按旧版优先级包含确定性肚子/腿部子区域")
 
     for zone_id in ["belly_bow", "belly_pointing", "legs_back", "legs_look_down"]:
         require(zone_id in manifest.get("hitZones", {}), f"hitZones 缺少 {zone_id}")
@@ -50,14 +50,14 @@ def main() -> int:
     require(action_pool_recipes(manifest, "click.legsLookDownArea") == ["click.legsLookDown"], "点击另一侧腿部应确定触发低头看")
 
     matcher_cpp = read("apps/desktop/src/pet/interaction/HitZoneMatcher.cpp")
+    require("hitZoneIdForClickPool" not in matcher_cpp, "HitZoneMatcher 不应继续写死 click pool 到 zone 的映射")
     for pool_id, zone_id in [
         ("click.bellyBow", "belly_bow"),
         ("click.bellyPointingArea", "belly_pointing"),
         ("click.legsBackArea", "legs_back"),
         ("click.legsLookDownArea", "legs_look_down"),
     ]:
-        require(f'poolId == "{pool_id}"' in matcher_cpp, f"HitZoneMatcher.cpp 缺少 {pool_id} 映射")
-        require(f'return "{zone_id}"' in matcher_cpp, f"HitZoneMatcher.cpp 缺少 {zone_id} 映射")
+        require({"pool": pool_id, "zone": zone_id} in click_order, f"manifest 缺少 {zone_id} -> {pool_id} 配对")
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

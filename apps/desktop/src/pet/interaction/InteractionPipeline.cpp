@@ -16,6 +16,19 @@ void appendIfPlayable(QList<ActionRequest> &requests, const ActionRequest &reque
         requests.append(request);
     }
 }
+
+QStringList singleClickZoneIds(const QList<ClickBehaviorEntry> &entries)
+{
+    // 命中检测只需要 zone 顺序。pool / recipe / action 的选择留在
+    // InteractionPipeline 里完成，避免 HitZoneMatcher 知道皮肤命名。
+    QStringList zoneIds;
+    for (const ClickBehaviorEntry &entry : entries) {
+        if (!entry.zoneId.isEmpty()) {
+            zoneIds.append(entry.zoneId);
+        }
+    }
+    return zoneIds;
+}
 } // namespace
 
 QList<ActionRequest> InteractionPipeline::handleEvent(
@@ -48,16 +61,22 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
             snapshot.currentFacing,
             manifest.defaultFacing,
         };
-        const QString poolId = HitZoneMatcher::clickPoolForPoint(
+        const QString zoneId = HitZoneMatcher::hitZoneIdForPoint(
             manifest,
             hitZoneContext,
+            singleClickZoneIds(manifest.clickBehaviors.singleClick),
             event.x,
             event.y,
             event.width,
             event.height
         );
-        if (!poolId.isEmpty()) {
-            requests.append(ActionRequest::actionPool(poolId));
+        // 同一个 zone 可以在不同皮肤里绑定到不同请求；这里按 manifest
+        // 声明顺序选择第一条命中的行为，保持旧版分区优先级。
+        for (const ClickBehaviorEntry &entry : manifest.clickBehaviors.singleClick) {
+            if (entry.zoneId == zoneId) {
+                appendIfPlayable(requests, entry.request);
+                break;
+            }
         }
         return requests;
     }
@@ -70,7 +89,14 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
             requests.append(ActionRequest::returnToIdle());
             return requests;
         }
-        requests.append(ActionRequest::actionPool("doubleClick.random"));
+        // 默认双击行为也从 manifest 读取。后续 Custom Interaction 接入后，
+        // 可以在同一个列表里先声明高级交互，再声明普通 action pool 兜底。
+        for (const ClickBehaviorEntry &entry : manifest.clickBehaviors.doubleClick) {
+            if (entry.when.isEmpty() || entry.when == "default") {
+                appendIfPlayable(requests, entry.request);
+                break;
+            }
+        }
         return requests;
 
     case PetEventType::MenuCommand:
