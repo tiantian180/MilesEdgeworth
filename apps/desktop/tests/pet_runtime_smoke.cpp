@@ -161,6 +161,23 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "idle_stand", "wake 播完后应回到 idle_stand");
     require(runtime.teaEnabled(), "醒来后应重新允许喝茶");
 
+    runtime.setVoiceLanguage("jp");
+    runtime.playRecipe("doubleClick.holdIt");
+    require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");
+    require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit0.wav", "Hold it 应播放默认语音");
+
+    runtime.playRecipe("doubleClick.takeThat");
+    require(runtime.currentActionId() == "objecting", "Take that 应播放异议动作");
+    require(runtime.currentSoundUrl().toString() == "qrc:/audio/takethat0.wav", "Take that 应播放默认语音");
+
+    runtime.playRecipe("doubleClick.objection");
+    require(runtime.currentActionId() == "objecting", "Objection 应播放异议动作");
+    require(runtime.currentSoundUrl().toString() == "qrc:/audio/objection0.wav", "Objection 应播放默认语音");
+
+    runtime.playRecipe("doubleClick.eureka");
+    require(runtime.currentActionId() == "objecting", "Eureka 应播放异议动作");
+    require(runtime.currentSoundUrl().toString() == "qrc:/audio/eureka0.wav", "Eureka 应播放默认语音");
+
     runtime.setVoiceLanguage("zh");
     runtime.playRecipe("doubleClick.objection");
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/objection2.wav", "中文语音应选择 objection2.wav");

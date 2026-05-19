@@ -238,5 +238,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_32_single_click_zone_smoke.py
         )
+
+        # Phase 0.33 的双击 recipe smoke 检查：确保四个旧版
+        # 双击语音动作都能由 PetRuntime 播放动作和默认音效。
+        add_test(
+            NAME check_phase_0_33_double_click_recipe_smoke
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_33_double_click_recipe_smoke.py
+        )
     endif()
 endif()
