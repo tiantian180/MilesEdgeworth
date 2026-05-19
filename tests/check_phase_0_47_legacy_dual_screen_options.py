@@ -65,16 +65,16 @@ def main() -> int:
     ]:
         require(token in shell_cpp, f"DesktopShellController.cpp 缺少双屏实现：{token}")
 
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     for token in [
-        'title: "双屏选项"',
-        'App.DesktopShell.setScreenLayoutMode("single")',
-        'App.DesktopShell.setScreenLayoutMode("primaryLeft")',
-        'App.DesktopShell.setScreenLayoutMode("primaryRight")',
-        'checked: App.DesktopShell.screenLayoutMode === "single"',
-        'enabled: App.DesktopShell.screenCount > 1',
+        'menu.addMenu(QStringLiteral("双屏选项"))',
+        'shellController->setScreenLayoutMode(QStringLiteral("single"))',
+        'shellController->setScreenLayoutMode(QStringLiteral("primaryLeft"))',
+        'shellController->setScreenLayoutMode(QStringLiteral("primaryRight"))',
+        'shellController->screenLayoutMode() == "single"',
+        'shellController->screenCount() > 1',
     ]:
-        require(token in qml, f"PetWindow.qml 缺少双屏菜单入口：{token}")
+        require(token in menu_cpp, f"PetContextMenu.cpp 缺少双屏菜单入口：{token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_47_legacy_dual_screen_options" in root_cmake, "CTest 未注册 Phase 0.47 检查")

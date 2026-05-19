@@ -37,13 +37,13 @@ def main() -> int:
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少启动交互保护实现：{token}")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        "if (!App.PetRuntime.pointerInteractionEnabled)",
-        "contextMenu.open()",
-        "App.DesktopShell.movePetWindowBy(mouse.x - pressX, mouse.y - pressY)",
+        "if (!m_runtime->pointerInteractionEnabled())",
+        "showContextMenuAt",
+        "m_shellController->movePetWindowBy(delta.x(), delta.y())",
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少启动交互保护入口：{token}")
+        require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少启动交互保护入口：{token}")
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

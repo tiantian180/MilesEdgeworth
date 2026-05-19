@@ -81,13 +81,14 @@ def main() -> int:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
     require("#include <QRandomGenerator>" in event_bridge_cpp, "随机 idle 的随机数应由事件桥生成")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     for token in [
-        "App.PetEventBridge.submitIdleLoopFinished()",
-        "App.PetEventBridge.enabledSkinCommands",
-        "App.PetEventBridge.submitMenuCommand(modelData.id)",
+        "m_eventBridge->submitIdleLoopFinished()",
+        "eventBridge->enabledSkinCommands()",
+        "eventBridge->submitMenuCommand(commandId)",
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp + menu_cpp, f"原生表面 / 菜单缺少 {token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_8_recipe_runtime" in root_cmake, "CTest 未注册 Phase 0.8 检查")

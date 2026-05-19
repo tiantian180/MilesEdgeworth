@@ -39,7 +39,8 @@ def main() -> int:
         for path in (ROOT / "apps/desktop/src").rglob("*")
         if path.suffix in {".cpp", ".h", ".mm"}
     )
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     manifest = read("apps/desktop/resources/skins/miles-edgeworth/manifest.json")
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
@@ -52,7 +53,7 @@ def main() -> int:
         "prosecutorBadgeImage",
     ]:
         require(forbidden not in cpp_sources, f"通用 C++ 框架层不应硬编码 Miles 定制内容：{forbidden}")
-        require(forbidden not in qml, f"通用 QML 壳层不应硬编码 Miles 定制内容：{forbidden}")
+        require(forbidden not in menu_cpp + surface_cpp, f"通用表现层不应硬编码 Miles 定制内容：{forbidden}")
 
     require('"skinCommands"' in manifest, "Miles manifest 应声明 skinCommands")
     require('"miles.feedTea"' in manifest, "Miles 红茶命令应只存在于皮肤 manifest")

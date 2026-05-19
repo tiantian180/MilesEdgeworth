@@ -79,15 +79,15 @@ def main() -> None:
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
 
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        "App.PetRuntime.handleDragStarted",
-        "App.PetRuntime.handleDragMoved",
-        "App.PetRuntime.handleDragEnded",
-        "App.PetRuntime.handleHoldAnimationReachedEnd",
-        "App.PetRuntime.currentLoopMode === \"hold\"",
+        "m_runtime->handleDragStarted",
+        "m_runtime->handleDragMoved",
+        "m_runtime->handleDragEnded",
+        "m_runtime->handleHoldAnimationReachedEnd",
+        'm_runtime->currentLoopMode() == QStringLiteral("hold")',
     ]:
-        require(token in qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少 {token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_13_drag_shake_runtime" in root_cmake, "CTest 未注册 Phase 0.13 检查")

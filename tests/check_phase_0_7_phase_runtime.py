@@ -71,13 +71,14 @@ def main() -> int:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
     require('ActionRequest::recipe("sleep.enterLoopExit")' in pipeline_cpp, "睡觉事件应由 InteractionPipeline 转成 sleep recipe 请求")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     for token in [
-        'App.PetEventBridge.submitMenuCommand("runtime.sleep.toggle")',
-        'App.PetRuntime.currentLoopMode === "once"',
-        "App.PetRuntime.handleAnimationFinished()",
+        'eventBridge->submitMenuCommand(QStringLiteral("runtime.sleep.toggle"))',
+        'm_runtime->currentLoopMode() == QStringLiteral("once")',
+        "m_runtime->handleAnimationFinished()",
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp + menu_cpp, f"原生表面 / 菜单缺少 {token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_7_phase_runtime" in root_cmake, "CTest 未注册 Phase 0.7 检查")

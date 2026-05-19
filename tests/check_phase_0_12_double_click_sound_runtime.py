@@ -83,17 +83,17 @@ def main() -> int:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
     require('ActionRequest::actionPool("doubleClick.random")' in pipeline_cpp, "双击事件应由 InteractionPipeline 转成 doubleClick.random 请求")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")
     for token in [
-        "import QtMultimedia",
-        "SoundEffect",
-        "voiceEffect",
-        "App.PetRuntime.currentSoundUrl",
-        "App.PetRuntime.soundPlaybackSerial",
-        "singleClickTimer",
-        "App.PetEventBridge.submitDoubleClick()",
+        "QSoundEffect",
+        "m_soundEffect",
+        "m_runtime->currentSoundUrl()",
+        "PetRuntime::soundPlaybackSerialChanged",
+        "m_singleClickTimer",
+        "m_eventBridge->submitDoubleClick()",
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp + surface_h, f"PetSurfaceWindow 缺少 {token}")
 
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     require("Multimedia" in desktop_cmake, "CMake 应接入 Qt Multimedia")

@@ -31,12 +31,12 @@ def main() -> int:
     ]:
         require(token in old_cpp, f"旧版手型光标缺少参考 token：{token}")
 
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        "cursorShape: Qt.PointingHandCursor",
-        "id: dragArea",
+        "setCursor(Qt::PointingHandCursor)",
+        "mousePressEvent",
     ]:
-        require(token in qml, f"PetWindow.qml 缺少手型光标入口：{token}")
+        require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少手型光标入口：{token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_48_legacy_hand_cursor" in root_cmake, "CTest 未注册 Phase 0.48 检查")

@@ -29,7 +29,7 @@ def main() -> int:
     controller_cpp = read("apps/desktop/src/window/WindowInputMaskController.cpp")
     shell_h = read("apps/desktop/src/DesktopShellController.h")
     shell_cpp = read("apps/desktop/src/DesktopShellController.cpp")
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     cmake = read("apps/desktop/CMakeLists.txt")
 
     for token in [
@@ -41,10 +41,11 @@ def main() -> int:
     ]:
         require(token in controller_h + controller_cpp, f"WindowInputMaskController 缺少 {token}")
 
-    require("setMask" in controller_cpp, "输入 mask 应通过 QWindow::setMask 应用")
+    require("setMask" in controller_cpp + surface_cpp, "输入 mask 应通过 Qt window/widget mask 应用")
     require("setPetInputMask" in shell_h + shell_cpp, "DesktopShellController 应暴露 setPetInputMask")
     require("clearPetInputMask" in shell_h + shell_cpp, "DesktopShellController 应暴露 clearPetInputMask")
-    require("setPetInputMask" in qml, "QML 应在动画或尺寸变化时更新输入 mask")
+    require("applyCurrentFrameMask" in surface_cpp, "原生表面应在动画或尺寸变化时更新输入 mask")
+    require("regionFromCurrentFrame" in surface_cpp, "原生表面应从当前 GIF 帧生成输入 mask")
     require("WindowInputMaskController" in cmake, "CMake 应链接 WindowInputMaskController")
 
     return 0

@@ -57,23 +57,24 @@ def main() -> int:
     ]:
         require(token in runtime_cpp, f"PetRuntime.cpp 缺少旧版尺寸逻辑：{token}")
 
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        "title: \"调整大小\"",
-        'text: "迷你"',
-        'text: "小"',
-        'text: "中"',
-        'text: "大"',
-        "App.PetRuntime.setPetSize(\"mini\")",
-        "App.PetRuntime.setPetSize(\"small\")",
-        "App.PetRuntime.setPetSize(\"medium\")",
-        "App.PetRuntime.setPetSize(\"big\")",
-        "width: App.PetRuntime.petWindowSize",
-        "height: App.PetRuntime.petWindowSize",
-        "width: App.PetRuntime.petImageSize",
-        "height: App.PetRuntime.petImageSize",
+        'menu.addMenu(QStringLiteral("调整大小"))',
+        'QStringLiteral("迷你")',
+        'QStringLiteral("小")',
+        'QStringLiteral("中")',
+        'QStringLiteral("大")',
+        'runtime->setPetSize(QStringLiteral("mini"))',
+        'runtime->setPetSize(QStringLiteral("small"))',
+        'runtime->setPetSize(QStringLiteral("medium"))',
+        'runtime->setPetSize(QStringLiteral("big"))',
+        "m_runtime->petWindowSize()",
+        "setFixedSize(windowSize, windowSize)",
+        "m_runtime->petImageSize()",
+        "m_petLabel->setGeometry(",
     ]:
-        require(token in qml, f"PetWindow.qml 缺少尺寸菜单或绑定：{token}")
+        require(token in menu_cpp + surface_cpp, f"原生菜单 / 表面缺少尺寸菜单或绑定：{token}")
 
     smoke = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

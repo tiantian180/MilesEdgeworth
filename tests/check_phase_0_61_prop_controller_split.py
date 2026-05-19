@@ -30,7 +30,7 @@ def main() -> int:
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     prop_controller_h = read("apps/desktop/src/pet/effects/PropController.h")
     prop_controller_cpp = read("apps/desktop/src/pet/effects/PropController.cpp")
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     cmake = read("apps/desktop/CMakeLists.txt")
 
     for forbidden in [
@@ -57,7 +57,7 @@ def main() -> int:
         require(token in prop_controller_h + prop_controller_cpp, f"PropController 缺少能力：{token}")
 
     require("PropController m_propController" in runtime_h, "PetRuntime 应组合 PropController")
-    require("PropOverlay" in qml or "currentProp" in qml, "QML 应通过通用 Prop 表示显示附件")
+    require("PropSurfaceWindow" in surface_cpp and "currentProp" in surface_cpp, "原生表面应通过通用 Prop 表示显示附件")
     require("PropController" in cmake, "CMake 应链接 PropController")
 
     return 0

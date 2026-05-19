@@ -105,16 +105,19 @@ def main() -> int:
     require('ActionRequest::recipe("sleep.enterLoopExit")' in pipeline_cpp, "睡眠菜单事件应转成 sleep recipe 请求")
     require("SkinCommandResolver::resolveCommand" in pipeline_cpp, "皮肤菜单命令应由 SkinCommandResolver 转成 ActionRequest")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     for token in [
-        "App.PetEventBridge.enabledSkinCommands",
-        "skinCommandMenu.insertItem",
-        "App.PetEventBridge.submitMenuCommand(modelData.id)",
-        'App.PetRuntime.sleeping ? "唤醒" : "睡觉"',
+        "eventBridge->enabledSkinCommands()",
+        'menu.addMenu(QStringLiteral("皮肤动作"))',
+        "eventBridge->submitMenuCommand(commandId)",
+        'runtime->sleeping() ? QStringLiteral("唤醒") : QStringLiteral("睡觉")',
         "enabled: !App.PetRuntime.sleepTransitioning",
-        'App.PetEventBridge.submitMenuCommand("runtime.sleep.toggle")',
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
+        if token.startswith("enabled:"):
+            require("sleepAction->setEnabled(!runtime->sleepTransitioning())" in menu_cpp, "PetContextMenu.cpp 缺少睡眠过渡禁用逻辑")
+        else:
+            require(token in menu_cpp, f"PetContextMenu.cpp 缺少 {token}")
+    require('eventBridge->submitMenuCommand(QStringLiteral("runtime.sleep.toggle"))' in menu_cpp, "睡眠菜单应通过事件桥提交 runtime.sleep.toggle")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_16_menu_tea_sleep_wake" in root_cmake, "CTest 未注册 Phase 0.16 检查")

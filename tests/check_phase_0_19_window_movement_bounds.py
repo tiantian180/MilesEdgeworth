@@ -44,15 +44,14 @@ def main() -> int:
     ]:
         require(token in shell_cpp, f"DesktopShellController.cpp 缺少 {token}")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        "App.DesktopShell.movePetWindowBy(movementDelta.dx, movementDelta.dy)",
-        "App.DesktopShell.movePetWindowBy(mouse.x - pressX, mouse.y - pressY)",
+        "m_shellController->movePetWindowBy(dx, dy)",
+        "m_shellController->movePetWindowBy(delta.x(), delta.y())",
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少 {token}")
 
-    require("petWindow.x += movementDelta.dx" not in pet_window_qml, "自动移动不应直接修改 petWindow.x")
-    require("petWindow.y += movementDelta.dy" not in pet_window_qml, "自动移动不应直接修改 petWindow.y")
+    require("move(" not in surface_cpp, "自动移动不应绕过 DesktopShellController 直接移动窗口")
 
     runtime_smoke = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     require("walk.east 应推动窗口向右移动" in runtime_smoke, "运行时 smoke 应继续覆盖 walk.east 移动增量")

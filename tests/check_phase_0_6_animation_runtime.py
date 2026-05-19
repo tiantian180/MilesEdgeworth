@@ -29,7 +29,8 @@ def main() -> int:
     qrc = read("apps/desktop/resources/pet_assets.qrc")
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")
     root_cmake = read("CMakeLists.txt")
 
     inventory_path = ROOT / "docs/v2/参考资料/动画素材盘点.md"
@@ -88,12 +89,12 @@ def main() -> int:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
 
     for token in [
-        'App.PetEventBridge.submitMenuCommand("runtime.facing.toggle")',
-        "onCurrentFrameChanged",
-        "App.PetRuntime.handleAnimationFinished()",
-        "onPlaybackSerialChanged",
+        "handleMovieFrameChanged",
+        "m_runtime->handleAnimationFinished()",
+        "m_runtime->playbackSerial()",
+        "restartMovieFromRuntime",
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp + surface_h, f"PetSurfaceWindow 缺少 {token}")
 
     require("check_phase_0_6_animation_runtime" in root_cmake, "CTest 未注册 Phase 0.6 检查")
 

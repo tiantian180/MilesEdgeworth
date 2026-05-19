@@ -2,7 +2,7 @@
 """检查 Phase 0.5 的 Pet Runtime 最小纵切是否接线完整。
 
 这里做的是轻量静态检查，不替代真实 UI 验证。它的目的主要是防止后续重构时
-不小心退回到 QML 写死 GIF、或者退回到 context property 注入对象的旧写法。
+不小心退回到表现层写死 GIF、或者退回到 context property 注入对象的旧写法。
 """
 
 from __future__ import annotations
@@ -24,7 +24,8 @@ def require(condition: bool, message: str) -> None:
 
 def main() -> int:
     main_cpp = read("apps/desktop/src/main.cpp")
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     qrc = read("apps/desktop/resources/pet_assets.qrc")
 
@@ -39,12 +40,12 @@ def main() -> int:
         "PetRuntime singleton 没有绑定现有 C++ 实例",
     )
 
-    require("desktopShell." not in pet_window_qml, "PetWindow.qml 应使用 DesktopShell singleton")
-    require("App.DesktopShell.alwaysOnTop" in pet_window_qml, "菜单应读取 DesktopShell.alwaysOnTop")
-    require("App.DesktopShell.toggleAlwaysOnTop()" in pet_window_qml, "菜单应调用 DesktopShell.toggleAlwaysOnTop()")
-    require("App.PetRuntime.currentAnimationUrl" in pet_window_qml, "动画源应绑定 PetRuntime.currentAnimationUrl")
-    require('App.PetEventBridge.submitMenuCommand("runtime.returnToIdle")' in pet_window_qml, "菜单应提供回到待机入口")
-    require('source: "qrc:/pet/stand-right.gif"' not in pet_window_qml, "QML 不应直接写死待机 GIF")
+    require("PetSurfaceWindow petSurfaceWindow" in main_cpp, "main.cpp 应使用原生桌宠表面")
+    require("PetEventBridge petEventBridge" in main_cpp, "main.cpp 应创建 PetEventBridge")
+    require("shellController->alwaysOnTop()" in menu_cpp, "菜单应读取 DesktopShellController.alwaysOnTop")
+    require("DesktopShellController::toggleAlwaysOnTop" in menu_cpp, "菜单应调用 DesktopShellController.toggleAlwaysOnTop")
+    require("m_runtime->currentAnimationUrl()" in surface_cpp, "动画源应绑定 PetRuntime.currentAnimationUrl")
+    require('"qrc:/pet/stand-right.gif"' not in surface_cpp + menu_cpp, "表现层不应直接写死待机 GIF")
 
     require("src/pet/PetRuntime.cpp" in desktop_cmake, "PetRuntime.cpp 应加入桌面目标")
     require("src/pet/PetRuntime.h" in desktop_cmake, "PetRuntime.h 应加入 QML module sources")

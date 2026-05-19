@@ -90,18 +90,19 @@ def main() -> None:
     ]:
         require(token in pipeline_cpp, f"InteractionPipeline.cpp 缺少 Prop 事件处理：{token}")
 
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    prop_surface_h = read("apps/desktop/src/pet/surface/PropSurfaceWindow.h")
     for token in [
-        "id: propWindow",
-        "App.PetRuntime.currentPropVisible",
-        "App.PetRuntime.currentPropImageUrl",
-        "onCurrentPropPlaybackSerialChanged",
-        "propFlyAnimation",
-        "propExpireTimer",
-        "App.PetEventBridge.submitPropClicked()",
-        "App.PetEventBridge.submitPropExpired()",
+        "m_propWindow",
+        "m_runtime->currentPropVisible()",
+        "m_runtime->currentPropImageUrl()",
+        "PetRuntime::currentPropPlaybackSerialChanged",
+        "QPropertyAnimation",
+        "m_propExpireTimer",
+        "m_eventBridge->submitPropClicked()",
+        "m_eventBridge->submitPropExpired()",
     ]:
-        require(token in qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp + prop_surface_h, f"Prop 原生表面缺少 {token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_14_prosecutor_badge_runtime" in root_cmake, "CTest 未注册 Phase 0.14 检查")

@@ -26,13 +26,13 @@ def main() -> int:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     resolver_cpp = read("apps/desktop/src/pet/commands/SkinCommandResolver.cpp")
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
 
-    require("testTea" not in runtime_h + runtime_cpp + smoke_test + pet_window_qml, "测试喝茶入口应移除")
-    require("requestTea" not in runtime_h + runtime_cpp + smoke_test + pet_window_qml, "喝茶不应继续暴露 requestTea")
+    require("testTea" not in runtime_h + runtime_cpp + smoke_test + menu_cpp, "测试喝茶入口应移除")
+    require("requestTea" not in runtime_h + runtime_cpp + smoke_test + menu_cpp, "喝茶不应继续暴露 requestTea")
     require("tea.drinkThenBow" not in runtime_cpp, "测试喝茶入口不应引用已废弃的 tea.drinkThenBow")
-    require("submitMenuCommand" in bridge_h + smoke_test + pet_window_qml, "喝茶应通过事件桥提交菜单命令")
-    require("miles.feedTea" not in runtime_h + runtime_cpp + bridge_h + pet_window_qml, "Miles 红茶命令不应写死在通用 Runtime/QML")
+    require("submitMenuCommand" in bridge_h + smoke_test + menu_cpp, "喝茶应通过事件桥提交菜单命令")
+    require("miles.feedTea" not in runtime_h + runtime_cpp + bridge_h + menu_cpp, "Miles 红茶命令不应写死在通用 Runtime/菜单层")
 
     skin_command = manifest.get("skinCommands", {}).get("miles.feedTea", {})
     require(skin_command.get("request", {}).get("pool") == "menu.tea", "Miles 红茶命令应在 manifest 中复用 menu.tea 候选池")

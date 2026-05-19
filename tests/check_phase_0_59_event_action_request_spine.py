@@ -50,7 +50,8 @@ def main() -> int:
     skin_command_resolver_cpp = read("apps/desktop/src/pet/commands/SkinCommandResolver.cpp")
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     main_cpp = read("apps/desktop/src/main.cpp")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     root_cmake = read("CMakeLists.txt")
@@ -163,19 +164,17 @@ def main() -> int:
         "App.PetRuntime.returnToIdle()",
         "App.PetRuntime.toggleFacing()",
     ]:
-        require(forbidden not in qml, f"QML 不应继续直连 Runtime 行为入口：{forbidden}")
+        require(forbidden not in surface_cpp + menu_cpp, f"表现层不应继续直连 Runtime 行为入口：{forbidden}")
 
     for token in [
-        "App.PetEventBridge.submitPrimaryClick",
-        "App.PetEventBridge.submitDoubleClick",
-        "App.PetEventBridge.submitMenuCommand",
-        "App.PetEventBridge.submitIdleLoopFinished",
-        "App.PetEventBridge.submitPropClicked",
-        "App.PetEventBridge.submitPropExpired",
-        'App.PetEventBridge.submitMenuCommand("runtime.returnToIdle")',
-        'App.PetEventBridge.submitMenuCommand("runtime.facing.toggle")',
+        "m_eventBridge->submitPrimaryClick",
+        "m_eventBridge->submitDoubleClick",
+        "eventBridge->submitMenuCommand",
+        "m_eventBridge->submitIdleLoopFinished",
+        "m_eventBridge->submitPropClicked",
+        "m_eventBridge->submitPropExpired",
     ]:
-        require(token in qml, f"QML 应通过 PetEventBridge 发事件：{token}")
+        require(token in surface_cpp + menu_cpp, f"表现层应通过 PetEventBridge 发事件：{token}")
 
     for forbidden in [
         "Q_INVOKABLE void handlePrimaryClick",

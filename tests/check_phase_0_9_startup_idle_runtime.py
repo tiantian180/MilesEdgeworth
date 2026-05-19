@@ -116,12 +116,12 @@ def main() -> int:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
     require("action.facingAfter.insert" in loader_cpp, "SkinManifestLoader 应解析 facingAfter")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        'App.PetEventBridge.submitMenuCommand("runtime.facing.toggle")',
-        "App.PetRuntime.currentRecipeId === \"\"",
+        "m_eventBridge->submitIdleLoopFinished()",
+        "m_runtime->currentRecipeId().isEmpty()",
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少 {token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_9_startup_idle_runtime" in root_cmake, "CTest 未注册 Phase 0.9 检查")

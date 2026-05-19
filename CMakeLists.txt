@@ -478,5 +478,17 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_64_surface_menu_regressions.py
         )
+
+        # Phase 0.65 的架构门禁：把当前已知的 Miles 专属硬编码点
+        # 转成可执行断言。此阶段它们是有意存在的技术债，所以先用
+        # WILL_FAIL 保持总测试绿色；后续每完成一个去定制化 Phase，
+        # 就把对应断言翻成普通通过项。
+        add_test(
+            NAME check_phase_0_65_architecture_guardrails
+            COMMAND ${CMAKE_COMMAND}
+                    -DPROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+                    -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_65_architecture_guardrails.cmake
+        )
+        set_tests_properties(check_phase_0_65_architecture_guardrails PROPERTIES WILL_FAIL TRUE)
     endif()
 endif()

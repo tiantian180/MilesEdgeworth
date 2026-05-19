@@ -63,12 +63,12 @@ def main() -> int:
     ]:
         require(token in loader_cpp, f"SkinManifestLoader.cpp 缺少 Prop 缩放解析：{token}")
 
-    qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        "App.PetRuntime.currentPropVisualWidth",
-        "App.PetRuntime.currentPropVisualHeight",
+        "m_runtime->currentPropVisualWidth()",
+        "m_runtime->currentPropVisualHeight()",
     ]:
-        require(token in qml, f"PetWindow.qml 缺少 Prop 视觉尺寸绑定：{token}")
+        require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少 Prop 视觉尺寸绑定：{token}")
 
     smoke = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

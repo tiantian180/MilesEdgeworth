@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""检查静音开关会立即影响 QML 语音音量。"""
+"""检查静音开关会立即影响原生表面的语音音量。"""
 
 from __future__ import annotations
 
@@ -32,19 +32,20 @@ def main() -> int:
     ]:
         require(token in old_cpp, f"旧版静音逻辑缺少参考 token：{token}")
 
-    qml = read("apps/desktop/qml/PetWindow.qml")
-    require("SoundEffect {" in qml, "PetWindow.qml 应使用 SoundEffect 播放语音")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
+    require("QSoundEffect" in surface_cpp, "PetSurfaceWindow 应使用 QSoundEffect 播放语音")
     require(
-        "volume: App.PetRuntime.audioMuted ? 0 : 0.8" in qml,
-        "SoundEffect.volume 应绑定 audioMuted，而不是固定 0.8",
+        "m_soundEffect->setVolume(m_runtime->audioMuted() ? 0.0f : 0.8f)" in surface_cpp,
+        "QSoundEffect volume 应绑定 audioMuted，而不是固定 0.8",
     )
     require(
-        "volume: 0.8" not in qml,
+        "m_soundEffect->setVolume(0.8f)" not in surface_cpp,
         "静音后不能保留固定音量，否则正在播放的语音不会立即静音",
     )
     require(
-        "checked: App.PetRuntime.audioMuted" in qml
-        and "onTriggered: App.PetRuntime.toggleAudioMuted()" in qml,
+        "muteAction->setChecked(runtime->audioMuted())" in menu_cpp
+        and "PetRuntime::toggleAudioMuted" in menu_cpp,
         "静音菜单项应继续驱动 PetRuntime.audioMuted",
     )
 

@@ -106,19 +106,21 @@ def main() -> int:
     ]:
         require(token in bridge_h, f"PetEventBridge.h 缺少核心事件入口 {token}")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     for token in [
         "submitIdleLoopFinished",
-        "SoundEffect",
-        "propWindow",
-        "singleClickTimer",
+        "QSoundEffect",
+        "m_propWindow",
+        "m_singleClickTimer",
         "submitDoubleClick()",
         "handleDragMoved",
         "enabledSkinCommands",
-        "submitMenuCommand(modelData.id)",
-        'submitMenuCommand("runtime.sleep.toggle")',
+        "submitMenuCommand(commandId)",
+        'submitMenuCommand(QStringLiteral("runtime.sleep.toggle"))',
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少核心表现入口 {token}")
+        require(token in surface_cpp + surface_h + menu_cpp, f"原生表现层缺少核心入口 {token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_17_core_handfeel_coverage" in root_cmake, "CTest 未注册 Phase 0.17 检查")

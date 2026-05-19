@@ -19,7 +19,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     bridge_h = read("apps/desktop/src/pet/events/PetEventBridge.h")
@@ -33,17 +33,17 @@ def main() -> int:
     phase_record = read("docs/v2/阶段记录/第0阶段桌面壳验证.md")
     root_cmake = read("CMakeLists.txt")
 
-    require("测试" not in pet_window_qml, "右键菜单不应再暴露开发测试入口")
-    require("testThinking" not in runtime_h + runtime_cpp + pet_window_qml, "testThinking 应从公开入口移除")
-    require("testSpeaking" not in runtime_h + runtime_cpp + pet_window_qml, "testSpeaking 应从公开入口移除")
-    require("testObjecting" not in runtime_h + runtime_cpp + pet_window_qml, "testObjecting 应从公开入口移除")
-    require("testTurn" not in runtime_h + runtime_cpp + pet_window_qml, "testTurn 应从公开入口移除")
-    require("testWalk" not in runtime_h + runtime_cpp + pet_window_qml, "testWalk 应从公开入口移除")
-    require("testRun" not in runtime_h + runtime_cpp + pet_window_qml, "testRun 应从公开入口移除")
-    require("testBow" not in runtime_h + runtime_cpp + pet_window_qml, "testBow 应从公开入口移除")
-    require("testTea" not in runtime_h + runtime_cpp + pet_window_qml + smoke_test, "testTea 应从公开入口和 smoke 测试移除")
-    require("testSleep" not in runtime_h + runtime_cpp + pet_window_qml, "testSleep 应从公开入口移除")
-    require("testProsecutorBadge" not in runtime_h + runtime_cpp + pet_window_qml, "testProsecutorBadge 应从公开入口移除")
+    require("测试" not in menu_cpp, "右键菜单不应再暴露开发测试入口")
+    require("testThinking" not in runtime_h + runtime_cpp + menu_cpp, "testThinking 应从公开入口移除")
+    require("testSpeaking" not in runtime_h + runtime_cpp + menu_cpp, "testSpeaking 应从公开入口移除")
+    require("testObjecting" not in runtime_h + runtime_cpp + menu_cpp, "testObjecting 应从公开入口移除")
+    require("testTurn" not in runtime_h + runtime_cpp + menu_cpp, "testTurn 应从公开入口移除")
+    require("testWalk" not in runtime_h + runtime_cpp + menu_cpp, "testWalk 应从公开入口移除")
+    require("testRun" not in runtime_h + runtime_cpp + menu_cpp, "testRun 应从公开入口移除")
+    require("testBow" not in runtime_h + runtime_cpp + menu_cpp, "testBow 应从公开入口移除")
+    require("testTea" not in runtime_h + runtime_cpp + menu_cpp + smoke_test, "testTea 应从公开入口和 smoke 测试移除")
+    require("testSleep" not in runtime_h + runtime_cpp + menu_cpp, "testSleep 应从公开入口移除")
+    require("testProsecutorBadge" not in runtime_h + runtime_cpp + menu_cpp, "testProsecutorBadge 应从公开入口移除")
 
     for removed_token in [
         "Q_PROPERTY(bool teaEnabled",
@@ -54,7 +54,7 @@ def main() -> int:
         "App.PetRuntime.teaEnabled",
         "App.PetRuntime.requestTea()",
     ]:
-        require(removed_token not in runtime_h + runtime_cpp + pet_window_qml, f"红茶不应继续使用通用 Runtime 入口：{removed_token}")
+        require(removed_token not in runtime_h + runtime_cpp + menu_cpp, f"红茶不应继续使用通用 Runtime 入口：{removed_token}")
 
     for token in [
         "Q_PROPERTY(QVariantList enabledSkinCommands READ enabledSkinCommands NOTIFY skinCommandAvailabilityChanged)",
@@ -80,16 +80,16 @@ def main() -> int:
         "command.request",
     ]:
         require(token in resolver_cpp, f"SkinCommandResolver.cpp 缺少 skin command 解析：{token}")
-    require("miles.feedTea" not in custom_cpp + bridge_cpp + pet_window_qml, "Miles 皮肤命令不应写死在通用 C++/QML")
+    require("miles.feedTea" not in custom_cpp + bridge_cpp + menu_cpp, "Miles 皮肤命令不应写死在通用 C++/菜单层")
 
     for token in [
-        "App.PetEventBridge.enabledSkinCommands",
-        "skinCommandMenu.insertItem",
-        "App.PetEventBridge.submitMenuCommand(modelData.id)",
-        'App.PetRuntime.sleeping ? "唤醒" : "睡觉"',
-        'App.PetEventBridge.submitMenuCommand("runtime.sleep.toggle")',
+        "eventBridge->enabledSkinCommands()",
+        'menu.addMenu(QStringLiteral("皮肤动作"))',
+        "eventBridge->submitMenuCommand(commandId)",
+        'runtime->sleeping() ? QStringLiteral("唤醒") : QStringLiteral("睡觉")',
+        'eventBridge->submitMenuCommand(QStringLiteral("runtime.sleep.toggle"))',
     ]:
-        require(token in pet_window_qml, f"QML 菜单缺少正式入口：{token}")
+        require(token in menu_cpp, f"原生菜单缺少正式入口：{token}")
 
     for token in [
         "bridge.submitMenuCommand(\"miles.feedTea\")",

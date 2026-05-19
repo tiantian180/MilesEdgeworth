@@ -103,12 +103,12 @@ def main() -> int:
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
 
-    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        "App.PetRuntime.consumeFrameMovementDelta()",
-        "App.DesktopShell.movePetWindowBy(movementDelta.dx, movementDelta.dy)",
+        "m_runtime->consumeFrameMovementDelta()",
+        "m_shellController->movePetWindowBy(dx, dy)",
     ]:
-        require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
+        require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少 {token}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_10_locomotion_runtime" in root_cmake, "CTest 未注册 Phase 0.10 检查")
