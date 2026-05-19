@@ -119,6 +119,9 @@ int main(int argc, char *argv[])
     require(runtime.currentRecipeId() == "doubleClick.holdIt", "非待机 recipe 播放中不应被站立循环入口打断");
     runtime.returnToIdle();
 
+    // 前面的随机 idle 可能抽到转身或移动动作；这里固定朝向，
+    // 让下面的转身检查只验证 turn.once 本身。
+    runtime.setFacing("right");
     runtime.playRecipe("turn.once");
     require(runtime.currentActionId() == "turn_around", "turn.once 应播放 turn_around");
     require(runtime.currentFacing() == "right", "默认朝向应为 right");
@@ -245,6 +248,13 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "tea" || runtime.currentActionId() == "tea_alt", "喝茶 recipe 应只播放茶杯 GIF 本体");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "喝茶 GIF 播完后应直接回到待机");
+
+    runtime.returnToIdle();
+    runtime.testTea();
+    require(runtime.currentRecipeId() == "tea.once" || runtime.currentRecipeId() == "teaAlt.once", "测试喝茶入口也应复用菜单喝茶候选池");
+    require(runtime.currentActionId() == "tea" || runtime.currentActionId() == "tea_alt", "测试喝茶入口应播放旧版茶杯 GIF");
+    runtime.handleAnimationFinished();
+    require(runtime.currentActionId() == "idle_stand", "测试喝茶 GIF 播完后应直接回到待机");
 
     runtime.toggleSleep();
     require(runtime.currentActionId() == "sleep", "toggleSleep 应进入 sleep action");

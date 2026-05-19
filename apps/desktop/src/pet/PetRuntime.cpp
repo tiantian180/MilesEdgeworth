@@ -696,7 +696,7 @@ void PetRuntime::testBow()
 
 void PetRuntime::testTea()
 {
-    playRecipe("tea.drinkThenBow");
+    requestTea();
 }
 
 void PetRuntime::testSleep()

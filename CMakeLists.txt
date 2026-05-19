@@ -294,5 +294,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_39_double_click_window.py
         )
+
+        # Phase 0.40 的测试喝茶入口检查：确保开发菜单入口
+        # 复用正式菜单喝茶逻辑，不再引用早期废弃 recipe。
+        add_test(
+            NAME check_phase_0_40_test_tea_entry
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_40_test_tea_entry.py
+        )
     endif()
 endif()
