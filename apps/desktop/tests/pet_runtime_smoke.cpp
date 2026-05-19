@@ -285,24 +285,18 @@ int main(int argc, char *argv[])
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "完整站起播完后应回到 idle_stand");
 
-    runtime.requestTea();
-    require(runtime.currentRecipeId() == "tea.once" || runtime.currentRecipeId() == "teaAlt.once", "requestTea 应从两组喝茶 recipe 中选择");
+    require(runtime.enabledSkinCommandIds().contains("miles.feedTea"), "待机状态应允许 Miles 红茶皮肤命令");
+    runtime.triggerSkinCommand("miles.feedTea");
+    require(runtime.currentRecipeId() == "tea.once" || runtime.currentRecipeId() == "teaAlt.once", "红茶皮肤命令应从两组喝茶 recipe 中选择");
     require(runtime.currentActionId() == "tea" || runtime.currentActionId() == "tea_alt", "喝茶 recipe 应只播放茶杯 GIF 本体");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "喝茶 GIF 播完后应直接回到待机");
-
-    runtime.returnToIdle();
-    runtime.testTea();
-    require(runtime.currentRecipeId() == "tea.once" || runtime.currentRecipeId() == "teaAlt.once", "测试喝茶入口也应复用菜单喝茶候选池");
-    require(runtime.currentActionId() == "tea" || runtime.currentActionId() == "tea_alt", "测试喝茶入口应播放旧版茶杯 GIF");
-    runtime.handleAnimationFinished();
-    require(runtime.currentActionId() == "idle_stand", "测试喝茶 GIF 播完后应直接回到待机");
 
     runtime.toggleSleep();
     require(runtime.currentActionId() == "sleep", "toggleSleep 应进入 sleep action");
     require(runtime.currentPhaseId() == "enter", "非睡眠状态 toggleSleep 应从 enter phase 开始");
     require(runtime.sleepTransitioning(), "sleep.enter 期间应视为睡眠过渡");
-    require(!runtime.teaEnabled(), "睡眠相关状态中应禁用喝茶");
+    require(!runtime.enabledSkinCommandIds().contains("miles.feedTea"), "睡眠相关状态中应禁用红茶皮肤命令");
 
     runtime.handleAnimationFinished();
     require(runtime.sleeping(), "sleep.enter 播完后应进入 sleeping loop");
@@ -314,7 +308,7 @@ int main(int argc, char *argv[])
     require(runtime.currentPhaseId() == "exit", "睡眠中双击应进入 wake/exit phase");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "wake 播完后应回到 idle_stand");
-    require(runtime.teaEnabled(), "醒来后应重新允许喝茶");
+    require(runtime.enabledSkinCommandIds().contains("miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
 
     runtime.toggleSleep();
     runtime.handleAnimationFinished();
@@ -323,7 +317,7 @@ int main(int argc, char *argv[])
     require(runtime.currentPhaseId() == "exit", "睡眠循环中 toggleSleep 应进入 wake/exit phase");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "wake 播完后应回到 idle_stand");
-    require(runtime.teaEnabled(), "醒来后应重新允许喝茶");
+    require(runtime.enabledSkinCommandIds().contains("miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
 
     runtime.setVoiceLanguage("jp");
     runtime.playRecipe("doubleClick.holdIt");

@@ -52,7 +52,7 @@ def main() -> int:
     for token in [
         "Q_PROPERTY(QString currentPhaseId",
         "QString currentPhaseId() const",
-        "Q_INVOKABLE void testSleep",
+        "Q_INVOKABLE void toggleSleep",
         "currentPhaseChanged",
         "PhaseDefinition",
         "playPhase",
@@ -66,13 +66,13 @@ def main() -> int:
         "m_currentPhaseId",
         "playPhase(",
         'playPhase(m_currentActionId, action.exitPhase)',
-        "testSleep",
+        'playRecipe("sleep.enterLoopExit")',
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "App.PetRuntime.testSleep()",
+        "App.PetRuntime.toggleSleep()",
         'App.PetRuntime.currentLoopMode === "once"',
         "App.PetRuntime.handleAnimationFinished()",
     ]:

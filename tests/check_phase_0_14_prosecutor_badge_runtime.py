@@ -68,7 +68,6 @@ def main() -> None:
         "currentPropPlaybackSerial",
         "handlePropClicked",
         "handlePropExpired",
-        "testProsecutorBadge",
         "spawnPropForRecipe",
         "PropDefinition",
     ]:
@@ -95,7 +94,6 @@ def main() -> None:
         "badgeExpireTimer",
         "App.PetRuntime.handlePropClicked()",
         "App.PetRuntime.handlePropExpired()",
-        "测试徽章",
     ]:
         require(token in qml, f"PetWindow.qml 缺少 {token}")
 

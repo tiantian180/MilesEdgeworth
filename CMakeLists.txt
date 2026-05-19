@@ -295,7 +295,7 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_39_double_click_window.py
         )
 
-        # Phase 0.40 的测试喝茶入口检查：确保开发菜单入口
+        # Phase 0.40 的喝茶入口检查：确保红茶从皮肤命令进入，
         # 复用正式菜单喝茶逻辑，不再引用早期废弃 recipe。
         add_test(
             NAME check_phase_0_40_test_tea_entry
@@ -421,6 +421,14 @@ if(BUILD_TESTING)
             NAME check_phase_0_57_hit_zone_matcher
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_57_hit_zone_matcher.py
+        )
+
+        # Phase 0.58 的菜单和定制交互边界检查：开发测试入口应移除，
+        # 红茶应通过皮肤定制命令进入，而不是暴露为通用 Runtime API。
+        add_test(
+            NAME check_phase_0_58_menu_custom_boundary
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_58_menu_custom_boundary.py
         )
     endif()
 endif()

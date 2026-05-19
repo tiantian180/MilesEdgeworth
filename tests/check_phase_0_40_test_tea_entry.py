@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""检查开发菜单的测试喝茶入口复用正式菜单喝茶逻辑。"""
+"""检查喝茶入口已经从开发测试入口收敛为皮肤命令。"""
 
 from __future__ import annotations
 
@@ -19,15 +19,20 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
+    runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
+    pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
 
-    require("void PetRuntime::testTea()" in runtime_cpp, "PetRuntime.cpp 应保留测试喝茶入口")
+    require("testTea" not in runtime_h + runtime_cpp + smoke_test + pet_window_qml, "测试喝茶入口应移除")
+    require("requestTea" not in runtime_h + runtime_cpp + smoke_test + pet_window_qml, "喝茶不应继续暴露 requestTea")
     require("tea.drinkThenBow" not in runtime_cpp, "测试喝茶入口不应引用已废弃的 tea.drinkThenBow")
-    require("void PetRuntime::testTea()\n{\n    requestTea();\n}" in runtime_cpp, "testTea 应复用 requestTea 的菜单喝茶逻辑")
+    require("triggerSkinCommand" in runtime_h + runtime_cpp + smoke_test + pet_window_qml, "喝茶应通过皮肤命令入口触发")
+    require('"miles.feedTea"' in runtime_cpp + smoke_test + pet_window_qml, "Miles 红茶命令应使用稳定 command id")
+    require('playActionFromPool("menu.tea")' in runtime_cpp, "Miles 红茶命令应继续复用 menu.tea 候选池")
 
-    require("runtime.testTea();" in smoke_test, "PetRuntimeSmoke 应覆盖测试喝茶入口")
-    require("测试喝茶入口也应复用菜单喝茶候选池" in smoke_test, "PetRuntimeSmoke 应验证测试喝茶候选池")
+    require("runtime.triggerSkinCommand(\"miles.feedTea\");" in smoke_test, "PetRuntimeSmoke 应覆盖红茶皮肤命令")
+    require("红茶皮肤命令应从两组喝茶 recipe 中选择" in smoke_test, "PetRuntimeSmoke 应验证红茶候选池")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_40_test_tea_entry" in root_cmake, "CTest 未注册 Phase 0.40 检查")

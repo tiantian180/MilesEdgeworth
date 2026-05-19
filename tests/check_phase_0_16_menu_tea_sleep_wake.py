@@ -61,13 +61,14 @@ def main() -> int:
     for token in [
         "Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)",
         "Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)",
-        "Q_PROPERTY(bool teaEnabled READ teaEnabled NOTIFY sleepStateChanged)",
+        "Q_PROPERTY(QStringList enabledSkinCommandIds READ enabledSkinCommandIds NOTIFY skinCommandAvailabilityChanged)",
         "bool sleeping() const",
         "bool sleepTransitioning() const",
-        "bool teaEnabled() const",
-        "Q_INVOKABLE void requestTea()",
+        "QStringList enabledSkinCommandIds() const",
+        "Q_INVOKABLE void triggerSkinCommand(const QString &commandId)",
         "Q_INVOKABLE void toggleSleep()",
         "sleepStateChanged",
+        "skinCommandAvailabilityChanged",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
 
@@ -75,20 +76,22 @@ def main() -> int:
     for token in [
         "bool PetRuntime::sleeping() const",
         "bool PetRuntime::sleepTransitioning() const",
-        "bool PetRuntime::teaEnabled() const",
-        "void PetRuntime::requestTea()",
+        "QStringList PetRuntime::enabledSkinCommandIds() const",
+        "void PetRuntime::triggerSkinCommand(const QString &commandId)",
+        '"miles.feedTea"',
         'playActionFromPool("menu.tea")',
         "void PetRuntime::toggleSleep()",
         'playRecipe("sleep.enterLoopExit")',
         "emit sleepStateChanged()",
+        "emit skinCommandAvailabilityChanged()",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
         "喂食红茶",
-        "App.PetRuntime.requestTea()",
-        "enabled: App.PetRuntime.teaEnabled",
+        "App.PetRuntime.triggerSkinCommand(\"miles.feedTea\")",
+        "App.PetRuntime.enabledSkinCommandIds.indexOf(\"miles.feedTea\")",
         'App.PetRuntime.sleeping ? "唤醒" : "睡觉"',
         "enabled: !App.PetRuntime.sleepTransitioning",
         "App.PetRuntime.toggleSleep()",

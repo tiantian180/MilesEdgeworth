@@ -86,8 +86,6 @@ def main() -> int:
         "QString currentMovementDirection() const",
         "Q_INVOKABLE void playLocomotion",
         "Q_INVOKABLE QVariantMap consumeFrameMovementDelta",
-        "Q_INVOKABLE void testWalk",
-        "Q_INVOKABLE void testRun",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
     for token in ["movementDeltas", "movementDirection"]:
@@ -109,8 +107,6 @@ def main() -> int:
     for token in [
         "App.PetRuntime.consumeFrameMovementDelta()",
         "App.DesktopShell.movePetWindowBy(movementDelta.dx, movementDelta.dy)",
-        "App.PetRuntime.testWalk()",
-        "App.PetRuntime.testRun()",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
 

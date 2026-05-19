@@ -85,7 +85,7 @@ def main() -> int:
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
         "App.PetRuntime.handleIdleLoopFinished()",
-        "App.PetRuntime.testTea()",
+        "App.PetRuntime.triggerSkinCommand(\"miles.feedTea\")",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
 

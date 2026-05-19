@@ -73,8 +73,6 @@ def main() -> int:
         "Q_PROPERTY(int playbackSerial",
         "Q_INVOKABLE void setFacing",
         "Q_INVOKABLE void toggleFacing",
-        "Q_INVOKABLE void testObjecting",
-        "Q_INVOKABLE void testBow",
         "Q_INVOKABLE void handleAnimationFinished",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
@@ -91,8 +89,6 @@ def main() -> int:
 
     for token in [
         "App.PetRuntime.toggleFacing()",
-        "App.PetRuntime.testObjecting()",
-        "App.PetRuntime.testBow()",
         "onCurrentFrameChanged",
         "App.PetRuntime.handleAnimationFinished()",
         "onPlaybackSerialChanged",

@@ -100,7 +100,6 @@ def main() -> int:
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     for token in [
         "Q_INVOKABLE void startStartupSequence",
-        "Q_INVOKABLE void testTurn",
         "applyFacingAfterCurrentAction",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
@@ -111,7 +110,6 @@ def main() -> int:
     for token in [
         'playRecipe("startup.briefcase")',
         "startStartupSequence",
-        "testTurn",
         "applyFacingAfterCurrentAction",
         "action.facingAfter",
     ]:
@@ -120,7 +118,7 @@ def main() -> int:
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "App.PetRuntime.testTurn()",
+        "App.PetRuntime.toggleFacing()",
         "App.PetRuntime.currentRecipeId === \"\"",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")

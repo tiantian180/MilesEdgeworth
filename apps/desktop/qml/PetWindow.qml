@@ -130,8 +130,8 @@ Window {
 
         Platform.MenuItem {
             text: "喂食红茶"
-            enabled: App.PetRuntime.teaEnabled
-            onTriggered: App.PetRuntime.requestTea()
+            enabled: App.PetRuntime.enabledSkinCommandIds.indexOf("miles.feedTea") >= 0
+            onTriggered: App.PetRuntime.triggerSkinCommand("miles.feedTea")
         }
 
         Platform.MenuItem {
@@ -150,58 +150,6 @@ Window {
         Platform.MenuItem {
             text: App.PetRuntime.currentFacing === "right" ? "切到朝左" : "切到朝右"
             onTriggered: App.PetRuntime.toggleFacing()
-        }
-
-        Platform.MenuSeparator {}
-
-        Platform.MenuItem {
-            text: "测试思考"
-            onTriggered: App.PetRuntime.testThinking()
-        }
-
-        Platform.MenuItem {
-            text: "测试说话"
-            onTriggered: App.PetRuntime.testSpeaking()
-        }
-
-        Platform.MenuItem {
-            text: "测试异议"
-            onTriggered: App.PetRuntime.testObjecting()
-        }
-
-        Platform.MenuItem {
-            text: "测试转身"
-            onTriggered: App.PetRuntime.testTurn()
-        }
-
-        Platform.MenuItem {
-            text: "测试走路"
-            onTriggered: App.PetRuntime.testWalk()
-        }
-
-        Platform.MenuItem {
-            text: "测试跑步"
-            onTriggered: App.PetRuntime.testRun()
-        }
-
-        Platform.MenuItem {
-            text: "测试鞠躬"
-            onTriggered: App.PetRuntime.testBow()
-        }
-
-        Platform.MenuItem {
-            text: "测试喝茶"
-            onTriggered: App.PetRuntime.testTea()
-        }
-
-        Platform.MenuItem {
-            text: "测试睡觉"
-            onTriggered: App.PetRuntime.testSleep()
-        }
-
-        Platform.MenuItem {
-            text: "测试徽章"
-            onTriggered: App.PetRuntime.testProsecutorBadge()
         }
 
         Platform.MenuSeparator {}

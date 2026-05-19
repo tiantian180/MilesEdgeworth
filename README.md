@@ -76,6 +76,7 @@ Phase 0 已完成最小桌面壳层验证：
 - 旧版静音音量语义，静音时正在播放的语音也会立即降到 0。
 - 站立循环后的随机待机触发概率已迁入皮肤 manifest，不再写死在运行时。
 - Miles GIF、语音和检察官徽章图片已迁入皮肤包 `assets/`，运行时继续通过稳定 qrc alias 加载。
+- 右键菜单已移除开发测试入口；Miles 红茶从皮肤定制命令进入，睡觉/唤醒继续作为通用 sleep/rest 能力保留。
 - `PetRuntime` 已开始拆分：manifest 数据结构、JSON 加载、候选池选择、behavior trigger 选择和单击 hit zone 命中逻辑已移出单体运行时。
 
 当前仍是技术验证，不是完整可发布的 v2 AI 桌宠。后续会继续实现 Pet Runtime、聊天窗口、设置中心、模型 Provider、皮肤 manifest 和 Agent Runtime。

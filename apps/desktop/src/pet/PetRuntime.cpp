@@ -14,6 +14,7 @@ namespace {
 constexpr auto kManifestPath = ":/pet/manifest.json";
 constexpr auto kFallbackActionId = "idle_stand";
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
+constexpr auto kFeedTeaCommandId = "miles.feedTea";
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -200,9 +201,17 @@ bool PetRuntime::sleepTransitioning() const
     return m_currentActionId == "sleep" && m_currentPhaseId != "loop";
 }
 
-bool PetRuntime::teaEnabled() const
+QStringList PetRuntime::enabledSkinCommandIds() const
 {
-    return m_currentActionId != "sleep";
+    QStringList commandIds;
+
+    // 红茶是 Miles 皮肤的定制菜单命令，不属于所有桌宠都具备的通用能力。
+    // 这里先用通用 command id 暴露给 QML，后续再迁入正式 Custom Interaction。
+    if (m_currentActionId != "sleep") {
+        commandIds.append(QString::fromUtf8(kFeedTeaCommandId));
+    }
+
+    return commandIds;
 }
 
 int PetRuntime::playbackSerial() const
@@ -588,11 +597,14 @@ void PetRuntime::setPetSize(const QString &sizeId)
     emit petScaleChanged();
 }
 
-void PetRuntime::requestTea()
+void PetRuntime::triggerSkinCommand(const QString &commandId)
 {
-    // 旧版睡觉时会禁用“喂食红茶”。这里把判断放在运行时，
-    // 避免 QML 菜单之外的未来入口绕过这条规则。
-    if (!teaEnabled()) {
+    const QString normalizedCommandId = commandId.trimmed();
+    if (normalizedCommandId != QString::fromUtf8(kFeedTeaCommandId)) {
+        return;
+    }
+
+    if (!enabledSkinCommandIds().contains(normalizedCommandId)) {
         return;
     }
 
@@ -653,56 +665,6 @@ void PetRuntime::returnToIdle()
     }
 
     setState("idle");
-}
-
-void PetRuntime::testThinking()
-{
-    setState("thinking");
-}
-
-void PetRuntime::testSpeaking()
-{
-    testObjecting();
-}
-
-void PetRuntime::testObjecting()
-{
-    setState("speaking");
-}
-
-void PetRuntime::testTurn()
-{
-    playRecipe("turn.once");
-}
-
-void PetRuntime::testWalk()
-{
-    playLocomotion("walk", "east");
-}
-
-void PetRuntime::testRun()
-{
-    playLocomotion("run", "east");
-}
-
-void PetRuntime::testBow()
-{
-    playRecipe("bow.once");
-}
-
-void PetRuntime::testTea()
-{
-    requestTea();
-}
-
-void PetRuntime::testSleep()
-{
-    playRecipe("sleep.enterLoopExit");
-}
-
-void PetRuntime::testProsecutorBadge()
-{
-    playRecipe("doubleClick.takeThat");
 }
 
 void PetRuntime::handleAnimationFinished()
@@ -1170,7 +1132,7 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
     const bool wasSleeping = sleeping();
     const bool wasSleepTransitioning = sleepTransitioning();
-    const bool wasTeaEnabled = teaEnabled();
+    const QStringList previousSkinCommandIds = enabledSkinCommandIds();
 
     const QUrl nextAnimationUrl = variantForFacing(phase.variants, m_currentFacing);
     const QString nextLoopMode = phase.loopMode.isEmpty() ? "loop" : phase.loopMode;
@@ -1209,9 +1171,11 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
         emit currentAnimationUrlChanged();
     }
     if (wasSleeping != sleeping()
-            || wasSleepTransitioning != sleepTransitioning()
-            || wasTeaEnabled != teaEnabled()) {
+            || wasSleepTransitioning != sleepTransitioning()) {
         emit sleepStateChanged();
+    }
+    if (previousSkinCommandIds != enabledSkinCommandIds()) {
+        emit skinCommandAvailabilityChanged();
     }
     emit playbackSerialChanged();
 }

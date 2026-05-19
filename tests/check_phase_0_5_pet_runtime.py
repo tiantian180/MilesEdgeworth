@@ -44,8 +44,6 @@ def main() -> int:
     require("App.DesktopShell.toggleAlwaysOnTop()" in pet_window_qml, "菜单应调用 DesktopShell.toggleAlwaysOnTop()")
     require("App.PetRuntime.currentAnimationUrl" in pet_window_qml, "动画源应绑定 PetRuntime.currentAnimationUrl")
     require("App.PetRuntime.returnToIdle()" in pet_window_qml, "菜单应提供回到待机入口")
-    require("App.PetRuntime.testThinking()" in pet_window_qml, "菜单应提供测试思考入口")
-    require("App.PetRuntime.testSpeaking()" in pet_window_qml, "菜单应提供测试说话入口")
     require('source: "qrc:/pet/stand-right.gif"' not in pet_window_qml, "QML 不应直接写死待机 GIF")
 
     require("src/pet/PetRuntime.cpp" in desktop_cmake, "PetRuntime.cpp 应加入桌面目标")

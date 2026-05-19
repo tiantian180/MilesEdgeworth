@@ -96,7 +96,7 @@ def main() -> int:
         "handleDragEnded",
         "handlePropClicked",
         "handlePropExpired",
-        "requestTea",
+        "triggerSkinCommand",
         "toggleSleep",
         "consumeFrameMovementDelta",
     ]:
@@ -110,7 +110,7 @@ def main() -> int:
         "singleClickTimer",
         "handleDoubleClick()",
         "handleDragMoved",
-        "requestTea()",
+        "triggerSkinCommand(\"miles.feedTea\")",
         "toggleSleep()",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少核心表现入口 {token}")

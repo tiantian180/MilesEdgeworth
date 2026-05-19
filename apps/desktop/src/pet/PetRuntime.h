@@ -18,10 +18,10 @@
 
 // PetRuntime 是 v2 桌宠动画系统的最小入口。
 //
-// 当前阶段它只做三件事：
+// 当前阶段它主要负责把 QML 的交互请求转成动画调度结果：
 // 1. 从内置 skin manifest 里读出 state -> action -> animation 的映射。
 // 2. 暴露 currentAnimationUrl 给 QML 的 AnimatedImage 使用。
-// 3. 提供几个开发测试入口，方便右键菜单验证状态切换。
+// 3. 暂时承接少量皮肤定制命令，后续再迁入 Custom Interaction 层。
 //
 // Phase 0.6 开始引入“朝向”和“动作播放模式”，但仍然不做完整编排器。
 // 后续的 enter/loop/exit、移动驱动动画、点击交互优先级，会继续在
@@ -47,7 +47,7 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool pointerInteractionEnabled READ pointerInteractionEnabled NOTIFY pointerInteractionEnabledChanged)
     Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)
     Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)
-    Q_PROPERTY(bool teaEnabled READ teaEnabled NOTIFY sleepStateChanged)
+    Q_PROPERTY(QStringList enabledSkinCommandIds READ enabledSkinCommandIds NOTIFY skinCommandAvailabilityChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
     Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
     Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
@@ -87,7 +87,7 @@ public:
     bool pointerInteractionEnabled() const;
     bool sleeping() const;
     bool sleepTransitioning() const;
-    bool teaEnabled() const;
+    QStringList enabledSkinCommandIds() const;
     QUrl currentAnimationUrl() const;
     QUrl currentSoundUrl() const;
     bool currentPropVisible() const;
@@ -126,22 +126,12 @@ public:
     Q_INVOKABLE void setVoiceLanguage(const QString &voiceLanguage);
     Q_INVOKABLE void toggleAutoMovementEnabled();
     Q_INVOKABLE void setPetSize(const QString &sizeId);
-    Q_INVOKABLE void requestTea();
+    Q_INVOKABLE void triggerSkinCommand(const QString &commandId);
     Q_INVOKABLE void toggleSleep();
     Q_INVOKABLE void triggerIdle();
     Q_INVOKABLE void handleIdleLoopFinished();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
-    Q_INVOKABLE void testThinking();
-    Q_INVOKABLE void testSpeaking();
-    Q_INVOKABLE void testObjecting();
-    Q_INVOKABLE void testTurn();
-    Q_INVOKABLE void testWalk();
-    Q_INVOKABLE void testRun();
-    Q_INVOKABLE void testBow();
-    Q_INVOKABLE void testTea();
-    Q_INVOKABLE void testSleep();
-    Q_INVOKABLE void testProsecutorBadge();
     Q_INVOKABLE void handleAnimationFinished();
     void handleIdleLoopFinishedForTest(double randomValue);
 
@@ -160,6 +150,7 @@ signals:
     void petScaleChanged();
     void pointerInteractionEnabledChanged();
     void sleepStateChanged();
+    void skinCommandAvailabilityChanged();
     void currentAnimationUrlChanged();
     void currentSoundUrlChanged();
     void currentPropChanged();
