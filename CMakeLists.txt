@@ -390,5 +390,29 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_52_manifest_idle_loop_trigger.py
         )
+
+        # Phase 0.54 的皮肤资源布局检查：GIF、音频和 Prop 图片应迁入
+        # skin assets 目录，但 qrc:/pet 和 qrc:/audio 对外 alias 保持稳定。
+        add_test(
+            NAME check_phase_0_54_assets_layout
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_54_assets_layout.py
+        )
+
+        # Phase 0.55 的 manifest 结构拆分检查：PetRuntime 不再内联维护
+        # manifest schema 数据结构，而是通过 SkinManifest 承载皮肤配置。
+        add_test(
+            NAME check_phase_0_55_pet_runtime_manifest_split
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_55_pet_runtime_manifest_split.py
+        )
+
+        # Phase 0.56 的运行时服务拆分检查：稳定的 manifest 加载逻辑
+        # 应离开 PetRuntime，后续 selector / trigger engine 也走同一方向。
+        add_test(
+            NAME check_phase_0_56_pet_runtime_service_split
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_56_pet_runtime_service_split.py
+        )
     endif()
 endif()

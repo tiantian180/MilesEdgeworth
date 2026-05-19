@@ -30,20 +30,30 @@ def main() -> int:
         require(all("x" in point and "y" in point for point in polygon), f"face.{facing} polygon 点应包含 x/y")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     for token in [
         "QList<QPointF> polygon",
         "QHash<QString, QList<QPointF>> facingPolygons",
+    ]:
+        require(token in manifest_h, f"SkinManifest.h 缺少 polygon hit zone 声明：{token}")
+
+    for token in [
         "polygonForHitZone",
         "hitZoneContainsPoint",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 polygon hit zone 声明：{token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     for token in [
         'zoneType != "rect" && zoneType != "polygon"',
         "polygonFromJsonArray",
         'zoneObject.value("polygon").toArray()',
         "zone.facingPolygons.insert",
+    ]:
+        require(token in loader_cpp, f"SkinManifestLoader.cpp 缺少 polygon hit zone 解析：{token}")
+
+    for token in [
         "polygonForHitZone(zone)",
         "pointInPolygon",
         "hitZoneContainsPoint(zone, logicalPoint)",

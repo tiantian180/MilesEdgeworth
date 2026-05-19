@@ -35,24 +35,33 @@ def main() -> int:
     require(badge["travelPerScale"]["left"]["x"] == -150, "左向徽章每 scale 飞行补偿应来自旧版 -150")
 
     runtime_header = read("apps/desktop/src/pet/PetRuntime.h")
+    manifest_header = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     for token in [
         "currentPropVisualWidth READ currentPropVisualWidth",
         "currentPropVisualHeight READ currentPropVisualHeight",
-        "travelBaseDeltas",
-        "travelPerScaleDeltas",
     ]:
         require(token in runtime_header, f"PetRuntime.h 缺少 Prop 缩放入口：{token}")
 
+    for token in [
+        "travelBaseDeltas",
+        "travelPerScaleDeltas",
+    ]:
+        require(token in manifest_header, f"SkinManifest.h 缺少 Prop 缩放字段：{token}")
+
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     for token in [
         "scaledPropPoint",
         "propTravelDelta",
         "prop.visualWidth",
         "prop.visualHeight",
+    ]:
+        require(token in runtime_cpp, f"PetRuntime.cpp 缺少 Prop 缩放逻辑：{token}")
+    for token in [
         "travelBase",
         "travelPerScale",
     ]:
-        require(token in runtime_cpp, f"PetRuntime.cpp 缺少 Prop 缩放逻辑：{token}")
+        require(token in loader_cpp, f"SkinManifestLoader.cpp 缺少 Prop 缩放解析：{token}")
 
     qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [

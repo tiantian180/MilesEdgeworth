@@ -29,17 +29,18 @@ def main() -> int:
     require({"doubleClick.holdIt", "doubleClick.takeThat", "doubleClick.objection"} <= zh_recipes, "中文双击池应保留前三类旧版动作")
     require("doubleClick.eureka" not in zh_recipes, "中文双击池不应包含 Eureka")
 
-    pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
-    require("actionPoolIdForContext" in pet_runtime_h, "PetRuntime.h 应声明按上下文解析 action pool 的 helper")
+    pool_selector_h = read("apps/desktop/src/pet/selection/ActionPoolSelector.h")
+    pool_selector_cpp = read("apps/desktop/src/pet/selection/ActionPoolSelector.cpp")
+    require("resolvePoolId" in pool_selector_h, "ActionPoolSelector 应声明按上下文解析 action pool 的入口")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    require("ActionPoolSelector::resolvePoolId" in pet_runtime_cpp, "PetRuntime 应委托 ActionPoolSelector 解析语言覆盖池")
     for token in [
-        "actionPoolIdForContext",
         "languagePoolId",
-        'normalizedPoolId + "." + m_voiceLanguage',
-        'playActionFromPool("doubleClick.random")',
+        'normalizedPoolId + "." + voiceLanguage',
     ]:
-        require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少语言感知 action pool 实现：{token}")
+        require(token in pool_selector_cpp, f"ActionPoolSelector.cpp 缺少语言感知 action pool 实现：{token}")
+    require('playActionFromPool("doubleClick.random")' in pet_runtime_cpp, "PetRuntime.cpp 缺少双击随机池入口")
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

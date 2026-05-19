@@ -5,9 +5,8 @@ MilesEdgeworth 正在从旧版 Qt Widgets 桌宠，升级为 Qt 6 / QML 驱动�
 当前 `v2-ai-pet` 分支只保留新版主线代码和可复用素材：
 
 - `apps/desktop/`：Qt 6 / QML 桌面壳层。
+- `apps/desktop/resources/skins/miles-edgeworth/assets/`：Miles 皮肤包资源，包括动画、语音、Prop 图片和源素材。
 - `docs/v2/`：新版文档，按设计方案、参考资料、阶段记录分类。
-- `gifs/`：Miles 桌宠动画素材。
-- `audios/`：旧版语音素材，后续可按皮肤 / 动作系统重新接入。
 - `icon/`：图标素材。
 
 旧版 Qt Widgets 源码、Visual Studio 工程、图片置顶查看器和旧版 macOS 打包脚本已经从该分支移除，避免干扰 v2 阅读和开发。需要参考旧版实现时，可以查看仓库历史或旧分支。
@@ -76,7 +75,8 @@ Phase 0 已完成最小桌面壳层验证：
 - 旧版 clickTimer 风格的单双击判定，避免双击后补触发单击反应。
 - 旧版静音音量语义，静音时正在播放的语音也会立即降到 0。
 - 站立循环后的随机待机触发概率已迁入皮肤 manifest，不再写死在运行时。
-- 从资源系统加载 Miles GIF。
+- Miles GIF、语音和检察官徽章图片已迁入皮肤包 `assets/`，运行时继续通过稳定 qrc alias 加载。
+- `PetRuntime` 已开始拆分：manifest 数据结构、JSON 加载、候选池选择和 behavior trigger 选择已移出单体运行时。
 
 当前仍是技术验证，不是完整可发布的 v2 AI 桌宠。后续会继续实现 Pet Runtime、聊天窗口、设置中心、模型 Provider、皮肤 manifest 和 Agent Runtime。
 

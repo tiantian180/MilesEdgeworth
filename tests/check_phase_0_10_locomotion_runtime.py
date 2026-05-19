@@ -80,6 +80,7 @@ def main() -> int:
             require(f'alias="{action_id}-{direction_id}.gif"' in qrc, f"qrc 缺少 {action_id}-{direction_id}.gif")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     for token in [
         "Q_PROPERTY(QString currentMovementDirection",
         "QString currentMovementDirection() const",
@@ -87,10 +88,10 @@ def main() -> int:
         "Q_INVOKABLE QVariantMap consumeFrameMovementDelta",
         "Q_INVOKABLE void testWalk",
         "Q_INVOKABLE void testRun",
-        "movementDeltas",
-        "movementDirection",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
+    for token in ["movementDeltas", "movementDirection"]:
+        require(token in manifest_h, f"SkinManifest.h 缺少移动字段 {token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [

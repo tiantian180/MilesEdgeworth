@@ -106,8 +106,7 @@ def main() -> int:
         "Q_INVOKABLE void handlePrimaryClick",
         "HitZoneDefinition",
         "clickPoolForPoint",
-        "m_hitZones",
-        "m_singleClickPools",
+        "SkinManifest m_manifest",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
 
@@ -115,8 +114,8 @@ def main() -> int:
     for token in [
         "handlePrimaryClick",
         "clickPoolForPoint",
-        "m_hitZones",
-        "m_singleClickPools",
+        "m_manifest.hitZones",
+        "m_manifest.singleClickPools",
         "playActionFromPool(poolId)",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")

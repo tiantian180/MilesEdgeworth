@@ -18,8 +18,15 @@ set(DESKTOP_SOURCES
     src/DesktopShellController.cpp
     src/DesktopShellController.h
     src/main.cpp
+    src/pet/behavior/BehaviorTriggerEngine.cpp
+    src/pet/behavior/BehaviorTriggerEngine.h
+    src/pet/manifest/SkinManifest.h
+    src/pet/manifest/SkinManifestLoader.cpp
+    src/pet/manifest/SkinManifestLoader.h
     src/pet/PetRuntime.cpp
     src/pet/PetRuntime.h
+    src/pet/selection/ActionPoolSelector.cpp
+    src/pet/selection/ActionPoolSelector.h
     resources/pet_assets.qrc
 )
 
@@ -73,8 +80,15 @@ qt_finalize_executable(MilesEdgeworthDesktop)
 if(BUILD_TESTING)
     qt_add_executable(PetRuntimeSmoke
         tests/pet_runtime_smoke.cpp
+        src/pet/behavior/BehaviorTriggerEngine.cpp
+        src/pet/behavior/BehaviorTriggerEngine.h
+        src/pet/manifest/SkinManifest.h
+        src/pet/manifest/SkinManifestLoader.cpp
+        src/pet/manifest/SkinManifestLoader.h
         src/pet/PetRuntime.cpp
         src/pet/PetRuntime.h
+        src/pet/selection/ActionPoolSelector.cpp
+        src/pet/selection/ActionPoolSelector.h
         resources/pet_assets.qrc
     )
 

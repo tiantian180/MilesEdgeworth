@@ -54,6 +54,8 @@ def main() -> int:
     require(any(entry.get("recipe") == "idle.randomThinking" for entry in idle_entries), "idle.random 应能抽到思考动作")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
+    selector_h = read("apps/desktop/src/pet/selection/ActionPoolSelector.h")
     for token in [
         "Q_PROPERTY(QString currentRecipeId",
         "QString currentRecipeId() const",
@@ -62,15 +64,16 @@ def main() -> int:
         "Q_INVOKABLE void triggerIdle",
         "currentRecipeChanged",
         "RecipeDefinition",
-        "ActionPoolEntry",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
+    require("ActionPoolEntry" in manifest_h + selector_h, "ActionPoolEntry 应由 SkinManifest / ActionPoolSelector 承载")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [
         "#include <QRandomGenerator>",
-        "m_recipes",
-        "m_actionPools",
+        "m_manifest.recipes",
+        "m_manifest.actionPools",
+        "ActionPoolSelector::selectEntry",
         "playNextRecipeStep",
         "clearActiveRecipe",
         "playActionFromPool",

@@ -97,15 +97,17 @@ def main() -> int:
         require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     for token in [
         "Q_INVOKABLE void startStartupSequence",
         "Q_INVOKABLE void testTurn",
-        "facingAfter",
         "applyFacingAfterCurrentAction",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
+    require("facingAfter" in manifest_h, "ActionDefinition 应保存 facingAfter")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     for token in [
         'playRecipe("startup.briefcase")',
         "startStartupSequence",
@@ -114,6 +116,7 @@ def main() -> int:
         "action.facingAfter",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    require("action.facingAfter.insert" in loader_cpp, "SkinManifestLoader 应解析 facingAfter")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [

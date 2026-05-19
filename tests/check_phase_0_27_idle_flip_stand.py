@@ -33,13 +33,19 @@ def main() -> int:
     require("idle.flipStand" in idle_recipes, "idle.random 应包含 idle.flipStand")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
-    require("QString facing;" in pet_runtime_h, "RecipeStep 应支持 facing 字段")
+    manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
+    require("QString facing;" in manifest_h, "RecipeStep 应支持 facing 字段")
     require("resolveRecipeFacing" in pet_runtime_h, "PetRuntime.h 应声明 recipe 朝向解析 helper")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     for token in [
         'recipeObject.value("facing").toString()',
         'stepObject.value("facing").toString',
+    ]:
+        require(token in loader_cpp, f"SkinManifestLoader.cpp 缺少 recipe facing 解析：{token}")
+
+    for token in [
         'resolveRecipeFacing',
         'normalizedFacing == "$opposite"',
     ]:

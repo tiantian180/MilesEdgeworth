@@ -35,7 +35,13 @@ def main() -> int:
     inventory_path = ROOT / "docs/v2/参考资料/动画素材盘点.md"
     require(inventory_path.exists(), "缺少动画资源盘点文档")
     inventory = inventory_path.read_text(encoding="utf-8")
-    for token in ["stand/0.gif", "walk/0.gif", "run/0.gif", "special/object0.gif", "once/4.gif"]:
+    for token in [
+        "body/idle/stand-right.gif",
+        "body/locomotion/walk-east.gif",
+        "body/locomotion/run-east.gif",
+        "body/interaction/objecting-right.gif",
+        "body/gestures/thinking-right.gif",
+    ]:
         require(token in inventory, f"资源盘点缺少 {token}")
 
     require(manifest.get("schemaVersion") == 2, "manifest 应升级到 schemaVersion 2")

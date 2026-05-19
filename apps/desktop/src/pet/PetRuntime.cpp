@@ -1,9 +1,9 @@
 #include "pet/PetRuntime.h"
 
-#include <QFile>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
+#include "pet/behavior/BehaviorTriggerEngine.h"
+#include "pet/manifest/SkinManifestLoader.h"
+#include "pet/selection/ActionPoolSelector.h"
+
 #include <QRandomGenerator>
 #include <QTimer>
 #include <QtGlobal>
@@ -54,28 +54,6 @@ QString hitZoneIdForClickPool(const QString &poolId)
     return {};
 }
 
-QRectF rectFromJsonObject(const QJsonObject &object)
-{
-    return QRectF(
-        object.value("x").toDouble(0),
-        object.value("y").toDouble(0),
-        object.value("width").toDouble(0),
-        object.value("height").toDouble(0)
-    );
-}
-
-QList<QPointF> polygonFromJsonArray(const QJsonArray &array)
-{
-    QList<QPointF> polygon;
-    for (const QJsonValue &value : array) {
-        const QJsonObject pointObject = value.toObject();
-        if (pointObject.contains("x") && pointObject.contains("y")) {
-            polygon.append(QPointF(pointObject.value("x").toDouble(0), pointObject.value("y").toDouble(0)));
-        }
-    }
-    return polygon;
-}
-
 bool pointInPolygon(const QList<QPointF> &polygon, const QPointF &point)
 {
     if (polygon.size() < 3) {
@@ -107,10 +85,15 @@ PetRuntime::PetRuntime(QObject *parent)
     : QObject(parent)
 {
     setPetSize("medium");
-    loadManifest();
+    m_manifest = SkinManifestLoader::loadFromResource(QString::fromUtf8(kManifestPath));
 
-    if (m_actions.isEmpty()) {
-        loadFallbackManifest();
+    if (m_manifest.actions.isEmpty()) {
+        m_manifest = SkinManifestLoader::fallbackManifest();
+    }
+
+    m_currentFacing = m_manifest.defaultFacing;
+    if (!m_manifest.movementDirections.isEmpty()) {
+        m_currentMovementDirection = m_manifest.movementDirections.constFirst();
     }
 
     setState("idle");
@@ -311,7 +294,7 @@ void PetRuntime::setState(const QString &state)
     }
 
     if (nextAction.isEmpty()) {
-        nextAction = m_fallbackAction;
+        nextAction = m_manifest.fallbackAction;
     }
 
     const bool stateChanged = (m_currentState != nextState);
@@ -327,7 +310,7 @@ void PetRuntime::setState(const QString &state)
 void PetRuntime::setFacing(const QString &facing)
 {
     const QString normalizedFacing = facing.trimmed();
-    if (normalizedFacing.isEmpty() || normalizedFacing == m_currentFacing || !m_facings.contains(normalizedFacing)) {
+    if (normalizedFacing.isEmpty() || normalizedFacing == m_currentFacing || !m_manifest.facings.contains(normalizedFacing)) {
         return;
     }
 
@@ -337,7 +320,7 @@ void PetRuntime::setFacing(const QString &facing)
     // 朝向变化后，当前 action 立即换成同动作的对应朝向 variant。
     // 这样移动系统以后只需要先更新 facing，再继续播放动作即可。
     if (!m_currentActionId.isEmpty()) {
-        const ActionDefinition action = m_actions.value(m_currentActionId);
+        const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
         if (!m_currentPhaseId.isEmpty() && action.phases.contains(m_currentPhaseId)) {
             playPhase(m_currentActionId, m_currentPhaseId);
         } else {
@@ -348,7 +331,7 @@ void PetRuntime::setFacing(const QString &facing)
 
 void PetRuntime::toggleFacing()
 {
-    if (m_currentFacing == "right" && m_facings.contains("left")) {
+    if (m_currentFacing == "right" && m_manifest.facings.contains("left")) {
         setFacing("left");
         return;
     }
@@ -364,7 +347,7 @@ void PetRuntime::playAction(const QString &actionId)
 void PetRuntime::playLocomotion(const QString &actionId, const QString &movementDirection)
 {
     const QString nextMovementDirection = movementDirection.trimmed();
-    if (!nextMovementDirection.isEmpty() && m_movementDirections.contains(nextMovementDirection)) {
+    if (!nextMovementDirection.isEmpty() && m_manifest.movementDirections.contains(nextMovementDirection)) {
         const bool movementDirectionChanged = (m_currentMovementDirection != nextMovementDirection);
         m_currentMovementDirection = nextMovementDirection;
         updateFacingFromMovementDirection(nextMovementDirection);
@@ -379,7 +362,7 @@ void PetRuntime::playLocomotion(const QString &actionId, const QString &movement
 void PetRuntime::playRecipe(const QString &recipeId)
 {
     const QString nextRecipeId = recipeId.trimmed();
-    if (!m_recipes.contains(nextRecipeId)) {
+    if (!m_manifest.recipes.contains(nextRecipeId)) {
         return;
     }
 
@@ -391,20 +374,20 @@ void PetRuntime::playRecipe(const QString &recipeId)
         emit currentRecipeChanged();
     }
 
-    playSoundForRecipe(m_recipes.value(nextRecipeId));
-    schedulePropForRecipe(m_recipes.value(nextRecipeId));
+    playSoundForRecipe(m_manifest.recipes.value(nextRecipeId));
+    schedulePropForRecipe(m_manifest.recipes.value(nextRecipeId));
     playNextRecipeStep();
 }
 
 void PetRuntime::playActionFromPool(const QString &poolId)
 {
-    const QString normalizedPoolId = actionPoolIdForContext(poolId);
-    if (!m_actionPools.contains(normalizedPoolId)) {
+    const QString normalizedPoolId = ActionPoolSelector::resolvePoolId(m_manifest.actionPools, poolId, m_voiceLanguage);
+    if (!m_manifest.actionPools.contains(normalizedPoolId)) {
         return;
     }
 
-    const ActionPoolEntry entry = selectActionPoolEntry(m_actionPools.value(normalizedPoolId));
-    if (!entry.recipeId.isEmpty() && m_recipes.contains(entry.recipeId)) {
+    const ActionPoolEntry entry = ActionPoolSelector::selectEntry(m_manifest.actionPools.value(normalizedPoolId));
+    if (!entry.recipeId.isEmpty() && m_manifest.recipes.contains(entry.recipeId)) {
         playRecipe(entry.recipeId);
         return;
     }
@@ -450,7 +433,7 @@ QVariantMap PetRuntime::consumeFrameMovementDelta() const
         return delta;
     }
 
-    const ActionDefinition action = m_actions.value(m_currentActionId);
+    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
     if (action.movementDeltas.isEmpty()) {
         return delta;
     }
@@ -700,27 +683,31 @@ void PetRuntime::startStartupSequence()
 void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
 {
     QString nextActionId = actionId.trimmed();
-    if (!m_actions.contains(nextActionId)) {
-        nextActionId = m_fallbackAction;
+    if (!m_manifest.actions.contains(nextActionId)) {
+        nextActionId = m_manifest.fallbackAction;
     }
 
-    if (!m_actions.contains(nextActionId)) {
-        loadFallbackManifest();
-        nextActionId = kFallbackActionId;
+    if (!m_manifest.actions.contains(nextActionId)) {
+        m_manifest = SkinManifestLoader::fallbackManifest();
+        m_currentFacing = m_manifest.defaultFacing;
+        if (!m_manifest.movementDirections.isEmpty()) {
+            m_currentMovementDirection = m_manifest.movementDirections.constFirst();
+        }
+        nextActionId = m_manifest.fallbackAction;
     }
 
     if (resetRecipe) {
         clearActiveRecipe();
     }
 
-    setCurrentAction(nextActionId, m_actions.value(nextActionId));
+    setCurrentAction(nextActionId, m_manifest.actions.value(nextActionId));
 }
 
 void PetRuntime::returnToIdle()
 {
     clearActiveRecipe();
 
-    const ActionDefinition action = m_actions.value(m_currentActionId);
+    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
     if (!action.exitPhase.isEmpty() && m_currentPhaseId != action.exitPhase) {
         playPhase(m_currentActionId, action.exitPhase);
         return;
@@ -781,7 +768,7 @@ void PetRuntime::testProsecutorBadge()
 
 void PetRuntime::handleAnimationFinished()
 {
-    const ActionDefinition action = m_actions.value(m_currentActionId);
+    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
     const PhaseDefinition phase = action.phases.value(m_currentPhaseId);
     if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
         playPhase(m_currentActionId, phase.nextPhase);
@@ -791,7 +778,7 @@ void PetRuntime::handleAnimationFinished()
     applyFacingAfterCurrentAction(action);
 
     if (!m_currentRecipeId.isEmpty()) {
-        const RecipeDefinition recipe = m_recipes.value(m_currentRecipeId);
+        const RecipeDefinition recipe = m_manifest.recipes.value(m_currentRecipeId);
         if (m_currentRecipeStepIndex + 1 < recipe.steps.size()) {
             playNextRecipeStep();
             return;
@@ -811,371 +798,9 @@ void PetRuntime::handleAnimationFinished()
     }
 }
 
-void PetRuntime::loadManifest()
-{
-    QFile file(QString::fromUtf8(kManifestPath));
-    if (!file.open(QIODevice::ReadOnly)) {
-        return;
-    }
-
-    const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
-    if (!document.isObject()) {
-        return;
-    }
-
-    const QJsonObject root = document.object();
-    m_fallbackAction = root.value("fallbackAction").toString(kFallbackActionId);
-    m_defaultFacing = root.value("defaultFacing").toString("right");
-    m_currentFacing = m_defaultFacing;
-
-    const QJsonArray facings = root.value("facings").toArray();
-    if (!facings.isEmpty()) {
-        m_facings.clear();
-        for (const QJsonValue &value : facings) {
-            const QString facing = value.toString();
-            if (!facing.isEmpty()) {
-                m_facings.append(facing);
-            }
-        }
-    }
-
-    const QJsonArray movementDirections = root.value("movementDirections").toArray();
-    if (!movementDirections.isEmpty()) {
-        m_movementDirections.clear();
-        for (const QJsonValue &value : movementDirections) {
-            const QString movementDirection = value.toString();
-            if (!movementDirection.isEmpty()) {
-                m_movementDirections.append(movementDirection);
-            }
-        }
-        if (!m_movementDirections.isEmpty()) {
-            m_currentMovementDirection = m_movementDirections.constFirst();
-        }
-    }
-
-    const QJsonObject hitZones = root.value("hitZones").toObject();
-    for (auto it = hitZones.constBegin(); it != hitZones.constEnd(); ++it) {
-        const QJsonObject zoneObject = it.value().toObject();
-        const QString zoneType = zoneObject.value("type").toString("rect");
-        if (zoneType != "rect" && zoneType != "polygon") {
-            continue;
-        }
-
-        HitZoneDefinition zone;
-        zone.id = it.key();
-        zone.rect = rectFromJsonObject(zoneObject);
-        zone.polygon = polygonFromJsonArray(zoneObject.value("polygon").toArray());
-
-        const QJsonObject zoneVariants = zoneObject.value("variants").toObject();
-        for (auto variantIt = zoneVariants.constBegin(); variantIt != zoneVariants.constEnd(); ++variantIt) {
-            const QJsonObject variantObject = variantIt.value().toObject();
-            const QRectF variantRect = rectFromJsonObject(variantObject);
-            if (variantRect.isValid()) {
-                zone.facingRects.insert(variantIt.key(), variantRect);
-            }
-
-            const QList<QPointF> variantPolygon = polygonFromJsonArray(variantObject.value("polygon").toArray());
-            if (variantPolygon.size() >= 3) {
-                zone.facingPolygons.insert(variantIt.key(), variantPolygon);
-            }
-        }
-
-        if (zone.rect.isValid() || zone.polygon.size() >= 3 || !zone.facingRects.isEmpty() || !zone.facingPolygons.isEmpty()) {
-            m_hitZones.insert(zone.id, zone);
-        }
-    }
-
-    const QJsonArray singleClickPools = root.value("clickBehaviors").toObject().value("singleClick").toArray();
-    for (const QJsonValue &value : singleClickPools) {
-        const QString poolId = value.toString();
-        if (!poolId.isEmpty()) {
-            m_singleClickPools.append(poolId);
-        }
-    }
-
-    const QJsonObject props = root.value("props").toObject();
-    for (auto it = props.constBegin(); it != props.constEnd(); ++it) {
-        const QJsonObject propObject = it.value().toObject();
-
-        PropDefinition prop;
-        prop.id = it.key();
-        prop.assetUrl = QUrl(propObject.value("asset").toString());
-        prop.width = propObject.value("width").toDouble(0);
-        prop.height = propObject.value("height").toDouble(0);
-        prop.visualWidth = propObject.value("visualWidth").toDouble(0);
-        prop.visualHeight = propObject.value("visualHeight").toDouble(0);
-        prop.delayMs = propObject.value("delayMs").toInt(0);
-        prop.durationMs = propObject.value("durationMs").toInt(0);
-        prop.clickedRecipeId = propObject.value("clickedRecipe").toString();
-        prop.expiredRecipeId = propObject.value("expiredRecipe").toString();
-
-        const QJsonObject startOffsets = propObject.value("startOffsets").toObject();
-        for (auto offsetIt = startOffsets.constBegin(); offsetIt != startOffsets.constEnd(); ++offsetIt) {
-            const QJsonObject offsetObject = offsetIt.value().toObject();
-            prop.startOffsets.insert(offsetIt.key(), QPointF(offsetObject.value("x").toDouble(0), offsetObject.value("y").toDouble(0)));
-        }
-
-        const QJsonObject travel = propObject.value("travel").toObject();
-        for (auto travelIt = travel.constBegin(); travelIt != travel.constEnd(); ++travelIt) {
-            const QJsonObject travelObject = travelIt.value().toObject();
-            prop.travelDeltas.insert(travelIt.key(), QPointF(travelObject.value("x").toDouble(0), travelObject.value("y").toDouble(0)));
-        }
-
-        const QJsonObject travelBase = propObject.value("travelBase").toObject();
-        for (auto travelIt = travelBase.constBegin(); travelIt != travelBase.constEnd(); ++travelIt) {
-            const QJsonObject travelObject = travelIt.value().toObject();
-            prop.travelBaseDeltas.insert(travelIt.key(), QPointF(travelObject.value("x").toDouble(0), travelObject.value("y").toDouble(0)));
-        }
-
-        const QJsonObject travelPerScale = propObject.value("travelPerScale").toObject();
-        for (auto travelIt = travelPerScale.constBegin(); travelIt != travelPerScale.constEnd(); ++travelIt) {
-            const QJsonObject travelObject = travelIt.value().toObject();
-            prop.travelPerScaleDeltas.insert(travelIt.key(), QPointF(travelObject.value("x").toDouble(0), travelObject.value("y").toDouble(0)));
-        }
-
-        if (!prop.id.isEmpty() && !prop.assetUrl.isEmpty()) {
-            m_props.insert(prop.id, prop);
-        }
-    }
-
-    const QJsonObject states = root.value("states").toObject();
-    for (auto it = states.constBegin(); it != states.constEnd(); ++it) {
-        const QString action = it.value().toObject().value("action").toString();
-        if (!action.isEmpty()) {
-            m_stateToAction.insert(it.key(), action);
-        }
-    }
-
-    const QJsonObject actions = root.value("actions").toObject();
-    for (auto it = actions.constBegin(); it != actions.constEnd(); ++it) {
-        const QJsonObject actionObject = it.value().toObject();
-
-        ActionDefinition action;
-        action.label = actionObject.value("label").toString(it.key());
-        action.category = actionObject.value("category").toString();
-        action.loopMode = actionObject.value("loopMode").toString(actionObject.value("loop").toBool(true) ? "loop" : "onceThenIdle");
-        action.priority = actionObject.value("priority").toInt(0);
-        action.initialPhase = actionObject.value("initialPhase").toString();
-        action.exitPhase = actionObject.value("exitPhase").toString();
-
-        const QJsonArray tags = actionObject.value("tags").toArray();
-        for (const QJsonValue &tag : tags) {
-            const QString tagText = tag.toString();
-            if (!tagText.isEmpty()) {
-                action.tags.append(tagText);
-            }
-        }
-
-        const QJsonObject variants = actionObject.value("variants").toObject();
-        for (auto variantIt = variants.constBegin(); variantIt != variants.constEnd(); ++variantIt) {
-            const QJsonObject variantObject = variantIt.value().toObject();
-            const QString animation = variantObject.value("animation").toString();
-            if (!animation.isEmpty()) {
-                action.variants.insert(variantIt.key(), QUrl(animation));
-            }
-
-            const QJsonObject movementObject = variantObject.value("movement").toObject();
-            if (movementObject.contains("dx") || movementObject.contains("dy")) {
-                action.movementDeltas.insert(
-                    variantIt.key(),
-                    QPointF(movementObject.value("dx").toDouble(0), movementObject.value("dy").toDouble(0))
-                );
-            }
-        }
-
-        const QJsonObject facingAfter = actionObject.value("facingAfter").toObject();
-        for (auto facingIt = facingAfter.constBegin(); facingIt != facingAfter.constEnd(); ++facingIt) {
-            const QString nextFacing = facingIt.value().toString();
-            if (!nextFacing.isEmpty()) {
-                action.facingAfter.insert(facingIt.key(), nextFacing);
-            }
-        }
-
-        // 兼容 Phase 0.5 的旧 manifest：如果 action 直接写 animation，
-        // 就把它当成默认朝向的 variant。
-        const QString legacyAnimation = actionObject.value("animation").toString();
-        if (!legacyAnimation.isEmpty()) {
-            action.variants.insert(m_defaultFacing, QUrl(legacyAnimation));
-        }
-
-        const QJsonObject phases = actionObject.value("phases").toObject();
-        for (auto phaseIt = phases.constBegin(); phaseIt != phases.constEnd(); ++phaseIt) {
-            const QJsonObject phaseObject = phaseIt.value().toObject();
-            PhaseDefinition phase;
-            phase.loopMode = phaseObject.value("loopMode").toString("loop");
-            phase.nextPhase = phaseObject.value("nextPhase").toString();
-
-            const QJsonObject phaseVariants = phaseObject.value("variants").toObject();
-            for (auto variantIt = phaseVariants.constBegin(); variantIt != phaseVariants.constEnd(); ++variantIt) {
-                const QString animation = variantIt.value().toObject().value("animation").toString();
-                if (!animation.isEmpty()) {
-                    phase.variants.insert(variantIt.key(), QUrl(animation));
-                }
-            }
-
-            if (!phase.variants.isEmpty()) {
-                action.phases.insert(phaseIt.key(), phase);
-            }
-        }
-
-        if (!action.variants.isEmpty() || !action.phases.isEmpty()) {
-            m_actions.insert(it.key(), action);
-        }
-    }
-
-    const QJsonObject recipes = root.value("recipes").toObject();
-    for (auto it = recipes.constBegin(); it != recipes.constEnd(); ++it) {
-        const QJsonObject recipeObject = it.value().toObject();
-
-        RecipeDefinition recipe;
-        recipe.label = recipeObject.value("label").toString(it.key());
-        recipe.scope = recipeObject.value("scope").toString();
-        recipe.actionId = recipeObject.value("action").toString();
-        recipe.soundUrl = QUrl(recipeObject.value("sound").toString());
-        recipe.propId = recipeObject.value("prop").toString();
-
-        const QJsonObject sounds = recipeObject.value("sounds").toObject();
-        for (auto soundIt = sounds.constBegin(); soundIt != sounds.constEnd(); ++soundIt) {
-            const QString soundUrl = soundIt.value().toString();
-            if (!soundUrl.isEmpty()) {
-                recipe.soundUrls.insert(soundIt.key(), QUrl(soundUrl));
-            }
-        }
-
-        const QJsonArray steps = recipeObject.value("steps").toArray();
-        for (const QJsonValue &stepValue : steps) {
-            const QJsonObject stepObject = stepValue.toObject();
-
-            RecipeStep step;
-            step.actionId = stepObject.value("action").toString(recipe.actionId);
-            step.phaseId = stepObject.value("phase").toString();
-            step.recipeId = stepObject.value("recipe").toString();
-            step.movementDirection = stepObject.value("movementDirection").toString(recipeObject.value("movementDirection").toString());
-            step.facing = stepObject.value("facing").toString(recipeObject.value("facing").toString());
-            step.repeat = stepObject.value("repeat").toInt(1);
-            step.durationMs = stepObject.value("durationMs").toInt(0);
-
-            if (!step.actionId.isEmpty() || !step.phaseId.isEmpty() || !step.recipeId.isEmpty()) {
-                recipe.steps.append(step);
-            }
-        }
-
-        // 允许最简单的 recipe 只写 action，不必为了一个动作再包一层 steps。
-        if (recipe.steps.isEmpty() && !recipe.actionId.isEmpty()) {
-            RecipeStep singleStep;
-            singleStep.actionId = recipe.actionId;
-            singleStep.movementDirection = recipeObject.value("movementDirection").toString();
-            singleStep.facing = recipeObject.value("facing").toString();
-            recipe.steps.append(singleStep);
-        }
-
-        if (!recipe.steps.isEmpty()) {
-            m_recipes.insert(it.key(), recipe);
-        }
-    }
-
-    const QJsonObject actionPools = root.value("actionPools").toObject();
-    for (auto it = actionPools.constBegin(); it != actionPools.constEnd(); ++it) {
-        const QJsonObject poolObject = it.value().toObject();
-
-        ActionPoolDefinition pool;
-        pool.label = poolObject.value("label").toString(it.key());
-
-        const QJsonArray entries = poolObject.value("entries").toArray();
-        for (const QJsonValue &entryValue : entries) {
-            const QJsonObject entryObject = entryValue.toObject();
-
-            ActionPoolEntry entry;
-            entry.recipeId = entryObject.value("recipe").toString();
-            entry.actionId = entryObject.value("action").toString();
-            entry.weight = entryObject.value("weight").toInt(1);
-            if (entry.weight < 1) {
-                entry.weight = 1;
-            }
-
-            if (!entry.recipeId.isEmpty() || !entry.actionId.isEmpty()) {
-                pool.entries.append(entry);
-            }
-        }
-
-        if (!pool.entries.isEmpty()) {
-            m_actionPools.insert(it.key(), pool);
-        }
-    }
-
-    const QJsonObject behaviorTriggers = root.value("behaviorTriggers").toObject();
-    for (auto it = behaviorTriggers.constBegin(); it != behaviorTriggers.constEnd(); ++it) {
-        const QJsonObject triggerObject = it.value().toObject();
-
-        BehaviorTriggerDefinition trigger;
-        trigger.label = triggerObject.value("label").toString(it.key());
-
-        const QJsonObject whenObject = triggerObject.value("when").toObject();
-        trigger.state = whenObject.value("state").toString();
-        trigger.actionId = whenObject.value("action").toString();
-        trigger.requiresNoActiveRecipe = whenObject.value("requiresNoActiveRecipe").toBool(false);
-
-        const QJsonArray entries = triggerObject.value("entries").toArray();
-        for (const QJsonValue &entryValue : entries) {
-            const QJsonObject entryObject = entryValue.toObject();
-
-            BehaviorTriggerEntry entry;
-            entry.type = entryObject.value("type").toString();
-            entry.poolId = entryObject.value("pool").toString();
-            entry.recipeId = entryObject.value("recipe").toString();
-            entry.actionId = entryObject.value("action").toString();
-            entry.weight = entryObject.value("weight").toInt(1);
-            if (entry.weight < 1) {
-                entry.weight = 1;
-            }
-
-            if (!entry.type.isEmpty()) {
-                trigger.entries.append(entry);
-            }
-        }
-
-        if (!trigger.entries.isEmpty()) {
-            m_behaviorTriggers.insert(it.key(), trigger);
-        }
-    }
-}
-
-void PetRuntime::loadFallbackManifest()
-{
-    m_fallbackAction = kFallbackActionId;
-    m_stateToAction.clear();
-    m_actions.clear();
-    m_recipes.clear();
-    m_actionPools.clear();
-    m_behaviorTriggers.clear();
-    m_props.clear();
-    m_hitZones.clear();
-    m_singleClickPools.clear();
-    m_facings = {"right", "left"};
-    m_movementDirections = {"east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"};
-    m_defaultFacing = "right";
-    m_currentFacing = m_defaultFacing;
-    m_currentMovementDirection = "east";
-
-    m_stateToAction.insert("idle", kFallbackActionId);
-
-    ActionDefinition fallbackAction;
-    fallbackAction.loopMode = "loop";
-    fallbackAction.variants.insert("right", QUrl(QString::fromUtf8(kFallbackAnimationUrl)));
-    m_actions.insert(kFallbackActionId, fallbackAction);
-
-    RecipeDefinition idleRecipe;
-    idleRecipe.scope = "state";
-    idleRecipe.actionId = kFallbackActionId;
-    RecipeStep idleStep;
-    idleStep.actionId = kFallbackActionId;
-    idleRecipe.steps.append(idleStep);
-    m_recipes.insert("idle.stand", idleRecipe);
-}
-
 QString PetRuntime::actionForState(const QString &state) const
 {
-    return m_stateToAction.value(state);
+    return m_manifest.stateToAction.value(state);
 }
 
 QUrl PetRuntime::variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const
@@ -1184,8 +809,8 @@ QUrl PetRuntime::variantForFacing(const QHash<QString, QUrl> &variants, const QS
         return variants.value(facing);
     }
 
-    if (variants.contains(m_defaultFacing)) {
-        return variants.value(m_defaultFacing);
+    if (variants.contains(m_manifest.defaultFacing)) {
+        return variants.value(m_manifest.defaultFacing);
     }
 
     if (!variants.isEmpty()) {
@@ -1214,7 +839,7 @@ QRectF PetRuntime::rectForHitZone(const HitZoneDefinition &zone) const
         return zone.rect;
     }
 
-    return zone.facingRects.value(m_defaultFacing, QRectF());
+    return zone.facingRects.value(m_manifest.defaultFacing, QRectF());
 }
 
 QList<QPointF> PetRuntime::polygonForHitZone(const HitZoneDefinition &zone) const
@@ -1227,7 +852,7 @@ QList<QPointF> PetRuntime::polygonForHitZone(const HitZoneDefinition &zone) cons
         return zone.polygon;
     }
 
-    return zone.facingPolygons.value(m_defaultFacing);
+    return zone.facingPolygons.value(m_manifest.defaultFacing);
 }
 
 bool PetRuntime::hitZoneContainsPoint(const HitZoneDefinition &zone, const QPointF &point) const
@@ -1249,9 +874,9 @@ QString PetRuntime::clickPoolForPoint(double x, double y, double width, double h
     // hitZones 以 240x240 逻辑画布描述，QML 可按实际窗口尺寸传入坐标。
     // 这样后续皮肤改 canvas 或窗口缩放时，只需要统一做一次坐标归一化。
     const QPointF logicalPoint(x * 240.0 / width, y * 240.0 / height);
-    for (const QString &poolId : m_singleClickPools) {
+    for (const QString &poolId : m_manifest.singleClickPools) {
         const QString zoneId = hitZoneIdForClickPool(poolId);
-        const HitZoneDefinition zone = m_hitZones.value(zoneId);
+        const HitZoneDefinition zone = m_manifest.hitZones.value(zoneId);
         if (!zone.id.isEmpty() && hitZoneContainsPoint(zone, logicalPoint)) {
             return poolId;
         }
@@ -1307,14 +932,14 @@ void PetRuntime::playSoundForRecipe(const RecipeDefinition &recipe)
 
 void PetRuntime::schedulePropForRecipe(const RecipeDefinition &recipe)
 {
-    if (recipe.propId.isEmpty() || !m_props.contains(recipe.propId)) {
+    if (recipe.propId.isEmpty() || !m_manifest.props.contains(recipe.propId)) {
         // 任何新的非 Prop recipe 都会取消尚未飞出的延迟 Prop。
         // 这样用户在 700ms 延迟期间触发其它动作时，不会突然冒出上一轮徽章。
         ++m_propRequestSerial;
         return;
     }
 
-    const PropDefinition prop = m_props.value(recipe.propId);
+    const PropDefinition prop = m_manifest.props.value(recipe.propId);
     const QString propId = recipe.propId;
     const QString facing = m_currentFacing;
     const int requestSerial = ++m_propRequestSerial;
@@ -1332,11 +957,11 @@ void PetRuntime::schedulePropForRecipe(const RecipeDefinition &recipe)
 
 void PetRuntime::spawnPropForRecipe(const QString &propId, const QString &facing)
 {
-    if (!m_props.contains(propId)) {
+    if (!m_manifest.props.contains(propId)) {
         return;
     }
 
-    const PropDefinition prop = m_props.value(propId);
+    const PropDefinition prop = m_manifest.props.value(propId);
     const QPointF startOffset = scaledPropPoint(propPointForFacing(prop.startOffsets, facing));
     const QPointF travelDelta = propTravelDelta(prop, facing);
 
@@ -1395,12 +1020,12 @@ void PetRuntime::clearActiveRecipe()
 
 void PetRuntime::playNextRecipeStep()
 {
-    if (m_currentRecipeId.isEmpty() || !m_recipes.contains(m_currentRecipeId)) {
+    if (m_currentRecipeId.isEmpty() || !m_manifest.recipes.contains(m_currentRecipeId)) {
         clearActiveRecipe();
         return;
     }
 
-    const RecipeDefinition recipe = m_recipes.value(m_currentRecipeId);
+    const RecipeDefinition recipe = m_manifest.recipes.value(m_currentRecipeId);
     ++m_currentRecipeStepIndex;
 
     if (m_currentRecipeStepIndex < 0 || m_currentRecipeStepIndex >= recipe.steps.size()) {
@@ -1426,7 +1051,7 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
     }
 
     const QString movementDirection = resolveRecipeMovementDirection(step.movementDirection);
-    if (!movementDirection.isEmpty() && m_movementDirections.contains(movementDirection)) {
+    if (!movementDirection.isEmpty() && m_manifest.movementDirections.contains(movementDirection)) {
         const bool movementDirectionChanged = (m_currentMovementDirection != movementDirection);
         m_currentMovementDirection = movementDirection;
         updateFacingFromMovementDirection(movementDirection);
@@ -1435,7 +1060,7 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
         }
     }
 
-    if (!step.recipeId.isEmpty() && m_recipes.contains(step.recipeId)) {
+    if (!step.recipeId.isEmpty() && m_manifest.recipes.contains(step.recipeId)) {
         playRecipe(step.recipeId);
         return;
     }
@@ -1450,109 +1075,24 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
     }
 }
 
-QString PetRuntime::actionPoolIdForContext(const QString &poolId) const
-{
-    const QString normalizedPoolId = poolId.trimmed();
-    if (normalizedPoolId.isEmpty()) {
-        return {};
-    }
-
-    // 语言后缀池用于还原旧版“某些语言没有某个语音动作”的细节。
-    // 例如中文没有 eureka2.wav，manifest 可以用 doubleClick.random.zh
-    // 覆盖默认 doubleClick.random。
-    const QString languagePoolId = normalizedPoolId + "." + m_voiceLanguage;
-    if (m_actionPools.contains(languagePoolId)) {
-        return languagePoolId;
-    }
-
-    return normalizedPoolId;
-}
-
-PetRuntime::ActionPoolEntry PetRuntime::selectActionPoolEntry(const ActionPoolDefinition &pool) const
-{
-    ActionPoolEntry fallbackEntry;
-    if (pool.entries.isEmpty()) {
-        return fallbackEntry;
-    }
-
-    int totalWeight = 0;
-    for (const ActionPoolEntry &entry : pool.entries) {
-        totalWeight += entry.weight;
-    }
-
-    if (totalWeight <= 0) {
-        return pool.entries.constFirst();
-    }
-
-    int cursor = QRandomGenerator::global()->bounded(totalWeight);
-    for (const ActionPoolEntry &entry : pool.entries) {
-        cursor -= entry.weight;
-        if (cursor < 0) {
-            return entry;
-        }
-    }
-
-    return pool.entries.constLast();
-}
-
-PetRuntime::BehaviorTriggerEntry PetRuntime::selectBehaviorTriggerEntry(const BehaviorTriggerDefinition &trigger, double randomValue) const
-{
-    BehaviorTriggerEntry fallbackEntry;
-    if (trigger.entries.isEmpty()) {
-        return fallbackEntry;
-    }
-
-    int totalWeight = 0;
-    for (const BehaviorTriggerEntry &entry : trigger.entries) {
-        totalWeight += entry.weight;
-    }
-
-    if (totalWeight <= 0) {
-        return trigger.entries.constFirst();
-    }
-
-    // 外部测试会传入确定性的 0..1 随机值；真实运行时则来自 QRandomGenerator。
-    // 这里把它投射到权重区间，manifest 里的 70/30、80/20 等比例都能复用同一套逻辑。
-    double cursor = qBound(0.0, randomValue, 0.999999999) * totalWeight;
-    for (const BehaviorTriggerEntry &entry : trigger.entries) {
-        cursor -= entry.weight;
-        if (cursor < 0) {
-            return entry;
-        }
-    }
-
-    return trigger.entries.constLast();
-}
-
-bool PetRuntime::behaviorTriggerMatchesCurrentContext(const BehaviorTriggerDefinition &trigger) const
-{
-    if (!trigger.state.isEmpty() && trigger.state != m_currentState) {
-        return false;
-    }
-
-    if (!trigger.actionId.isEmpty() && trigger.actionId != m_currentActionId) {
-        return false;
-    }
-
-    if (trigger.requiresNoActiveRecipe && !m_currentRecipeId.isEmpty()) {
-        return false;
-    }
-
-    return true;
-}
-
 void PetRuntime::handleBehaviorTriggerWithRoll(const QString &triggerId, double randomValue)
 {
-    if (!m_behaviorTriggers.contains(triggerId)) {
+    if (!m_manifest.behaviorTriggers.contains(triggerId)) {
         return;
     }
 
-    const BehaviorTriggerDefinition trigger = m_behaviorTriggers.value(triggerId);
-    if (!behaviorTriggerMatchesCurrentContext(trigger)) {
+    const BehaviorTriggerDefinition trigger = m_manifest.behaviorTriggers.value(triggerId);
+    const BehaviorTriggerContext context {
+        m_currentState,
+        m_currentActionId,
+        !m_currentRecipeId.isEmpty(),
+    };
+
+    if (!BehaviorTriggerEngine::matches(trigger, context)) {
         return;
     }
 
-    const BehaviorTriggerEntry entry = selectBehaviorTriggerEntry(trigger, randomValue);
+    const BehaviorTriggerEntry entry = BehaviorTriggerEngine::selectEntry(trigger, randomValue);
     if (entry.type == "none") {
         return;
     }
@@ -1580,11 +1120,11 @@ QString PetRuntime::followUpPoolForCompletedAction(const ActionDefinition &actio
 
     // 旧版走路 / 跑步播完后会继续走、继续跑、换方向或停下。
     // 这里只把“完成后去哪个候选池”写在运行时，具体概率仍交给 manifest。
-    if (m_currentActionId == "walk" && m_actionPools.contains("walk.finished")) {
+    if (m_currentActionId == "walk" && m_manifest.actionPools.contains("walk.finished")) {
         return "walk.finished";
     }
 
-    if (m_currentActionId == "run" && m_actionPools.contains("run.finished")) {
+    if (m_currentActionId == "run" && m_manifest.actionPools.contains("run.finished")) {
         return "run.finished";
     }
 
@@ -1611,18 +1151,18 @@ QString PetRuntime::resolveRecipeFacing(const QString &facing) const
     if (normalizedFacing == "$opposite") {
         // Miles 只有左右两个朝向，但这里不把名字写死。
         // 未来皮肤若提供两个 facings，也能复用同一个“反向站立”recipe。
-        if (m_facings.size() == 2) {
-            return (m_currentFacing == m_facings.constFirst()) ? m_facings.constLast() : m_facings.constFirst();
+        if (m_manifest.facings.size() == 2) {
+            return (m_currentFacing == m_manifest.facings.constFirst()) ? m_manifest.facings.constLast() : m_manifest.facings.constFirst();
         }
 
-        if (m_currentFacing == "right" && m_facings.contains("left")) {
+        if (m_currentFacing == "right" && m_manifest.facings.contains("left")) {
             return "left";
         }
-        if (m_currentFacing == "left" && m_facings.contains("right")) {
+        if (m_currentFacing == "left" && m_manifest.facings.contains("right")) {
             return "right";
         }
 
-        for (const QString &candidate : m_facings) {
+        for (const QString &candidate : m_manifest.facings) {
             if (candidate != m_currentFacing) {
                 return candidate;
             }
@@ -1631,7 +1171,7 @@ QString PetRuntime::resolveRecipeFacing(const QString &facing) const
         return {};
     }
 
-    if (m_facings.contains(normalizedFacing)) {
+    if (m_manifest.facings.contains(normalizedFacing)) {
         return normalizedFacing;
     }
 
@@ -1654,7 +1194,7 @@ double PetRuntime::scaledPropLength(double length) const
 
 QPointF PetRuntime::propPointForFacing(const QHash<QString, QPointF> &points, const QString &facing) const
 {
-    return points.value(facing, points.value(m_defaultFacing, QPointF(0, 0)));
+    return points.value(facing, points.value(m_manifest.defaultFacing, QPointF(0, 0)));
 }
 
 QPointF PetRuntime::scaledPropPoint(const QPointF &point) const
@@ -1687,7 +1227,7 @@ void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)
     }
 
     const QString nextFacing = action.facingAfter.value(m_currentFacing);
-    if (nextFacing.isEmpty() || nextFacing == m_currentFacing || !m_facings.contains(nextFacing)) {
+    if (nextFacing.isEmpty() || nextFacing == m_currentFacing || !m_manifest.facings.contains(nextFacing)) {
         return;
     }
 
@@ -1706,7 +1246,7 @@ void PetRuntime::updateFacingFromMovementDirection(const QString &movementDirect
         nextFacing = "left";
     }
 
-    if (nextFacing.isEmpty() || nextFacing == m_currentFacing || !m_facings.contains(nextFacing)) {
+    if (nextFacing.isEmpty() || nextFacing == m_currentFacing || !m_manifest.facings.contains(nextFacing)) {
         return;
     }
 
@@ -1716,7 +1256,7 @@ void PetRuntime::updateFacingFromMovementDirection(const QString &movementDirect
 
 void PetRuntime::playPhase(const QString &actionId, const QString &phaseId)
 {
-    const ActionDefinition action = m_actions.value(actionId);
+    const ActionDefinition action = m_manifest.actions.value(actionId);
     if (!action.phases.contains(phaseId)) {
         return;
     }
@@ -1738,7 +1278,7 @@ void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinitio
 
     PhaseDefinition singlePhase;
     singlePhase.loopMode = action.loopMode;
-    singlePhase.variants.insert(m_defaultFacing, variantForAction(action));
+    singlePhase.variants.insert(m_manifest.defaultFacing, variantForAction(action));
     setCurrentPhase(actionId, "single", singlePhase);
 }
 

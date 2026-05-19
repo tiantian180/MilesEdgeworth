@@ -38,6 +38,8 @@ def main() -> int:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     runtime_header = read("apps/desktop/src/pet/PetRuntime.h")
+    manifest_header = read("apps/desktop/src/pet/manifest/SkinManifest.h")
+    trigger_engine = read("apps/desktop/src/pet/behavior/BehaviorTriggerEngine.h")
 
     triggers = manifest.get("behaviorTriggers", {})
     idle_trigger = triggers.get("idle.loopFinished")
@@ -72,10 +74,11 @@ def main() -> int:
     for token in [
         "BehaviorTriggerEntry",
         "BehaviorTriggerDefinition",
-        "m_behaviorTriggers",
         "handleBehaviorTriggerWithRoll",
     ]:
-        require(token in runtime_header, f"PetRuntime 应提供通用 behavior trigger 结构：{token}")
+        require(token in runtime_header + manifest_header + trigger_engine, f"PetRuntime 应提供通用 behavior trigger 结构：{token}")
+    require("m_manifest.behaviorTriggers" in runtime_cpp, "PetRuntime 应从 SkinManifest 读取 behavior triggers")
+    require("BehaviorTriggerEngine::selectEntry" in runtime_cpp, "PetRuntime 应委托 BehaviorTriggerEngine 抽取触发结果")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_52_manifest_idle_loop_trigger" in root_cmake, "CTest 未注册 Phase 0.52 检查")
