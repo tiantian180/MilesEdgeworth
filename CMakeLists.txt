@@ -190,5 +190,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_26_idle_look_variants.py
         )
+
+        # Phase 0.27 的站立朝向检查：旧版随机待机中存在一条
+        # 直接切到反向站立的分支，不播放转身动画。
+        add_test(
+            NAME check_phase_0_27_idle_flip_stand
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_27_idle_flip_stand.py
+        )
     endif()
 endif()

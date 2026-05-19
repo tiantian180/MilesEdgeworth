@@ -738,6 +738,12 @@
       "scope": "state",
       "action": "idle_stand"
     },
+    "idle.flipStand": {
+      "label": "随机反向站立",
+      "scope": "idle",
+      "action": "idle_stand",
+      "facing": "$opposite"
+    },
     "walk.current": {
       "label": "沿当前方向继续走",
       "scope": "locomotion",
@@ -1053,6 +1059,10 @@
         {
           "recipe": "turn.once",
           "weight": 2
+        },
+        {
+          "recipe": "idle.flipStand",
+          "weight": 1
         },
         {
           "recipe": "idle.tappingHead",

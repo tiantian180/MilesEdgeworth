@@ -178,6 +178,7 @@ private:
         QString phaseId;
         QString recipeId;
         QString movementDirection;
+        QString facing;
         int repeat = 1;
         int durationMs = 0;
     };
@@ -252,6 +253,7 @@ private:
     ActionPoolEntry selectActionPoolEntry(const ActionPoolDefinition &pool) const;
     QString followUpPoolForCompletedAction(const ActionDefinition &action) const;
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
+    QString resolveRecipeFacing(const QString &facing) const;
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
     void playPhase(const QString &actionId, const QString &phaseId);

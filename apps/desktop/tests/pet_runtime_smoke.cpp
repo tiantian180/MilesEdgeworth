@@ -52,6 +52,15 @@ int main(int argc, char *argv[])
     require(runtime.currentFacing() == "left", "转身播完后应切到 left");
     require(runtime.currentActionId() == "idle_stand", "转身播完后应回到 idle_stand");
 
+    runtime.setFacing("right");
+    runtime.playRecipe("idle.flipStand");
+    require(runtime.currentActionId() == "idle_stand", "idle.flipStand 应保持站立动作");
+    require(runtime.currentFacing() == "left", "idle.flipStand 应从 right 直接切到 left");
+
+    runtime.playRecipe("idle.flipStand");
+    require(runtime.currentActionId() == "idle_stand", "idle.flipStand 应保持站立动作");
+    require(runtime.currentFacing() == "right", "idle.flipStand 应从 left 直接切到 right");
+
     runtime.playRecipe("walk.east");
     QVariantMap walkDelta = runtime.consumeFrameMovementDelta();
     require(walkDelta.value("dx").toDouble() > 0, "walk.east 应推动窗口向右移动");

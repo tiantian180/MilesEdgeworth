@@ -957,6 +957,7 @@ void PetRuntime::loadManifest()
             step.phaseId = stepObject.value("phase").toString();
             step.recipeId = stepObject.value("recipe").toString();
             step.movementDirection = stepObject.value("movementDirection").toString(recipeObject.value("movementDirection").toString());
+            step.facing = stepObject.value("facing").toString(recipeObject.value("facing").toString());
             step.repeat = stepObject.value("repeat").toInt(1);
             step.durationMs = stepObject.value("durationMs").toInt(0);
 
@@ -970,6 +971,7 @@ void PetRuntime::loadManifest()
             RecipeStep singleStep;
             singleStep.actionId = recipe.actionId;
             singleStep.movementDirection = recipeObject.value("movementDirection").toString();
+            singleStep.facing = recipeObject.value("facing").toString();
             recipe.steps.append(singleStep);
         }
 
@@ -1289,6 +1291,11 @@ void PetRuntime::playNextRecipeStep()
 
 void PetRuntime::playRecipeStep(const RecipeStep &step)
 {
+    const QString recipeFacing = resolveRecipeFacing(step.facing);
+    if (!recipeFacing.isEmpty() && recipeFacing != m_currentFacing) {
+        setFacing(recipeFacing);
+    }
+
     const QString movementDirection = resolveRecipeMovementDirection(step.movementDirection);
     if (!movementDirection.isEmpty() && m_movementDirections.contains(movementDirection)) {
         const bool movementDirectionChanged = (m_currentMovementDirection != movementDirection);
@@ -1386,6 +1393,43 @@ QString PetRuntime::resolveRecipeMovementDirection(const QString &movementDirect
     }
 
     return normalizedDirection;
+}
+
+QString PetRuntime::resolveRecipeFacing(const QString &facing) const
+{
+    const QString normalizedFacing = facing.trimmed();
+    if (normalizedFacing.isEmpty() || normalizedFacing == "$current") {
+        return {};
+    }
+
+    if (normalizedFacing == "$opposite") {
+        // Miles 只有左右两个朝向，但这里不把名字写死。
+        // 未来皮肤若提供两个 facings，也能复用同一个“反向站立”recipe。
+        if (m_facings.size() == 2) {
+            return (m_currentFacing == m_facings.constFirst()) ? m_facings.constLast() : m_facings.constFirst();
+        }
+
+        if (m_currentFacing == "right" && m_facings.contains("left")) {
+            return "left";
+        }
+        if (m_currentFacing == "left" && m_facings.contains("right")) {
+            return "right";
+        }
+
+        for (const QString &candidate : m_facings) {
+            if (candidate != m_currentFacing) {
+                return candidate;
+            }
+        }
+
+        return {};
+    }
+
+    if (m_facings.contains(normalizedFacing)) {
+        return normalizedFacing;
+    }
+
+    return {};
 }
 
 void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)
