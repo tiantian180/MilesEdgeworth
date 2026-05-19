@@ -230,5 +230,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_31_sleep_pointer_smoke.py
         )
+
+        # Phase 0.32 的单击分区 smoke 检查：确保头部、大臂、
+        # 小臂、胸口、肚子和腿部都经过真实 PetRuntime 点击路径。
+        add_test(
+            NAME check_phase_0_32_single_click_zone_smoke
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_32_single_click_zone_smoke.py
+        )
     endif()
 endif()

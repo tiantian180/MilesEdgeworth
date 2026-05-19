@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QEventLoop>
+#include <QStringList>
 #include <QTimer>
 #include <QVariantMap>
 
@@ -17,6 +18,16 @@ void require(bool condition, const char *message)
     }
 
     std::cerr << message << '\n';
+    std::exit(1);
+}
+
+void requireActionIn(const QString &actual, const QStringList &expected, const char *message)
+{
+    if (expected.contains(actual)) {
+        return;
+    }
+
+    std::cerr << message << ": " << actual.toStdString() << '\n';
     std::exit(1);
 }
 
@@ -179,6 +190,36 @@ int main(int argc, char *argv[])
     runtime.setFacing("left");
     runtime.handlePrimaryClick(150, 40, 240, 240);
     require(runtime.currentActionId() != "scared", "左朝向右上头部区域不应触发 scared");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(100, 40, 240, 240);
+    requireActionIn(runtime.currentActionId(), {"idle_tapping_head", "idle_look_up"}, "点击头部应触发头部候选动作");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(60, 85, 240, 240);
+    require(runtime.currentActionId() == "turn_around", "点击大臂应触发转身");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(60, 130, 240, 240);
+    requireActionIn(runtime.currentActionId(), {"idle_check_watch", "idle_shrug"}, "点击小臂应触发小臂候选动作");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(120, 85, 240, 240);
+    require(runtime.currentActionId() == "idle_thinking_once", "点击胸口应触发抱臂思考");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(120, 150, 240, 240);
+    requireActionIn(runtime.currentActionId(), {"idle_pointing", "bow"}, "点击肚子应触发肚子候选动作");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(120, 200, 240, 240);
+    requireActionIn(runtime.currentActionId(), {"back_away", "idle_look_down"}, "点击腿部应触发腿部候选动作");
 
     const QString soundBeforeMutedPlay = runtime.currentSoundUrl().toString();
     runtime.toggleAudioMuted();
