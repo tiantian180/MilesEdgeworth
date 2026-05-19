@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Window
+import QtQml.Models
 import Qt.labs.platform as Platform
 import QtMultimedia
 import MilesEdgeworth as App
@@ -15,6 +16,16 @@ Window {
 
     flags: Qt.FramelessWindowHint
            | Qt.NoDropShadowWindowHint
+
+    function refreshInputMask() {
+        App.DesktopShell.setPetInputMask(
+            App.PetRuntime.currentAnimationUrl,
+            App.PetRuntime.petImageSize,
+            App.PetRuntime.petWindowSize
+        )
+    }
+
+    Component.onCompleted: refreshInputMask()
 
     // Phase 0 先使用平台原生菜单承载最小操作入口。
     // 这样菜单的 hover、外部点击关闭、阴影和系统质感都交给 Qt/系统处理。
@@ -128,10 +139,34 @@ Window {
 
         Platform.MenuSeparator {}
 
-        Platform.MenuItem {
-            text: "喂食红茶"
-            enabled: App.PetEventBridge.enabledSkinCommandIds.indexOf("miles.feedTea") >= 0
-            onTriggered: App.PetEventBridge.submitMenuCommand("miles.feedTea")
+        Platform.Menu {
+            id: skinCommandMenu
+
+            title: "皮肤动作"
+            visible: skinCommandInstantiator.count > 0
+            enabled: skinCommandInstantiator.count > 0
+
+            // 简单皮肤命令由 manifest 暴露出来，这里只动态生成菜单项。
+            // 复杂玩法以后进入 Custom Interaction，不在 QML 里写具体皮肤逻辑。
+            Instantiator {
+                id: skinCommandInstantiator
+
+                model: App.PetEventBridge.enabledSkinCommands
+                delegate: Platform.MenuItem {
+                    required property var modelData
+
+                    text: modelData.label
+                    onTriggered: App.PetEventBridge.submitMenuCommand(modelData.id)
+                }
+
+                onObjectAdded: function(index, object) {
+                    skinCommandMenu.insertItem(index, object)
+                }
+
+                onObjectRemoved: function(index, object) {
+                    skinCommandMenu.removeItem(object)
+                }
+            }
         }
 
         Platform.MenuItem {
@@ -170,16 +205,16 @@ Window {
         volume: App.PetRuntime.audioMuted ? 0 : 0.8
     }
 
-    // Phase 0.14 的最小 Prop 窗口：先专门承载检察官徽章。
-    // 它是独立 Window，才能像旧版一样飞出桌宠本体窗口范围。
+    // Prop 是主体外的临时视觉对象，例如徽章、掉落物或轻量特效。
+    // 它使用独立 Window，才能像旧版一样飞出桌宠本体窗口范围。
     Window {
-        id: prosecutorBadgeWindow
+        id: propWindow
 
         width: Math.max(1, App.PetRuntime.currentPropWidth)
         height: Math.max(1, App.PetRuntime.currentPropHeight)
         visible: App.PetRuntime.currentPropVisible
         color: "transparent"
-        title: "Prosecutor Badge"
+        title: "MilesEdgeworth Prop"
 
         flags: Qt.FramelessWindowHint
                | Qt.NoDropShadowWindowHint
@@ -187,7 +222,7 @@ Window {
                | Qt.Tool
 
         Image {
-            id: prosecutorBadgeImage
+            id: propImage
 
             anchors.centerIn: parent
             source: App.PetRuntime.currentPropImageUrl
@@ -200,24 +235,24 @@ Window {
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton
             onClicked: {
-                badgeFlyAnimation.stop()
-                badgeExpireTimer.stop()
+                propFlyAnimation.stop()
+                propExpireTimer.stop()
                 App.PetEventBridge.submitPropClicked()
             }
         }
     }
 
     NumberAnimation {
-        id: badgeFlyAnimation
+        id: propFlyAnimation
 
-        target: prosecutorBadgeWindow
+        target: propWindow
         property: "x"
         duration: Math.max(1, App.PetRuntime.currentPropDurationMs)
         easing.type: Easing.OutSine
     }
 
     Timer {
-        id: badgeExpireTimer
+        id: propExpireTimer
 
         interval: Math.max(1, App.PetRuntime.currentPropDurationMs)
         repeat: false
@@ -283,6 +318,14 @@ Window {
     Connections {
         target: App.PetRuntime
 
+        function onCurrentAnimationUrlChanged() {
+            petWindow.refreshInputMask()
+        }
+
+        function onPetScaleChanged() {
+            petWindow.refreshInputMask()
+        }
+
         function onPlaybackSerialChanged() {
             // 同一个 action 连续触发时，source URL 可能不变。
             // playbackSerial 变化代表“这次要重新播放”，所以这里手动回到第 0 帧。
@@ -305,14 +348,14 @@ Window {
                 return
             }
 
-            prosecutorBadgeWindow.x = petWindow.x + App.PetRuntime.currentPropStartOffsetX
-            prosecutorBadgeWindow.y = petWindow.y + App.PetRuntime.currentPropStartOffsetY
-            badgeFlyAnimation.from = prosecutorBadgeWindow.x
-            badgeFlyAnimation.to = petWindow.x + App.PetRuntime.currentPropEndOffsetX
-            badgeFlyAnimation.duration = Math.max(1, App.PetRuntime.currentPropDurationMs)
-            badgeExpireTimer.interval = Math.max(1, App.PetRuntime.currentPropDurationMs)
-            badgeFlyAnimation.restart()
-            badgeExpireTimer.restart()
+            propWindow.x = petWindow.x + App.PetRuntime.currentPropStartX
+            propWindow.y = petWindow.y + App.PetRuntime.currentPropStartY
+            propFlyAnimation.from = propWindow.x
+            propFlyAnimation.to = petWindow.x + App.PetRuntime.currentPropEndX
+            propFlyAnimation.duration = Math.max(1, App.PetRuntime.currentPropDurationMs)
+            propExpireTimer.interval = Math.max(1, App.PetRuntime.currentPropDurationMs)
+            propFlyAnimation.restart()
+            propExpireTimer.restart()
         }
 
         function onCurrentPropChanged() {
@@ -320,8 +363,8 @@ Window {
                 return
             }
 
-            badgeFlyAnimation.stop()
-            badgeExpireTimer.stop()
+            propFlyAnimation.stop()
+            propExpireTimer.stop()
         }
     }
 

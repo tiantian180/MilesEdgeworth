@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pet/commands/SkinCommand.h"
+
 #include <QHash>
 #include <QList>
 #include <QPointF>
@@ -124,6 +126,7 @@ struct SkinManifest
     QHash<QString, BehaviorTriggerDefinition> behaviorTriggers;
     QHash<QString, PropDefinition> props;
     QHash<QString, HitZoneDefinition> hitZones;
+    QHash<QString, SkinCommandDefinition> skinCommands;
     QStringList singleClickPools;
     QString fallbackAction = "idle_stand";
     QStringList facings = {"right", "left"};

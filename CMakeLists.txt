@@ -438,5 +438,29 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_59_event_action_request_spine.py
         )
+
+        # Phase 0.60 的框架边界检查：Miles 皮肤定制内容只能留在
+        # manifest / assets / 后续自定义交互层，不能继续写进通用 Runtime。
+        add_test(
+            NAME check_phase_0_60_framework_boundaries
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_60_framework_boundaries.py
+        )
+
+        # Phase 0.61 的 PropController 拆分检查：主体外临时视觉对象
+        # 由专门控制器管理，PetRuntime 不再持有飞行路径和尺寸细节。
+        add_test(
+            NAME check_phase_0_61_prop_controller_split
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_61_prop_controller_split.py
+        )
+
+        # Phase 0.62 的输入 mask 检查：透明像素区域应尽量交还给系统，
+        # 避免整块透明矩形都拦截鼠标。
+        add_test(
+            NAME check_phase_0_62_window_input_mask
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_62_window_input_mask.py
+        )
     endif()
 endif()

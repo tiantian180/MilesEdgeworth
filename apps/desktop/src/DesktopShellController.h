@@ -5,6 +5,7 @@
 #include <QRect>
 #include <QJSEngine>
 #include <QQmlEngine>
+#include <QUrl>
 #include <QtQml/qqmlregistration.h>
 
 class QAction;
@@ -40,6 +41,8 @@ public slots:
     Q_INVOKABLE void placePetWindowForStartup(double petScale);
     Q_INVOKABLE void movePetWindowBy(double dx, double dy);
     Q_INVOKABLE void movePetWindowTo(double x, double y);
+    Q_INVOKABLE void setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize);
+    Q_INVOKABLE void clearPetInputMask();
 
 signals:
     void alwaysOnTopChanged();

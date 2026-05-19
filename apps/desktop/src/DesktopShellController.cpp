@@ -1,5 +1,7 @@
 #include "DesktopShellController.h"
 
+#include "window/WindowInputMaskController.h"
+
 #include <QAction>
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -162,6 +164,16 @@ void DesktopShellController::movePetWindowTo(double x, double y)
 
     const QPointF clampedPosition = clampedPetWindowPosition(QPointF(x, y));
     m_petWindow->setPosition(clampedPosition.toPoint());
+}
+
+void DesktopShellController::setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize)
+{
+    WindowInputMaskController::applyMask(m_petWindow, animationUrl, imageSize, windowSize);
+}
+
+void DesktopShellController::clearPetInputMask()
+{
+    WindowInputMaskController::clearMask(m_petWindow);
 }
 
 void DesktopShellController::createTrayIcon()

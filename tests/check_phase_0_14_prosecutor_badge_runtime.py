@@ -58,28 +58,30 @@ def main() -> None:
         require(alias in qrc, f"qrc 缺少 {alias}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    prop_controller_h = read("apps/desktop/src/pet/effects/PropController.h")
+    prop_controller_cpp = read("apps/desktop/src/pet/effects/PropController.cpp")
     for token in [
         "currentPropVisible",
         "currentPropId",
         "currentPropImageUrl",
-        "currentPropStartOffsetX",
-        "currentPropEndOffsetX",
+        "currentPropStartX",
+        "currentPropEndX",
         "currentPropDurationMs",
         "currentPropPlaybackSerial",
-        "spawnPropForRecipe",
         "PropDefinition",
     ]:
-        require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
+        require(token in pet_runtime_h + prop_controller_h, f"Prop 框架缺少 {token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     for token in [
-        "schedulePropForRecipe",
-        "spawnPropForRecipe",
-        "m_currentPropPlaybackSerial",
+        "scheduleForRecipe",
+        "spawn",
+        "m_playbackSerial",
         "QTimer::singleShot",
     ]:
-        require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+        require(token in prop_controller_h + prop_controller_cpp, f"PropController 缺少 {token}")
+    require("m_propController.scheduleForRecipe" in pet_runtime_cpp, "PetRuntime 应委托 PropController 调度 Prop")
     for token in [
         "PetEventType::PropClicked",
         "PetEventType::PropExpired",
@@ -90,12 +92,12 @@ def main() -> None:
 
     qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "id: prosecutorBadgeWindow",
+        "id: propWindow",
         "App.PetRuntime.currentPropVisible",
         "App.PetRuntime.currentPropImageUrl",
         "onCurrentPropPlaybackSerialChanged",
-        "badgeFlyAnimation",
-        "badgeExpireTimer",
+        "propFlyAnimation",
+        "propExpireTimer",
         "App.PetEventBridge.submitPropClicked()",
         "App.PetEventBridge.submitPropExpired()",
     ]:

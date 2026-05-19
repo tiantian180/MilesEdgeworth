@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pet/manifest/SkinManifest.h"
+#include "pet/effects/PropController.h"
 #include "pet/requests/ActionRequest.h"
 #include "pet/runtime/RuntimeSnapshot.h"
 
@@ -9,7 +10,6 @@
 #include <QJSEngine>
 #include <QList>
 #include <QObject>
-#include <QPointF>
 #include <QQmlEngine>
 #include <QRectF>
 #include <QStringList>
@@ -55,10 +55,10 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
     Q_PROPERTY(QString currentPropId READ currentPropId NOTIFY currentPropChanged)
     Q_PROPERTY(QUrl currentPropImageUrl READ currentPropImageUrl NOTIFY currentPropChanged)
-    Q_PROPERTY(double currentPropStartOffsetX READ currentPropStartOffsetX NOTIFY currentPropChanged)
-    Q_PROPERTY(double currentPropStartOffsetY READ currentPropStartOffsetY NOTIFY currentPropChanged)
-    Q_PROPERTY(double currentPropEndOffsetX READ currentPropEndOffsetX NOTIFY currentPropChanged)
-    Q_PROPERTY(double currentPropEndOffsetY READ currentPropEndOffsetY NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropStartX READ currentPropStartX NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropStartY READ currentPropStartY NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropEndX READ currentPropEndX NOTIFY currentPropChanged)
+    Q_PROPERTY(double currentPropEndY READ currentPropEndY NOTIFY currentPropChanged)
     Q_PROPERTY(double currentPropWidth READ currentPropWidth NOTIFY currentPropChanged)
     Q_PROPERTY(double currentPropHeight READ currentPropHeight NOTIFY currentPropChanged)
     Q_PROPERTY(double currentPropVisualWidth READ currentPropVisualWidth NOTIFY currentPropChanged)
@@ -71,42 +71,42 @@ class PetRuntime : public QObject
 public:
     explicit PetRuntime(QObject *parent = nullptr);
 
-    QString currentState() const;
-    QString currentActionId() const;
-    QString currentRecipeId() const;
-    QString currentPhaseId() const;
-    QString currentFacing() const;
-    QString currentMovementDirection() const;
-    QString currentLoopMode() const;
-    bool currentAutoReturnToIdle() const;
-    bool audioMuted() const;
-    QString voiceLanguage() const;
-    bool autoMovementEnabled() const;
-    QString petSizeId() const;
-    double petScale() const;
-    double petWindowSize() const;
-    double petImageSize() const;
-    bool pointerInteractionEnabled() const;
-    bool sleeping() const;
-    bool sleepTransitioning() const;
-    QUrl currentAnimationUrl() const;
-    QUrl currentSoundUrl() const;
-    bool currentPropVisible() const;
-    QString currentPropId() const;
-    QUrl currentPropImageUrl() const;
-    double currentPropStartOffsetX() const;
-    double currentPropStartOffsetY() const;
-    double currentPropEndOffsetX() const;
-    double currentPropEndOffsetY() const;
-    double currentPropWidth() const;
-    double currentPropHeight() const;
-    double currentPropVisualWidth() const;
-    double currentPropVisualHeight() const;
-    int currentPropDurationMs() const;
-    int currentPropPlaybackSerial() const;
-    int playbackSerial() const;
-    int soundPlaybackSerial() const;
-    const SkinManifest &manifest() const;
+    QString currentState() const { return m_currentState; }
+    QString currentActionId() const { return m_currentActionId; }
+    QString currentRecipeId() const { return m_currentRecipeId; }
+    QString currentPhaseId() const { return m_currentPhaseId; }
+    QString currentFacing() const { return m_currentFacing; }
+    QString currentMovementDirection() const { return m_currentMovementDirection; }
+    QString currentLoopMode() const { return m_currentLoopMode; }
+    bool currentAutoReturnToIdle() const { return m_currentAutoReturnToIdle; }
+    bool audioMuted() const { return m_audioMuted; }
+    QString voiceLanguage() const { return m_voiceLanguage; }
+    bool autoMovementEnabled() const { return m_autoMovementEnabled; }
+    QString petSizeId() const { return m_petSizeId; }
+    double petScale() const { return m_petScale; }
+    double petWindowSize() const { return 120.0 * m_petScale; }
+    double petImageSize() const { return 100.0 * m_petScale; }
+    bool pointerInteractionEnabled() const { return acceptsPointerInteraction(); }
+    bool sleeping() const { return m_currentActionId == "sleep" && m_currentPhaseId == "loop"; }
+    bool sleepTransitioning() const { return m_currentActionId == "sleep" && m_currentPhaseId != "loop"; }
+    QUrl currentAnimationUrl() const { return m_currentAnimationUrl; }
+    QUrl currentSoundUrl() const { return m_currentSoundUrl; }
+    bool currentPropVisible() const { return m_propController.current().visible; }
+    QString currentPropId() const { return m_propController.current().id; }
+    QUrl currentPropImageUrl() const { return m_propController.current().imageUrl; }
+    double currentPropStartX() const { return m_propController.current().startOffset.x(); }
+    double currentPropStartY() const { return m_propController.current().startOffset.y(); }
+    double currentPropEndX() const { return m_propController.current().endOffset.x(); }
+    double currentPropEndY() const { return m_propController.current().endOffset.y(); }
+    double currentPropWidth() const { return m_propController.current().width; }
+    double currentPropHeight() const { return m_propController.current().height; }
+    double currentPropVisualWidth() const { return m_propController.current().visualWidth; }
+    double currentPropVisualHeight() const { return m_propController.current().visualHeight; }
+    int currentPropDurationMs() const { return m_propController.current().durationMs; }
+    int currentPropPlaybackSerial() const { return m_propController.playbackSerial(); }
+    int playbackSerial() const { return m_playbackSerial; }
+    int soundPlaybackSerial() const { return m_soundPlaybackSerial; }
+    const SkinManifest &manifest() const { return m_manifest; }
     RuntimeSnapshot snapshot() const;
 
     Q_INVOKABLE void setState(const QString &state);
@@ -159,8 +159,6 @@ private:
     QUrl soundUrlForRecipe(const RecipeDefinition &recipe) const;
     bool acceptsPointerInteraction() const;
     void playSoundForRecipe(const RecipeDefinition &recipe);
-    void schedulePropForRecipe(const RecipeDefinition &recipe);
-    void spawnPropForRecipe(const QString &propId, const QString &facing);
     void hideCurrentProp();
     void clearActiveRecipe();
     void playActionInternal(const QString &actionId, bool resetRecipe);
@@ -170,10 +168,6 @@ private:
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
     double movementScaleFactor() const;
-    double scaledPropLength(double length) const;
-    QPointF propPointForFacing(const QHash<QString, QPointF> &points, const QString &facing) const;
-    QPointF scaledPropPoint(const QPointF &point) const;
-    QPointF propTravelDelta(const PropDefinition &prop, const QString &facing) const;
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
     void playPhase(const QString &actionId, const QString &phaseId);
@@ -197,20 +191,7 @@ private:
     double m_petScale = 2.0;
     QUrl m_currentAnimationUrl;
     QUrl m_currentSoundUrl;
-    bool m_currentPropVisible = false;
-    QString m_currentPropId;
-    QUrl m_currentPropImageUrl;
-    QPointF m_currentPropStartOffset;
-    QPointF m_currentPropEndOffset;
-    double m_currentPropWidth = 0;
-    double m_currentPropHeight = 0;
-    double m_currentPropVisualWidth = 0;
-    double m_currentPropVisualHeight = 0;
-    int m_currentPropDurationMs = 0;
-    QString m_currentPropClickedRecipeId;
-    QString m_currentPropExpiredRecipeId;
-    int m_currentPropPlaybackSerial = 0;
-    int m_propRequestSerial = 0;
+    PropController m_propController;
     int m_playbackSerial = 0;
     int m_soundPlaybackSerial = 0;
     QElapsedTimer m_dragShakeClock;

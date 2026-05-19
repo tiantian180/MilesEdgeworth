@@ -18,8 +18,16 @@ set(DESKTOP_SOURCES
     src/DesktopShellController.cpp
     src/DesktopShellController.h
     src/main.cpp
+    src/window/WindowInputMaskController.cpp
+    src/window/WindowInputMaskController.h
     src/pet/behavior/BehaviorTriggerEngine.cpp
     src/pet/behavior/BehaviorTriggerEngine.h
+    src/pet/commands/SkinCommand.h
+    src/pet/commands/SkinCommandResolver.cpp
+    src/pet/commands/SkinCommandResolver.h
+    src/pet/effects/PropController.cpp
+    src/pet/effects/PropController.h
+    src/pet/effects/PropState.h
     src/pet/events/PetEvent.h
     src/pet/events/PetEventBridge.cpp
     src/pet/events/PetEventBridge.h
@@ -95,6 +103,12 @@ if(BUILD_TESTING)
         tests/pet_runtime_smoke.cpp
         src/pet/behavior/BehaviorTriggerEngine.cpp
         src/pet/behavior/BehaviorTriggerEngine.h
+        src/pet/commands/SkinCommand.h
+        src/pet/commands/SkinCommandResolver.cpp
+        src/pet/commands/SkinCommandResolver.h
+        src/pet/effects/PropController.cpp
+        src/pet/effects/PropController.h
+        src/pet/effects/PropState.h
         src/pet/events/PetEvent.h
         src/pet/events/PetEventBridge.cpp
         src/pet/events/PetEventBridge.h

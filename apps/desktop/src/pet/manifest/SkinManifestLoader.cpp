@@ -30,6 +30,27 @@ QList<QPointF> polygonFromJsonArray(const QJsonArray &array)
     }
     return polygon;
 }
+
+ActionRequest requestFromJsonObject(const QJsonObject &object)
+{
+    const QString type = object.value("type").toString();
+    if (type == "pool") {
+        return ActionRequest::actionPool(object.value("pool").toString());
+    }
+    if (type == "recipe") {
+        return ActionRequest::recipe(object.value("recipe").toString());
+    }
+    if (type == "action") {
+        return ActionRequest::action(object.value("action").toString());
+    }
+    if (type == "returnToIdle") {
+        return ActionRequest::returnToIdle();
+    }
+    if (type == "toggleFacing") {
+        return ActionRequest::toggleFacing();
+    }
+    return ActionRequest::none();
+}
 } // namespace
 
 SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
@@ -109,6 +130,23 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
         const QString poolId = value.toString();
         if (!poolId.isEmpty()) {
             manifest.singleClickPools.append(poolId);
+        }
+    }
+
+    const QJsonObject skinCommands = root.value("skinCommands").toObject();
+    for (auto it = skinCommands.constBegin(); it != skinCommands.constEnd(); ++it) {
+        const QJsonObject commandObject = it.value().toObject();
+
+        SkinCommandDefinition command;
+        command.id = it.key();
+        command.label = commandObject.value("label").toString(it.key());
+        command.disabledWhenActionId = commandObject
+            .value("enabledWhen").toObject()
+            .value("notAction").toString();
+        command.request = requestFromJsonObject(commandObject.value("request").toObject());
+
+        if (!command.id.isEmpty() && command.request.kind != ActionRequestKind::None) {
+            manifest.skinCommands.insert(command.id, command);
         }
     }
 

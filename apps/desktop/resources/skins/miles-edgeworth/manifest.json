@@ -233,6 +233,18 @@
       "click.legsLookDownArea"
     ]
   },
+  "skinCommands": {
+    "miles.feedTea": {
+      "label": "喂食红茶",
+      "enabledWhen": {
+        "notAction": "sleep"
+      },
+      "request": {
+        "type": "pool",
+        "pool": "menu.tea"
+      }
+    }
+  },
   "props": {
     "prosecutor_badge": {
       "asset": "qrc:/pet/prosecutor-badge.png",

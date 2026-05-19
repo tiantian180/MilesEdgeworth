@@ -1,13 +1,10 @@
 #include "pet/events/PetEventBridge.h"
 
 #include "pet/PetRuntime.h"
+#include "pet/commands/SkinCommandResolver.h"
 #include "pet/interaction/InteractionPipeline.h"
 
 #include <QRandomGenerator>
-
-namespace {
-constexpr auto kFeedTeaCommandId = "miles.feedTea";
-}
 
 PetEventBridge::PetEventBridge(PetRuntime *runtime, QObject *parent)
     : QObject(parent)
@@ -21,18 +18,22 @@ PetEventBridge::PetEventBridge(PetRuntime *runtime, QObject *parent)
     connect(m_runtime, &PetRuntime::currentPhaseChanged, this, &PetEventBridge::skinCommandAvailabilityChanged);
 }
 
-QStringList PetEventBridge::enabledSkinCommandIds() const
+QVariantList PetEventBridge::enabledSkinCommands() const
 {
+    QVariantList commands;
     if (m_runtime == nullptr) {
-        return {};
+        return commands;
     }
 
     const RuntimeSnapshot snapshot = m_runtime->snapshot();
-    if (snapshot.currentActionId == "sleep") {
-        return {};
+    const QList<ResolvedSkinCommand> resolvedCommands =
+        SkinCommandResolver::enabledCommands(m_runtime->manifest(), snapshot);
+
+    for (const ResolvedSkinCommand &command : resolvedCommands) {
+        commands.append(command.toVariantMap());
     }
 
-    return {QString::fromUtf8(kFeedTeaCommandId)};
+    return commands;
 }
 
 void PetEventBridge::submitPrimaryClick(double x, double y, double width, double height)

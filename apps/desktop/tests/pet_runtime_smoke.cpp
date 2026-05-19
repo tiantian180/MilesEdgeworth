@@ -6,6 +6,7 @@
 #include <QEventLoop>
 #include <QStringList>
 #include <QTimer>
+#include <QVariantList>
 #include <QVariantMap>
 
 #include <cmath>
@@ -32,6 +33,16 @@ void requireActionIn(const QString &actual, const QStringList &expected, const c
 
     std::cerr << message << ": " << actual.toStdString() << '\n';
     std::exit(1);
+}
+
+bool hasSkinCommand(const QVariantList &commands, const QString &commandId)
+{
+    for (const QVariant &value : commands) {
+        if (value.toMap().value("id").toString() == commandId) {
+            return true;
+        }
+    }
+    return false;
 }
 
 struct MovementCase
@@ -288,7 +299,7 @@ int main(int argc, char *argv[])
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "完整站起播完后应回到 idle_stand");
 
-    require(bridge.enabledSkinCommandIds().contains("miles.feedTea"), "待机状态应允许 Miles 红茶皮肤命令");
+    require(hasSkinCommand(bridge.enabledSkinCommands(), "miles.feedTea"), "待机状态应允许 Miles 红茶皮肤命令");
     bridge.submitMenuCommand("miles.feedTea");
     require(runtime.currentRecipeId() == "tea.once" || runtime.currentRecipeId() == "teaAlt.once", "红茶皮肤命令应从两组喝茶 recipe 中选择");
     require(runtime.currentActionId() == "tea" || runtime.currentActionId() == "tea_alt", "喝茶 recipe 应只播放茶杯 GIF 本体");
@@ -299,7 +310,7 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "sleep", "睡眠菜单命令应进入 sleep action");
     require(runtime.currentPhaseId() == "enter", "非睡眠状态 sleep toggle 事件应从 enter phase 开始");
     require(runtime.sleepTransitioning(), "sleep.enter 期间应视为睡眠过渡");
-    require(!bridge.enabledSkinCommandIds().contains("miles.feedTea"), "睡眠相关状态中应禁用红茶皮肤命令");
+    require(!hasSkinCommand(bridge.enabledSkinCommands(), "miles.feedTea"), "睡眠相关状态中应禁用红茶皮肤命令");
 
     runtime.handleAnimationFinished();
     require(runtime.sleeping(), "sleep.enter 播完后应进入 sleeping loop");
@@ -311,7 +322,7 @@ int main(int argc, char *argv[])
     require(runtime.currentPhaseId() == "exit", "睡眠中双击应进入 wake/exit phase");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "wake 播完后应回到 idle_stand");
-    require(bridge.enabledSkinCommandIds().contains("miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
+    require(hasSkinCommand(bridge.enabledSkinCommands(), "miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
 
     bridge.submitMenuCommand("runtime.sleep.toggle");
     runtime.handleAnimationFinished();
@@ -320,7 +331,7 @@ int main(int argc, char *argv[])
     require(runtime.currentPhaseId() == "exit", "睡眠循环中 sleep toggle 事件应进入 wake/exit phase");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "wake 播完后应回到 idle_stand");
-    require(bridge.enabledSkinCommandIds().contains("miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
+    require(hasSkinCommand(bridge.enabledSkinCommands(), "miles.feedTea"), "醒来后应重新允许红茶皮肤命令");
 
     runtime.playAction("click_body");
     bridge.submitMenuCommand("runtime.returnToIdle");
@@ -438,9 +449,9 @@ int main(int argc, char *argv[])
     runtime.playRecipe("doubleClick.takeThat");
     waitForMilliseconds(750);
     require(runtime.currentPropVisible(), "大号 Take that 延迟后应飞出检察官徽章");
-    requireNear(runtime.currentPropStartOffsetX(), 258.0, "大号徽章右向起点应按旧版 scale=3 缩放");
-    requireNear(runtime.currentPropStartOffsetY(), 48.0, "大号徽章右向纵向起点应按旧版 scale=3 缩放");
-    requireNear(runtime.currentPropEndOffsetX(), 1308.0, "大号徽章右向终点应按旧版 600 + 150 * scale 计算");
+    requireNear(runtime.currentPropStartX(), 258.0, "大号徽章右向起点应按旧版 scale=3 缩放");
+    requireNear(runtime.currentPropStartY(), 48.0, "大号徽章右向纵向起点应按旧版 scale=3 缩放");
+    requireNear(runtime.currentPropEndX(), 1308.0, "大号徽章右向终点应按旧版 600 + 150 * scale 计算");
     requireNear(runtime.currentPropVisualWidth(), 105.0, "大号徽章视觉尺寸应按旧版 scale=3 缩放");
     bridge.submitPropExpired();
     runtime.handleAnimationFinished();
@@ -451,9 +462,9 @@ int main(int argc, char *argv[])
     runtime.playRecipe("doubleClick.takeThat");
     waitForMilliseconds(750);
     require(runtime.currentPropVisible(), "迷你 Take that 延迟后应飞出检察官徽章");
-    requireNear(runtime.currentPropStartOffsetX(), 1.0, "迷你徽章左向起点应按旧版 scale=1 缩放");
-    requireNear(runtime.currentPropStartOffsetY(), 16.0, "迷你徽章左向纵向起点应按旧版 scale=1 缩放");
-    requireNear(runtime.currentPropEndOffsetX(), -749.0, "迷你徽章左向终点应按旧版 -(600 + 150 * scale) 计算");
+    requireNear(runtime.currentPropStartX(), 1.0, "迷你徽章左向起点应按旧版 scale=1 缩放");
+    requireNear(runtime.currentPropStartY(), 16.0, "迷你徽章左向纵向起点应按旧版 scale=1 缩放");
+    requireNear(runtime.currentPropEndX(), -749.0, "迷你徽章左向终点应按旧版 -(600 + 150 * scale) 计算");
     requireNear(runtime.currentPropVisualWidth(), 35.0, "迷你徽章视觉尺寸应按旧版 scale=1 缩放");
     bridge.submitPropExpired();
     runtime.handleAnimationFinished();

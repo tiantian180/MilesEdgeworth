@@ -41,6 +41,11 @@ def main() -> int:
     sleep_recipe = recipes.get("sleep.enterLoopExit", {})
     require(sleep_recipe.get("action") == "sleep", "sleep.enterLoopExit 应播放 sleep action")
 
+    skin_command = manifest.get("skinCommands", {}).get("miles.feedTea", {})
+    require(skin_command.get("label") == "喂食红茶", "红茶入口应由 Miles 皮肤命令提供中文标签")
+    require(skin_command.get("enabledWhen", {}).get("notAction") == "sleep", "红茶皮肤命令应在 sleep 动作中禁用")
+    require(skin_command.get("request", {}).get("pool") == "menu.tea", "红茶皮肤命令应映射到 menu.tea 候选池")
+
     menu_tea = action_pools.get("menu.tea", {})
     require(any(entry.get("recipe") == "tea.once" for entry in menu_tea.get("entries", [])), "menu.tea 应能触发喝茶 recipe")
     require(any(entry.get("recipe") == "teaAlt.once" for entry in menu_tea.get("entries", [])), "menu.tea 应能触发第二组喝茶 recipe")
@@ -68,8 +73,8 @@ def main() -> int:
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
     for token in [
-        "Q_PROPERTY(QStringList enabledSkinCommandIds READ enabledSkinCommandIds NOTIFY skinCommandAvailabilityChanged)",
-        "QStringList enabledSkinCommandIds() const",
+        "Q_PROPERTY(QVariantList enabledSkinCommands READ enabledSkinCommands NOTIFY skinCommandAvailabilityChanged)",
+        "QVariantList enabledSkinCommands() const",
         "Q_INVOKABLE void submitMenuCommand",
         "skinCommandAvailabilityChanged",
     ]:
@@ -77,32 +82,34 @@ def main() -> int:
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     bridge_cpp = read("apps/desktop/src/pet/events/PetEventBridge.cpp")
-    custom_cpp = read("apps/desktop/src/pet/interaction/CustomInteractionRegistry.cpp")
+    resolver_cpp = read("apps/desktop/src/pet/commands/SkinCommandResolver.cpp")
     pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     for token in [
-        "bool PetRuntime::sleeping() const",
-        "bool PetRuntime::sleepTransitioning() const",
+        'm_currentActionId == "sleep"',
+        'm_currentPhaseId == "loop"',
         "emit sleepStateChanged()",
     ]:
-        require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+        require(token in pet_runtime_cpp + pet_runtime_h, f"PetRuntime 缺少睡眠状态语义：{token}")
     for token in [
-        "QStringList PetEventBridge::enabledSkinCommandIds() const",
+        "QVariantList PetEventBridge::enabledSkinCommands() const",
+        "SkinCommandResolver::enabledCommands",
         "void PetEventBridge::submitMenuCommand",
         "PetEventBridge::skinCommandAvailabilityChanged",
     ]:
         require(token in bridge_cpp, f"PetEventBridge.cpp 缺少 {token}")
     for token in [
-        '"miles.feedTea"',
-        'ActionRequest::actionPool("menu.tea")',
+        "resolveCommand",
+        "command.request",
     ]:
-        require(token in custom_cpp, f"CustomInteractionRegistry.cpp 缺少 {token}")
+        require(token in resolver_cpp, f"SkinCommandResolver.cpp 缺少 {token}")
     require('ActionRequest::recipe("sleep.enterLoopExit")' in pipeline_cpp, "睡眠菜单事件应转成 sleep recipe 请求")
+    require("SkinCommandResolver::resolveCommand" in pipeline_cpp, "皮肤菜单命令应由 SkinCommandResolver 转成 ActionRequest")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "喂食红茶",
-        'App.PetEventBridge.submitMenuCommand("miles.feedTea")',
-        'App.PetEventBridge.enabledSkinCommandIds.indexOf("miles.feedTea")',
+        "App.PetEventBridge.enabledSkinCommands",
+        "skinCommandMenu.insertItem",
+        "App.PetEventBridge.submitMenuCommand(modelData.id)",
         'App.PetRuntime.sleeping ? "唤醒" : "睡觉"',
         "enabled: !App.PetRuntime.sleepTransitioning",
         'App.PetEventBridge.submitMenuCommand("runtime.sleep.toggle")',

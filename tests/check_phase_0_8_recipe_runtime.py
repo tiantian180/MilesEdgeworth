@@ -84,7 +84,8 @@ def main() -> int:
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
         "App.PetEventBridge.submitIdleLoopFinished()",
-        'App.PetEventBridge.submitMenuCommand("miles.feedTea")',
+        "App.PetEventBridge.enabledSkinCommands",
+        "App.PetEventBridge.submitMenuCommand(modelData.id)",
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少 {token}")
 

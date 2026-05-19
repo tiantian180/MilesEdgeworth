@@ -110,11 +110,12 @@ def main() -> int:
     for token in [
         "submitIdleLoopFinished",
         "SoundEffect",
-        "prosecutorBadgeWindow",
+        "propWindow",
         "singleClickTimer",
         "submitDoubleClick()",
         "handleDragMoved",
-        'submitMenuCommand("miles.feedTea")',
+        "enabledSkinCommands",
+        "submitMenuCommand(modelData.id)",
         'submitMenuCommand("runtime.sleep.toggle")',
     ]:
         require(token in pet_window_qml, f"PetWindow.qml 缺少核心表现入口 {token}")

@@ -33,6 +33,8 @@ def main() -> int:
         "apps/desktop/src/pet/interaction/InteractionPipeline.cpp",
         "apps/desktop/src/pet/interaction/CustomInteractionRegistry.h",
         "apps/desktop/src/pet/interaction/CustomInteractionRegistry.cpp",
+        "apps/desktop/src/pet/commands/SkinCommandResolver.h",
+        "apps/desktop/src/pet/commands/SkinCommandResolver.cpp",
     ]
     for path in required_files:
         require((ROOT / path).is_file(), f"缺少事件/request 架构文件：{path}")
@@ -43,6 +45,9 @@ def main() -> int:
     bridge_h = read("apps/desktop/src/pet/events/PetEventBridge.h")
     pipeline_h = read("apps/desktop/src/pet/interaction/InteractionPipeline.h")
     custom_registry_h = read("apps/desktop/src/pet/interaction/CustomInteractionRegistry.h")
+    custom_registry_cpp = read("apps/desktop/src/pet/interaction/CustomInteractionRegistry.cpp")
+    skin_command_resolver_h = read("apps/desktop/src/pet/commands/SkinCommandResolver.h")
+    skin_command_resolver_cpp = read("apps/desktop/src/pet/commands/SkinCommandResolver.cpp")
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     qml = read("apps/desktop/qml/PetWindow.qml")
@@ -119,10 +124,16 @@ def main() -> int:
     for token in [
         "class CustomInteractionRegistry",
         "handleEvent",
-        "miles.feedTea",
         "continueDefault",
     ]:
         require(token in custom_registry_h, f"CustomInteractionRegistry.h 缺少 {token}")
+    require("miles.feedTea" not in custom_registry_h + custom_registry_cpp, "CustomInteractionRegistry 不应写死 Miles 皮肤命令")
+    for token in [
+        "class SkinCommandResolver",
+        "enabledCommands",
+        "resolveCommand",
+    ]:
+        require(token in skin_command_resolver_h + skin_command_resolver_cpp, f"SkinCommandResolver 缺少 {token}")
 
     for token in [
         '#include "pet/requests/ActionRequest.h"',
@@ -193,6 +204,8 @@ def main() -> int:
         "src/pet/interaction/InteractionPipeline.h",
         "src/pet/interaction/CustomInteractionRegistry.cpp",
         "src/pet/interaction/CustomInteractionRegistry.h",
+        "src/pet/commands/SkinCommandResolver.cpp",
+        "src/pet/commands/SkinCommandResolver.h",
     ]:
         require(token in desktop_cmake, f"桌面 CMake 缺少新架构文件：{token}")
 

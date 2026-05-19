@@ -5,7 +5,7 @@
 #include <QJSEngine>
 #include <QObject>
 #include <QQmlEngine>
-#include <QStringList>
+#include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 
 class PetRuntime;
@@ -18,12 +18,12 @@ class PetRuntime;
 class PetEventBridge : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QStringList enabledSkinCommandIds READ enabledSkinCommandIds NOTIFY skinCommandAvailabilityChanged)
+    Q_PROPERTY(QVariantList enabledSkinCommands READ enabledSkinCommands NOTIFY skinCommandAvailabilityChanged)
 
 public:
     explicit PetEventBridge(PetRuntime *runtime, QObject *parent = nullptr);
 
-    QStringList enabledSkinCommandIds() const;
+    QVariantList enabledSkinCommands() const;
 
     Q_INVOKABLE void submitPrimaryClick(double x, double y, double width, double height);
     Q_INVOKABLE void submitDoubleClick();

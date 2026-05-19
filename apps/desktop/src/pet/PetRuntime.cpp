@@ -3,7 +3,6 @@
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/selection/ActionPoolSelector.h"
 
-#include <QTimer>
 #include <QtGlobal>
 #include <QVariantMap>
 
@@ -16,6 +15,9 @@ constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
 PetRuntime::PetRuntime(QObject *parent)
     : QObject(parent)
 {
+    connect(&m_propController, &PropController::currentPropChanged, this, &PetRuntime::currentPropChanged);
+    connect(&m_propController, &PropController::currentPropPlaybackSerialChanged, this, &PetRuntime::currentPropPlaybackSerialChanged);
+
     setPetSize("medium");
     m_manifest = SkinManifestLoader::loadFromResource(QString::fromUtf8(kManifestPath));
 
@@ -32,186 +34,6 @@ PetRuntime::PetRuntime(QObject *parent)
     startStartupSequence();
 }
 
-QString PetRuntime::currentState() const
-{
-    return m_currentState;
-}
-
-QString PetRuntime::currentActionId() const
-{
-    return m_currentActionId;
-}
-
-QString PetRuntime::currentRecipeId() const
-{
-    return m_currentRecipeId;
-}
-
-QString PetRuntime::currentPhaseId() const
-{
-    return m_currentPhaseId;
-}
-
-QUrl PetRuntime::currentAnimationUrl() const
-{
-    return m_currentAnimationUrl;
-}
-
-QUrl PetRuntime::currentSoundUrl() const
-{
-    return m_currentSoundUrl;
-}
-
-bool PetRuntime::currentPropVisible() const
-{
-    return m_currentPropVisible;
-}
-
-QString PetRuntime::currentPropId() const
-{
-    return m_currentPropId;
-}
-
-QUrl PetRuntime::currentPropImageUrl() const
-{
-    return m_currentPropImageUrl;
-}
-
-double PetRuntime::currentPropStartOffsetX() const
-{
-    return m_currentPropStartOffset.x();
-}
-
-double PetRuntime::currentPropStartOffsetY() const
-{
-    return m_currentPropStartOffset.y();
-}
-
-double PetRuntime::currentPropEndOffsetX() const
-{
-    return m_currentPropEndOffset.x();
-}
-
-double PetRuntime::currentPropEndOffsetY() const
-{
-    return m_currentPropEndOffset.y();
-}
-
-double PetRuntime::currentPropWidth() const
-{
-    return m_currentPropWidth;
-}
-
-double PetRuntime::currentPropHeight() const
-{
-    return m_currentPropHeight;
-}
-
-double PetRuntime::currentPropVisualWidth() const
-{
-    return m_currentPropVisualWidth;
-}
-
-double PetRuntime::currentPropVisualHeight() const
-{
-    return m_currentPropVisualHeight;
-}
-
-int PetRuntime::currentPropDurationMs() const
-{
-    return m_currentPropDurationMs;
-}
-
-int PetRuntime::currentPropPlaybackSerial() const
-{
-    return m_currentPropPlaybackSerial;
-}
-
-QString PetRuntime::currentFacing() const
-{
-    return m_currentFacing;
-}
-
-QString PetRuntime::currentMovementDirection() const
-{
-    return m_currentMovementDirection;
-}
-
-QString PetRuntime::currentLoopMode() const
-{
-    return m_currentLoopMode;
-}
-
-bool PetRuntime::currentAutoReturnToIdle() const
-{
-    return m_currentAutoReturnToIdle;
-}
-
-bool PetRuntime::audioMuted() const
-{
-    return m_audioMuted;
-}
-
-QString PetRuntime::voiceLanguage() const
-{
-    return m_voiceLanguage;
-}
-
-bool PetRuntime::autoMovementEnabled() const
-{
-    return m_autoMovementEnabled;
-}
-
-QString PetRuntime::petSizeId() const
-{
-    return m_petSizeId;
-}
-
-double PetRuntime::petScale() const
-{
-    return m_petScale;
-}
-
-double PetRuntime::petWindowSize() const
-{
-    return 120.0 * m_petScale;
-}
-
-double PetRuntime::petImageSize() const
-{
-    return 100.0 * m_petScale;
-}
-
-bool PetRuntime::pointerInteractionEnabled() const
-{
-    return acceptsPointerInteraction();
-}
-
-bool PetRuntime::sleeping() const
-{
-    return m_currentActionId == "sleep" && m_currentPhaseId == "loop";
-}
-
-bool PetRuntime::sleepTransitioning() const
-{
-    return m_currentActionId == "sleep" && m_currentPhaseId != "loop";
-}
-
-int PetRuntime::playbackSerial() const
-{
-    return m_playbackSerial;
-}
-
-int PetRuntime::soundPlaybackSerial() const
-{
-    return m_soundPlaybackSerial;
-}
-
-const SkinManifest &PetRuntime::manifest() const
-{
-    return m_manifest;
-}
-
 RuntimeSnapshot PetRuntime::snapshot() const
 {
     RuntimeSnapshot snapshot;
@@ -221,10 +43,11 @@ RuntimeSnapshot PetRuntime::snapshot() const
     snapshot.currentPhaseId = m_currentPhaseId;
     snapshot.currentFacing = m_currentFacing;
     snapshot.voiceLanguage = m_voiceLanguage;
-    snapshot.currentPropId = m_currentPropId;
-    snapshot.currentPropClickedRecipeId = m_currentPropClickedRecipeId;
-    snapshot.currentPropExpiredRecipeId = m_currentPropExpiredRecipeId;
-    snapshot.currentPropVisible = m_currentPropVisible;
+    const PropState prop = m_propController.snapshot();
+    snapshot.currentPropId = prop.id;
+    snapshot.currentPropClickedRecipeId = prop.clickedRecipeId;
+    snapshot.currentPropExpiredRecipeId = prop.expiredRecipeId;
+    snapshot.currentPropVisible = prop.visible;
     snapshot.pointerInteractionEnabled = acceptsPointerInteraction();
     snapshot.sleeping = sleeping();
     snapshot.sleepTransitioning = sleepTransitioning();
@@ -326,7 +149,7 @@ void PetRuntime::playRecipe(const QString &recipeId)
     }
 
     playSoundForRecipe(m_manifest.recipes.value(nextRecipeId));
-    schedulePropForRecipe(m_manifest.recipes.value(nextRecipeId));
+    m_propController.scheduleForRecipe(m_manifest, m_manifest.recipes.value(nextRecipeId), m_currentFacing, m_petScale);
     playNextRecipeStep();
 }
 
@@ -683,81 +506,9 @@ void PetRuntime::playSoundForRecipe(const RecipeDefinition &recipe)
     emit soundPlaybackSerialChanged();
 }
 
-void PetRuntime::schedulePropForRecipe(const RecipeDefinition &recipe)
-{
-    if (recipe.propId.isEmpty() || !m_manifest.props.contains(recipe.propId)) {
-        // 任何新的非 Prop recipe 都会取消尚未飞出的延迟 Prop。
-        // 这样用户在 700ms 延迟期间触发其它动作时，不会突然冒出上一轮徽章。
-        ++m_propRequestSerial;
-        return;
-    }
-
-    const PropDefinition prop = m_manifest.props.value(recipe.propId);
-    const QString propId = recipe.propId;
-    const QString facing = m_currentFacing;
-    const int requestSerial = ++m_propRequestSerial;
-
-    // 旧版 Take that 会先播放出手动作，再延迟飞出徽章。
-    // 这里先把延迟保存在皮肤配置里，后续可迁移到正式 side effect 时间线。
-    QTimer::singleShot(qMax(0, prop.delayMs), this, [this, propId, facing, requestSerial]() {
-        if (requestSerial != m_propRequestSerial) {
-            return;
-        }
-
-        spawnPropForRecipe(propId, facing);
-    });
-}
-
-void PetRuntime::spawnPropForRecipe(const QString &propId, const QString &facing)
-{
-    if (!m_manifest.props.contains(propId)) {
-        return;
-    }
-
-    const PropDefinition prop = m_manifest.props.value(propId);
-    const QPointF startOffset = scaledPropPoint(propPointForFacing(prop.startOffsets, facing));
-    const QPointF travelDelta = propTravelDelta(prop, facing);
-
-    m_currentPropVisible = true;
-    m_currentPropId = prop.id;
-    m_currentPropImageUrl = prop.assetUrl;
-    m_currentPropStartOffset = startOffset;
-    m_currentPropEndOffset = startOffset + travelDelta;
-    m_currentPropWidth = scaledPropLength(prop.width > 0 ? prop.width : 94);
-    m_currentPropHeight = scaledPropLength(prop.height > 0 ? prop.height : 94);
-    m_currentPropVisualWidth = scaledPropLength(prop.visualWidth > 0 ? prop.visualWidth : (prop.width > 0 ? prop.width : 94));
-    m_currentPropVisualHeight = scaledPropLength(prop.visualHeight > 0 ? prop.visualHeight : (prop.height > 0 ? prop.height : 94));
-    m_currentPropDurationMs = prop.durationMs > 0 ? prop.durationMs : 1500;
-    m_currentPropClickedRecipeId = prop.clickedRecipeId;
-    m_currentPropExpiredRecipeId = prop.expiredRecipeId;
-    ++m_currentPropPlaybackSerial;
-
-    emit currentPropChanged();
-    emit currentPropPlaybackSerialChanged();
-}
-
 void PetRuntime::hideCurrentProp()
 {
-    ++m_propRequestSerial;
-
-    if (!m_currentPropVisible && m_currentPropId.isEmpty()) {
-        return;
-    }
-
-    m_currentPropVisible = false;
-    m_currentPropId.clear();
-    m_currentPropImageUrl = QUrl();
-    m_currentPropStartOffset = QPointF();
-    m_currentPropEndOffset = QPointF();
-    m_currentPropWidth = 0;
-    m_currentPropHeight = 0;
-    m_currentPropVisualWidth = 0;
-    m_currentPropVisualHeight = 0;
-    m_currentPropDurationMs = 0;
-    m_currentPropClickedRecipeId.clear();
-    m_currentPropExpiredRecipeId.clear();
-
-    emit currentPropChanged();
+    m_propController.hide();
 }
 
 void PetRuntime::clearActiveRecipe()
@@ -899,34 +650,6 @@ double PetRuntime::movementScaleFactor() const
     // manifest 里的移动增量按旧版默认“中”尺寸 scale=2 记录。
     // 用户切换迷你/小/大时，窗口移动步长也跟着缩放，保持旧版手感。
     return m_petScale / 2.0;
-}
-
-double PetRuntime::scaledPropLength(double length) const
-{
-    // Prop manifest 中的尺寸按旧版默认“中”尺寸 scale=2 记录。
-    // 视觉尺寸和透明点击窗口一起缩放，避免大号/迷你桌宠下徽章显得突兀。
-    return length * movementScaleFactor();
-}
-
-QPointF PetRuntime::propPointForFacing(const QHash<QString, QPointF> &points, const QString &facing) const
-{
-    return points.value(facing, points.value(m_manifest.defaultFacing, QPointF(0, 0)));
-}
-
-QPointF PetRuntime::scaledPropPoint(const QPointF &point) const
-{
-    return point * movementScaleFactor();
-}
-
-QPointF PetRuntime::propTravelDelta(const PropDefinition &prop, const QString &facing) const
-{
-    if (!prop.travelBaseDeltas.isEmpty() || !prop.travelPerScaleDeltas.isEmpty()) {
-        const QPointF base = propPointForFacing(prop.travelBaseDeltas, facing);
-        const QPointF perScale = propPointForFacing(prop.travelPerScaleDeltas, facing);
-        return base + perScale * m_petScale;
-    }
-
-    return scaledPropPoint(propPointForFacing(prop.travelDeltas, facing));
 }
 
 void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)

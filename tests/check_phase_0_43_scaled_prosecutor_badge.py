@@ -48,15 +48,15 @@ def main() -> int:
     ]:
         require(token in manifest_header, f"SkinManifest.h 缺少 Prop 缩放字段：{token}")
 
-    runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    prop_controller_cpp = read("apps/desktop/src/pet/effects/PropController.cpp")
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     for token in [
-        "scaledPropPoint",
-        "propTravelDelta",
+        "scaledPoint",
+        "travelDelta",
         "prop.visualWidth",
         "prop.visualHeight",
     ]:
-        require(token in runtime_cpp, f"PetRuntime.cpp 缺少 Prop 缩放逻辑：{token}")
+        require(token in prop_controller_cpp, f"PropController.cpp 缺少 Prop 缩放逻辑：{token}")
     for token in [
         "travelBase",
         "travelPerScale",

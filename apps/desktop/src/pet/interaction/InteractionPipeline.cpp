@@ -1,6 +1,7 @@
 #include "pet/interaction/InteractionPipeline.h"
 
 #include "pet/behavior/BehaviorTriggerEngine.h"
+#include "pet/commands/SkinCommandResolver.h"
 #include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/interaction/HitZoneMatcher.h"
 
@@ -86,6 +87,8 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
             requests.append(ActionRequest::returnToIdle());
         } else if (event.commandId == QString::fromUtf8(kFacingToggleCommandId)) {
             requests.append(ActionRequest::toggleFacing());
+        } else {
+            appendIfPlayable(requests, SkinCommandResolver::resolveCommand(manifest, snapshot, event.commandId));
         }
         return requests;
 
