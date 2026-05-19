@@ -1034,123 +1034,115 @@
       "entries": [
         {
           "recipe": "idle.randomThinking",
-          "weight": 3
+          "weight": 24
         },
         {
           "recipe": "turn.once",
-          "weight": 2
+          "weight": 48
         },
         {
           "recipe": "idle.flipStand",
-          "weight": 1
+          "weight": 32
         },
         {
           "recipe": "idle.tappingHead",
-          "weight": 3
+          "weight": 24
         },
         {
           "recipe": "idle.shrug",
-          "weight": 3
+          "weight": 24
         },
         {
           "recipe": "idle.checkWatch",
-          "weight": 2
+          "weight": 24
         },
         {
           "recipe": "idle.pointing",
-          "weight": 2
+          "weight": 24
         },
         {
           "recipe": "idle.sittingTea",
-          "weight": 2
+          "weight": 24
         },
         {
           "recipe": "idle.phoneCall",
-          "weight": 2
+          "weight": 24
         },
         {
           "recipe": "idle.lookBack",
-          "weight": 2
+          "weight": 24
         },
         {
           "recipe": "idle.lookDown",
-          "weight": 2
+          "weight": 24
         },
         {
           "recipe": "idle.lookUp",
-          "weight": 2
+          "weight": 24
         },
         {
           "recipe": "walk.east",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "walk.west",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "walk.northEast",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "walk.northWest",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "walk.southEast",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "walk.southWest",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "walk.north",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "walk.south",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "run.east",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "run.west",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "run.northEast",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "run.northWest",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "run.southEast",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "run.southWest",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "run.north",
-          "weight": 1
+          "weight": 5
         },
         {
           "recipe": "run.south",
-          "weight": 1
-        },
-        {
-          "recipe": "bow.once",
-          "weight": 1
-        },
-        {
-          "recipe": "objecting.once",
-          "weight": 1
+          "weight": 5
         }
       ]
     },

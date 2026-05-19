@@ -262,5 +262,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_35_idle_random_recipe_smoke.py
         )
+
+        # Phase 0.36 的随机 idle 权重检查：确保 idle.random
+        # 贴近旧版 STAND 自动切换的 8/12/60/10/10 概率结构。
+        add_test(
+            NAME check_phase_0_36_idle_random_legacy_weights
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_36_idle_random_legacy_weights.py
+        )
     endif()
 endif()

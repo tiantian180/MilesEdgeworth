@@ -134,8 +134,6 @@ int main(int argc, char *argv[])
         {"idle.lookBack", "idle_look_back"},
         {"idle.lookDown", "idle_look_down"},
         {"idle.lookUp", "idle_look_up"},
-        {"bow.once", "bow"},
-        {"objecting.once", "objecting"},
     };
 
     for (const RecipeActionCase &recipeCase : idleRecipeCases) {

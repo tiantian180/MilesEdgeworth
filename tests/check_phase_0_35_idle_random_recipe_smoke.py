@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""检查随机 idle 非移动候选已进入 PetRuntime smoke 验证。
-
-`idle.random` 里除了 walk/run，还有旧版站立小动作、转身、鞠躬和异议。
-这个检查要求 smoke 测试逐个播放这些非移动候选 recipe，确认它们都能从
-Recipe 走到预期 action。
-"""
+"""检查随机 idle 非移动候选已进入 PetRuntime smoke 验证。"""
 
 from __future__ import annotations
 
@@ -25,8 +20,6 @@ IDLE_RECIPES = [
     "idle.lookBack",
     "idle.lookDown",
     "idle.lookUp",
-    "bow.once",
-    "objecting.once",
 ]
 
 
