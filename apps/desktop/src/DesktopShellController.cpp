@@ -77,6 +77,19 @@ void DesktopShellController::revealPetWindow()
     m_petWindow->requestActivate();
 }
 
+void DesktopShellController::placePetWindowForStartup(double petScale)
+{
+    if (m_petWindow == nullptr) {
+        return;
+    }
+
+    // 旧版启动入场不是把整个透明窗口限制在屏幕内，而是先让角色
+    // 从左下角略微越界的位置出现，再由公文包入场动画和移动逻辑走进来。
+    // 这里直接设置窗口位置，刻意绕过普通移动用的 clampedPetWindowPosition()。
+    const QPointF startupPosition = legacyStartupPosition(petScale);
+    m_petWindow->setPosition(startupPosition.toPoint());
+}
+
 void DesktopShellController::movePetWindowBy(double dx, double dy)
 {
     if (m_petWindow == nullptr) {
@@ -138,6 +151,22 @@ void DesktopShellController::applyCurrentLayerMode()
     m_petWindow->setFlag(Qt::WindowStaysOnTopHint, m_alwaysOnTop);
     m_petWindow->show();
 #endif
+}
+
+QPointF DesktopShellController::legacyStartupPosition(double petScale) const
+{
+    QScreen *targetScreen = QGuiApplication::primaryScreen();
+    if (targetScreen == nullptr) {
+        return {};
+    }
+
+    const QRect availableGeometry = targetScreen->availableGeometry();
+    const double safeScale = petScale > 0.0 ? petScale : 2.0;
+
+    return QPointF(
+        availableGeometry.x() - 45.0 * safeScale,
+        availableGeometry.y() + availableGeometry.height() - 90.0 * safeScale
+    );
 }
 
 QPointF DesktopShellController::clampedPetWindowPosition(const QPointF &candidatePosition) const

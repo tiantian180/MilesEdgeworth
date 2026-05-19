@@ -46,8 +46,9 @@ int main(int argc, char *argv[])
     engine.loadFromModule("MilesEdgeworth", "PetWindow");
 
     // 等 QML Window 创建完 native handle 后，再追加平台级桌宠窗口行为。
-    QTimer::singleShot(0, &engine, [&engine, &shellController]() {
+    QTimer::singleShot(0, &engine, [&engine, &shellController, &petRuntime]() {
         attachPetWindowToShellController(engine, shellController);
+        shellController.placePetWindowForStartup(petRuntime.petScale());
     });
 
     return app.exec();

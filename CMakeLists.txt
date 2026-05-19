@@ -334,5 +334,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_44_system_tray.py
         )
+
+        # Phase 0.45 的旧版启动定位检查：旧版会从屏幕左下角
+        # 略微越界的位置播放公文包入场，v2 需要保留这个第一印象。
+        add_test(
+            NAME check_phase_0_45_legacy_startup_position
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_45_legacy_startup_position.py
+        )
     endif()
 endif()

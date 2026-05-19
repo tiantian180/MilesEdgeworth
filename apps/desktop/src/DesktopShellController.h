@@ -30,6 +30,7 @@ public slots:
     void setAlwaysOnTop(bool alwaysOnTop);
     void toggleAlwaysOnTop();
     Q_INVOKABLE void revealPetWindow();
+    Q_INVOKABLE void placePetWindowForStartup(double petScale);
     Q_INVOKABLE void movePetWindowBy(double dx, double dy);
     Q_INVOKABLE void movePetWindowTo(double x, double y);
 
@@ -39,6 +40,7 @@ signals:
 private:
     void createTrayIcon();
     void applyCurrentLayerMode();
+    QPointF legacyStartupPosition(double petScale) const;
     QPointF clampedPetWindowPosition(const QPointF &candidatePosition) const;
 
     QWindow *m_petWindow = nullptr;
