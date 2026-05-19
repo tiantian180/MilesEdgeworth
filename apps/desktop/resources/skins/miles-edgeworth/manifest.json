@@ -1012,35 +1012,15 @@
       "scope": "prop",
       "action": "pickup_badge"
     },
-    "tea.drinkThenBow": {
-      "label": "喝茶后鞠躬",
-      "scope": "scenario",
-      "steps": [
-        {
-          "action": "tea"
-        },
-        {
-          "action": "bow"
-        },
-        {
-          "action": "idle_stand"
-        }
-      ]
+    "tea.once": {
+      "label": "喝茶",
+      "scope": "menu",
+      "action": "tea"
     },
-    "teaAlt.drinkThenBow": {
-      "label": "喝茶后鞠躬候选动作",
-      "scope": "scenario",
-      "steps": [
-        {
-          "action": "tea_alt"
-        },
-        {
-          "action": "bow"
-        },
-        {
-          "action": "idle_stand"
-        }
-      ]
+    "teaAlt.once": {
+      "label": "喝茶候选动作",
+      "scope": "menu",
+      "action": "tea_alt"
     },
     "sleep.enterLoopExit": {
       "label": "睡觉",
@@ -1393,11 +1373,11 @@
       "label": "菜单喝茶",
       "entries": [
         {
-          "recipe": "tea.drinkThenBow",
+          "recipe": "tea.once",
           "weight": 1
         },
         {
-          "recipe": "teaAlt.drinkThenBow",
+          "recipe": "teaAlt.once",
           "weight": 1
         }
       ]

@@ -28,20 +28,22 @@ def main() -> int:
     recipes = manifest.get("recipes", {})
     action_pools = manifest.get("actionPools", {})
 
-    tea_recipe = recipes.get("tea.drinkThenBow", {})
-    require(tea_recipe.get("scope") == "scenario", "tea.drinkThenBow 应继续作为 scenario recipe")
-    require([step.get("action") for step in tea_recipe.get("steps", [])] == ["tea", "bow", "idle_stand"], "喝茶应按 tea -> bow -> idle_stand 编排")
+    tea_recipe = recipes.get("tea.once", {})
+    require(tea_recipe.get("scope") == "menu", "tea.once 应作为菜单 recipe")
+    require(tea_recipe.get("action") == "tea", "tea.once 应直接播放 tea GIF")
+    require("steps" not in tea_recipe, "tea.once 不应额外串联 bow 或 idle_stand")
 
-    tea_alt_recipe = recipes.get("teaAlt.drinkThenBow", {})
-    require(tea_alt_recipe.get("scope") == "scenario", "teaAlt.drinkThenBow 应作为第二组喝茶 scenario recipe")
-    require([step.get("action") for step in tea_alt_recipe.get("steps", [])] == ["tea_alt", "bow", "idle_stand"], "第二组喝茶应按 tea_alt -> bow -> idle_stand 编排")
+    tea_alt_recipe = recipes.get("teaAlt.once", {})
+    require(tea_alt_recipe.get("scope") == "menu", "teaAlt.once 应作为第二组喝茶菜单 recipe")
+    require(tea_alt_recipe.get("action") == "tea_alt", "teaAlt.once 应直接播放 tea_alt GIF")
+    require("steps" not in tea_alt_recipe, "teaAlt.once 不应额外串联 bow 或 idle_stand")
 
     sleep_recipe = recipes.get("sleep.enterLoopExit", {})
     require(sleep_recipe.get("action") == "sleep", "sleep.enterLoopExit 应播放 sleep action")
 
     menu_tea = action_pools.get("menu.tea", {})
-    require(any(entry.get("recipe") == "tea.drinkThenBow" for entry in menu_tea.get("entries", [])), "menu.tea 应能触发喝茶 recipe")
-    require(any(entry.get("recipe") == "teaAlt.drinkThenBow" for entry in menu_tea.get("entries", [])), "menu.tea 应能触发第二组喝茶 recipe")
+    require(any(entry.get("recipe") == "tea.once" for entry in menu_tea.get("entries", [])), "menu.tea 应能触发喝茶 recipe")
+    require(any(entry.get("recipe") == "teaAlt.once" for entry in menu_tea.get("entries", [])), "menu.tea 应能触发第二组喝茶 recipe")
     require(len(menu_tea.get("entries", [])) >= 2, "menu.tea 应保留旧版两组喝茶动作的随机候选")
 
     actions = manifest.get("actions", {})

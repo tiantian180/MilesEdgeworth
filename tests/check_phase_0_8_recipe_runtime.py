@@ -33,15 +33,15 @@ def main() -> int:
         "idle.randomThinking",
         "objecting.once",
         "bow.once",
-        "tea.drinkThenBow",
+        "tea.once",
         "sleep.enterLoopExit",
     ]:
         require(recipe_id in recipes, f"manifest recipes 缺少 {recipe_id}")
 
-    tea_recipe = recipes["tea.drinkThenBow"]
-    require(tea_recipe.get("scope") == "scenario", "tea.drinkThenBow 应声明为 scenario recipe")
-    tea_steps = tea_recipe.get("steps", [])
-    require([step.get("action") for step in tea_steps] == ["tea", "bow", "idle_stand"], "喝茶 recipe 应按 tea -> bow -> idle_stand 编排")
+    tea_recipe = recipes["tea.once"]
+    require(tea_recipe.get("scope") == "menu", "tea.once 应声明为 menu recipe")
+    require(tea_recipe.get("action") == "tea", "tea.once 应直接播放 tea GIF")
+    require("steps" not in tea_recipe, "tea.once 不应额外串联 bow 或 idle_stand")
 
     action_pools = manifest.get("actionPools", {})
     require(action_pools, "manifest 缺少 actionPools")

@@ -198,5 +198,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_27_idle_flip_stand.py
         )
+
+        # Phase 0.28 的菜单喝茶检查：旧版 tea*.gif 本身已经包含
+        # 喝茶后的致意动作，v2 不再额外串联 bow.gif。
+        add_test(
+            NAME check_phase_0_28_legacy_tea_once
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_28_legacy_tea_once.py
+        )
     endif()
 endif()

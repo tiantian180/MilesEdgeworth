@@ -71,7 +71,7 @@ def main() -> int:
         require(recipe.get("sounds"), f"{recipe_id} 应声明多语言语音")
 
     menu_tea_recipes = {entry.get("recipe") for entry in action_pools.get("menu.tea", {}).get("entries", [])}
-    require({"tea.drinkThenBow", "teaAlt.drinkThenBow"} <= menu_tea_recipes, "菜单喝茶应随机覆盖旧版两组茶杯动作")
+    require({"tea.once", "teaAlt.once"} <= menu_tea_recipes, "菜单喝茶应随机覆盖旧版两组茶杯动作")
     require(recipes.get("sleep.enterLoopExit", {}).get("action") == "sleep", "睡觉 / 唤醒应走 sleep enter-loop-exit action")
     require(recipes.get("doubleClick.takeThat", {}).get("prop") == "prosecutor_badge", "Take that 应触发检察官徽章")
     require(manifest.get("props", {}).get("prosecutor_badge", {}).get("clickedRecipe") == "bow.once", "点击徽章应触发鞠躬")

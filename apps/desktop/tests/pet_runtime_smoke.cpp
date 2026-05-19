@@ -80,8 +80,10 @@ int main(int argc, char *argv[])
     runtime.toggleAutoMovementEnabled();
 
     runtime.requestTea();
-    require(runtime.currentRecipeId() == "tea.drinkThenBow" || runtime.currentRecipeId() == "teaAlt.drinkThenBow", "requestTea 应从两组喝茶 recipe 中选择");
-    require(runtime.currentActionId() == "tea" || runtime.currentActionId() == "tea_alt", "喝茶 recipe 第一步应播放茶杯动作");
+    require(runtime.currentRecipeId() == "tea.once" || runtime.currentRecipeId() == "teaAlt.once", "requestTea 应从两组喝茶 recipe 中选择");
+    require(runtime.currentActionId() == "tea" || runtime.currentActionId() == "tea_alt", "喝茶 recipe 应只播放茶杯 GIF 本体");
+    runtime.handleAnimationFinished();
+    require(runtime.currentActionId() == "idle_stand", "喝茶 GIF 播完后应直接回到待机");
 
     runtime.toggleSleep();
     require(runtime.currentActionId() == "sleep", "toggleSleep 应进入 sleep action");
