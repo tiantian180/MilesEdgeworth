@@ -23,7 +23,7 @@ def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     hit_zones = manifest.get("hitZones", {})
 
-    for zone_id in ["face", "upper_arm", "forearm", "legs"]:
+    for zone_id in ["face", "upper_arm", "forearm", "legs_back", "legs_look_down"]:
         variants = hit_zones.get(zone_id, {}).get("variants", {})
         require("right" in variants and "left" in variants, f"{zone_id} 应声明左右朝向点击区域")
 

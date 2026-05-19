@@ -13,15 +13,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-HIT_ZONES = ["face", "head", "upper_arm", "forearm", "chest", "belly", "legs"]
+HIT_ZONES = [
+    "face",
+    "head",
+    "upper_arm",
+    "forearm",
+    "chest",
+    "belly_bow",
+    "belly_pointing",
+    "legs_back",
+    "legs_look_down",
+]
 CLICK_POOLS = [
     "click.face",
     "click.head",
     "click.upperArm",
     "click.forearm",
     "click.chest",
-    "click.belly",
-    "click.legs",
+    "click.bellyBow",
+    "click.bellyPointingArea",
+    "click.legsBackArea",
+    "click.legsLookDownArea",
 ]
 
 

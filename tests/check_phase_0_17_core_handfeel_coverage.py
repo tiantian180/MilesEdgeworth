@@ -62,7 +62,17 @@ def main() -> int:
         require(all("movement" in variants[direction] for direction in movement_directions), f"{action_id} 每个方向都应有 movement 增量")
 
     click_pools = manifest.get("clickBehaviors", {}).get("singleClick", [])
-    require(click_pools == ["click.face", "click.head", "click.upperArm", "click.forearm", "click.chest", "click.belly", "click.legs"], "单击分区顺序应覆盖旧版区域")
+    require(click_pools == [
+        "click.face",
+        "click.head",
+        "click.upperArm",
+        "click.forearm",
+        "click.chest",
+        "click.bellyBow",
+        "click.bellyPointingArea",
+        "click.legsBackArea",
+        "click.legsLookDownArea",
+    ], "单击分区顺序应覆盖旧版区域和肚子/腿部子区域")
 
     double_click_recipes = {entry.get("recipe") for entry in action_pools.get("doubleClick.random", {}).get("entries", [])}
     for recipe_id in ["doubleClick.holdIt", "doubleClick.takeThat", "doubleClick.objection", "doubleClick.eureka"]:

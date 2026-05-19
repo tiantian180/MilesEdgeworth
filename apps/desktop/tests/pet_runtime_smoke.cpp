@@ -352,13 +352,33 @@ int main(int argc, char *argv[])
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(120, 150, 240, 240);
-    requireActionIn(runtime.currentActionId(), {"idle_pointing", "bow"}, "点击肚子应触发肚子候选动作");
+    runtime.handlePrimaryClick(120, 138, 240, 240);
+    require(runtime.currentActionId() == "bow", "点击肚子上半应触发鞠躬");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    runtime.handlePrimaryClick(120, 200, 240, 240);
-    requireActionIn(runtime.currentActionId(), {"back_away", "idle_look_down"}, "点击腿部应触发腿部候选动作");
+    runtime.handlePrimaryClick(120, 158, 240, 240);
+    require(runtime.currentActionId() == "idle_pointing", "点击肚子下半应触发指点");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(95, 200, 240, 240);
+    require(runtime.currentActionId() == "back_away", "右朝向点击左侧腿部应触发后退");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    runtime.handlePrimaryClick(145, 200, 240, 240);
+    require(runtime.currentActionId() == "idle_look_down", "右朝向点击右侧腿部应触发低头看");
+
+    runtime.returnToIdle();
+    runtime.setFacing("left");
+    runtime.handlePrimaryClick(145, 200, 240, 240);
+    require(runtime.currentActionId() == "back_away", "左朝向点击右侧腿部应触发后退");
+
+    runtime.returnToIdle();
+    runtime.setFacing("left");
+    runtime.handlePrimaryClick(95, 200, 240, 240);
+    require(runtime.currentActionId() == "idle_look_down", "左朝向点击左侧腿部应触发低头看");
 
     const QString soundBeforeMutedPlay = runtime.currentSoundUrl().toString();
     runtime.toggleAudioMuted();

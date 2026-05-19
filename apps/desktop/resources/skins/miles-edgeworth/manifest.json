@@ -119,67 +119,119 @@
       "x": 92,
       "y": 72,
       "width": 62,
-      "height": 62,
+      "height": 54,
       "variants": {
         "right": {
           "x": 92,
           "y": 72,
           "width": 62,
-          "height": 62
+          "height": 54
         },
         "left": {
           "x": 86,
           "y": 72,
           "width": 62,
-          "height": 62
+          "height": 54
         }
       }
     },
-    "belly": {
+    "belly_bow": {
       "type": "rect",
       "x": 86,
       "y": 126,
       "width": 74,
-      "height": 44,
+      "height": 22,
       "variants": {
         "right": {
           "x": 86,
           "y": 126,
           "width": 74,
-          "height": 44
+          "height": 22
         },
         "left": {
           "x": 80,
           "y": 126,
           "width": 74,
-          "height": 44
+          "height": 22
         }
       }
     },
-    "legs": {
+    "belly_pointing": {
+      "type": "rect",
+      "x": 86,
+      "y": 148,
+      "width": 74,
+      "height": 22,
+      "variants": {
+        "right": {
+          "x": 86,
+          "y": 148,
+          "width": 74,
+          "height": 22
+        },
+        "left": {
+          "x": 80,
+          "y": 148,
+          "width": 74,
+          "height": 22
+        }
+      }
+    },
+    "legs_back": {
       "type": "rect",
       "x": 74,
       "y": 166,
-      "width": 92,
+      "width": 46,
       "height": 58,
       "variants": {
         "right": {
           "x": 74,
           "y": 166,
-          "width": 92,
+          "width": 46,
+          "height": 58
+        },
+        "left": {
+          "x": 120,
+          "y": 166,
+          "width": 46,
+          "height": 58
+        }
+      }
+    },
+    "legs_look_down": {
+      "type": "rect",
+      "x": 120,
+      "y": 166,
+      "width": 46,
+      "height": 58,
+      "variants": {
+        "right": {
+          "x": 120,
+          "y": 166,
+          "width": 46,
           "height": 58
         },
         "left": {
           "x": 74,
           "y": 166,
-          "width": 92,
+          "width": 46,
           "height": 58
         }
       }
     }
   },
   "clickBehaviors": {
-    "singleClick": ["click.face", "click.head", "click.upperArm", "click.forearm", "click.chest", "click.belly", "click.legs"]
+    "singleClick": [
+      "click.face",
+      "click.head",
+      "click.upperArm",
+      "click.forearm",
+      "click.chest",
+      "click.bellyBow",
+      "click.bellyPointingArea",
+      "click.legsBackArea",
+      "click.legsLookDownArea"
+    ]
   },
   "props": {
     "prosecutor_badge": {
@@ -1297,26 +1349,36 @@
         }
       ]
     },
-    "click.belly": {
-      "label": "点击肚子",
+    "click.bellyBow": {
+      "label": "点击肚子上半",
       "entries": [
-        {
-          "recipe": "click.bellyPointing",
-          "weight": 1
-        },
         {
           "recipe": "bow.once",
           "weight": 1
         }
       ]
     },
-    "click.legs": {
-      "label": "点击腿部",
+    "click.bellyPointingArea": {
+      "label": "点击肚子下半",
+      "entries": [
+        {
+          "recipe": "click.bellyPointing",
+          "weight": 1
+        }
+      ]
+    },
+    "click.legsBackArea": {
+      "label": "点击腿部后侧",
       "entries": [
         {
           "recipe": "click.legsBack",
           "weight": 1
-        },
+        }
+      ]
+    },
+    "click.legsLookDownArea": {
+      "label": "点击腿部前侧",
+      "entries": [
         {
           "recipe": "click.legsLookDown",
           "weight": 1

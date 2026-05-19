@@ -38,6 +38,18 @@ QString hitZoneIdForClickPool(const QString &poolId)
     if (poolId == "click.legs") {
         return "legs";
     }
+    if (poolId == "click.bellyBow") {
+        return "belly_bow";
+    }
+    if (poolId == "click.bellyPointingArea") {
+        return "belly_pointing";
+    }
+    if (poolId == "click.legsBackArea") {
+        return "legs_back";
+    }
+    if (poolId == "click.legsLookDownArea") {
+        return "legs_look_down";
+    }
 
     return {};
 }

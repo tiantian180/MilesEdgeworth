@@ -302,5 +302,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_40_test_tea_entry.py
         )
+
+        # Phase 0.41 的单击子区域检查：确保肚子和腿部
+        # 按旧版坐标分支拆成确定性区域，而不是粗区域随机池。
+        add_test(
+            NAME check_phase_0_41_split_click_subzones
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_41_split_click_subzones.py
+        )
     endif()
 endif()
