@@ -133,6 +133,17 @@ int main(int argc, char *argv[])
     require(runtime.sleeping(), "sleep.enter 播完后应进入 sleeping loop");
     require(runtime.currentPhaseId() == "loop", "sleep loop phase 应为 loop");
 
+    runtime.handlePrimaryClick(145, 40, 240, 240);
+    require(runtime.sleeping(), "睡眠中单击不应打断 sleep loop");
+    runtime.handleDoubleClick();
+    require(runtime.currentPhaseId() == "exit", "睡眠中双击应进入 wake/exit phase");
+    runtime.handleAnimationFinished();
+    require(runtime.currentActionId() == "idle_stand", "wake 播完后应回到 idle_stand");
+    require(runtime.teaEnabled(), "醒来后应重新允许喝茶");
+
+    runtime.toggleSleep();
+    runtime.handleAnimationFinished();
+    require(runtime.sleeping(), "再次 toggleSleep 后应进入 sleeping loop");
     runtime.toggleSleep();
     require(runtime.currentPhaseId() == "exit", "睡眠循环中 toggleSleep 应进入 wake/exit phase");
     runtime.handleAnimationFinished();

@@ -222,5 +222,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_30_prosecutor_badge_smoke.py
         )
+
+        # Phase 0.31 的睡眠鼠标交互 smoke 检查：确保睡眠循环中
+        # 单击不打断睡眠，双击能进入 wake/exit 唤醒分支。
+        add_test(
+            NAME check_phase_0_31_sleep_pointer_smoke
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_31_sleep_pointer_smoke.py
+        )
     endif()
 endif()
