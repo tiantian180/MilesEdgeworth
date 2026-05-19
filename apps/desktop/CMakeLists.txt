@@ -46,6 +46,12 @@ set(DESKTOP_SOURCES
     src/pet/runtime/RuntimeSnapshot.h
     src/pet/selection/ActionPoolSelector.cpp
     src/pet/selection/ActionPoolSelector.h
+    src/pet/surface/PetContextMenu.cpp
+    src/pet/surface/PetContextMenu.h
+    src/pet/surface/PetSurfaceWindow.cpp
+    src/pet/surface/PetSurfaceWindow.h
+    src/pet/surface/PropSurfaceWindow.cpp
+    src/pet/surface/PropSurfaceWindow.h
     resources/pet_assets.qrc
 )
 

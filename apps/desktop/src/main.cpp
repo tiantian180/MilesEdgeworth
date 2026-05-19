@@ -1,27 +1,11 @@
 #include "DesktopShellController.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/PetRuntime.h"
+#include "pet/surface/PetSurfaceWindow.h"
 
 #include <QApplication>
-#include <QQmlApplicationEngine>
 #include <QTimer>
 #include <QWindow>
-
-namespace {
-void attachPetWindowToShellController(QQmlApplicationEngine &engine, DesktopShellController &shellController)
-{
-    if (engine.rootObjects().isEmpty()) {
-        return;
-    }
-
-    auto *window = qobject_cast<QWindow *>(engine.rootObjects().constFirst());
-    if (window == nullptr) {
-        return;
-    }
-
-    shellController.setPetWindow(window);
-}
-}
 
 int main(int argc, char *argv[])
 {
@@ -43,19 +27,13 @@ int main(int argc, char *argv[])
         shellController.setPetScale(petRuntime.petScale());
     });
 
-    QQmlApplicationEngine engine;
-    QObject::connect(
-        &engine,
-        &QQmlApplicationEngine::objectCreationFailed,
-        &app,
-        []() { QCoreApplication::exit(-1); },
-        Qt::QueuedConnection);
+    PetSurfaceWindow petSurfaceWindow(&petRuntime, &petEventBridge, &shellController);
+    petSurfaceWindow.show();
+    petSurfaceWindow.winId();
 
-    engine.loadFromModule("MilesEdgeworth", "PetWindow");
-
-    // 等 QML Window 创建完 native handle 后，再追加平台级桌宠窗口行为。
-    QTimer::singleShot(0, &engine, [&engine, &shellController, &petRuntime]() {
-        attachPetWindowToShellController(engine, shellController);
+    // QWidget 需要先创建 native handle，macOS 原生层才能拿到 NSWindow。
+    QTimer::singleShot(0, &petSurfaceWindow, [&petSurfaceWindow, &shellController, &petRuntime]() {
+        shellController.setPetWindow(petSurfaceWindow.windowHandle());
         shellController.placePetWindowForStartup(petRuntime.petScale());
     });
 

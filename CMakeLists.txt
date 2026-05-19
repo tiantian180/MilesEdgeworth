@@ -462,5 +462,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_62_window_input_mask.py
         )
+
+        # Phase 0.63 的原生桌宠表面检查：QML Window 只适合普通 UI，
+        # 桌宠本体需要 QWidget + QMovie + 逐帧 setMask 来保证透明像素输入穿透。
+        add_test(
+            NAME check_phase_0_63_native_pet_surface
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_63_native_pet_surface.py
+        )
     endif()
 endif()
