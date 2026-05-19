@@ -46,6 +46,39 @@ void PetEventBridge::submitDoubleClick()
     submitEvent(PetEvent::pointerDoubleClick());
 }
 
+void PetEventBridge::submitDragStarted(double globalX)
+{
+    if (m_runtime == nullptr) {
+        return;
+    }
+
+    const RuntimeSnapshot snapshot = m_runtime->snapshot();
+    if (!snapshot.pointerInteractionEnabled || snapshot.currentActionId == "sleep") {
+        m_gestureTracker.reset();
+        return;
+    }
+
+    m_gestureTracker.startDrag(globalX);
+}
+
+void PetEventBridge::submitDragMoved(double globalX)
+{
+    if (m_gestureTracker.updateDrag(globalX)) {
+        submitEvent(PetEvent::pointerDragShake());
+    }
+}
+
+void PetEventBridge::submitDragEnded()
+{
+    const bool holdCompleted = m_gestureTracker.finishDrag();
+    submitEvent(PetEvent::pointerDragReleased(holdCompleted));
+}
+
+void PetEventBridge::submitHoldAnimationReachedEnd()
+{
+    m_gestureTracker.markHoldAnimationReachedEnd();
+}
+
 void PetEventBridge::submitMenuCommand(const QString &commandId)
 {
     submitEvent(PetEvent::menuCommand(commandId));

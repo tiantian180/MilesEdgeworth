@@ -74,6 +74,17 @@ ClickBehaviorEntry clickBehaviorEntryFromJsonValue(const QJsonValue &value)
 
     return entry;
 }
+
+BehaviorRuleCondition behaviorRuleConditionFromJsonObject(const QJsonObject &object)
+{
+    BehaviorRuleCondition condition;
+    condition.actionId = object.value("action").toString();
+    if (object.contains("holdCompleted")) {
+        condition.hasHoldCompleted = true;
+        condition.holdCompleted = object.value("holdCompleted").toBool(false);
+    }
+    return condition;
+}
 } // namespace
 
 SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
@@ -182,6 +193,20 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
 
         if (!command.id.isEmpty() && command.request.kind != ActionRequestKind::None) {
             manifest.skinCommands.insert(command.id, command);
+        }
+    }
+
+    const QJsonArray behaviorRules = root.value("behaviorRules").toArray();
+    for (const QJsonValue &value : behaviorRules) {
+        const QJsonObject ruleObject = value.toObject();
+
+        BehaviorRuleDefinition rule;
+        rule.event = ruleObject.value("event").toString();
+        rule.when = behaviorRuleConditionFromJsonObject(ruleObject.value("when").toObject());
+        rule.request = requestFromJsonObject(ruleObject);
+
+        if (!rule.event.isEmpty() && rule.request.kind != ActionRequestKind::None) {
+            manifest.behaviorRules.append(rule);
         }
     }
 

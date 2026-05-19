@@ -3,7 +3,7 @@
 
 旧版在左键拖拽时统计横向来回改变方向的次数：1 秒内达到 5 次后，
 桌宠播放蹲下受惊动画；松手时根据蹲下动画是否已经播到末帧，选择完整
-站起或快速恢复站起。这个检查先守住资源、manifest、运行时入口和 QML
+站起或快速恢复站起。这个检查先守住资源、manifest、事件桥和原生 surface
 事件连接，避免后续重构时把拖拽晃动链路拆散。
 """
 
@@ -28,6 +28,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> None:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     actions = manifest.get("actions", {})
+    behavior_rules = manifest.get("behaviorRules", [])
 
     expected_actions = {
         "drag_crouch": ("hold", ["qrc:/pet/crouch-right.gif", "qrc:/pet/crouch-left.gif"]),
@@ -57,6 +58,7 @@ def main() -> None:
         require(alias in qrc, f"qrc 缺少 {alias}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [
         "handleDragStarted",
         "handleDragMoved",
@@ -66,25 +68,26 @@ def main() -> None:
         "m_dragShakeTurns",
         "m_dragHoldAnimationCompleted",
     ]:
-        require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
+        require(token not in pet_runtime_h + pet_runtime_cpp, f"PetRuntime 不应继续持有拖拽识别职责：{token}")
 
-    pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    gesture_tracker = read("apps/desktop/src/pet/interaction/GestureTracker.cpp")
     for token in [
-        "drag_crouch",
-        "drag_stand_up_full",
-        "drag_stand_up_quick",
         "m_dragShakeClock.elapsed() > 1000",
         "m_dragShakeTurns >= 5",
         "m_dragHoldAnimationCompleted",
     ]:
-        require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+        require(token in gesture_tracker, f"GestureTracker.cpp 缺少 {token}")
+
+    require(any(rule.get("event") == "pointer.dragShake" and rule.get("action") == "drag_crouch" for rule in behavior_rules), "behaviorRules 缺少 pointer.dragShake -> drag_crouch")
+    require(any(rule.get("event") == "pointer.dragReleased" and rule.get("action") == "drag_stand_up_full" for rule in behavior_rules), "behaviorRules 缺少完整站起分支")
+    require(any(rule.get("event") == "pointer.dragReleased" and rule.get("action") == "drag_stand_up_quick" for rule in behavior_rules), "behaviorRules 缺少快速站起分支")
 
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
-        "m_runtime->handleDragStarted",
-        "m_runtime->handleDragMoved",
-        "m_runtime->handleDragEnded",
-        "m_runtime->handleHoldAnimationReachedEnd",
+        "m_eventBridge->submitDragStarted",
+        "m_eventBridge->submitDragMoved",
+        "m_eventBridge->submitDragEnded",
+        "m_eventBridge->submitHoldAnimationReachedEnd",
         'm_runtime->currentLoopMode() == QStringLiteral("hold")',
     ]:
         require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少 {token}")

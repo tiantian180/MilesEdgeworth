@@ -108,6 +108,20 @@ struct BehaviorTriggerDefinition
     QList<BehaviorTriggerEntry> entries;
 };
 
+struct BehaviorRuleCondition
+{
+    QString actionId;
+    bool hasHoldCompleted = false;
+    bool holdCompleted = false;
+};
+
+struct BehaviorRuleDefinition
+{
+    QString event;
+    BehaviorRuleCondition when;
+    ActionRequest request;
+};
+
 struct HitZoneDefinition
 {
     QString id;
@@ -138,6 +152,7 @@ struct SkinManifest
     QHash<QString, RecipeDefinition> recipes;
     QHash<QString, ActionPoolDefinition> actionPools;
     QHash<QString, BehaviorTriggerDefinition> behaviorTriggers;
+    QList<BehaviorRuleDefinition> behaviorRules;
     QHash<QString, PropDefinition> props;
     QHash<QString, HitZoneDefinition> hitZones;
     QHash<QString, SkinCommandDefinition> skinCommands;

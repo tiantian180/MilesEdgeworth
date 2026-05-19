@@ -9,6 +9,8 @@ namespace {
 constexpr auto kSleepToggleCommandId = "runtime.sleep.toggle";
 constexpr auto kReturnToIdleCommandId = "runtime.returnToIdle";
 constexpr auto kFacingToggleCommandId = "runtime.facing.toggle";
+constexpr auto kDragShakeEventName = "pointer.dragShake";
+constexpr auto kDragReleasedEventName = "pointer.dragReleased";
 
 void appendIfPlayable(QList<ActionRequest> &requests, const ActionRequest &request)
 {
@@ -28,6 +30,55 @@ QStringList singleClickZoneIds(const QList<ClickBehaviorEntry> &entries)
         }
     }
     return zoneIds;
+}
+
+QString behaviorRuleEventName(const PetEvent &event)
+{
+    switch (event.type) {
+    case PetEventType::PointerDragShake:
+        return QString::fromUtf8(kDragShakeEventName);
+    case PetEventType::PointerDragReleased:
+        return QString::fromUtf8(kDragReleasedEventName);
+    default:
+        return {};
+    }
+}
+
+bool behaviorRuleMatches(
+    const BehaviorRuleDefinition &rule,
+    const RuntimeSnapshot &snapshot,
+    const PetEvent &event
+)
+{
+    if (rule.event != behaviorRuleEventName(event)) {
+        return false;
+    }
+
+    if (!rule.when.actionId.isEmpty() && rule.when.actionId != snapshot.currentActionId) {
+        return false;
+    }
+
+    if (rule.when.hasHoldCompleted && rule.when.holdCompleted != event.dragHoldCompleted) {
+        return false;
+    }
+
+    return true;
+}
+
+void appendBehaviorRuleRequests(
+    QList<ActionRequest> &requests,
+    const SkinManifest &manifest,
+    const RuntimeSnapshot &snapshot,
+    const PetEvent &event
+)
+{
+    // behaviorRules 是皮肤包把通用事件映射到播放请求的第一版机制。
+    // 这里不理解 Miles 的动作名，只按 event/when 条件挑选声明好的请求。
+    for (const BehaviorRuleDefinition &rule : manifest.behaviorRules) {
+        if (behaviorRuleMatches(rule, snapshot, event)) {
+            appendIfPlayable(requests, rule.request);
+        }
+    }
 }
 } // namespace
 
@@ -97,6 +148,14 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
                 break;
             }
         }
+        return requests;
+
+    case PetEventType::PointerDragShake:
+    case PetEventType::PointerDragReleased:
+        if (!snapshot.pointerInteractionEnabled || snapshot.currentActionId == "sleep") {
+            return requests;
+        }
+        appendBehaviorRuleRequests(requests, manifest, snapshot, event);
         return requests;
 
     case PetEventType::MenuCommand:

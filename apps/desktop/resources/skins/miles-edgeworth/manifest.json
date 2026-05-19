@@ -1126,6 +1126,28 @@
       ]
     }
   },
+  "behaviorRules": [
+    {
+      "event": "pointer.dragShake",
+      "action": "drag_crouch"
+    },
+    {
+      "event": "pointer.dragReleased",
+      "when": {
+        "action": "drag_crouch",
+        "holdCompleted": true
+      },
+      "action": "drag_stand_up_full"
+    },
+    {
+      "event": "pointer.dragReleased",
+      "when": {
+        "action": "drag_crouch",
+        "holdCompleted": false
+      },
+      "action": "drag_stand_up_quick"
+    }
+  ],
   "actionPools": {
     "idle.random": {
       "label": "随机待机动作",

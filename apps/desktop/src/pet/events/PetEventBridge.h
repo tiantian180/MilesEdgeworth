@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pet/events/PetEvent.h"
+#include "pet/interaction/GestureTracker.h"
 
 #include <QJSEngine>
 #include <QObject>
@@ -27,6 +28,10 @@ public:
 
     Q_INVOKABLE void submitPrimaryClick(double x, double y, double width, double height);
     Q_INVOKABLE void submitDoubleClick();
+    Q_INVOKABLE void submitDragStarted(double globalX);
+    Q_INVOKABLE void submitDragMoved(double globalX);
+    Q_INVOKABLE void submitDragEnded();
+    Q_INVOKABLE void submitHoldAnimationReachedEnd();
     Q_INVOKABLE void submitMenuCommand(const QString &commandId);
     Q_INVOKABLE void submitIdleLoopFinished();
     Q_INVOKABLE void submitPropClicked();
@@ -40,6 +45,7 @@ private:
     void submitEvent(const PetEvent &event);
 
     PetRuntime *m_runtime = nullptr;
+    GestureTracker m_gestureTracker;
 };
 
 // 这个 wrapper 让 QML 看到 PetEventBridge 单例，但对象生命周期仍由 main.cpp 管理。

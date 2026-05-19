@@ -273,28 +273,28 @@ int main(int argc, char *argv[])
     // 旧版拖拽晃动会在 1 秒内统计左右换向次数：达到阈值后先蹲下，
     // 松手时再根据蹲下动画是否播到末帧，选择快速站起或完整站起。
     runtime.returnToIdle();
-    runtime.handleDragStarted(100);
-    runtime.handleDragMoved(90);
-    runtime.handleDragMoved(110);
-    runtime.handleDragMoved(85);
-    runtime.handleDragMoved(115);
-    runtime.handleDragMoved(80);
+    bridge.submitDragStarted(100);
+    bridge.submitDragMoved(90);
+    bridge.submitDragMoved(110);
+    bridge.submitDragMoved(85);
+    bridge.submitDragMoved(115);
+    bridge.submitDragMoved(80);
     require(runtime.currentActionId() == "drag_crouch", "左右晃动达到阈值后应进入 drag_crouch");
-    runtime.handleDragEnded();
+    bridge.submitDragEnded();
     require(runtime.currentActionId() == "drag_stand_up_quick", "未蹲到底时松手应快速站起");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "快速站起播完后应回到 idle_stand");
 
     runtime.returnToIdle();
-    runtime.handleDragStarted(100);
-    runtime.handleDragMoved(90);
-    runtime.handleDragMoved(110);
-    runtime.handleDragMoved(85);
-    runtime.handleDragMoved(115);
-    runtime.handleDragMoved(80);
+    bridge.submitDragStarted(100);
+    bridge.submitDragMoved(90);
+    bridge.submitDragMoved(110);
+    bridge.submitDragMoved(85);
+    bridge.submitDragMoved(115);
+    bridge.submitDragMoved(80);
     require(runtime.currentActionId() == "drag_crouch", "左右晃动达到阈值后应进入 drag_crouch");
-    runtime.handleHoldAnimationReachedEnd();
-    runtime.handleDragEnded();
+    bridge.submitHoldAnimationReachedEnd();
+    bridge.submitDragEnded();
     require(runtime.currentActionId() == "drag_stand_up_full", "蹲到底后松手应完整站起");
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "完整站起播完后应回到 idle_stand");

@@ -62,9 +62,9 @@ def main() -> int:
         "contextMenuEvent",
         "submitPrimaryClick",
         "submitDoubleClick",
-        "handleDragStarted",
-        "handleDragMoved",
-        "handleDragEnded",
+        "submitDragStarted",
+        "submitDragMoved",
+        "submitDragEnded",
     ]:
         require(token in surface_h + surface_cpp, f"原生桌宠表面缺少鼠标交互迁移：{token}")
 

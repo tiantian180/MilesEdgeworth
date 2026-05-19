@@ -31,11 +31,17 @@ def main() -> int:
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [
         'm_currentActionId != "briefcase_in"',
-        "if (!acceptsPointerInteraction())",
         "wasPointerInteractionEnabled",
         "pointerInteractionEnabledChanged",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少启动交互保护实现：{token}")
+
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
+    bridge_cpp = read("apps/desktop/src/pet/events/PetEventBridge.cpp")
+    for token in [
+        "snapshot.pointerInteractionEnabled",
+    ]:
+        require(token in pipeline_cpp + bridge_cpp, f"事件层缺少启动交互保护判断：{token}")
 
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [

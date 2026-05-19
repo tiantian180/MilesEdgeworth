@@ -498,5 +498,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_66_click_behavior_pairing.py
         )
+
+        # Phase 0.67 的拖拽手势检查：拖拽晃动识别进入 GestureTracker，
+        # PetRuntime 只执行 ActionRequest，不再保存晃动计数和 Miles 拖拽动作名。
+        add_test(
+            NAME check_phase_0_67_gesture_tracker_extracted
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_67_gesture_tracker_extracted.py
+        )
     endif()
 endif()

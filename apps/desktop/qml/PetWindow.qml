@@ -294,7 +294,7 @@ Window {
             if (App.PetRuntime.currentLoopMode === "hold"
                     && frameCount > 0
                     && currentFrame >= frameCount - 1) {
-                App.PetRuntime.handleHoldAnimationReachedEnd()
+                App.PetEventBridge.submitHoldAnimationReachedEnd()
                 pet.playing = false
             }
 
@@ -405,7 +405,7 @@ Window {
             pressX = mouse.x
             pressY = mouse.y
             dragMoved = false
-            App.PetRuntime.handleDragStarted(petWindow.x + mouse.x)
+            App.PetEventBridge.submitDragStarted(petWindow.x + mouse.x)
         }
 
         onPositionChanged: function(mouse) {
@@ -421,7 +421,7 @@ Window {
                 dragMoved = true
             }
 
-            App.PetRuntime.handleDragMoved(petWindow.x + mouse.x)
+            App.PetEventBridge.submitDragMoved(petWindow.x + mouse.x)
             App.DesktopShell.movePetWindowBy(mouse.x - pressX, mouse.y - pressY)
         }
 
@@ -434,7 +434,7 @@ Window {
                 return
             }
 
-            App.PetRuntime.handleDragEnded()
+            App.PetEventBridge.submitDragEnded()
 
             if (dragMoved) {
                 doubleClickPending = false

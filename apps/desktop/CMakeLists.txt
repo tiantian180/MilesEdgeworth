@@ -33,6 +33,8 @@ set(DESKTOP_SOURCES
     src/pet/events/PetEventBridge.h
     src/pet/interaction/CustomInteractionRegistry.cpp
     src/pet/interaction/CustomInteractionRegistry.h
+    src/pet/interaction/GestureTracker.cpp
+    src/pet/interaction/GestureTracker.h
     src/pet/interaction/HitZoneMatcher.cpp
     src/pet/interaction/HitZoneMatcher.h
     src/pet/interaction/InteractionPipeline.cpp
@@ -120,6 +122,8 @@ if(BUILD_TESTING)
         src/pet/events/PetEventBridge.h
         src/pet/interaction/CustomInteractionRegistry.cpp
         src/pet/interaction/CustomInteractionRegistry.h
+        src/pet/interaction/GestureTracker.cpp
+        src/pet/interaction/GestureTracker.h
         src/pet/interaction/HitZoneMatcher.cpp
         src/pet/interaction/HitZoneMatcher.h
         src/pet/interaction/InteractionPipeline.cpp

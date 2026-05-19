@@ -90,15 +90,15 @@ def main() -> int:
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     bridge_h = read("apps/desktop/src/pet/events/PetEventBridge.h")
     for token in [
-        "handleDragStarted",
-        "handleDragMoved",
-        "handleDragEnded",
         "consumeFrameMovementDelta",
     ]:
-        require(token in pet_runtime_h, f"PetRuntime.h 缺少核心交互入口 {token}")
+        require(token in pet_runtime_h, f"PetRuntime.h 缺少核心运行时入口 {token}")
     for token in [
         "submitPrimaryClick",
         "submitDoubleClick",
+        "submitDragStarted",
+        "submitDragMoved",
+        "submitDragEnded",
         "submitPropClicked",
         "submitPropExpired",
         "submitMenuCommand",
@@ -115,7 +115,7 @@ def main() -> int:
         "m_propWindow",
         "m_singleClickTimer",
         "submitDoubleClick()",
-        "handleDragMoved",
+        "submitDragMoved",
         "enabledSkinCommands",
         "submitMenuCommand(commandId)",
         'submitMenuCommand(QStringLiteral("runtime.sleep.toggle"))',

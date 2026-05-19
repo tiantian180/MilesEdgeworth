@@ -5,7 +5,6 @@
 #include "pet/requests/ActionRequest.h"
 #include "pet/runtime/RuntimeSnapshot.h"
 
-#include <QElapsedTimer>
 #include <QHash>
 #include <QJSEngine>
 #include <QList>
@@ -117,10 +116,6 @@ public:
     Q_INVOKABLE void playRecipe(const QString &recipeId);
     Q_INVOKABLE void playActionFromPool(const QString &poolId);
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
-    Q_INVOKABLE void handleDragStarted(double globalX);
-    Q_INVOKABLE void handleDragMoved(double globalX);
-    Q_INVOKABLE void handleDragEnded();
-    Q_INVOKABLE void handleHoldAnimationReachedEnd();
     Q_INVOKABLE void toggleAudioMuted();
     Q_INVOKABLE void setVoiceLanguage(const QString &voiceLanguage);
     Q_INVOKABLE void toggleAutoMovementEnabled();
@@ -194,12 +189,6 @@ private:
     PropController m_propController;
     int m_playbackSerial = 0;
     int m_soundPlaybackSerial = 0;
-    QElapsedTimer m_dragShakeClock;
-    double m_dragShakeX = 0;
-    int m_dragShakeDirection = 1;
-    int m_dragShakeTurns = 0;
-    bool m_dragShakeTracking = false;
-    bool m_dragHoldAnimationCompleted = false;
 };
 
 // 与 DesktopShellControllerForeign 一样，这个 wrapper 让 QML 看到一个名为

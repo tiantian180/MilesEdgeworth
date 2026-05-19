@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""检查拖拽晃动已经进入 PetRuntime smoke 验证。
+"""检查拖拽晃动已经进入事件桥 smoke 验证。
 
 旧版手感里，拖住桌宠快速左右晃动会触发蹲下；如果蹲下动画还没播到末帧
 就松手，会快速站起；如果已经播到末帧再松手，会播放完整站起。这个检查
@@ -27,10 +27,10 @@ def main() -> int:
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
 
     for token in [
-        "runtime.handleDragStarted",
-        "runtime.handleDragMoved",
-        "runtime.handleDragEnded",
-        "runtime.handleHoldAnimationReachedEnd",
+        "bridge.submitDragStarted",
+        "bridge.submitDragMoved",
+        "bridge.submitDragEnded",
+        "bridge.submitHoldAnimationReachedEnd",
         'runtime.currentActionId() == "drag_crouch"',
         'runtime.currentActionId() == "drag_stand_up_quick"',
         'runtime.currentActionId() == "drag_stand_up_full"',

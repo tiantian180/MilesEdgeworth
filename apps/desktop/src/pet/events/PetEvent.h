@@ -11,6 +11,8 @@ enum class PetEventType
 {
     PointerSingleClick,
     PointerDoubleClick,
+    PointerDragShake,
+    PointerDragReleased,
     MenuCommand,
     IdleLoopFinished,
     PropClicked,
@@ -28,6 +30,7 @@ struct PetEvent
     double height = 0.0;
     double randomValue = 0.0;
     bool hasRandomValue = false;
+    bool dragHoldCompleted = false;
 
     static PetEvent pointerSingleClick(double clickX, double clickY, double windowWidth, double windowHeight)
     {
@@ -44,6 +47,21 @@ struct PetEvent
     {
         PetEvent event;
         event.type = PetEventType::PointerDoubleClick;
+        return event;
+    }
+
+    static PetEvent pointerDragShake()
+    {
+        PetEvent event;
+        event.type = PetEventType::PointerDragShake;
+        return event;
+    }
+
+    static PetEvent pointerDragReleased(bool holdCompleted)
+    {
+        PetEvent event;
+        event.type = PetEventType::PointerDragReleased;
+        event.dragHoldCompleted = holdCompleted;
         return event;
     }
 

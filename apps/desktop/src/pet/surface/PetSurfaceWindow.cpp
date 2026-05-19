@@ -143,7 +143,7 @@ void PetSurfaceWindow::mousePressEvent(QMouseEvent *event)
 
     m_pressPosition = event->position().toPoint();
     m_dragMoved = false;
-    m_runtime->handleDragStarted(event->globalPosition().x());
+    m_eventBridge->submitDragStarted(event->globalPosition().x());
 }
 
 void PetSurfaceWindow::mouseMoveEvent(QMouseEvent *event)
@@ -164,7 +164,7 @@ void PetSurfaceWindow::mouseMoveEvent(QMouseEvent *event)
         m_dragMoved = true;
     }
 
-    m_runtime->handleDragMoved(event->globalPosition().x());
+    m_eventBridge->submitDragMoved(event->globalPosition().x());
     m_shellController->movePetWindowBy(delta.x(), delta.y());
 }
 
@@ -180,7 +180,7 @@ void PetSurfaceWindow::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
 
-    m_runtime->handleDragEnded();
+    m_eventBridge->submitDragEnded();
 
     if (m_dragMoved) {
         m_doubleClickPending = false;
@@ -272,7 +272,7 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
     const int currentFrameDelayMs = qMax(1, m_movie->nextFrameDelay());
 
     if (m_runtime->currentLoopMode() == QStringLiteral("hold")) {
-        m_runtime->handleHoldAnimationReachedEnd();
+        m_eventBridge->submitHoldAnimationReachedEnd();
         m_movie->setPaused(true);
         return;
     }
