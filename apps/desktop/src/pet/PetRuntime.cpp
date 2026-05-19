@@ -1102,6 +1102,42 @@ void PetRuntime::loadManifest()
             m_actionPools.insert(it.key(), pool);
         }
     }
+
+    const QJsonObject behaviorTriggers = root.value("behaviorTriggers").toObject();
+    for (auto it = behaviorTriggers.constBegin(); it != behaviorTriggers.constEnd(); ++it) {
+        const QJsonObject triggerObject = it.value().toObject();
+
+        BehaviorTriggerDefinition trigger;
+        trigger.label = triggerObject.value("label").toString(it.key());
+
+        const QJsonObject whenObject = triggerObject.value("when").toObject();
+        trigger.state = whenObject.value("state").toString();
+        trigger.actionId = whenObject.value("action").toString();
+        trigger.requiresNoActiveRecipe = whenObject.value("requiresNoActiveRecipe").toBool(false);
+
+        const QJsonArray entries = triggerObject.value("entries").toArray();
+        for (const QJsonValue &entryValue : entries) {
+            const QJsonObject entryObject = entryValue.toObject();
+
+            BehaviorTriggerEntry entry;
+            entry.type = entryObject.value("type").toString();
+            entry.poolId = entryObject.value("pool").toString();
+            entry.recipeId = entryObject.value("recipe").toString();
+            entry.actionId = entryObject.value("action").toString();
+            entry.weight = entryObject.value("weight").toInt(1);
+            if (entry.weight < 1) {
+                entry.weight = 1;
+            }
+
+            if (!entry.type.isEmpty()) {
+                trigger.entries.append(entry);
+            }
+        }
+
+        if (!trigger.entries.isEmpty()) {
+            m_behaviorTriggers.insert(it.key(), trigger);
+        }
+    }
 }
 
 void PetRuntime::loadFallbackManifest()
@@ -1111,6 +1147,7 @@ void PetRuntime::loadFallbackManifest()
     m_actions.clear();
     m_recipes.clear();
     m_actionPools.clear();
+    m_behaviorTriggers.clear();
     m_props.clear();
     m_hitZones.clear();
     m_singleClickPools.clear();
@@ -1458,6 +1495,83 @@ PetRuntime::ActionPoolEntry PetRuntime::selectActionPoolEntry(const ActionPoolDe
     return pool.entries.constLast();
 }
 
+PetRuntime::BehaviorTriggerEntry PetRuntime::selectBehaviorTriggerEntry(const BehaviorTriggerDefinition &trigger, double randomValue) const
+{
+    BehaviorTriggerEntry fallbackEntry;
+    if (trigger.entries.isEmpty()) {
+        return fallbackEntry;
+    }
+
+    int totalWeight = 0;
+    for (const BehaviorTriggerEntry &entry : trigger.entries) {
+        totalWeight += entry.weight;
+    }
+
+    if (totalWeight <= 0) {
+        return trigger.entries.constFirst();
+    }
+
+    // 外部测试会传入确定性的 0..1 随机值；真实运行时则来自 QRandomGenerator。
+    // 这里把它投射到权重区间，manifest 里的 70/30、80/20 等比例都能复用同一套逻辑。
+    double cursor = qBound(0.0, randomValue, 0.999999999) * totalWeight;
+    for (const BehaviorTriggerEntry &entry : trigger.entries) {
+        cursor -= entry.weight;
+        if (cursor < 0) {
+            return entry;
+        }
+    }
+
+    return trigger.entries.constLast();
+}
+
+bool PetRuntime::behaviorTriggerMatchesCurrentContext(const BehaviorTriggerDefinition &trigger) const
+{
+    if (!trigger.state.isEmpty() && trigger.state != m_currentState) {
+        return false;
+    }
+
+    if (!trigger.actionId.isEmpty() && trigger.actionId != m_currentActionId) {
+        return false;
+    }
+
+    if (trigger.requiresNoActiveRecipe && !m_currentRecipeId.isEmpty()) {
+        return false;
+    }
+
+    return true;
+}
+
+void PetRuntime::handleBehaviorTriggerWithRoll(const QString &triggerId, double randomValue)
+{
+    if (!m_behaviorTriggers.contains(triggerId)) {
+        return;
+    }
+
+    const BehaviorTriggerDefinition trigger = m_behaviorTriggers.value(triggerId);
+    if (!behaviorTriggerMatchesCurrentContext(trigger)) {
+        return;
+    }
+
+    const BehaviorTriggerEntry entry = selectBehaviorTriggerEntry(trigger, randomValue);
+    if (entry.type == "none") {
+        return;
+    }
+
+    if (entry.type == "pool" && !entry.poolId.isEmpty()) {
+        playActionFromPool(entry.poolId);
+        return;
+    }
+
+    if (entry.type == "recipe" && !entry.recipeId.isEmpty()) {
+        playRecipe(entry.recipeId);
+        return;
+    }
+
+    if (entry.type == "action" && !entry.actionId.isEmpty()) {
+        playAction(entry.actionId);
+    }
+}
+
 QString PetRuntime::followUpPoolForCompletedAction(const ActionDefinition &action) const
 {
     if (action.category != "locomotion") {
@@ -1561,20 +1675,9 @@ QPointF PetRuntime::propTravelDelta(const PropDefinition &prop, const QString &f
 
 void PetRuntime::handleIdleLoopFinishedWithRoll(double randomValue)
 {
-    // 旧版 STAND GIF 每播完一轮，会有 0.7 概率切到随机动作，
-    // 剩下 0.3 概率继续站立。这里保留同样的节奏入口。
-    if (m_currentState != "idle" || !m_currentRecipeId.isEmpty()) {
-        return;
-    }
-
-    const QString idleAction = actionForState("idle");
-    if (idleAction.isEmpty() || m_currentActionId != idleAction) {
-        return;
-    }
-
-    if (randomValue <= 0.7) {
-        playActionFromPool("idle.random");
-    }
+    // 站立循环完成只是一个事件入口，具体概率和目标动作交给皮肤 manifest。
+    // 这样 Miles 可以保留旧版 70/30 节奏，未来其它皮肤也能配置自己的待机节奏。
+    handleBehaviorTriggerWithRoll("idle.loopFinished", randomValue);
 }
 
 void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)

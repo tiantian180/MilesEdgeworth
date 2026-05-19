@@ -1090,6 +1090,27 @@
       "action": "sleep"
     }
   },
+  "behaviorTriggers": {
+    "idle.loopFinished": {
+      "label": "站立循环完成后的待机调度",
+      "when": {
+        "state": "idle",
+        "action": "idle_stand",
+        "requiresNoActiveRecipe": true
+      },
+      "entries": [
+        {
+          "type": "pool",
+          "pool": "idle.random",
+          "weight": 70
+        },
+        {
+          "type": "none",
+          "weight": 30
+        }
+      ]
+    }
+  },
   "actionPools": {
     "idle.random": {
       "label": "随机待机动作",

@@ -241,6 +241,24 @@ private:
         QList<ActionPoolEntry> entries;
     };
 
+    struct BehaviorTriggerEntry
+    {
+        QString type;
+        QString poolId;
+        QString recipeId;
+        QString actionId;
+        int weight = 1;
+    };
+
+    struct BehaviorTriggerDefinition
+    {
+        QString label;
+        QString state;
+        QString actionId;
+        bool requiresNoActiveRecipe = false;
+        QList<BehaviorTriggerEntry> entries;
+    };
+
     struct HitZoneDefinition
     {
         QString id;
@@ -271,6 +289,9 @@ private:
     void playRecipeStep(const RecipeStep &step);
     QString actionPoolIdForContext(const QString &poolId) const;
     ActionPoolEntry selectActionPoolEntry(const ActionPoolDefinition &pool) const;
+    BehaviorTriggerEntry selectBehaviorTriggerEntry(const BehaviorTriggerDefinition &trigger, double randomValue) const;
+    bool behaviorTriggerMatchesCurrentContext(const BehaviorTriggerDefinition &trigger) const;
+    void handleBehaviorTriggerWithRoll(const QString &triggerId, double randomValue);
     QString followUpPoolForCompletedAction(const ActionDefinition &action) const;
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
@@ -290,6 +311,7 @@ private:
     QHash<QString, ActionDefinition> m_actions;
     QHash<QString, RecipeDefinition> m_recipes;
     QHash<QString, ActionPoolDefinition> m_actionPools;
+    QHash<QString, BehaviorTriggerDefinition> m_behaviorTriggers;
     QHash<QString, PropDefinition> m_props;
     QHash<QString, HitZoneDefinition> m_hitZones;
     QStringList m_singleClickPools;

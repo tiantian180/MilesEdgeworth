@@ -382,5 +382,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_50_mute_volume_binding.py
         )
+
+        # Phase 0.52 的 idle loop 触发配置检查：站立循环播完后
+        # 是否进入随机待机池，应由皮肤 manifest 决定，避免运行时硬编码概率。
+        add_test(
+            NAME check_phase_0_52_manifest_idle_loop_trigger
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_52_manifest_idle_loop_trigger.py
+        )
     endif()
 endif()
