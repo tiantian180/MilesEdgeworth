@@ -206,5 +206,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_28_legacy_tea_once.py
         )
+
+        # Phase 0.29 的拖拽晃动 smoke 检查：确保 PetRuntime
+        # 真实模拟过“左右晃到蹲下、松手快站/完整站起”两条旧版分支。
+        add_test(
+            NAME check_phase_0_29_drag_shake_smoke
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_29_drag_shake_smoke.py
+        )
     endif()
 endif()
