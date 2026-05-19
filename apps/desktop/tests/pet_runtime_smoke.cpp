@@ -106,6 +106,19 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "idle_stand", "公文包停下后应进入 idle_stand");
     require(runtime.currentRecipeId().isEmpty(), "启动序列结束后应清空 currentRecipeId");
 
+    runtime.handleIdleLoopFinishedForTest(0.71);
+    require(runtime.currentActionId() == "idle_stand", "站立循环随机数超过 0.7 时应继续站立");
+    require(runtime.currentRecipeId().isEmpty(), "站立循环随机数超过 0.7 时不应进入随机 recipe");
+
+    runtime.handleIdleLoopFinishedForTest(0.69);
+    require(!runtime.currentRecipeId().isEmpty(), "站立循环随机数不超过 0.7 时应进入随机 idle recipe");
+    runtime.returnToIdle();
+
+    runtime.playRecipe("doubleClick.holdIt");
+    runtime.handleIdleLoopFinishedForTest(0.0);
+    require(runtime.currentRecipeId() == "doubleClick.holdIt", "非待机 recipe 播放中不应被站立循环入口打断");
+    runtime.returnToIdle();
+
     runtime.playRecipe("turn.once");
     require(runtime.currentActionId() == "turn_around", "turn.once 应播放 turn_around");
     require(runtime.currentFacing() == "right", "默认朝向应为 right");

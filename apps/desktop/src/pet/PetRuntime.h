@@ -114,6 +114,7 @@ public:
     Q_INVOKABLE void requestTea();
     Q_INVOKABLE void toggleSleep();
     Q_INVOKABLE void triggerIdle();
+    Q_INVOKABLE void handleIdleLoopFinished();
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
     Q_INVOKABLE void testThinking();
@@ -127,6 +128,7 @@ public:
     Q_INVOKABLE void testSleep();
     Q_INVOKABLE void testProsecutorBadge();
     Q_INVOKABLE void handleAnimationFinished();
+    void handleIdleLoopFinishedForTest(double randomValue);
 
 signals:
     void currentStateChanged();
@@ -254,6 +256,7 @@ private:
     QString followUpPoolForCompletedAction(const ActionDefinition &action) const;
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
+    void handleIdleLoopFinishedWithRoll(double randomValue);
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
     void playPhase(const QString &actionId, const QString &phaseId);

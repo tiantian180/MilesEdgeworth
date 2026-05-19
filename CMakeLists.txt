@@ -270,5 +270,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_36_idle_random_legacy_weights.py
         )
+
+        # Phase 0.37 的随机 idle 触发检查：确保随机待机
+        # 由站立循环完成事件驱动，而不是固定间隔 Timer。
+        add_test(
+            NAME check_phase_0_37_idle_loop_trigger
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_37_idle_loop_trigger.py
+        )
     endif()
 endif()

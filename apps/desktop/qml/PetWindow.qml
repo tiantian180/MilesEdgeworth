@@ -213,17 +213,6 @@ Window {
         onTriggered: App.PetRuntime.handlePropExpired()
     }
 
-    // Phase 0.8 先用一个轻量 Timer 模拟旧版“待机时偶尔做点小动作”。
-    // 真正能不能触发由 PetRuntime 决定，避免 Timer 打断正在播放的交互动作。
-    Timer {
-        id: idleRandomTimer
-
-        interval: 7000
-        repeat: true
-        running: petWindow.visible && App.PetRuntime.currentRecipeId === ""
-        onTriggered: App.PetRuntime.triggerIdle()
-    }
-
     // 和旧版一样，单击需要等一小段时间才能确认不是双击。
     // 这样双击不会先误触发一次单击分区反应。
     Timer {
@@ -268,6 +257,14 @@ Window {
                     && frameCount > 0
                     && currentFrame >= frameCount - 1) {
                 App.PetRuntime.handleAnimationFinished()
+            }
+
+            if (App.PetRuntime.currentActionId === "idle_stand"
+                    && App.PetRuntime.currentLoopMode === "loop"
+                    && App.PetRuntime.currentRecipeId === ""
+                    && frameCount > 0
+                    && currentFrame >= frameCount - 1) {
+                App.PetRuntime.handleIdleLoopFinished()
             }
         }
     }

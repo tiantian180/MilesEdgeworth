@@ -387,6 +387,16 @@ void PetRuntime::triggerIdle()
     playActionFromPool("idle.random");
 }
 
+void PetRuntime::handleIdleLoopFinished()
+{
+    handleIdleLoopFinishedWithRoll(QRandomGenerator::global()->generateDouble());
+}
+
+void PetRuntime::handleIdleLoopFinishedForTest(double randomValue)
+{
+    handleIdleLoopFinishedWithRoll(randomValue);
+}
+
 QVariantMap PetRuntime::consumeFrameMovementDelta() const
 {
     QVariantMap delta;
@@ -1430,6 +1440,24 @@ QString PetRuntime::resolveRecipeFacing(const QString &facing) const
     }
 
     return {};
+}
+
+void PetRuntime::handleIdleLoopFinishedWithRoll(double randomValue)
+{
+    // 旧版 STAND GIF 每播完一轮，会有 0.7 概率切到随机动作，
+    // 剩下 0.3 概率继续站立。这里保留同样的节奏入口。
+    if (m_currentState != "idle" || !m_currentRecipeId.isEmpty()) {
+        return;
+    }
+
+    const QString idleAction = actionForState("idle");
+    if (idleAction.isEmpty() || m_currentActionId != idleAction) {
+        return;
+    }
+
+    if (randomValue <= 0.7) {
+        playActionFromPool("idle.random");
+    }
 }
 
 void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)

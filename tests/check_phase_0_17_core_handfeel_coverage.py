@@ -94,7 +94,7 @@ def main() -> int:
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
-        "idleRandomTimer",
+        "handleIdleLoopFinished",
         "SoundEffect",
         "prosecutorBadgeWindow",
         "singleClickTimer",
