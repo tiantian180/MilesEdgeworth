@@ -358,5 +358,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_47_legacy_dual_screen_options.py
         )
+
+        # Phase 0.48 的旧版手型光标检查：旧版 enterEvent 会把鼠标
+        # 设成 PointingHandCursor，提示桌宠可以点击和拖拽。
+        add_test(
+            NAME check_phase_0_48_legacy_hand_cursor
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_48_legacy_hand_cursor.py
+        )
     endif()
 endif()

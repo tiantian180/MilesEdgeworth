@@ -382,6 +382,7 @@ Window {
 
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        cursorShape: Qt.PointingHandCursor
         z: 1
 
         property real pressX: 0
