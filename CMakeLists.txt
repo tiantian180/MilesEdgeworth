@@ -182,5 +182,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_25_legacy_idle_once_pool.py
         )
+
+        # Phase 0.26 的随机待机补充检查：抬头和低头动作既可由
+        # 单击触发，也要保留旧版 once 随机待机的使用场景。
+        add_test(
+            NAME check_phase_0_26_idle_look_variants
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_26_idle_look_variants.py
+        )
     endif()
 endif()

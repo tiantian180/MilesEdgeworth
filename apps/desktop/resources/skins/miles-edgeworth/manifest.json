@@ -891,6 +891,16 @@
       "scope": "idle",
       "action": "idle_look_back"
     },
+    "idle.lookDown": {
+      "label": "随机低头看",
+      "scope": "idle",
+      "action": "idle_look_down"
+    },
+    "idle.lookUp": {
+      "label": "随机抬头看",
+      "scope": "idle",
+      "action": "idle_look_up"
+    },
     "click.faceScared": {
       "label": "点脸受惊",
       "scope": "click",
@@ -1070,6 +1080,14 @@
         },
         {
           "recipe": "idle.lookBack",
+          "weight": 2
+        },
+        {
+          "recipe": "idle.lookDown",
+          "weight": 2
+        },
+        {
+          "recipe": "idle.lookUp",
           "weight": 2
         },
         {

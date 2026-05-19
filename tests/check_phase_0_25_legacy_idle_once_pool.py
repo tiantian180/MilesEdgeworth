@@ -30,6 +30,8 @@ def main() -> int:
         "idle_sitting_tea": ["qrc:/pet/idle-sitting-tea-right.gif", "qrc:/pet/idle-sitting-tea-left.gif"],
         "idle_phone_call": ["qrc:/pet/idle-phone-call-right.gif", "qrc:/pet/idle-phone-call-left.gif"],
         "idle_look_back": ["qrc:/pet/idle-look-back-right.gif", "qrc:/pet/idle-look-back-left.gif"],
+        "idle_look_down": ["qrc:/pet/idle-look-down-right.gif", "qrc:/pet/idle-look-down-left.gif"],
+        "idle_look_up": ["qrc:/pet/idle-look-up-right.gif", "qrc:/pet/idle-look-up-left.gif"],
     }
 
     for action_id, urls in expected_actions.items():
@@ -45,6 +47,8 @@ def main() -> int:
         "idle.sittingTea": "idle_sitting_tea",
         "idle.phoneCall": "idle_phone_call",
         "idle.lookBack": "idle_look_back",
+        "idle.lookDown": "idle_look_down",
+        "idle.lookUp": "idle_look_up",
     }
 
     for recipe_id, action_id in expected_recipes.items():
