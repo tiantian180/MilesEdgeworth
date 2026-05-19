@@ -278,5 +278,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_37_idle_loop_trigger.py
         )
+
+        # Phase 0.38 的移动续行权重检查：确保 walk/run 播完后
+        # 的自由游走概率贴近旧版每轮动画结束时的分布。
+        add_test(
+            NAME check_phase_0_38_locomotion_followup_legacy_weights
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_38_locomotion_followup_legacy_weights.py
+        )
     endif()
 endif()

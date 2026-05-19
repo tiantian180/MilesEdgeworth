@@ -1151,47 +1151,47 @@
       "entries": [
         {
           "recipe": "run.current",
-          "weight": 20
+          "weight": 80
         },
         {
           "recipe": "walk.current",
-          "weight": 10
+          "weight": 400
         },
         {
           "recipe": "walk.east",
-          "weight": 4
+          "weight": 15
         },
         {
           "recipe": "walk.west",
-          "weight": 4
+          "weight": 15
         },
         {
           "recipe": "walk.northEast",
-          "weight": 4
+          "weight": 15
         },
         {
           "recipe": "walk.northWest",
-          "weight": 4
+          "weight": 15
         },
         {
           "recipe": "walk.southEast",
-          "weight": 4
+          "weight": 15
         },
         {
           "recipe": "walk.southWest",
-          "weight": 4
+          "weight": 15
         },
         {
           "recipe": "walk.north",
-          "weight": 4
+          "weight": 15
         },
         {
           "recipe": "walk.south",
-          "weight": 4
+          "weight": 15
         },
         {
           "recipe": "idle.stand",
-          "weight": 50
+          "weight": 200
         }
       ]
     },
@@ -1200,47 +1200,47 @@
       "entries": [
         {
           "recipe": "walk.current",
-          "weight": 20
+          "weight": 80
         },
         {
           "recipe": "run.current",
-          "weight": 10
+          "weight": 400
         },
         {
           "recipe": "run.east",
-          "weight": 3
+          "weight": 10
         },
         {
           "recipe": "run.west",
-          "weight": 3
+          "weight": 10
         },
         {
           "recipe": "run.northEast",
-          "weight": 3
+          "weight": 10
         },
         {
           "recipe": "run.northWest",
-          "weight": 3
+          "weight": 10
         },
         {
           "recipe": "run.southEast",
-          "weight": 3
+          "weight": 10
         },
         {
           "recipe": "run.southWest",
-          "weight": 3
+          "weight": 10
         },
         {
           "recipe": "run.north",
-          "weight": 3
+          "weight": 10
         },
         {
           "recipe": "run.south",
-          "weight": 3
+          "weight": 10
         },
         {
           "recipe": "idle.stand",
-          "weight": 60
+          "weight": 240
         }
       ]
     },
