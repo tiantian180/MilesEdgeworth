@@ -88,4 +88,7 @@
     <file alias="eureka0.wav">../../../audios/eureka0.wav</file>
     <file alias="eureka1.wav">../../../audios/eureka1.wav</file>
   </qresource>
+  <qresource prefix="/icon">
+    <file alias="favicon-bar.ico">../../../icon/favicon_bar.ico</file>
+  </qresource>
 </RCC>

@@ -68,6 +68,7 @@ Phase 0 已完成最小桌面壳层验证：
 - macOS 下跨 Spaces / 全屏应用置顶的技术验证。
 - 左键拖拽。
 - 右键显示最小退出菜单。
+- 系统托盘图标和托盘退出入口。
 - 从资源系统加载 Miles GIF。
 
 当前仍是技术验证，不是完整可发布的 v2 AI 桌宠。后续会继续实现 Pet Runtime、聊天窗口、设置中心、模型 Provider、皮肤 manifest 和 Agent Runtime。

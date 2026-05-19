@@ -326,5 +326,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_43_scaled_prosecutor_badge.py
         )
+
+        # Phase 0.44 的系统托盘检查：还原旧版托盘常驻、
+        # 托盘右键退出和单击唤起桌宠窗口。
+        add_test(
+            NAME check_phase_0_44_system_tray
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_44_system_tray.py
+        )
     endif()
 endif()

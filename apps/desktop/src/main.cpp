@@ -27,6 +27,7 @@ int main(int argc, char *argv[])
     // Qt.labs.platform 的原生菜单在部分平台需要 Qt Widgets fallback。
     // 因此桌面壳层使用 QApplication，而不是更轻的 QGuiApplication。
     QApplication app(argc, argv);
+    app.setQuitOnLastWindowClosed(false);
 
     DesktopShellController shellController;
     DesktopShellControllerForeign::s_instance = &shellController;

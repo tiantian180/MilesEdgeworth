@@ -1,8 +1,13 @@
 #include "DesktopShellController.h"
 
+#include <QAction>
+#include <QCoreApplication>
 #include <QGuiApplication>
+#include <QIcon>
+#include <QMenu>
 #include <QRect>
 #include <QScreen>
+#include <QSystemTrayIcon>
 #include <QWindow>
 #include <QtGlobal>
 
@@ -13,6 +18,12 @@
 DesktopShellController::DesktopShellController(QObject *parent)
     : QObject(parent)
 {
+    createTrayIcon();
+}
+
+DesktopShellController::~DesktopShellController()
+{
+    delete m_trayMenu;
 }
 
 bool DesktopShellController::alwaysOnTop() const
@@ -53,6 +64,19 @@ void DesktopShellController::toggleAlwaysOnTop()
     setAlwaysOnTop(!m_alwaysOnTop);
 }
 
+void DesktopShellController::revealPetWindow()
+{
+    if (m_petWindow == nullptr) {
+        return;
+    }
+
+    // 旧版单击托盘图标会 activateWindow。QWindow 侧用 show/raise/
+    // requestActivate 组合实现“从托盘找回桌宠”的轻量入口。
+    m_petWindow->show();
+    m_petWindow->raise();
+    m_petWindow->requestActivate();
+}
+
 void DesktopShellController::movePetWindowBy(double dx, double dy)
 {
     if (m_petWindow == nullptr) {
@@ -71,6 +95,32 @@ void DesktopShellController::movePetWindowTo(double x, double y)
 
     const QPointF clampedPosition = clampedPetWindowPosition(QPointF(x, y));
     m_petWindow->setPosition(clampedPosition.toPoint());
+}
+
+void DesktopShellController::createTrayIcon()
+{
+    if (m_trayIcon != nullptr) {
+        return;
+    }
+
+    m_trayMenu = new QMenu();
+    m_exitAction = m_trayMenu->addAction("退出");
+
+    // 托盘菜单的退出入口走 QApplication/QCoreApplication，
+    // 与旧版 actionExit 一样是“退出整个应用”，不只是隐藏窗口。
+    connect(m_exitAction, &QAction::triggered, QCoreApplication::instance(), &QCoreApplication::quit);
+
+    m_trayIcon = new QSystemTrayIcon(this);
+    m_trayIcon->setIcon(QIcon(":/icon/favicon-bar.ico"));
+    m_trayIcon->setToolTip("MilesEdgeworth");
+    m_trayIcon->setContextMenu(m_trayMenu);
+    m_trayIcon->show();
+
+    connect(m_trayIcon, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::Trigger) {
+            revealPetWindow();
+        }
+    });
 }
 
 void DesktopShellController::applyCurrentLayerMode()

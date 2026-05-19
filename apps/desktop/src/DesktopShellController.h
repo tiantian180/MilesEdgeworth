@@ -6,6 +6,9 @@
 #include <QQmlEngine>
 #include <QtQml/qqmlregistration.h>
 
+class QAction;
+class QMenu;
+class QSystemTrayIcon;
 class QWindow;
 
 // QML 与桌面壳层之间的极薄桥接层。
@@ -18,6 +21,7 @@ class DesktopShellController : public QObject
 
 public:
     explicit DesktopShellController(QObject *parent = nullptr);
+    ~DesktopShellController() override;
 
     bool alwaysOnTop() const;
     void setPetWindow(QWindow *window);
@@ -25,6 +29,7 @@ public:
 public slots:
     void setAlwaysOnTop(bool alwaysOnTop);
     void toggleAlwaysOnTop();
+    Q_INVOKABLE void revealPetWindow();
     Q_INVOKABLE void movePetWindowBy(double dx, double dy);
     Q_INVOKABLE void movePetWindowTo(double x, double y);
 
@@ -32,10 +37,14 @@ signals:
     void alwaysOnTopChanged();
 
 private:
+    void createTrayIcon();
     void applyCurrentLayerMode();
     QPointF clampedPetWindowPosition(const QPointF &candidatePosition) const;
 
     QWindow *m_petWindow = nullptr;
+    QSystemTrayIcon *m_trayIcon = nullptr;
+    QMenu *m_trayMenu = nullptr;
+    QAction *m_exitAction = nullptr;
     bool m_alwaysOnTop = true;
 };
 
