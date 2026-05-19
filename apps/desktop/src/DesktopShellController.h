@@ -28,6 +28,7 @@ public:
 
 public slots:
     void setAlwaysOnTop(bool alwaysOnTop);
+    void setPetScale(double petScale);
     void toggleAlwaysOnTop();
     Q_INVOKABLE void revealPetWindow();
     Q_INVOKABLE void placePetWindowForStartup(double petScale);
@@ -47,6 +48,7 @@ private:
     QSystemTrayIcon *m_trayIcon = nullptr;
     QMenu *m_trayMenu = nullptr;
     QAction *m_exitAction = nullptr;
+    double m_petScale = 2.0;
     bool m_alwaysOnTop = true;
 };
 

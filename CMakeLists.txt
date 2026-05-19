@@ -342,5 +342,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_45_legacy_startup_position.py
         )
+
+        # Phase 0.46 的旧版身体边界检查：旧版不是按透明窗口外壳夹取，
+        # 而是按角色身体附近的点位限制活动范围。
+        add_test(
+            NAME check_phase_0_46_legacy_body_bounds
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_46_legacy_body_bounds.py
+        )
     endif()
 endif()

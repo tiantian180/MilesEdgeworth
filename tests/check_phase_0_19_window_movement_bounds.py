@@ -39,7 +39,7 @@ def main() -> int:
         "DesktopShellController::movePetWindowBy",
         "DesktopShellController::movePetWindowTo",
         "DesktopShellController::clampedPetWindowPosition",
-        "availableGeometry()",
+        "legacyBodyCenter",
         "qBound",
     ]:
         require(token in shell_cpp, f"DesktopShellController.cpp 缺少 {token}")

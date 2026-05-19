@@ -59,6 +59,22 @@ void DesktopShellController::setAlwaysOnTop(bool alwaysOnTop)
     emit alwaysOnTopChanged();
 }
 
+void DesktopShellController::setPetScale(double petScale)
+{
+    const double safeScale = petScale > 0.0 ? petScale : 2.0;
+    if (qFuzzyCompare(m_petScale, safeScale)) {
+        return;
+    }
+
+    m_petScale = safeScale;
+
+    if (m_petWindow != nullptr) {
+        // 旧版切换尺寸后会轻微 move 一下，借 moveEvent 重新夹住边界。
+        // v2 直接复用统一移动入口，让尺寸变化后的角色身体仍在屏幕内。
+        movePetWindowTo(m_petWindow->position().x(), m_petWindow->position().y());
+    }
+}
+
 void DesktopShellController::toggleAlwaysOnTop()
 {
     setAlwaysOnTop(!m_alwaysOnTop);
@@ -175,16 +191,15 @@ QPointF DesktopShellController::clampedPetWindowPosition(const QPointF &candidat
         return candidatePosition;
     }
 
-    // 旧版在 moveEvent 里限制窗口，避免自动走路/跑步把桌宠带出屏幕。
-    // v2 先按窗口外壳做保守夹取；后续如果引入 alpha mask / body bounds，
-    // 可以把这里的 margin 改成由皮肤 manifest 提供。
-    const QSize windowSize = m_petWindow->size();
-    const QPointF windowCenter(
-        candidatePosition.x() + windowSize.width() / 2.0,
-        candidatePosition.y() + windowSize.height() / 2.0
+    // 旧版不是按透明窗口外壳限制边界，而是取角色身体附近的四个点：
+    // (36,10)、(63,10)、(36,90)、(63,90) * scale。
+    // 这样透明留白可以略微越过屏幕边缘，但 Miles 的身体仍会留在屏幕内。
+    const QPointF legacyBodyCenter(
+        candidatePosition.x() + 50.0 * m_petScale,
+        candidatePosition.y() + 50.0 * m_petScale
     );
 
-    QScreen *targetScreen = QGuiApplication::screenAt(windowCenter.toPoint());
+    QScreen *targetScreen = QGuiApplication::screenAt(legacyBodyCenter.toPoint());
     if (targetScreen == nullptr) {
         targetScreen = m_petWindow->screen();
     }
@@ -195,11 +210,11 @@ QPointF DesktopShellController::clampedPetWindowPosition(const QPointF &candidat
         return candidatePosition;
     }
 
-    const QRect availableGeometry = targetScreen->availableGeometry();
-    const double minX = availableGeometry.x();
-    const double minY = availableGeometry.y();
-    const double maxX = availableGeometry.x() + availableGeometry.width() - windowSize.width();
-    const double maxY = availableGeometry.y() + availableGeometry.height() - windowSize.height();
+    const QRect screenGeometry = targetScreen->geometry();
+    const double minX = screenGeometry.x() - 36.0 * m_petScale;
+    const double minY = screenGeometry.y() - 10.0 * m_petScale;
+    const double maxX = screenGeometry.x() + screenGeometry.width() - 63.0 * m_petScale;
+    const double maxY = screenGeometry.y() + screenGeometry.height() - 90.0 * m_petScale;
 
     const double clampedX = (maxX >= minX) ? qBound(minX, candidatePosition.x(), maxX) : minX;
     const double clampedY = (maxY >= minY) ? qBound(minY, candidatePosition.y(), maxY) : minY;

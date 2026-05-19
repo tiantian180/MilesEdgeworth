@@ -34,6 +34,10 @@ int main(int argc, char *argv[])
 
     PetRuntime petRuntime;
     PetRuntimeForeign::s_instance = &petRuntime;
+    shellController.setPetScale(petRuntime.petScale());
+    QObject::connect(&petRuntime, &PetRuntime::petScaleChanged, &shellController, [&shellController, &petRuntime]() {
+        shellController.setPetScale(petRuntime.petScale());
+    });
 
     QQmlApplicationEngine engine;
     QObject::connect(
