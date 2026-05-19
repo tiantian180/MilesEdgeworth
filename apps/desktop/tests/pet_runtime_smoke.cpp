@@ -94,6 +94,12 @@ int main(int argc, char *argv[])
     runtime.playRecipe("doubleClick.objection");
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/objection2.wav", "中文语音应选择 objection2.wav");
 
+    for (int i = 0; i < 80; ++i) {
+        runtime.returnToIdle();
+        runtime.handleDoubleClick();
+        require(runtime.currentRecipeId() != "doubleClick.eureka", "中文双击不应进入 Eureka 分支");
+    }
+
     runtime.returnToIdle();
     runtime.setFacing("right");
     runtime.handlePrimaryClick(145, 40, 240, 240);
@@ -114,9 +120,10 @@ int main(int argc, char *argv[])
     runtime.handlePrimaryClick(150, 40, 240, 240);
     require(runtime.currentActionId() != "scared", "左朝向右上头部区域不应触发 scared");
 
+    const QString soundBeforeMutedPlay = runtime.currentSoundUrl().toString();
     runtime.toggleAudioMuted();
     runtime.playRecipe("doubleClick.holdIt");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/objection2.wav", "静音时不应发出新的声音播放请求");
+    require(runtime.currentSoundUrl().toString() == soundBeforeMutedPlay, "静音时不应发出新的声音播放请求");
 
     runtime.handlePropExpired();
     runtime.playRecipe("doubleClick.takeThat");

@@ -248,6 +248,7 @@ private:
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
     void playRecipeStep(const RecipeStep &step);
+    QString actionPoolIdForContext(const QString &poolId) const;
     ActionPoolEntry selectActionPoolEntry(const ActionPoolDefinition &pool) const;
     QString followUpPoolForCompletedAction(const ActionDefinition &action) const;
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;

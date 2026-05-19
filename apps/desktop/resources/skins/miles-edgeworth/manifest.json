@@ -1272,6 +1272,23 @@
         }
       ]
     },
+    "doubleClick.random.zh": {
+      "label": "中文双击随机语音动作",
+      "entries": [
+        {
+          "recipe": "doubleClick.holdIt",
+          "weight": 1
+        },
+        {
+          "recipe": "doubleClick.takeThat",
+          "weight": 1
+        },
+        {
+          "recipe": "doubleClick.objection",
+          "weight": 2
+        }
+      ]
+    },
     "menu.tea": {
       "label": "菜单喝茶",
       "entries": [

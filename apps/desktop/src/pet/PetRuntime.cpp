@@ -355,7 +355,7 @@ void PetRuntime::playRecipe(const QString &recipeId)
 
 void PetRuntime::playActionFromPool(const QString &poolId)
 {
-    const QString normalizedPoolId = poolId.trimmed();
+    const QString normalizedPoolId = actionPoolIdForContext(poolId);
     if (!m_actionPools.contains(normalizedPoolId)) {
         return;
     }
@@ -1312,6 +1312,24 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
     if (!step.actionId.isEmpty()) {
         playActionInternal(step.actionId, false);
     }
+}
+
+QString PetRuntime::actionPoolIdForContext(const QString &poolId) const
+{
+    const QString normalizedPoolId = poolId.trimmed();
+    if (normalizedPoolId.isEmpty()) {
+        return {};
+    }
+
+    // 语言后缀池用于还原旧版“某些语言没有某个语音动作”的细节。
+    // 例如中文没有 eureka2.wav，manifest 可以用 doubleClick.random.zh
+    // 覆盖默认 doubleClick.random。
+    const QString languagePoolId = normalizedPoolId + "." + m_voiceLanguage;
+    if (m_actionPools.contains(languagePoolId)) {
+        return languagePoolId;
+    }
+
+    return normalizedPoolId;
 }
 
 PetRuntime::ActionPoolEntry PetRuntime::selectActionPoolEntry(const ActionPoolDefinition &pool) const

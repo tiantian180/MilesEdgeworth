@@ -166,5 +166,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_23_startup_interaction_guard.py
         )
+
+        # Phase 0.24 的双击语言候选池检查：守住旧版中文语音下
+        # 不进入 Eureka 分支的细节。
+        add_test(
+            NAME check_phase_0_24_language_double_click_pool
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_24_language_double_click_pool.py
+        )
     endif()
 endif()
