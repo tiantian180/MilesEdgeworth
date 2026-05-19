@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QVariantMap>
 
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -28,6 +29,33 @@ void requireActionIn(const QString &actual, const QStringList &expected, const c
     }
 
     std::cerr << message << ": " << actual.toStdString() << '\n';
+    std::exit(1);
+}
+
+struct MovementCase
+{
+    const char *direction;
+    int dxSign;
+    int dySign;
+    const char *facing;
+    bool preserveFacing = false;
+};
+
+void requireSignedDelta(double value, int expectedSign, const QString &recipeId, const char *axis)
+{
+    if (expectedSign > 0 && value > 0) {
+        return;
+    }
+
+    if (expectedSign < 0 && value < 0) {
+        return;
+    }
+
+    if (expectedSign == 0 && value == 0.0) {
+        return;
+    }
+
+    std::cerr << recipeId.toStdString() << ' ' << axis << " 移动方向不符合预期: " << value << '\n';
     std::exit(1);
 }
 
@@ -85,6 +113,46 @@ int main(int argc, char *argv[])
     QVariantMap walkDelta = runtime.consumeFrameMovementDelta();
     require(walkDelta.value("dx").toDouble() > 0, "walk.east 应推动窗口向右移动");
     require(runtime.currentFacing() == "right", "walk.east 应让桌宠朝右");
+
+    const MovementCase movementCases[] = {
+        {"east", 1, 0, "right", false},
+        {"west", -1, 0, "left", false},
+        {"northEast", 1, -1, "right", false},
+        {"northWest", -1, -1, "left", false},
+        {"southEast", 1, 1, "right", false},
+        {"southWest", -1, 1, "left", false},
+        {"north", 0, -1, "left", true},
+        {"south", 0, 1, "left", true},
+    };
+
+    for (const MovementCase &movementCase : movementCases) {
+        const QString direction = QString::fromUtf8(movementCase.direction);
+        const QString walkRecipeId = QStringLiteral("walk.%1").arg(direction);
+        const QString runRecipeId = QStringLiteral("run.%1").arg(direction);
+        if (movementCase.preserveFacing) {
+            runtime.setFacing("left");
+        }
+
+        runtime.playRecipe(walkRecipeId);
+        require(runtime.currentActionId() == "walk", "walk recipe 应播放 walk action");
+        require(runtime.currentMovementDirection() == direction, "移动方向应更新到 recipe 声明的方向");
+        require(runtime.currentFacing() == QString::fromUtf8(movementCase.facing), movementCase.preserveFacing ? "纯纵向移动应保留原朝向" : "移动方向应更新桌宠朝向");
+        const QVariantMap directionWalkDelta = runtime.consumeFrameMovementDelta();
+        requireSignedDelta(directionWalkDelta.value("dx").toDouble(), movementCase.dxSign, walkRecipeId, "dx");
+        requireSignedDelta(directionWalkDelta.value("dy").toDouble(), movementCase.dySign, walkRecipeId, "dy");
+
+        runtime.playRecipe(runRecipeId);
+        require(runtime.currentActionId() == "run", "run recipe 应播放 run action");
+        require(runtime.currentMovementDirection() == direction, "移动方向应更新到 recipe 声明的方向");
+        require(runtime.currentFacing() == QString::fromUtf8(movementCase.facing), movementCase.preserveFacing ? "纯纵向移动应保留原朝向" : "移动方向应更新桌宠朝向");
+        const QVariantMap directionRunDelta = runtime.consumeFrameMovementDelta();
+        requireSignedDelta(directionRunDelta.value("dx").toDouble(), movementCase.dxSign, runRecipeId, "dx");
+        requireSignedDelta(directionRunDelta.value("dy").toDouble(), movementCase.dySign, runRecipeId, "dy");
+
+        const double walkSpeed = std::abs(directionWalkDelta.value("dx").toDouble()) + std::abs(directionWalkDelta.value("dy").toDouble());
+        const double runSpeed = std::abs(directionRunDelta.value("dx").toDouble()) + std::abs(directionRunDelta.value("dy").toDouble());
+        require(runSpeed > walkSpeed, "run 应比 walk 移动更快");
+    }
 
     runtime.playLocomotion("walk", "northEast");
     runtime.playRecipe("run.current");

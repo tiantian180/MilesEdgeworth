@@ -246,5 +246,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_33_double_click_recipe_smoke.py
         )
+
+        # Phase 0.34 的 8 方向移动 smoke 检查：确保 walk/run
+        # 全方向都经过 PetRuntime，且 run 的移动速度大于 walk。
+        add_test(
+            NAME check_phase_0_34_locomotion_direction_smoke
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_34_locomotion_direction_smoke.py
+        )
     endif()
 endif()
