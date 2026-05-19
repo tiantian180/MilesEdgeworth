@@ -214,5 +214,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_29_drag_shake_smoke.py
         )
+
+        # Phase 0.30 的检察官徽章 smoke 检查：确保 PetRuntime
+        # 真实等待 Prop 生成，并覆盖点击鞠躬和自然消失捡徽章两条分支。
+        add_test(
+            NAME check_phase_0_30_prosecutor_badge_smoke
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_30_prosecutor_badge_smoke.py
+        )
     endif()
 endif()

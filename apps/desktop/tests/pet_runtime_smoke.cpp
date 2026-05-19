@@ -1,6 +1,8 @@
 #include "pet/PetRuntime.h"
 
 #include <QCoreApplication>
+#include <QEventLoop>
+#include <QTimer>
 #include <QVariantMap>
 
 #include <cstdlib>
@@ -16,6 +18,13 @@ void require(bool condition, const char *message)
 
     std::cerr << message << '\n';
     std::exit(1);
+}
+
+void waitForMilliseconds(int milliseconds)
+{
+    QEventLoop loop;
+    QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
+    loop.exec();
 }
 
 } // namespace
@@ -165,9 +174,28 @@ int main(int argc, char *argv[])
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentSoundUrl().toString() == soundBeforeMutedPlay, "静音时不应发出新的声音播放请求");
 
-    runtime.handlePropExpired();
+    runtime.returnToIdle();
     runtime.playRecipe("doubleClick.takeThat");
     require(runtime.currentActionId() == "objecting", "Take that 应播放 objecting 动作");
+    require(!runtime.currentPropVisible(), "Take that 刚触发时徽章应先等待延迟");
+    waitForMilliseconds(750);
+    require(runtime.currentPropVisible(), "Take that 延迟后应飞出检察官徽章");
+    require(runtime.currentPropId() == "prosecutor_badge", "飞出的 Prop 应是检察官徽章");
+    runtime.handlePropClicked();
+    require(!runtime.currentPropVisible(), "点击徽章后应隐藏 Prop");
+    require(runtime.currentActionId() == "bow", "点击徽章后应触发鞠躬");
+    runtime.handleAnimationFinished();
+    require(runtime.currentActionId() == "idle_stand", "鞠躬播完后应回到 idle_stand");
+
+    runtime.returnToIdle();
+    runtime.playRecipe("doubleClick.takeThat");
+    waitForMilliseconds(750);
+    require(runtime.currentPropVisible(), "Take that 延迟后应飞出检察官徽章");
+    runtime.handlePropExpired();
+    require(!runtime.currentPropVisible(), "徽章自然消失后应隐藏 Prop");
+    require(runtime.currentActionId() == "pickup_badge", "徽章自然消失后应触发捡徽章");
+    runtime.handleAnimationFinished();
+    require(runtime.currentActionId() == "idle_stand", "捡徽章播完后应回到 idle_stand");
 
     std::cout << "PetRuntime smoke checks passed for current handfeel slice.\n";
     return 0;
