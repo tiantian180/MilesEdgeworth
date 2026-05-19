@@ -123,7 +123,7 @@ def main() -> int:
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
         "m_eventBridge->submitIdleLoopFinished()",
-        "m_runtime->currentRecipeId().isEmpty()",
+        "m_runtime->currentActionAcceptsIdleLoopFinished()",
     ]:
         require(token in surface_cpp, f"PetSurfaceWindow.cpp 缺少 {token}")
 

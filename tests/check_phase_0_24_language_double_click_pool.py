@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""检查双击语音动作支持按语言覆盖候选池。"""
+"""检查双击语音动作保留语言覆盖池配置。
+
+Phase 0.69 移除了 Runtime 里的临时 voiceLanguage 状态。语言菜单和动态语言
+切换会在 Audio Capability 阶段回归；这里先守住 manifest 数据和 selector 能力。
+"""
 
 from __future__ import annotations
 
@@ -38,19 +42,14 @@ def main() -> int:
     require("ActionPoolSelector::resolvePoolId" in pet_runtime_cpp, "PetRuntime 执行 ActionRequest 时应委托 ActionPoolSelector 解析语言覆盖池")
     for token in [
         "languagePoolId",
-        'normalizedPoolId + "." + voiceLanguage',
+        'normalizedPoolId + "." + languageId',
     ]:
         require(token in pool_selector_cpp, f"ActionPoolSelector.cpp 缺少语言感知 action pool 实现：{token}")
     require("manifest.clickBehaviors.doubleClick" in interaction_pipeline_cpp, "InteractionPipeline.cpp 应从 manifest 读取双击随机池请求")
     require('"doubleClick.random"' not in interaction_pipeline_cpp, "双击随机池不应硬编码在 InteractionPipeline.cpp")
 
-    smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
-    for token in [
-        "for (int i = 0; i < 80; ++i)",
-        "中文双击不应进入 Eureka 分支",
-        "bridge.submitDoubleClick()",
-    ]:
-        require(token in smoke_test, f"PetRuntimeSmoke 缺少中文双击候选池覆盖：{token}")
+    pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    require("setVoiceLanguage" not in pet_runtime_h, "语言切换入口应等 Audio Capability 阶段回归")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_24_language_double_click_pool" in root_cmake, "CTest 未注册 Phase 0.24 检查")

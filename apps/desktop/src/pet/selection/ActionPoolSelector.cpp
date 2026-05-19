@@ -5,7 +5,7 @@
 QString ActionPoolSelector::resolvePoolId(
     const QHash<QString, ActionPoolDefinition> &actionPools,
     const QString &poolId,
-    const QString &voiceLanguage
+    const QString &languageId
 )
 {
     const QString normalizedPoolId = poolId.trimmed();
@@ -16,7 +16,7 @@ QString ActionPoolSelector::resolvePoolId(
     // 语言后缀池用于还原旧版“某些语言没有某个语音动作”的细节。
     // 例如中文没有 eureka2.wav，manifest 可以用 doubleClick.random.zh
     // 覆盖默认 doubleClick.random。
-    const QString languagePoolId = normalizedPoolId + "." + voiceLanguage;
+    const QString languagePoolId = normalizedPoolId + "." + languageId;
     if (actionPools.contains(languagePoolId)) {
         return languagePoolId;
     }

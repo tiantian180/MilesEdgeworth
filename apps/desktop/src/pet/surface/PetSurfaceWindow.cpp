@@ -287,9 +287,7 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
         return;
     }
 
-    if (m_runtime->currentActionId() == QStringLiteral("idle_stand")
-            && m_runtime->currentLoopMode() == QStringLiteral("loop")
-            && m_runtime->currentRecipeId().isEmpty()) {
+    if (m_runtime->currentActionAcceptsIdleLoopFinished()) {
         scheduleIdleLoopFinished(playbackSerial, currentFrameDelayMs);
     }
 }
@@ -320,9 +318,7 @@ void PetSurfaceWindow::scheduleIdleLoopFinished(int playbackSerial, int delayMs)
 void PetSurfaceWindow::submitIdleLoopFinishedIfStillCurrent(int playbackSerial)
 {
     if (m_runtime->playbackSerial() != playbackSerial
-            || m_runtime->currentActionId() != QStringLiteral("idle_stand")
-            || m_runtime->currentLoopMode() != QStringLiteral("loop")
-            || !m_runtime->currentRecipeId().isEmpty()) {
+            || !m_runtime->currentActionAcceptsIdleLoopFinished()) {
         return;
     }
 

@@ -1,7 +1,7 @@
 # Phase 0.65 架构门禁：把阶段记录里的“已知硬编码点”变成可执行检查。
 #
 # 当前阶段这些检查预期会失败，所以 CTest 里会暂时标记 WILL_FAIL。
-# 后续 Phase 0.69-0.73 每消掉一组硬编码，就把对应断言从 WILL_FAIL 债务
+# 后续 Phase 0.70-0.73 每消掉一组硬编码，就把对应断言从 WILL_FAIL 债务
 # 翻成普通通过项，避免通用框架继续混入 Miles 皮肤专属逻辑。
 
 if(NOT DEFINED PROJECT_SOURCE_DIR)
@@ -42,62 +42,6 @@ function(_check_absent ITEM_ID PHASE FILE_PATH TOKEN DESCRIPTION)
         set(_HAS_FAILURE TRUE PARENT_SCOPE)
     endif()
 endfunction()
-
-# 7. 画布与图像尺寸应来自 manifest.canvas。
-_check_absent(7 0.69
-    "apps/desktop/src/pet/PetRuntime.h"
-    "120.0"
-    "pet window size must be manifest-driven"
-)
-_check_absent(7 0.69
-    "apps/desktop/src/pet/PetRuntime.h"
-    "100.0"
-    "pet image size must be manifest-driven"
-)
-
-# 8. 尺寸档位和语音语言不应硬编码在 PetRuntime。
-_check_absent(8 0.69
-    "apps/desktop/src/pet/PetRuntime.cpp"
-    "\"mini\""
-    "pet sizes must be manifest-driven"
-)
-_check_absent(8 0.69
-    "apps/desktop/src/pet/PetRuntime.cpp"
-    "\"small\""
-    "pet sizes must be manifest-driven"
-)
-_check_absent(8 0.69
-    "apps/desktop/src/pet/PetRuntime.cpp"
-    "\"medium\""
-    "pet sizes must be manifest-driven"
-)
-_check_absent(8 0.69
-    "apps/desktop/src/pet/PetRuntime.cpp"
-    "\"big\""
-    "pet sizes must be manifest-driven"
-)
-_check_absent(8 0.72
-    "apps/desktop/src/pet/PetRuntime.cpp"
-    "\"jp\""
-    "voice language must move to optional Audio Capability"
-)
-_check_absent(8 0.72
-    "apps/desktop/src/pet/PetRuntime.cpp"
-    "\"en\""
-    "voice language must move to optional Audio Capability"
-)
-_check_absent(8 0.72
-    "apps/desktop/src/pet/PetRuntime.cpp"
-    "\"zh\""
-    "voice language must move to optional Audio Capability"
-)
-
-# 9. 表面层判断 idle loop 不应写死 Miles idle action。
-_check_absent(9 0.69
-    "apps/desktop/src/pet/surface/PetSurfaceWindow.cpp"
-    "idle_stand"
-    "surface idle loop detection must be manifest-driven"
-)
 
 # 10. CustomInteractionRegistry 不应停留在空壳。
 _check_absent(10 0.70

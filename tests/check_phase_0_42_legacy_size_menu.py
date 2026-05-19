@@ -47,28 +47,37 @@ def main() -> int:
 
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [
-        'setPetSize("medium")',
-        'if (sizeId == "mini")',
-        'if (sizeId == "small")',
-        'if (sizeId == "medium")',
-        'if (sizeId == "big")',
+        "m_manifest.sizes",
+        "size.id == normalizedSizeId",
         "movementScaleFactor()",
         "movementDelta * movementScaleFactor()",
     ]:
         require(token in runtime_cpp, f"PetRuntime.cpp 缺少旧版尺寸逻辑：{token}")
 
+    manifest = read("apps/desktop/resources/skins/miles-edgeworth/manifest.json")
+    for token in [
+        '"defaultSize": "medium"',
+        '"id": "mini"',
+        '"id": "small"',
+        '"id": "medium"',
+        '"id": "big"',
+        '"label": "迷你"',
+        '"label": "小"',
+        '"label": "中"',
+        '"label": "大"',
+        '"scale": 1.0',
+        '"scale": 1.5',
+        '"scale": 2.0',
+        '"scale": 3.0',
+    ]:
+        require(token in manifest, f"manifest 缺少旧版尺寸配置：{token}")
+
     menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     for token in [
         'menu.addMenu(QStringLiteral("调整大小"))',
-        'QStringLiteral("迷你")',
-        'QStringLiteral("小")',
-        'QStringLiteral("中")',
-        'QStringLiteral("大")',
-        'runtime->setPetSize(QStringLiteral("mini"))',
-        'runtime->setPetSize(QStringLiteral("small"))',
-        'runtime->setPetSize(QStringLiteral("medium"))',
-        'runtime->setPetSize(QStringLiteral("big"))',
+        "runtime->availablePetSizes()",
+        "runtime->setPetSize(sizeId)",
         "m_runtime->petWindowSize()",
         "setFixedSize(windowSize, windowSize)",
         "m_runtime->petImageSize()",

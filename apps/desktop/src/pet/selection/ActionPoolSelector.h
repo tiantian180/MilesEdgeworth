@@ -16,7 +16,7 @@ public:
     static QString resolvePoolId(
         const QHash<QString, ActionPoolDefinition> &actionPools,
         const QString &poolId,
-        const QString &voiceLanguage
+        const QString &languageId
     );
     static ActionPoolEntry selectEntry(const ActionPoolDefinition &pool);
 };

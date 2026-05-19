@@ -6,6 +6,21 @@
   "defaultFacing": "right",
   "facings": ["right", "left"],
   "movementDirections": ["east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"],
+  "canvas": {
+    "windowSize": 120,
+    "imageSize": 100,
+    "idleLoopAction": "idle_stand"
+  },
+  "defaultSize": "medium",
+  "sizes": [
+    { "id": "mini", "label": "迷你", "scale": 1.0 },
+    { "id": "small", "label": "小", "scale": 1.5 },
+    { "id": "medium", "label": "中", "scale": 2.0 },
+    { "id": "big", "label": "大", "scale": 3.0 }
+  ],
+  "audio": {
+    "defaultVoiceLanguage": "jp"
+  },
   "movementFacingMap": {
     "east": "right",
     "northEast": "right",

@@ -341,7 +341,6 @@ int main(int argc, char *argv[])
     bridge.submitMenuCommand("runtime.facing.toggle");
     require(runtime.currentFacing() != facingBeforeToggle, "切换朝向菜单事件应通过 ActionRequest 切换 facing");
 
-    runtime.setVoiceLanguage("jp");
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit0.wav", "Hold it 应播放默认语音");
@@ -357,16 +356,6 @@ int main(int argc, char *argv[])
     runtime.playRecipe("doubleClick.eureka");
     require(runtime.currentActionId() == "objecting", "Eureka 应播放异议动作");
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/eureka0.wav", "Eureka 应播放默认语音");
-
-    runtime.setVoiceLanguage("zh");
-    runtime.playRecipe("doubleClick.objection");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/objection2.wav", "中文语音应选择 objection2.wav");
-
-    for (int i = 0; i < 80; ++i) {
-        runtime.returnToIdle();
-        bridge.submitDoubleClick();
-        require(runtime.currentRecipeId() != "doubleClick.eureka", "中文双击不应进入 Eureka 分支");
-    }
 
     runtime.returnToIdle();
     runtime.setFacing("right");

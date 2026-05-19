@@ -32,17 +32,30 @@ void PetContextMenu::show(
 {
     QMenu menu(parent);
 
-    QMenu *sizeMenu = menu.addMenu(QStringLiteral("调整大小"));
-    auto *sizeGroup = new QActionGroup(sizeMenu);
-    sizeGroup->setExclusive(true);
-    QAction *miniAction = addCheckedAction(sizeMenu, sizeGroup, QStringLiteral("迷你"), runtime->petSizeId() == "mini");
-    QAction *smallAction = addCheckedAction(sizeMenu, sizeGroup, QStringLiteral("小"), runtime->petSizeId() == "small");
-    QAction *mediumAction = addCheckedAction(sizeMenu, sizeGroup, QStringLiteral("中"), runtime->petSizeId() == "medium");
-    QAction *bigAction = addCheckedAction(sizeMenu, sizeGroup, QStringLiteral("大"), runtime->petSizeId() == "big");
-    QObject::connect(miniAction, &QAction::triggered, parent, [runtime]() { runtime->setPetSize(QStringLiteral("mini")); });
-    QObject::connect(smallAction, &QAction::triggered, parent, [runtime]() { runtime->setPetSize(QStringLiteral("small")); });
-    QObject::connect(mediumAction, &QAction::triggered, parent, [runtime]() { runtime->setPetSize(QStringLiteral("medium")); });
-    QObject::connect(bigAction, &QAction::triggered, parent, [runtime]() { runtime->setPetSize(QStringLiteral("big")); });
+    const QVariantList availablePetSizes = runtime->availablePetSizes();
+    if (!availablePetSizes.isEmpty()) {
+        QMenu *sizeMenu = menu.addMenu(QStringLiteral("调整大小"));
+        auto *sizeGroup = new QActionGroup(sizeMenu);
+        sizeGroup->setExclusive(true);
+        for (const QVariant &sizeValue : availablePetSizes) {
+            const QVariantMap size = sizeValue.toMap();
+            const QString sizeId = size.value(QStringLiteral("id")).toString();
+            const QString label = size.value(QStringLiteral("label")).toString();
+            if (sizeId.isEmpty()) {
+                continue;
+            }
+
+            QAction *sizeAction = addCheckedAction(
+                sizeMenu,
+                sizeGroup,
+                label.isEmpty() ? sizeId : label,
+                runtime->petSizeId() == sizeId
+            );
+            QObject::connect(sizeAction, &QAction::triggered, parent, [runtime, sizeId]() {
+                runtime->setPetSize(sizeId);
+            });
+        }
+    }
 
     QMenu *screenMenu = menu.addMenu(QStringLiteral("双屏选项"));
     auto *screenGroup = new QActionGroup(screenMenu);

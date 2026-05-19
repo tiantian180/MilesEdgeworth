@@ -15,6 +15,7 @@
 #include <QStringList>
 #include <QString>
 #include <QUrl>
+#include <QVariantList>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
@@ -41,9 +42,9 @@ class PetRuntime : public QObject
     Q_PROPERTY(QString currentLoopMode READ currentLoopMode NOTIFY currentLoopModeChanged)
     Q_PROPERTY(bool currentAutoReturnToIdle READ currentAutoReturnToIdle NOTIFY currentAutoReturnToIdleChanged)
     Q_PROPERTY(bool audioMuted READ audioMuted NOTIFY audioMutedChanged)
-    Q_PROPERTY(QString voiceLanguage READ voiceLanguage NOTIFY voiceLanguageChanged)
     Q_PROPERTY(bool autoMovementEnabled READ autoMovementEnabled NOTIFY autoMovementEnabledChanged)
     Q_PROPERTY(QString petSizeId READ petSizeId NOTIFY petScaleChanged)
+    Q_PROPERTY(QVariantList availablePetSizes READ availablePetSizes CONSTANT)
     Q_PROPERTY(double petScale READ petScale NOTIFY petScaleChanged)
     Q_PROPERTY(double petWindowSize READ petWindowSize NOTIFY petScaleChanged)
     Q_PROPERTY(double petImageSize READ petImageSize NOTIFY petScaleChanged)
@@ -80,14 +81,15 @@ public:
     QString currentLoopMode() const { return m_currentLoopMode; }
     bool currentAutoReturnToIdle() const { return m_currentAutoReturnToIdle; }
     bool audioMuted() const { return m_audioMuted; }
-    QString voiceLanguage() const { return m_voiceLanguage; }
     bool autoMovementEnabled() const { return m_autoMovementEnabled; }
     QString petSizeId() const { return m_petSizeId; }
+    QVariantList availablePetSizes() const;
     double petScale() const { return m_petScale; }
-    double petWindowSize() const { return 120.0 * m_petScale; }
-    double petImageSize() const { return 100.0 * m_petScale; }
+    double petWindowSize() const { return m_manifest.canvas.windowSize * m_petScale; }
+    double petImageSize() const { return m_manifest.canvas.imageSize * m_petScale; }
     bool pointerInteractionEnabled() const { return acceptsPointerInteraction(); }
     bool restCapabilityEnabled() const { return m_manifest.capabilities.rest.enabled(); }
+    bool currentActionAcceptsIdleLoopFinished() const;
     bool sleeping() const;
     bool sleepTransitioning() const;
     QUrl currentAnimationUrl() const { return m_currentAnimationUrl; }
@@ -119,7 +121,6 @@ public:
     Q_INVOKABLE void playActionFromPool(const QString &poolId);
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void toggleAudioMuted();
-    Q_INVOKABLE void setVoiceLanguage(const QString &voiceLanguage);
     Q_INVOKABLE void toggleAutoMovementEnabled();
     Q_INVOKABLE void setPetSize(const QString &sizeId);
     Q_INVOKABLE void startStartupSequence();
@@ -137,7 +138,6 @@ signals:
     void currentLoopModeChanged();
     void currentAutoReturnToIdleChanged();
     void audioMutedChanged();
-    void voiceLanguageChanged();
     void autoMovementEnabledChanged();
     void petScaleChanged();
     void pointerInteractionEnabledChanged();
@@ -182,9 +182,8 @@ private:
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
     bool m_audioMuted = false;
-    QString m_voiceLanguage = "jp";
     bool m_autoMovementEnabled = true;
-    QString m_petSizeId = "medium";
+    QString m_petSizeId;
     double m_petScale = 2.0;
     QUrl m_currentAnimationUrl;
     QUrl m_currentSoundUrl;

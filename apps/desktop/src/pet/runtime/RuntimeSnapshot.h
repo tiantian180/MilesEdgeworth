@@ -13,7 +13,6 @@ struct RuntimeSnapshot
     QString currentRecipeId;
     QString currentPhaseId;
     QString currentFacing;
-    QString voiceLanguage;
     QString currentPropId;
     QString currentPropClickedRecipeId;
     QString currentPropExpiredRecipeId;

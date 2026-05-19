@@ -514,5 +514,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_68_runtime_decoupling.py
         )
+
+        # Phase 0.69 的 canvas / sizes / surface 收尾检查：窗口尺寸、
+        # 动画尺寸、尺寸菜单和 idle loop 入口都应由 manifest 驱动。
+        add_test(
+            NAME check_phase_0_69_canvas_and_size_externalised
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_69_canvas_and_size_externalised.py
+        )
     endif()
 endif()

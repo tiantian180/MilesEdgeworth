@@ -19,7 +19,6 @@ PetRuntime::PetRuntime(QObject *parent)
     connect(&m_propController, &PropController::currentPropChanged, this, &PetRuntime::currentPropChanged);
     connect(&m_propController, &PropController::currentPropPlaybackSerialChanged, this, &PetRuntime::currentPropPlaybackSerialChanged);
 
-    setPetSize("medium");
     m_manifest = SkinManifestLoader::loadFromResource(QString::fromUtf8(kManifestPath));
 
     if (m_manifest.actions.isEmpty()) {
@@ -30,6 +29,7 @@ PetRuntime::PetRuntime(QObject *parent)
     if (!m_manifest.movementDirections.isEmpty()) {
         m_currentMovementDirection = m_manifest.movementDirections.constFirst();
     }
+    setPetSize(m_manifest.defaultSizeId);
 
     setState("idle");
     startStartupSequence();
@@ -43,7 +43,6 @@ RuntimeSnapshot PetRuntime::snapshot() const
     snapshot.currentRecipeId = m_currentRecipeId;
     snapshot.currentPhaseId = m_currentPhaseId;
     snapshot.currentFacing = m_currentFacing;
-    snapshot.voiceLanguage = m_voiceLanguage;
     const PropState prop = m_propController.snapshot();
     snapshot.currentPropId = prop.id;
     snapshot.currentPropClickedRecipeId = prop.clickedRecipeId;
@@ -69,6 +68,27 @@ bool PetRuntime::sleepTransitioning() const
     return rest.enabled()
         && m_currentActionId == rest.loopActionId
         && m_currentPhaseId != QStringLiteral("loop");
+}
+
+bool PetRuntime::currentActionAcceptsIdleLoopFinished() const
+{
+    return !m_manifest.canvas.idleLoopActionId.isEmpty()
+        && m_currentActionId == m_manifest.canvas.idleLoopActionId
+        && m_currentLoopMode == QStringLiteral("loop")
+        && m_currentRecipeId.isEmpty();
+}
+
+QVariantList PetRuntime::availablePetSizes() const
+{
+    QVariantList sizes;
+    for (const PetSizeDefinition &size : m_manifest.sizes) {
+        QVariantMap item;
+        item.insert(QStringLiteral("id"), size.id);
+        item.insert(QStringLiteral("label"), size.label);
+        item.insert(QStringLiteral("scale"), size.scale);
+        sizes.append(item);
+    }
+    return sizes;
 }
 
 void PetRuntime::setState(const QString &state)
@@ -172,7 +192,7 @@ void PetRuntime::playRecipe(const QString &recipeId)
 
 void PetRuntime::playActionFromPool(const QString &poolId)
 {
-    const QString normalizedPoolId = ActionPoolSelector::resolvePoolId(m_manifest.actionPools, poolId, m_voiceLanguage);
+    const QString normalizedPoolId = ActionPoolSelector::resolvePoolId(m_manifest.actionPools, poolId, m_manifest.audio.defaultVoiceLanguage);
     if (!m_manifest.actionPools.contains(normalizedPoolId)) {
         return;
     }
@@ -244,21 +264,6 @@ void PetRuntime::toggleAudioMuted()
     emit audioMutedChanged();
 }
 
-void PetRuntime::setVoiceLanguage(const QString &voiceLanguage)
-{
-    const QString normalizedLanguage = voiceLanguage.trimmed();
-    if (normalizedLanguage.isEmpty() || normalizedLanguage == m_voiceLanguage) {
-        return;
-    }
-
-    if (normalizedLanguage != "jp" && normalizedLanguage != "en" && normalizedLanguage != "zh") {
-        return;
-    }
-
-    m_voiceLanguage = normalizedLanguage;
-    emit voiceLanguageChanged();
-}
-
 void PetRuntime::toggleAutoMovementEnabled()
 {
     m_autoMovementEnabled = !m_autoMovementEnabled;
@@ -268,17 +273,19 @@ void PetRuntime::toggleAutoMovementEnabled()
 void PetRuntime::setPetSize(const QString &sizeId)
 {
     const QString normalizedSizeId = sizeId.trimmed();
-    double nextScale = m_petScale;
+    if (normalizedSizeId.isEmpty()) {
+        return;
+    }
 
-    if (sizeId == "mini") {
-        nextScale = 1.0;
-    } else if (sizeId == "small") {
-        nextScale = 1.5;
-    } else if (sizeId == "medium") {
-        nextScale = 2.0;
-    } else if (sizeId == "big") {
-        nextScale = 3.0;
-    } else {
+    double nextScale = 0.0;
+    for (const PetSizeDefinition &size : m_manifest.sizes) {
+        if (size.id == normalizedSizeId) {
+            nextScale = size.scale;
+            break;
+        }
+    }
+
+    if (nextScale <= 0.0) {
         return;
     }
 
@@ -395,12 +402,9 @@ QUrl PetRuntime::variantForAction(const ActionDefinition &action) const
 
 QUrl PetRuntime::soundUrlForRecipe(const RecipeDefinition &recipe) const
 {
-    if (recipe.soundUrls.contains(m_voiceLanguage)) {
-        return recipe.soundUrls.value(m_voiceLanguage);
-    }
-
-    if (recipe.soundUrls.contains("jp")) {
-        return recipe.soundUrls.value("jp");
+    const QString defaultLanguage = m_manifest.audio.defaultVoiceLanguage;
+    if (!defaultLanguage.isEmpty() && recipe.soundUrls.contains(defaultLanguage)) {
+        return recipe.soundUrls.value(defaultLanguage);
     }
 
     if (!recipe.soundUrls.isEmpty()) {

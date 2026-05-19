@@ -2,8 +2,8 @@
 """检查 Phase 0.15 的旧版设置骨架。
 
 旧版右键菜单里有静音、语音语言和禁止走动。v2 当前原生菜单只保留
-静音和禁止走动；语音语言会在后续 Audio Capability 阶段以 manifest
-声明的可选能力回归。运行时残留的 voiceLanguage 字段暂时由 Phase 0.72 收口。
+静音和禁止走动；默认语音语言先由 manifest.audio.defaultVoiceLanguage 声明。
+完整语言菜单会在后续 Audio Capability 阶段以可选能力回归。
 """
 
 from __future__ import annotations
@@ -69,27 +69,41 @@ def main() -> None:
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     for token in [
         "Q_PROPERTY(bool audioMuted",
-        "Q_PROPERTY(QString voiceLanguage",
         "Q_PROPERTY(bool autoMovementEnabled",
         "audioMuted() const",
-        "voiceLanguage() const",
         "autoMovementEnabled() const",
         "toggleAudioMuted",
-        "setVoiceLanguage",
         "toggleAutoMovementEnabled",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
+    for token in [
+        "Q_PROPERTY(QString voiceLanguage",
+        "voiceLanguage() const",
+        "setVoiceLanguage",
+        "voiceLanguageChanged",
+    ]:
+        require(token not in pet_runtime_h, f"PetRuntime.h 不应保留临时语音语言入口：{token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [
         "soundUrlForRecipe",
         "m_audioMuted",
-        "m_voiceLanguage",
+        "m_manifest.audio.defaultVoiceLanguage",
         "m_autoMovementEnabled",
         "if (m_audioMuted)",
         "if (!m_autoMovementEnabled)",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    for token in [
+        "m_voiceLanguage",
+        "setVoiceLanguage",
+    ]:
+        require(token not in pet_runtime_cpp, f"PetRuntime.cpp 不应保留临时语音语言状态：{token}")
+
+    require(
+        manifest.get("audio", {}).get("defaultVoiceLanguage") == "jp",
+        "manifest 应声明 audio.defaultVoiceLanguage 作为临时默认语音语言",
+    )
 
     menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")

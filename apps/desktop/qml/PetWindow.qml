@@ -113,33 +113,6 @@ Window {
         }
 
         Platform.Menu {
-            title: "语音语言"
-
-            Platform.MenuItem {
-                text: "日语"
-                checkable: true
-                checked: App.PetRuntime.voiceLanguage === "jp"
-                onTriggered: App.PetRuntime.setVoiceLanguage("jp")
-            }
-
-            Platform.MenuItem {
-                text: "英语"
-                checkable: true
-                checked: App.PetRuntime.voiceLanguage === "en"
-                onTriggered: App.PetRuntime.setVoiceLanguage("en")
-            }
-
-            Platform.MenuItem {
-                text: "汉语"
-                checkable: true
-                checked: App.PetRuntime.voiceLanguage === "zh"
-                onTriggered: App.PetRuntime.setVoiceLanguage("zh")
-            }
-        }
-
-        Platform.MenuSeparator {}
-
-        Platform.Menu {
             id: skinCommandMenu
 
             title: "皮肤动作"

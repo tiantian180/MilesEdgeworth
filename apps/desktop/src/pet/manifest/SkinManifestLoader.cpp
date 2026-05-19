@@ -104,6 +104,15 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
     const QJsonObject root = document.object();
     manifest.fallbackAction = root.value("fallbackAction").toString(kFallbackActionId);
     manifest.defaultFacing = root.value("defaultFacing").toString("right");
+    manifest.defaultSizeId = root.value("defaultSize").toString();
+
+    const QJsonObject canvas = root.value("canvas").toObject();
+    manifest.canvas.windowSize = canvas.value("windowSize").toDouble(manifest.canvas.windowSize);
+    manifest.canvas.imageSize = canvas.value("imageSize").toDouble(manifest.canvas.imageSize);
+    manifest.canvas.idleLoopActionId = canvas.value("idleLoopAction").toString();
+
+    const QJsonObject audio = root.value("audio").toObject();
+    manifest.audio.defaultVoiceLanguage = audio.value("defaultVoiceLanguage").toString();
 
     const QJsonObject capabilities = root.value("capabilities").toObject();
     const QJsonObject rest = capabilities.value("rest").toObject();
@@ -139,6 +148,22 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
         if (!it.key().isEmpty() && !facing.isEmpty()) {
             manifest.movementFacingMap.insert(it.key(), facing);
         }
+    }
+
+    const QJsonArray sizes = root.value("sizes").toArray();
+    for (const QJsonValue &value : sizes) {
+        const QJsonObject sizeObject = value.toObject();
+        PetSizeDefinition size;
+        size.id = sizeObject.value("id").toString();
+        size.label = sizeObject.value("label").toString(size.id);
+        size.scale = sizeObject.value("scale").toDouble(0);
+        if (!size.id.isEmpty() && size.scale > 0) {
+            manifest.sizes.append(size);
+        }
+    }
+
+    if (manifest.defaultSizeId.isEmpty() && !manifest.sizes.isEmpty()) {
+        manifest.defaultSizeId = manifest.sizes.constFirst().id;
     }
 
     const QJsonObject hitZones = root.value("hitZones").toObject();
@@ -479,6 +504,12 @@ SkinManifest SkinManifestLoader::fallbackManifest()
 {
     SkinManifest manifest;
     manifest.fallbackAction = kFallbackActionId;
+    manifest.canvas.windowSize = 120.0;
+    manifest.canvas.imageSize = 100.0;
+    manifest.canvas.idleLoopActionId = kFallbackActionId;
+    manifest.defaultSizeId = "medium";
+    manifest.audio.defaultVoiceLanguage = "jp";
+    manifest.sizes.append(PetSizeDefinition {"medium", QStringLiteral("中"), 2.0});
     manifest.facings = {"right", "left"};
     manifest.movementDirections = {"east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"};
     manifest.defaultFacing = "right";

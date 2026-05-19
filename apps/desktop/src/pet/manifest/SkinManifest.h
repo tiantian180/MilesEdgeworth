@@ -142,6 +142,27 @@ struct CapabilityDefinition
     RestCapabilityDefinition rest;
 };
 
+struct CanvasDefinition
+{
+    // windowSize / imageSize 是 scale=1 时的基础尺寸。
+    // Miles 当前中号 scale=2，因此窗口 120*2=240，动画 100*2=200。
+    double windowSize = 120.0;
+    double imageSize = 100.0;
+    QString idleLoopActionId;
+};
+
+struct PetSizeDefinition
+{
+    QString id;
+    QString label;
+    double scale = 1.0;
+};
+
+struct AudioDefinition
+{
+    QString defaultVoiceLanguage;
+};
+
 struct HitZoneDefinition
 {
     QString id;
@@ -167,7 +188,11 @@ struct ClickBehaviorDefinition
 
 struct SkinManifest
 {
+    CanvasDefinition canvas;
+    AudioDefinition audio;
     CapabilityDefinition capabilities;
+    QList<PetSizeDefinition> sizes;
+    QString defaultSizeId;
     QHash<QString, QString> stateToAction;
     QHash<QString, ActionDefinition> actions;
     QHash<QString, RecipeDefinition> recipes;
