@@ -49,15 +49,15 @@ def main() -> int:
     require(action_pool_recipes(manifest, "click.legsBackArea") == ["click.legsBack"], "点击靠当前朝向后侧腿部应确定触发后退")
     require(action_pool_recipes(manifest, "click.legsLookDownArea") == ["click.legsLookDown"], "点击另一侧腿部应确定触发低头看")
 
-    runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    matcher_cpp = read("apps/desktop/src/pet/interaction/HitZoneMatcher.cpp")
     for pool_id, zone_id in [
         ("click.bellyBow", "belly_bow"),
         ("click.bellyPointingArea", "belly_pointing"),
         ("click.legsBackArea", "legs_back"),
         ("click.legsLookDownArea", "legs_look_down"),
     ]:
-        require(f'poolId == "{pool_id}"' in runtime_cpp, f"PetRuntime.cpp 缺少 {pool_id} 映射")
-        require(f'return "{zone_id}"' in runtime_cpp, f"PetRuntime.cpp 缺少 {zone_id} 映射")
+        require(f'poolId == "{pool_id}"' in matcher_cpp, f"HitZoneMatcher.cpp 缺少 {pool_id} 映射")
+        require(f'return "{zone_id}"' in matcher_cpp, f"HitZoneMatcher.cpp 缺少 {zone_id} 映射")
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

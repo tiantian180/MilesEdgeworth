@@ -30,23 +30,23 @@ def main() -> int:
     face = hit_zones["face"]["variants"]
     require(face["right"]["x"] > face["left"]["x"], "右朝向 face 区域应在画布右侧，左朝向 face 区域应在画布左侧")
 
-    pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    matcher_h = read("apps/desktop/src/pet/interaction/HitZoneMatcher.h")
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     require("QHash<QString, QRectF> facingRects" in manifest_h, "HitZoneDefinition 应保存按朝向区分的 rect")
-    require("rectForHitZone" in pet_runtime_h, "PetRuntime.h 应声明朝向感知 hit zone rect 选择器")
+    require("rectForHitZone" in matcher_h, "HitZoneMatcher.h 应声明朝向感知 hit zone rect 选择器")
 
-    pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    matcher_cpp = read("apps/desktop/src/pet/interaction/HitZoneMatcher.cpp")
     for token in [
         'zoneObject.value("variants").toObject()',
         "zone.facingRects.insert",
     ]:
         require(token in loader_cpp, f"SkinManifestLoader.cpp 缺少朝向点击分区解析标记：{token}")
     for token in [
-        "rectForHitZone(zone)",
-        "zone.facingRects.value(m_currentFacing",
+        "rectForHitZone(zone, context)",
+        "zone.facingRects.value(context.facing",
     ]:
-        require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少朝向点击分区实现标记：{token}")
+        require(token in matcher_cpp, f"HitZoneMatcher.cpp 缺少朝向点击分区实现标记：{token}")
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

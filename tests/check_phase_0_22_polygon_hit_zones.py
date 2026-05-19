@@ -29,7 +29,7 @@ def main() -> int:
         require(len(polygon) >= 3, f"face.{facing} 应声明至少 3 个 polygon 点")
         require(all("x" in point and "y" in point for point in polygon), f"face.{facing} polygon 点应包含 x/y")
 
-    pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    matcher_h = read("apps/desktop/src/pet/interaction/HitZoneMatcher.h")
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     for token in [
         "QList<QPointF> polygon",
@@ -41,9 +41,9 @@ def main() -> int:
         "polygonForHitZone",
         "hitZoneContainsPoint",
     ]:
-        require(token in pet_runtime_h, f"PetRuntime.h 缺少 polygon hit zone 声明：{token}")
+        require(token in matcher_h, f"HitZoneMatcher.h 缺少 polygon hit zone 声明：{token}")
 
-    pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    matcher_cpp = read("apps/desktop/src/pet/interaction/HitZoneMatcher.cpp")
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     for token in [
         'zoneType != "rect" && zoneType != "polygon"',
@@ -54,11 +54,11 @@ def main() -> int:
         require(token in loader_cpp, f"SkinManifestLoader.cpp 缺少 polygon hit zone 解析：{token}")
 
     for token in [
-        "polygonForHitZone(zone)",
+        "polygonForHitZone(zone, context)",
         "pointInPolygon",
-        "hitZoneContainsPoint(zone, logicalPoint)",
+        "hitZoneContainsPoint(zone, context, logicalPoint)",
     ]:
-        require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 polygon hit zone 实现：{token}")
+        require(token in matcher_cpp, f"HitZoneMatcher.cpp 缺少 polygon hit zone 实现：{token}")
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [

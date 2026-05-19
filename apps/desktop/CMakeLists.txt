@@ -20,6 +20,8 @@ set(DESKTOP_SOURCES
     src/main.cpp
     src/pet/behavior/BehaviorTriggerEngine.cpp
     src/pet/behavior/BehaviorTriggerEngine.h
+    src/pet/interaction/HitZoneMatcher.cpp
+    src/pet/interaction/HitZoneMatcher.h
     src/pet/manifest/SkinManifest.h
     src/pet/manifest/SkinManifestLoader.cpp
     src/pet/manifest/SkinManifestLoader.h
@@ -82,6 +84,8 @@ if(BUILD_TESTING)
         tests/pet_runtime_smoke.cpp
         src/pet/behavior/BehaviorTriggerEngine.cpp
         src/pet/behavior/BehaviorTriggerEngine.h
+        src/pet/interaction/HitZoneMatcher.cpp
+        src/pet/interaction/HitZoneMatcher.h
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h

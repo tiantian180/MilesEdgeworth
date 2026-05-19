@@ -1,6 +1,7 @@
 #include "pet/PetRuntime.h"
 
 #include "pet/behavior/BehaviorTriggerEngine.h"
+#include "pet/interaction/HitZoneMatcher.h"
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/selection/ActionPoolSelector.h"
 
@@ -13,72 +14,6 @@ namespace {
 constexpr auto kManifestPath = ":/pet/manifest.json";
 constexpr auto kFallbackActionId = "idle_stand";
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
-
-QString hitZoneIdForClickPool(const QString &poolId)
-{
-    if (poolId == "click.upperArm") {
-        return "upper_arm";
-    }
-
-    if (poolId == "click.face") {
-        return "face";
-    }
-    if (poolId == "click.head") {
-        return "head";
-    }
-    if (poolId == "click.forearm") {
-        return "forearm";
-    }
-    if (poolId == "click.chest") {
-        return "chest";
-    }
-    if (poolId == "click.belly") {
-        return "belly";
-    }
-    if (poolId == "click.legs") {
-        return "legs";
-    }
-    if (poolId == "click.bellyBow") {
-        return "belly_bow";
-    }
-    if (poolId == "click.bellyPointingArea") {
-        return "belly_pointing";
-    }
-    if (poolId == "click.legsBackArea") {
-        return "legs_back";
-    }
-    if (poolId == "click.legsLookDownArea") {
-        return "legs_look_down";
-    }
-
-    return {};
-}
-
-bool pointInPolygon(const QList<QPointF> &polygon, const QPointF &point)
-{
-    if (polygon.size() < 3) {
-        return false;
-    }
-
-    bool inside = false;
-    int previousIndex = polygon.size() - 1;
-    for (int currentIndex = 0; currentIndex < polygon.size(); ++currentIndex) {
-        const QPointF current = polygon.at(currentIndex);
-        const QPointF previous = polygon.at(previousIndex);
-        const bool yCrosses = ((current.y() > point.y()) != (previous.y() > point.y()));
-        if (yCrosses) {
-            const double xAtPointY = (previous.x() - current.x()) * (point.y() - current.y())
-                / (previous.y() - current.y()) + current.x();
-            if (point.x() < xAtPointY) {
-                inside = !inside;
-            }
-        }
-
-        previousIndex = currentIndex;
-    }
-
-    return inside;
-}
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -464,7 +399,11 @@ void PetRuntime::handlePrimaryClick(double x, double y, double width, double hei
         return;
     }
 
-    const QString poolId = clickPoolForPoint(x, y, width, height);
+    const HitZoneMatchContext hitZoneContext {
+        m_currentFacing,
+        m_manifest.defaultFacing,
+    };
+    const QString poolId = HitZoneMatcher::clickPoolForPoint(m_manifest, hitZoneContext, x, y, width, height);
     if (!poolId.isEmpty()) {
         playActionFromPool(poolId);
     }
@@ -827,62 +766,6 @@ QUrl PetRuntime::variantForAction(const ActionDefinition &action) const
     }
 
     return variantForFacing(action.variants, m_currentFacing);
-}
-
-QRectF PetRuntime::rectForHitZone(const HitZoneDefinition &zone) const
-{
-    if (zone.facingRects.contains(m_currentFacing)) {
-        return zone.facingRects.value(m_currentFacing);
-    }
-
-    if (zone.rect.isValid()) {
-        return zone.rect;
-    }
-
-    return zone.facingRects.value(m_manifest.defaultFacing, QRectF());
-}
-
-QList<QPointF> PetRuntime::polygonForHitZone(const HitZoneDefinition &zone) const
-{
-    if (zone.facingPolygons.contains(m_currentFacing)) {
-        return zone.facingPolygons.value(m_currentFacing);
-    }
-
-    if (zone.polygon.size() >= 3) {
-        return zone.polygon;
-    }
-
-    return zone.facingPolygons.value(m_manifest.defaultFacing);
-}
-
-bool PetRuntime::hitZoneContainsPoint(const HitZoneDefinition &zone, const QPointF &point) const
-{
-    const QList<QPointF> polygon = polygonForHitZone(zone);
-    if (polygon.size() >= 3) {
-        return pointInPolygon(polygon, point);
-    }
-
-    return rectForHitZone(zone).contains(point);
-}
-
-QString PetRuntime::clickPoolForPoint(double x, double y, double width, double height) const
-{
-    if (width <= 0 || height <= 0) {
-        return {};
-    }
-
-    // hitZones 以 240x240 逻辑画布描述，QML 可按实际窗口尺寸传入坐标。
-    // 这样后续皮肤改 canvas 或窗口缩放时，只需要统一做一次坐标归一化。
-    const QPointF logicalPoint(x * 240.0 / width, y * 240.0 / height);
-    for (const QString &poolId : m_manifest.singleClickPools) {
-        const QString zoneId = hitZoneIdForClickPool(poolId);
-        const HitZoneDefinition zone = m_manifest.hitZones.value(zoneId);
-        if (!zone.id.isEmpty() && hitZoneContainsPoint(zone, logicalPoint)) {
-            return poolId;
-        }
-    }
-
-    return {};
 }
 
 QUrl PetRuntime::soundUrlForRecipe(const RecipeDefinition &recipe) const

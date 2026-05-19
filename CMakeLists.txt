@@ -414,5 +414,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_56_pet_runtime_service_split.py
         )
+
+        # Phase 0.57 的 hit zone matcher 拆分检查：单击区域的坐标归一化、
+        # 朝向 rect / polygon 选择和命中判断应离开 PetRuntime。
+        add_test(
+            NAME check_phase_0_57_hit_zone_matcher
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_57_hit_zone_matcher.py
+        )
     endif()
 endif()

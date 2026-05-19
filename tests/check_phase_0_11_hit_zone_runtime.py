@@ -102,23 +102,31 @@ def main() -> int:
         require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
+    matcher_h = read("apps/desktop/src/pet/interaction/HitZoneMatcher.h")
+    matcher_cpp = read("apps/desktop/src/pet/interaction/HitZoneMatcher.cpp")
     for token in [
         "Q_INVOKABLE void handlePrimaryClick",
-        "HitZoneDefinition",
-        "clickPoolForPoint",
         "SkinManifest m_manifest",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
+    for token in [
+        "HitZoneDefinition",
+        "clickPoolForPoint",
+    ]:
+        require(token in matcher_h, f"HitZoneMatcher.h 缺少 {token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     for token in [
         "handlePrimaryClick",
-        "clickPoolForPoint",
-        "m_manifest.hitZones",
-        "m_manifest.singleClickPools",
+        "HitZoneMatcher::clickPoolForPoint",
         "playActionFromPool(poolId)",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    for token in [
+        "manifest.hitZones",
+        "manifest.singleClickPools",
+    ]:
+        require(token in matcher_cpp, f"HitZoneMatcher.cpp 缺少 {token}")
 
     pet_window_qml = read("apps/desktop/qml/PetWindow.qml")
     for token in [
