@@ -366,5 +366,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_48_legacy_hand_cursor.py
         )
+
+        # Phase 0.49 的旧版双击释放检查：旧版第二次点击会取消单击计时器，
+        # 松手后只触发双击动作，不能再补排一次单击分区反应。
+        add_test(
+            NAME check_phase_0_49_double_click_release_guard
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_49_double_click_release_guard.py
+        )
     endif()
 endif()

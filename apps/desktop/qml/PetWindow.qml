@@ -388,6 +388,7 @@ Window {
         property real pressX: 0
         property real pressY: 0
         property bool dragMoved: false
+        property bool doubleClickPending: false
 
         onPressed: function(mouse) {
             if (!App.PetRuntime.pointerInteractionEnabled) {
@@ -397,6 +398,15 @@ Window {
             if (mouse.button === Qt.RightButton) {
                 contextMenu.open()
                 return
+            }
+
+            // 旧版用 300ms clickTimer 判断单双击：第二次按下时先取消第一次
+            // 单击的延迟触发，等第二次松手后只执行双击动作。
+            if (singleClickTimer.running) {
+                singleClickTimer.stop()
+                doubleClickPending = true
+            } else {
+                doubleClickPending = false
             }
 
             pressX = mouse.x
@@ -434,25 +444,19 @@ Window {
             App.PetRuntime.handleDragEnded()
 
             if (dragMoved) {
+                doubleClickPending = false
+                return
+            }
+
+            if (doubleClickPending) {
+                doubleClickPending = false
+                App.PetRuntime.handleDoubleClick()
                 return
             }
 
             singleClickTimer.clickX = mouse.x
             singleClickTimer.clickY = mouse.y
             singleClickTimer.restart()
-        }
-
-        onDoubleClicked: function(mouse) {
-            if (!App.PetRuntime.pointerInteractionEnabled) {
-                return
-            }
-
-            if (mouse.button !== Qt.LeftButton) {
-                return
-            }
-
-            singleClickTimer.stop()
-            App.PetRuntime.handleDoubleClick()
         }
     }
 }
