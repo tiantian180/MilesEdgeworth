@@ -3,11 +3,15 @@
 #include "DesktopShellController.h"
 #include "pet/PetRuntime.h"
 #include "pet/events/PetEventBridge.h"
+#include "pet/manifest/SkinManifestLoader.h"
 
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QDesktopServices>
+#include <QDir>
 #include <QMenu>
+#include <QUrl>
 #include <QVariantMap>
 #include <QWidget>
 
@@ -106,6 +110,44 @@ void PetContextMenu::show(
                 runtime->setAudioLanguage(languageId);
             });
         }
+    }
+
+    const QVariantList skins = runtime->availableSkins();
+    if (!skins.isEmpty()) {
+        menu.addSeparator();
+        QMenu *skinMenu = menu.addMenu(QStringLiteral("皮肤"));
+        auto *skinGroup = new QActionGroup(skinMenu);
+        skinGroup->setExclusive(true);
+
+        for (const QVariant &skinValue : skins) {
+            const QVariantMap skin = skinValue.toMap();
+            const QString skinId = skin.value(QStringLiteral("id")).toString();
+            const QString skinName = skin.value(QStringLiteral("name")).toString();
+            if (skinId.isEmpty()) {
+                continue;
+            }
+
+            QAction *skinAction = addCheckedAction(
+                skinMenu,
+                skinGroup,
+                skinName.isEmpty() ? skinId : skinName,
+                runtime->activeSkinId() == skinId
+            );
+            QObject::connect(skinAction, &QAction::triggered, parent, [runtime, skinId]() {
+                runtime->setActiveSkin(skinId);
+            });
+        }
+
+        skinMenu->addSeparator();
+        QAction *reloadSkinAction = skinMenu->addAction(QStringLiteral("重载当前皮肤"));
+        QObject::connect(reloadSkinAction, &QAction::triggered, runtime, &PetRuntime::reloadActiveSkin);
+
+        QAction *openSkinDirectoryAction = skinMenu->addAction(QStringLiteral("打开皮肤目录"));
+        QObject::connect(openSkinDirectoryAction, &QAction::triggered, parent, []() {
+            const QString path = SkinManifestLoader::userSkinDirectoryPath();
+            QDir().mkpath(path);
+            QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+        });
     }
 
     const QVariantList skinCommands = eventBridge->enabledSkinCommands();

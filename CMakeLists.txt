@@ -568,5 +568,13 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_2_locomotion_qmovie_start.py
         )
 
+        # Phase 1.4 的文件系统皮肤包契约检查：皮肤发现、切换、重载、
+        # 内置皮肤根路径和右键菜单入口必须一起存在。
+        add_test(
+            NAME check_phase_1_4_skin_package_contract
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_4_skin_package_contract.py
+        )
+
     endif()
 endif()
