@@ -352,7 +352,7 @@
   },
   "props": {
     "prosecutor_badge": {
-      "asset": "qrc:/pet/prosecutor-badge.png",
+      "asset": "skin:assets/props/prosecutor_badge/prosecutor-badge.png",
       "width": 94,
       "height": 94,
       "visualWidth": 24,
@@ -388,10 +388,10 @@
       "tags": ["idle", "standing"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/stand-right.gif"
+          "animation": "skin:assets/body/idle/stand-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/stand-left.gif"
+          "animation": "skin:assets/body/idle/stand-left.gif"
         }
       }
     },
@@ -404,7 +404,7 @@
       "tags": ["startup", "briefcase", "walking"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/briefcase-in-right.gif",
+          "animation": "skin:assets/body/startup/briefcase-in-right.gif",
           "movement": { "dx": 11.2, "dy": 0 }
         }
       }
@@ -417,7 +417,7 @@
       "tags": ["startup", "briefcase", "standing"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/briefcase-stop-right.gif"
+          "animation": "skin:assets/body/startup/briefcase-stop-right.gif"
         }
       }
     },
@@ -433,10 +433,10 @@
       },
       "variants": {
         "right": {
-          "animation": "qrc:/pet/turn-right-to-left.gif"
+          "animation": "skin:assets/body/interaction/turn-right-to-left.gif"
         },
         "left": {
-          "animation": "qrc:/pet/turn-left-to-right.gif"
+          "animation": "skin:assets/body/interaction/turn-left-to-right.gif"
         }
       }
     },
@@ -448,35 +448,35 @@
       "tags": ["walk", "moving"],
       "variants": {
         "east": {
-          "animation": "qrc:/pet/walk-east.gif",
+          "animation": "skin:assets/body/locomotion/walk-east.gif",
           "movement": { "dx": 8.4, "dy": 0 }
         },
         "west": {
-          "animation": "qrc:/pet/walk-west.gif",
+          "animation": "skin:assets/body/locomotion/walk-west.gif",
           "movement": { "dx": -8.4, "dy": 0 }
         },
         "northEast": {
-          "animation": "qrc:/pet/walk-northEast.gif",
+          "animation": "skin:assets/body/locomotion/walk-north-east.gif",
           "movement": { "dx": 6, "dy": -6 }
         },
         "northWest": {
-          "animation": "qrc:/pet/walk-northWest.gif",
+          "animation": "skin:assets/body/locomotion/walk-north-west.gif",
           "movement": { "dx": -6, "dy": -6 }
         },
         "southEast": {
-          "animation": "qrc:/pet/walk-southEast.gif",
+          "animation": "skin:assets/body/locomotion/walk-south-east.gif",
           "movement": { "dx": 6, "dy": 6 }
         },
         "southWest": {
-          "animation": "qrc:/pet/walk-southWest.gif",
+          "animation": "skin:assets/body/locomotion/walk-south-west.gif",
           "movement": { "dx": -6, "dy": 6 }
         },
         "north": {
-          "animation": "qrc:/pet/walk-north.gif",
+          "animation": "skin:assets/body/locomotion/walk-north.gif",
           "movement": { "dx": 0, "dy": -6 }
         },
         "south": {
-          "animation": "qrc:/pet/walk-south.gif",
+          "animation": "skin:assets/body/locomotion/walk-south.gif",
           "movement": { "dx": 0, "dy": 6 }
         }
       }
@@ -489,35 +489,35 @@
       "tags": ["run", "moving"],
       "variants": {
         "east": {
-          "animation": "qrc:/pet/run-east.gif",
+          "animation": "skin:assets/body/locomotion/run-east.gif",
           "movement": { "dx": 11.2, "dy": 0 }
         },
         "west": {
-          "animation": "qrc:/pet/run-west.gif",
+          "animation": "skin:assets/body/locomotion/run-west.gif",
           "movement": { "dx": -11.2, "dy": 0 }
         },
         "northEast": {
-          "animation": "qrc:/pet/run-northEast.gif",
+          "animation": "skin:assets/body/locomotion/run-north-east.gif",
           "movement": { "dx": 8, "dy": -8 }
         },
         "northWest": {
-          "animation": "qrc:/pet/run-northWest.gif",
+          "animation": "skin:assets/body/locomotion/run-north-west.gif",
           "movement": { "dx": -8, "dy": -8 }
         },
         "southEast": {
-          "animation": "qrc:/pet/run-southEast.gif",
+          "animation": "skin:assets/body/locomotion/run-south-east.gif",
           "movement": { "dx": 8, "dy": 8 }
         },
         "southWest": {
-          "animation": "qrc:/pet/run-southWest.gif",
+          "animation": "skin:assets/body/locomotion/run-south-west.gif",
           "movement": { "dx": -8, "dy": 8 }
         },
         "north": {
-          "animation": "qrc:/pet/run-north.gif",
+          "animation": "skin:assets/body/locomotion/run-north.gif",
           "movement": { "dx": 0, "dy": -8 }
         },
         "south": {
-          "animation": "qrc:/pet/run-south.gif",
+          "animation": "skin:assets/body/locomotion/run-south.gif",
           "movement": { "dx": 0, "dy": 8 }
         }
       }
@@ -530,10 +530,10 @@
       "tags": ["thinking", "cognitive"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/thinking-right.gif"
+          "animation": "skin:assets/body/gestures/thinking-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/thinking-left.gif"
+          "animation": "skin:assets/body/gestures/thinking-left.gif"
         }
       }
     },
@@ -545,10 +545,10 @@
       "tags": ["idle", "thinking", "cognitive"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-thinking-once-right.gif"
+          "animation": "skin:assets/body/gestures/thinking-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-thinking-once-left.gif"
+          "animation": "skin:assets/body/gestures/thinking-left.gif"
         }
       }
     },
@@ -560,10 +560,10 @@
       "tags": ["idle", "tapping_head"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-tapping-head-right.gif"
+          "animation": "skin:assets/body/gestures/tapping-head-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-tapping-head-left.gif"
+          "animation": "skin:assets/body/gestures/tapping-head-left.gif"
         }
       }
     },
@@ -575,10 +575,10 @@
       "tags": ["idle", "shrug", "confident"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-shrug-right.gif"
+          "animation": "skin:assets/body/gestures/shrug-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-shrug-left.gif"
+          "animation": "skin:assets/body/gestures/shrug-left.gif"
         }
       }
     },
@@ -590,10 +590,10 @@
       "tags": ["idle", "watch", "waiting"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-check-watch-right.gif"
+          "animation": "skin:assets/body/gestures/check-watch-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-check-watch-left.gif"
+          "animation": "skin:assets/body/gestures/check-watch-left.gif"
         }
       }
     },
@@ -605,10 +605,10 @@
       "tags": ["idle", "pointing", "lecture"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-pointing-right.gif"
+          "animation": "skin:assets/body/gestures/pointing-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-pointing-left.gif"
+          "animation": "skin:assets/body/gestures/pointing-left.gif"
         }
       }
     },
@@ -620,10 +620,10 @@
       "tags": ["idle", "tea", "rest"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-sitting-tea-right.gif"
+          "animation": "skin:assets/body/gestures/sitting-tea-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-sitting-tea-left.gif"
+          "animation": "skin:assets/body/gestures/sitting-tea-left.gif"
         }
       }
     },
@@ -635,10 +635,10 @@
       "tags": ["idle", "phone", "call"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-phone-call-right.gif"
+          "animation": "skin:assets/body/gestures/phone-call-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-phone-call-left.gif"
+          "animation": "skin:assets/body/gestures/phone-call-left.gif"
         }
       }
     },
@@ -650,10 +650,10 @@
       "tags": ["idle", "look_back"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-look-back-right.gif"
+          "animation": "skin:assets/body/gestures/look-back-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-look-back-left.gif"
+          "animation": "skin:assets/body/gestures/look-back-left.gif"
         }
       }
     },
@@ -665,10 +665,10 @@
       "tags": ["idle", "look_up", "head"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-look-up-right.gif"
+          "animation": "skin:assets/body/gestures/look-up-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-look-up-left.gif"
+          "animation": "skin:assets/body/gestures/look-up-left.gif"
         }
       }
     },
@@ -680,10 +680,10 @@
       "tags": ["idle", "look_down", "legs"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/idle-look-down-right.gif"
+          "animation": "skin:assets/body/gestures/look-down-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/idle-look-down-left.gif"
+          "animation": "skin:assets/body/gestures/look-down-left.gif"
         }
       }
     },
@@ -695,10 +695,10 @@
       "tags": ["click", "face", "scared"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/scared-right.gif"
+          "animation": "skin:assets/body/interaction/scared-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/scared-left.gif"
+          "animation": "skin:assets/body/interaction/scared-left.gif"
         }
       }
     },
@@ -710,10 +710,10 @@
       "tags": ["click", "legs", "back"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/back-right.gif"
+          "animation": "skin:assets/body/interaction/back-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/back-left.gif"
+          "animation": "skin:assets/body/interaction/back-left.gif"
         }
       }
     },
@@ -725,10 +725,10 @@
       "tags": ["drag", "shake", "crouch", "scared"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/crouch-right.gif"
+          "animation": "skin:assets/body/interaction/crouch-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/crouch-left.gif"
+          "animation": "skin:assets/body/interaction/crouch-left.gif"
         }
       }
     },
@@ -740,10 +740,10 @@
       "tags": ["drag", "shake", "recover"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/stand-up-full-right.gif"
+          "animation": "skin:assets/body/interaction/stand-up-full-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/stand-up-full-left.gif"
+          "animation": "skin:assets/body/interaction/stand-up-full-left.gif"
         }
       }
     },
@@ -755,10 +755,10 @@
       "tags": ["drag", "shake", "recover", "quick"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/stand-up-quick-right.gif"
+          "animation": "skin:assets/body/interaction/stand-up-quick-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/stand-up-quick-left.gif"
+          "animation": "skin:assets/body/interaction/stand-up-quick-left.gif"
         }
       }
     },
@@ -770,10 +770,10 @@
       "tags": ["double_click", "hold_it", "crossed"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/crossed-right.gif"
+          "animation": "skin:assets/body/interaction/crossed-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/crossed-left.gif"
+          "animation": "skin:assets/body/interaction/crossed-left.gif"
         }
       }
     },
@@ -785,10 +785,10 @@
       "tags": ["objecting", "speaking", "emphasis"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/objecting-right.gif"
+          "animation": "skin:assets/body/interaction/objecting-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/objecting-left.gif"
+          "animation": "skin:assets/body/interaction/objecting-left.gif"
         }
       }
     },
@@ -800,10 +800,10 @@
       "tags": ["bow", "polite"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/bow-right.gif"
+          "animation": "skin:assets/body/interaction/bow-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/bow-left.gif"
+          "animation": "skin:assets/body/interaction/bow-left.gif"
         }
       }
     },
@@ -815,10 +815,10 @@
       "tags": ["prop", "badge", "pickup"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/pickup-right.gif"
+          "animation": "skin:assets/body/interaction/pickup-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/pickup-left.gif"
+          "animation": "skin:assets/body/interaction/pickup-left.gif"
         }
       }
     },
@@ -830,10 +830,10 @@
       "tags": ["tea", "rest"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/tea-right.gif"
+          "animation": "skin:assets/body/menu/tea-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/tea-left.gif"
+          "animation": "skin:assets/body/menu/tea-left.gif"
         }
       }
     },
@@ -845,10 +845,10 @@
       "tags": ["tea", "rest"],
       "variants": {
         "right": {
-          "animation": "qrc:/pet/tea-alt-right.gif"
+          "animation": "skin:assets/body/menu/tea-alt-right.gif"
         },
         "left": {
-          "animation": "qrc:/pet/tea-alt-left.gif"
+          "animation": "skin:assets/body/menu/tea-alt-left.gif"
         }
       }
     },
@@ -865,10 +865,10 @@
           "nextPhase": "loop",
           "variants": {
             "right": {
-              "animation": "qrc:/pet/sleep-right.gif"
+              "animation": "skin:assets/body/rest/sleep-right.gif"
             },
             "left": {
-              "animation": "qrc:/pet/sleep-left.gif"
+              "animation": "skin:assets/body/rest/sleep-left.gif"
             }
           }
         },
@@ -876,10 +876,10 @@
           "loopMode": "loop",
           "variants": {
             "right": {
-              "animation": "qrc:/pet/sleeping-right.gif"
+              "animation": "skin:assets/body/rest/sleeping-right.gif"
             },
             "left": {
-              "animation": "qrc:/pet/sleeping-left.gif"
+              "animation": "skin:assets/body/rest/sleeping-left.gif"
             }
           }
         },
@@ -887,10 +887,10 @@
           "loopMode": "onceThenIdle",
           "variants": {
             "right": {
-              "animation": "qrc:/pet/wake-right.gif"
+              "animation": "skin:assets/body/rest/wake-right.gif"
             },
             "left": {
-              "animation": "qrc:/pet/wake-left.gif"
+              "animation": "skin:assets/body/rest/wake-left.gif"
             }
           }
         }
@@ -1136,22 +1136,22 @@
       "label": "等等",
       "scope": "doubleClick",
       "action": "crossed",
-      "sound": "qrc:/audio/holdit0.wav",
+      "sound": "skin:assets/audio/voice/holdit0.wav",
       "sounds": {
-        "jp": "qrc:/audio/holdit0.wav",
-        "en": "qrc:/audio/holdit1.wav",
-        "zh": "qrc:/audio/holdit2.wav"
+        "jp": "skin:assets/audio/voice/holdit0.wav",
+        "en": "skin:assets/audio/voice/holdit1.wav",
+        "zh": "skin:assets/audio/voice/holdit2.wav"
       }
     },
     "doubleClick.takeThat": {
       "label": "看招",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "qrc:/audio/takethat0.wav",
+      "sound": "skin:assets/audio/voice/takethat0.wav",
       "sounds": {
-        "jp": "qrc:/audio/takethat0.wav",
-        "en": "qrc:/audio/takethat1.wav",
-        "zh": "qrc:/audio/takethat2.wav"
+        "jp": "skin:assets/audio/voice/takethat0.wav",
+        "en": "skin:assets/audio/voice/takethat1.wav",
+        "zh": "skin:assets/audio/voice/takethat2.wav"
       },
       "prop": "prosecutor_badge"
     },
@@ -1159,22 +1159,22 @@
       "label": "异议",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "qrc:/audio/objection0.wav",
+      "sound": "skin:assets/audio/voice/objection0.wav",
       "sounds": {
-        "jp": "qrc:/audio/objection0.wav",
-        "en": "qrc:/audio/objection1.wav",
-        "zh": "qrc:/audio/objection2.wav"
+        "jp": "skin:assets/audio/voice/objection0.wav",
+        "en": "skin:assets/audio/voice/objection1.wav",
+        "zh": "skin:assets/audio/voice/objection2.wav"
       }
     },
     "doubleClick.eureka": {
       "label": "就是这个",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "qrc:/audio/eureka0.wav",
+      "sound": "skin:assets/audio/voice/eureka0.wav",
       "sounds": {
-        "jp": "qrc:/audio/eureka0.wav",
-        "en": "qrc:/audio/eureka1.wav",
-        "zh": "qrc:/audio/objection2.wav"
+        "jp": "skin:assets/audio/voice/eureka0.wav",
+        "en": "skin:assets/audio/voice/eureka1.wav",
+        "zh": "skin:assets/audio/voice/objection2.wav"
       }
     },
     "objecting.once": {

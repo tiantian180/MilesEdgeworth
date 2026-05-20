@@ -33,10 +33,10 @@ def main() -> int:
     require(actions["crossed"].get("loopMode") == "onceThenIdle", "crossed 应播放一次后回 idle")
 
     expected_recipes = {
-        "doubleClick.holdIt": ("crossed", "qrc:/audio/holdit0.wav"),
-        "doubleClick.takeThat": ("objecting", "qrc:/audio/takethat0.wav"),
-        "doubleClick.objection": ("objecting", "qrc:/audio/objection0.wav"),
-        "doubleClick.eureka": ("objecting", "qrc:/audio/eureka0.wav"),
+        "doubleClick.holdIt": ("crossed", "skin:assets/audio/voice/holdit0.wav"),
+        "doubleClick.takeThat": ("objecting", "skin:assets/audio/voice/takethat0.wav"),
+        "doubleClick.objection": ("objecting", "skin:assets/audio/voice/objection0.wav"),
+        "doubleClick.eureka": ("objecting", "skin:assets/audio/voice/eureka0.wav"),
     }
     for recipe_id, (action_id, sound_url) in expected_recipes.items():
         recipe = recipes.get(recipe_id, {})

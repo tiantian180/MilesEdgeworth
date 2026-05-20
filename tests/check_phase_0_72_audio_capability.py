@@ -116,9 +116,9 @@ def main() -> int:
     for token in [
         "runtime.availableAudioLanguages()",
         'runtime.setAudioLanguage("zh")',
-        'runtime.currentSoundUrl().toString() == "qrc:/audio/holdit2.wav"',
+        'runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit2.wav"',
         'runtime.setAudioLanguage("en")',
-        'runtime.currentSoundUrl().toString() == "qrc:/audio/holdit1.wav"',
+        'runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit1.wav"',
         'runtime.setAudioLanguage("jp")',
         "defaultOnlyAudio.defaultVoiceLanguage",
         "defaultOnlyAudioController.availableLanguages().isEmpty()",

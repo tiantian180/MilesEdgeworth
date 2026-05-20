@@ -576,5 +576,13 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_4_skin_package_contract.py
         )
 
+        # Phase 1.4 的 skin: URL 迁移检查：内置 Miles manifest 不能继续
+        # 直接引用 /pet 或 /audio，同时每个 skin: URL 都必须能在 qrc 皮肤根中找到。
+        add_test(
+            NAME phase_1_4_skin_url_migration
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_4_skin_url_migration.py
+        )
+
     endif()
 endif()

@@ -379,7 +379,7 @@ int main(int argc, char *argv[])
     runtime.setFacing("right");
     bridge.submitDoubleClickForTest(0.0);
     require(runtime.currentActionId() == "objecting", "确定性随机命中时应由徽章 CI 播放 objecting");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/takethat0.wav", "确定性随机命中时应播放看招语音");
+    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/takethat0.wav", qPrintable(QStringLiteral("确定性随机命中时应播放看招语音，实际为 %1").arg(runtime.currentSoundUrl().toString())));
     waitForMilliseconds(750);
     require(runtime.currentPropId() == "prosecutor_badge", "确定性随机命中后应飞出检察官徽章");
     bridge.submitPropClicked();
@@ -405,7 +405,7 @@ int main(int argc, char *argv[])
 
     runtime.setAudioLanguage("zh");
     bridge.submitDoubleClickForTest(0.0);
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/takethat2.wav", "徽章 CI 应沿用当前语音语言选择看招音频");
+    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/takethat2.wav", "徽章 CI 应沿用当前语音语言选择看招音频");
     waitForMilliseconds(750);
     bridge.submitPropExpired();
     runtime.handleAnimationFinished();
@@ -639,11 +639,11 @@ int main(int argc, char *argv[])
     require(runtime.availableAudioLanguages().size() == 3, "Miles 应暴露三种可选语音语言");
     runtime.setAudioLanguage("zh");
     runtime.playRecipe("doubleClick.holdIt");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit2.wav", "中文语音应选择 holdit2");
+    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit2.wav", "中文语音应选择 holdit2");
 
     runtime.setAudioLanguage("en");
     runtime.playRecipe("doubleClick.holdIt");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit1.wav", "英语语音应选择 holdit1");
+    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit1.wav", "英语语音应选择 holdit1");
 
     runtime.setAudioLanguage("jp");
     runtime.submitExpressionRequest("speaking", "objection", 0.0);
@@ -658,19 +658,19 @@ int main(int argc, char *argv[])
 
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit0.wav", "Hold it 应播放默认语音");
+    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit0.wav", "Hold it 应播放默认语音");
 
     runtime.playRecipe("doubleClick.takeThat");
     require(runtime.currentActionId() == "objecting", "Take that 应播放异议动作");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/takethat0.wav", "Take that 应播放默认语音");
+    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/takethat0.wav", "Take that 应播放默认语音");
 
     runtime.playRecipe("doubleClick.objection");
     require(runtime.currentActionId() == "objecting", "Objection 应播放异议动作");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/objection0.wav", "Objection 应播放默认语音");
+    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/objection0.wav", "Objection 应播放默认语音");
 
     runtime.playRecipe("doubleClick.eureka");
     require(runtime.currentActionId() == "objecting", "Eureka 应播放异议动作");
-    require(runtime.currentSoundUrl().toString() == "qrc:/audio/eureka0.wav", "Eureka 应播放默认语音");
+    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/eureka0.wav", "Eureka 应播放默认语音");
 
     runtime.returnToIdle();
     runtime.setFacing("right");

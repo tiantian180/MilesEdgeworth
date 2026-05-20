@@ -35,10 +35,10 @@ def main() -> int:
         "Take that 应播放默认语音",
         "Objection 应播放默认语音",
         "Eureka 应播放默认语音",
-        'qrc:/audio/holdit0.wav',
-        'qrc:/audio/takethat0.wav',
-        'qrc:/audio/objection0.wav',
-        'qrc:/audio/eureka0.wav',
+        'qrc:/skins/miles-edgeworth/assets/audio/voice/holdit0.wav',
+        'qrc:/skins/miles-edgeworth/assets/audio/voice/takethat0.wav',
+        'qrc:/skins/miles-edgeworth/assets/audio/voice/objection0.wav',
+        'qrc:/skins/miles-edgeworth/assets/audio/voice/eureka0.wav',
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少双击 recipe 行为覆盖：{token}")
 
