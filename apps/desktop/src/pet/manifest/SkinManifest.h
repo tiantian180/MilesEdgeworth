@@ -149,6 +149,9 @@ struct CanvasDefinition
     // Miles 当前中号 scale=2，因此窗口 120*2=240，动画 100*2=200。
     double windowSize = 120.0;
     double imageSize = 100.0;
+    // hitZoneSize 是点击命中区域使用的逻辑画布尺寸。它独立于显示窗口尺寸，
+    // 因为有些皮肤会按放大后的像素坐标绘制 hitZones。
+    double hitZoneSize = 0.0;
     QString idleLoopActionId;
 };
 

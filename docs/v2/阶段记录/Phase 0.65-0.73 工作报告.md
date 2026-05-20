@@ -23,7 +23,7 @@ Phase 0.65-0.73 的目标是把 v2 桌宠框架从“旧版手感还原代码”
 | 0.66 | ClickBehavior 配置化 | 单击 zone -> pool/action/recipe 和双击默认入口迁入 manifest；`HitZoneMatcher` 只负责命中判断。 |
 | 0.67 | GestureTracker 拆分 | 拖拽晃动识别从 `PetRuntime` 移出，变成 `pointer.dragShake` / `pointer.dragReleased` 事件。 |
 | 0.68 | rest / startup / follow-up 去硬编码 | 睡眠能力、启动入场、动作完成续接、移动方向到朝向映射迁入 manifest。 |
-| 0.69 | canvas / size / surface 收尾 | 基础窗口尺寸、动画尺寸、尺寸菜单、idle loop 来源迁入 manifest；窗口透明点击 mask 由原生 surface 处理。 |
+| 0.69 | canvas / size / hit zone / surface 收尾 | 基础窗口尺寸、动画尺寸、点击命中画布、尺寸菜单、idle loop 来源迁入 manifest；窗口透明点击 mask 由原生 surface 处理。 |
 | 0.70 | CustomInteraction Host API | 建立 C++ `CustomInteraction`、`CustomInteractionHostApi`、Registry 分发和异常隔离。 |
 | 0.71 | 检察官徽章 CI | 双击概率“看招”作为 Miles 皮肤侧 Custom Interaction 回归；通用层不写徽章逻辑。 |
 | 0.72 | Audio Capability | 语音语言变为可选能力，由 `manifest.audio.voiceLanguages` + `AudioController` + 动态菜单驱动。 |
@@ -61,7 +61,7 @@ flowchart TD
 
 ## 4. 自审修正
 
-本轮自审发现并修正了两个问题。
+本轮自审发现并修正了以下问题。
 
 ### 4.1 检察官徽章 CI 绕过语音语言
 
@@ -92,6 +92,19 @@ flowchart TD
 - 未知 state 会回退到当前 `m_currentState`。
 - `PetRuntimeSmoke` 增加“未知 expression state 应回退到当前 PetState”的回归断言。
 
+### 4.3 Phase 1 收官 review 补修
+
+`Phase 1 收官 review 2026-05-20.md` 提出的低风险收口项已经处理：
+
+- `CustomInteractionRegistry::registerBuiltins()` 不再调用 `clearForTest()`，生产注册入口变为幂等；重复 id 的 handler 会被跳过。
+- `PetRuntimeSmoke` 增加“registerBuiltins 不清空已注册 handler”和“重复 id 不重复分发”的回归断言。
+- `CustomInteractionRegistry` 的异常隔离分支增加 `qWarning`，输出 handler id 与异常信息，方便后续调试 JS/TS adapter。
+- `manifest.canvas.hitZoneSize` 成为点击命中逻辑画布尺寸；`InteractionPipeline` 显式传入 `HitZoneMatchContext`，不再依赖 240 默认值。
+- `m_currentFacing` / `m_petScale` 的构造期默认值改为空与 `0.0`，由 manifest 初始化后的字段作为单一来源。
+- Phase 0.65 guardrail 脚本标注当前没有活跃 `_check_absent` 调用，后续发现新边界债务再追加断言。
+
+较大的 `fallbackManifest()` 拆分和 `DesktopShellController` 身体边界 manifest 化仍留作 Phase 0.74+，不混入本轮小修。
+
 ## 5. 边界复核
 
 当前通用层状态：
@@ -117,6 +130,8 @@ Prop 的边界：
 | `PetRuntime.cpp` 仍偏长 | 约 700 行，仍混有 recipe runner、phase 切换、action 执行和部分 facade 职责 | Phase 0.74+ 拆 `PlaybackController` / `RecipeRunner`，但不要在接 AI 前做大规模无保护重构。 |
 | Registry 是进程级单例 | 当前假设只有一个 PetRuntime / 一个皮肤实例 | 多桌宠或多皮肤并存前，改为 `SkinSession` 或 Runtime 持有。 |
 | 底层播放方法仍是 `Q_INVOKABLE` | QML 理论上仍能绕过 `PetEventBridge` 调 `playAction/playRecipe` | 短期保留给 smoke 和调试；后续引入 DebugController 或内部 C++ 测试入口后再收窄。 |
+| fallback manifest 仍带 Miles rescue | `SkinManifestLoader::fallbackManifest()` 仍包含 `idle_stand`、默认朝向和示例资源 URL | Phase 0.74+ 拆成框架空 fallback 与 Miles 皮肤 rescue manifest。 |
+| DesktopShell 几何仍有 Miles 身体框 | `DesktopShellController` 仍保留旧版身体边界和启动偏移常量 | Phase 0.74+ 设计 `surface.bodyBounds` / `surface.startupOffset` 后迁入 manifest。 |
 | JS/TS Custom Interaction 未实现 | 目前 CI 是 C++ 接口，Host API 语义已保持语言无关 | 第三方皮肤开放前，再设计 JS sandbox、权限和资源访问边界。 |
 | MotionController 未落地 | 现在仍是帧驱动移动，目标点寻路还没实现 | Phase 2 之后如果要让 Agent 控制移动到目标位置，再做 MotionController。 |
 | 文档里仍有参考性旧方案 | `docs/superpowers/specs/` 和部分历史段落保留过程上下文 | 正式开发只以 `docs/v2/设计方案/` 为准；发现冲突时更新设计方案。 |
@@ -149,4 +164,3 @@ git diff --check
 1. 由人工复查本报告和 Phase 0.65-0.73 的代码边界。
 2. 若边界认可，进入 Phase 2 设计：Go sidecar、OpenAI-compatible provider、ChatWindow、配置保存、流式回复。
 3. Phase 2 开始前保留一条技术债任务：把 `PetRuntime` 的播放内部拆分路线写成更小的 0.74+ 计划，但不要和聊天主链路混在一个提交里。
-

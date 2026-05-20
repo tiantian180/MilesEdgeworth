@@ -185,14 +185,14 @@ private:
     QString m_currentRecipeId;
     int m_currentRecipeStepIndex = -1;
     QString m_currentPhaseId;
-    QString m_currentFacing = "right";
+    QString m_currentFacing;
     QString m_currentMovementDirection;
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
     AudioController m_audioController;
     bool m_autoMovementEnabled = true;
     QString m_petSizeId;
-    double m_petScale = 2.0;
+    double m_petScale = 0.0;
     QUrl m_currentAnimationUrl;
     PropController m_propController;
     int m_playbackSerial = 0;

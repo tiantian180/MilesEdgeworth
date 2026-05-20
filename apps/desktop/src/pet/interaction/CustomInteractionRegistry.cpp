@@ -1,5 +1,6 @@
 #include "pet/interaction/CustomInteractionRegistry.h"
 
+#include <QDebug>
 #include <QRandomGenerator>
 #include <QTimer>
 #include <QtGlobal>
@@ -22,6 +23,21 @@ QHash<QString, QVariantMap> &interactionStates()
 {
     static QHash<QString, QVariantMap> states;
     return states;
+}
+
+QString normalizedInteractionId(const CustomInteraction &interaction)
+{
+    return interaction.id().trimmed();
+}
+
+bool hasRegisteredInteraction(const QString &interactionId)
+{
+    for (const std::unique_ptr<CustomInteraction> &interaction : registeredInteractions()) {
+        if (interaction && normalizedInteractionId(*interaction) == interactionId) {
+            return true;
+        }
+    }
+    return false;
 }
 
 class ObserverCustomInteraction final : public CustomInteraction
@@ -191,7 +207,12 @@ CustomInteractionResult CustomInteractionHostApi::result() const
 
 void CustomInteractionRegistry::registerInteraction(std::unique_ptr<CustomInteraction> interaction)
 {
-    if (!interaction || interaction->id().trimmed().isEmpty()) {
+    if (!interaction) {
+        return;
+    }
+
+    const QString interactionId = normalizedInteractionId(*interaction);
+    if (interactionId.isEmpty() || hasRegisteredInteraction(interactionId)) {
         return;
     }
 
@@ -200,8 +221,6 @@ void CustomInteractionRegistry::registerInteraction(std::unique_ptr<CustomIntera
 
 void CustomInteractionRegistry::registerBuiltins(const SkinManifest &manifest)
 {
-    clearForTest();
-
     // Phase 0.70 只提供一个无副作用观察型 handler，用于验证注册和分发管线。
     // Miles 专属玩法会在后续 Phase 以独立 handler 接回，不写进这里。
     for (const QString &interactionId : manifest.customInteractions) {
@@ -231,8 +250,9 @@ CustomInteractionResult CustomInteractionRegistry::handleEvent(
         }
 
         try {
-            QVariantMap &state = interactionStates()[interaction->id()];
-            CustomInteractionHostApi host(manifest, snapshot, event, interaction->id(), &state);
+            const QString interactionId = normalizedInteractionId(*interaction);
+            QVariantMap &state = interactionStates()[interactionId];
+            CustomInteractionHostApi host(manifest, snapshot, event, interactionId, &state);
             const CustomInteractionResult handlerResult = interaction->handleEvent(event, snapshot, host);
             const CustomInteractionResult merged = mergeResults(host.result(), handlerResult);
 
@@ -243,10 +263,16 @@ CustomInteractionResult CustomInteractionRegistry::handleEvent(
             if (combined.stopPropagation) {
                 break;
             }
-        } catch (const std::exception &) {
+        } catch (const std::exception &error) {
             // 高级交互失败时回退默认逻辑，避免皮肤脚本破坏桌宠主流程。
+            qWarning().noquote() << "CustomInteraction handler failed:"
+                                 << normalizedInteractionId(*interaction)
+                                 << error.what();
             continue;
         } catch (...) {
+            qWarning().noquote() << "CustomInteraction handler failed:"
+                                 << normalizedInteractionId(*interaction)
+                                 << "unknown exception";
             continue;
         }
     }

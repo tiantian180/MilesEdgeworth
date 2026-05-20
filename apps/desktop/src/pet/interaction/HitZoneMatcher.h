@@ -10,14 +10,14 @@
 
 // HitZoneMatchContext 描述一次点击命中计算所需的运行时上下文。
 //
-// hitZones 目前以 Miles 皮肤的 240x240 逻辑画布为基准声明。QML 传入的是
-// 真实窗口坐标，matcher 会先归一化到这个逻辑画布，再按当前朝向选择区域。
+// hitZones 以皮肤 manifest 声明的逻辑画布为基准。QML 传入真实窗口坐标，
+// matcher 会先归一化到这个逻辑画布，再按当前朝向选择区域。
 struct HitZoneMatchContext
 {
     QString facing;
     QString defaultFacing;
-    double canvasWidth = 240.0;
-    double canvasHeight = 240.0;
+    double canvasWidth = 0.0;
+    double canvasHeight = 0.0;
 };
 
 // HitZoneMatcher 只负责“点中了哪个 hit zone”的纯匹配逻辑。

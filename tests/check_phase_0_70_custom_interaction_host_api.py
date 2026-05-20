@@ -84,8 +84,10 @@ def main() -> int:
         "std::unique_ptr<CustomInteraction>",
         "QTimer::singleShot",
         "QRandomGenerator",
+        "hasRegisteredInteraction",
         "try",
         "catch",
+        "qWarning",
         "当前 v2 只有一个 PetRuntime 实例",
         "supportedEvents().contains",
         "manifest.customInteractions",
@@ -94,6 +96,10 @@ def main() -> int:
         require(token in registry_h + registry_cpp, f"Registry 实现缺少：{token}")
 
     require("manifestConfig(const QString" not in registry_h + registry_cpp, "manifestConfig 应只读取当前 handler 自己的配置")
+    register_builtins_body = registry_cpp.split(
+        "void CustomInteractionRegistry::registerBuiltins", 1
+    )[1].split("void CustomInteractionRegistry::clearForTest", 1)[0]
+    require("clearForTest();" not in register_builtins_body, "registerBuiltins 不应清空生产 Registry")
 
     for token in [
         "ActionRequestKind::SpawnProp",
@@ -134,6 +140,8 @@ def main() -> int:
         "scheduleAfter 回调应回到 Qt 事件循环执行",
         "抛异常的 CI 不应阻断默认单击行为",
         "stopPropagation CI 应阻止后续 handler",
+        "registerBuiltins 不应清空已注册 handler",
+        "重复 id 的 CI 不应重复分发",
     ]:
         require(token in smoke_test, f"Smoke 测试缺少 CI 行为覆盖：{token}")
 

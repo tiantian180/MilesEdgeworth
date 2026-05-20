@@ -121,6 +121,7 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
     const QJsonObject canvas = root.value("canvas").toObject();
     manifest.canvas.windowSize = canvas.value("windowSize").toDouble(manifest.canvas.windowSize);
     manifest.canvas.imageSize = canvas.value("imageSize").toDouble(manifest.canvas.imageSize);
+    manifest.canvas.hitZoneSize = canvas.value("hitZoneSize").toDouble(manifest.canvas.hitZoneSize);
     manifest.canvas.idleLoopActionId = canvas.value("idleLoopAction").toString();
 
     const QJsonObject audio = root.value("audio").toObject();
@@ -597,6 +598,7 @@ SkinManifest SkinManifestLoader::fallbackManifest()
     manifest.fallbackAction = kFallbackActionId;
     manifest.canvas.windowSize = 120.0;
     manifest.canvas.imageSize = 100.0;
+    manifest.canvas.hitZoneSize = 240.0;
     manifest.canvas.idleLoopActionId = kFallbackActionId;
     manifest.defaultSizeId = "medium";
     manifest.audio.defaultVoiceLanguage = "jp";

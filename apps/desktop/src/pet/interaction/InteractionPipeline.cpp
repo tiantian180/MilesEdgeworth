@@ -159,9 +159,19 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
             return requests;
         }
 
+        // hit zone 逻辑画布由皮肤声明。未声明时退回事件窗口尺寸，避免
+        // 框架层隐式假设某个具体皮肤的命中坐标系。
+        const double hitZoneCanvasWidth = manifest.canvas.hitZoneSize > 0.0
+            ? manifest.canvas.hitZoneSize
+            : event.width;
+        const double hitZoneCanvasHeight = manifest.canvas.hitZoneSize > 0.0
+            ? manifest.canvas.hitZoneSize
+            : event.height;
         const HitZoneMatchContext hitZoneContext {
             snapshot.currentFacing,
             manifest.defaultFacing,
+            hitZoneCanvasWidth,
+            hitZoneCanvasHeight,
         };
         const QString zoneId = HitZoneMatcher::hitZoneIdForPoint(
             manifest,

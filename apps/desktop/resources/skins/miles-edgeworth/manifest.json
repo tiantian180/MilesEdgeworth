@@ -9,6 +9,7 @@
   "canvas": {
     "windowSize": 120,
     "imageSize": 100,
+    "hitZoneSize": 240,
     "idleLoopAction": "idle_stand"
   },
   "defaultSize": "medium",

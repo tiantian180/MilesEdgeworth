@@ -349,6 +349,24 @@ int main(int argc, char *argv[])
     CustomInteractionRegistry::clearForTest();
     runtime.returnToIdle();
 
+    int preservedEvents = 0;
+    CustomInteractionRegistry::registerInteraction(std::make_unique<ObserverCustomInteraction>(&preservedEvents));
+    CustomInteractionRegistry::registerBuiltins(runtime.manifest());
+    runtime.setFacing("right");
+    bridge.submitPrimaryClick(145, 40, 240, 240);
+    require(preservedEvents == 1, "registerBuiltins 不应清空已注册 handler");
+    CustomInteractionRegistry::clearForTest();
+    runtime.returnToIdle();
+
+    int duplicateEvents = 0;
+    CustomInteractionRegistry::registerInteraction(std::make_unique<ObserverCustomInteraction>(&duplicateEvents));
+    CustomInteractionRegistry::registerInteraction(std::make_unique<ObserverCustomInteraction>(&duplicateEvents));
+    runtime.setFacing("right");
+    bridge.submitPrimaryClick(145, 40, 240, 240);
+    require(duplicateEvents == 1, "重复 id 的 CI 不应重复分发");
+    CustomInteractionRegistry::clearForTest();
+    runtime.returnToIdle();
+
     registerMilesEdgeworthInteractions(runtime.manifest());
     runtime.setFacing("right");
     bridge.submitDoubleClickForTest(0.0);

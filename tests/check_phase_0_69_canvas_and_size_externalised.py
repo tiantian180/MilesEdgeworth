@@ -26,12 +26,15 @@ def main() -> int:
     snapshot_h = read("apps/desktop/src/pet/runtime/RuntimeSnapshot.h")
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
+    hit_zone_h = read("apps/desktop/src/pet/interaction/HitZoneMatcher.h")
+    pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
 
     canvas = manifest.get("canvas", {})
     require(canvas.get("windowSize") == 120, "manifest.canvas.windowSize 应保留旧版基础窗口尺寸")
     require(canvas.get("imageSize") == 100, "manifest.canvas.imageSize 应保留旧版基础动画尺寸")
+    require(canvas.get("hitZoneSize") == 240, "manifest.canvas.hitZoneSize 应声明单击命中逻辑画布")
     require(canvas.get("idleLoopAction") == "idle_stand", "manifest.canvas.idleLoopAction 应声明 idle loop 来源")
 
     sizes = manifest.get("sizes", [])
@@ -56,6 +59,7 @@ def main() -> int:
         "PetSizeDefinition",
         "AudioDefinition",
         "canvas",
+        "hitZoneSize",
         "sizes",
         "defaultSizeId",
         "defaultVoiceLanguage",
@@ -65,6 +69,7 @@ def main() -> int:
     for token in [
         "manifest.canvas.windowSize",
         "manifest.canvas.imageSize",
+        "manifest.canvas.hitZoneSize",
         "manifest.canvas.idleLoopActionId",
         "manifest.sizes.append",
         "manifest.defaultSizeId",
@@ -96,6 +101,9 @@ def main() -> int:
     require("manifest.canvas.imageSize * m_petScale" in runtime_h, "petImageSize 应读取 manifest.canvas.imageSize")
     require("availablePetSizes" in runtime_h + runtime_cpp, "PetRuntime 应向原生菜单暴露 manifest sizes")
     require("currentActionAcceptsIdleLoopFinished" in runtime_h + runtime_cpp, "idle loop 判断应由 Runtime 读取 manifest 后提供")
+    require("canvasWidth = 240.0" not in hit_zone_h, "HitZoneMatchContext 不应内置 Miles 240 宽度")
+    require("canvasHeight = 240.0" not in hit_zone_h, "HitZoneMatchContext 不应内置 Miles 240 高度")
+    require("manifest.canvas.hitZoneSize" in pipeline_cpp, "InteractionPipeline 应显式把 manifest hitZoneSize 注入命中计算")
 
     for token in [
         'QStringLiteral("迷你")',
