@@ -115,6 +115,23 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 qt_finalize_executable(MilesEdgeworthDesktop)
 
 if(BUILD_TESTING)
+    add_executable(SkinManifestLoaderSmoke
+        tests/skin_manifest_loader_smoke.cpp
+        src/pet/manifest/SkinManifestLoader.cpp
+    )
+
+    target_link_libraries(SkinManifestLoaderSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    target_include_directories(SkinManifestLoaderSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    add_test(NAME skin_manifest_loader_smoke COMMAND SkinManifestLoaderSmoke)
+
     qt_add_executable(PetRuntimeSmoke
         tests/pet_runtime_smoke.cpp
         src/pet/behavior/BehaviorTriggerEngine.cpp
