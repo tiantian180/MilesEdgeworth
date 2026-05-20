@@ -58,8 +58,8 @@ def main() -> int:
     tea_alt = actions.get("tea_alt", {})
     require(tea_alt.get("loopMode") == "onceThenIdle", "tea_alt 应播放一次后回 idle")
     variants = tea_alt.get("variants", {})
-    require(variants.get("right", {}).get("animation") == "qrc:/pet/tea-alt-right.gif", "tea_alt.right 应使用 tea2")
-    require(variants.get("left", {}).get("animation") == "qrc:/pet/tea-alt-left.gif", "tea_alt.left 应使用 tea3")
+    require(variants.get("right", {}).get("animation") == "skin:assets/body/menu/tea-alt-right.gif", "tea_alt.right 应使用 tea2")
+    require(variants.get("left", {}).get("animation") == "skin:assets/body/menu/tea-alt-left.gif", "tea_alt.left 应使用 tea3")
 
     qrc = read("apps/desktop/resources/pet_assets.qrc")
     for alias in ["tea-alt-right.gif", "tea-alt-left.gif"]:

@@ -31,7 +31,7 @@ def main() -> None:
     props = manifest.get("props", {})
     badge = props.get("prosecutor_badge")
     require(badge, "manifest 缺少 props.prosecutor_badge")
-    require(badge.get("asset") == "qrc:/pet/prosecutor-badge.png", "prosecutor_badge 应声明徽章图片资源")
+    require(badge.get("asset") == "skin:assets/props/prosecutor_badge/prosecutor-badge.png", "prosecutor_badge 应声明徽章图片资源")
     require(badge.get("delayMs") == 700, "prosecutor_badge 应保留旧版 700ms 延迟")
     require(badge.get("durationMs") == 1500, "prosecutor_badge 应保留旧版 1500ms 飞行时间")
     require(badge.get("clickedRecipe") == "bow.once", "点击徽章后应触发鞠躬")
@@ -46,8 +46,8 @@ def main() -> None:
     require(pickup, "manifest 缺少 pickup_badge 动作")
     require(pickup.get("loopMode") == "onceThenIdle", "pickup_badge 应播放一次后回待机")
     pickup_urls = {variant.get("animation") for variant in pickup.get("variants", {}).values()}
-    require("qrc:/pet/pickup-right.gif" in pickup_urls, "pickup_badge 缺少右向动画")
-    require("qrc:/pet/pickup-left.gif" in pickup_urls, "pickup_badge 缺少左向动画")
+    require("skin:assets/body/interaction/pickup-right.gif" in pickup_urls, "pickup_badge 缺少右向动画")
+    require("skin:assets/body/interaction/pickup-left.gif" in pickup_urls, "pickup_badge 缺少左向动画")
 
     take_that = manifest.get("recipes", {}).get("doubleClick.takeThat", {})
     require(take_that.get("prop") == "prosecutor_badge", "doubleClick.takeThat 应触发 prosecutor_badge")

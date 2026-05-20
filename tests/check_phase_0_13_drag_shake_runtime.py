@@ -31,9 +31,9 @@ def main() -> None:
     behavior_rules = manifest.get("behaviorRules", [])
 
     expected_actions = {
-        "drag_crouch": ("hold", ["qrc:/pet/crouch-right.gif", "qrc:/pet/crouch-left.gif"]),
-        "drag_stand_up_full": ("onceThenIdle", ["qrc:/pet/stand-up-full-right.gif", "qrc:/pet/stand-up-full-left.gif"]),
-        "drag_stand_up_quick": ("onceThenIdle", ["qrc:/pet/stand-up-quick-right.gif", "qrc:/pet/stand-up-quick-left.gif"]),
+        "drag_crouch": ("hold", ["skin:assets/body/interaction/crouch-right.gif", "skin:assets/body/interaction/crouch-left.gif"]),
+        "drag_stand_up_full": ("onceThenIdle", ["skin:assets/body/interaction/stand-up-full-right.gif", "skin:assets/body/interaction/stand-up-full-left.gif"]),
+        "drag_stand_up_quick": ("onceThenIdle", ["skin:assets/body/interaction/stand-up-quick-right.gif", "skin:assets/body/interaction/stand-up-quick-left.gif"]),
     }
 
     for action_id, (loop_mode, urls) in expected_actions.items():

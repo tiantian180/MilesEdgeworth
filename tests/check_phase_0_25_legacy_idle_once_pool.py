@@ -27,11 +27,11 @@ def main() -> int:
     idle_recipes = {entry.get("recipe") for entry in idle_entries}
 
     expected_actions = {
-        "idle_sitting_tea": ["qrc:/pet/idle-sitting-tea-right.gif", "qrc:/pet/idle-sitting-tea-left.gif"],
-        "idle_phone_call": ["qrc:/pet/idle-phone-call-right.gif", "qrc:/pet/idle-phone-call-left.gif"],
-        "idle_look_back": ["qrc:/pet/idle-look-back-right.gif", "qrc:/pet/idle-look-back-left.gif"],
-        "idle_look_down": ["qrc:/pet/idle-look-down-right.gif", "qrc:/pet/idle-look-down-left.gif"],
-        "idle_look_up": ["qrc:/pet/idle-look-up-right.gif", "qrc:/pet/idle-look-up-left.gif"],
+        "idle_sitting_tea": ["skin:assets/body/gestures/sitting-tea-right.gif", "skin:assets/body/gestures/sitting-tea-left.gif"],
+        "idle_phone_call": ["skin:assets/body/gestures/phone-call-right.gif", "skin:assets/body/gestures/phone-call-left.gif"],
+        "idle_look_back": ["skin:assets/body/gestures/look-back-right.gif", "skin:assets/body/gestures/look-back-left.gif"],
+        "idle_look_down": ["skin:assets/body/gestures/look-down-right.gif", "skin:assets/body/gestures/look-down-left.gif"],
+        "idle_look_up": ["skin:assets/body/gestures/look-up-right.gif", "skin:assets/body/gestures/look-up-left.gif"],
     }
 
     for action_id, urls in expected_actions.items():
