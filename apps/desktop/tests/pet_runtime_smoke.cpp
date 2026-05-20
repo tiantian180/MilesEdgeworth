@@ -761,7 +761,7 @@ int main(int argc, char *argv[])
     requireNear(runtime.currentPropStartX(), 258.0, "大号徽章右向起点应按旧版 scale=3 缩放");
     requireNear(runtime.currentPropStartY(), 48.0, "大号徽章右向纵向起点应按旧版 scale=3 缩放");
     requireNear(runtime.currentPropEndX(), 1308.0, "大号徽章右向终点应按旧版 600 + 150 * scale 计算");
-    requireNear(runtime.currentPropVisualWidth(), 105.0, "大号徽章视觉尺寸应按旧版 scale=3 缩放");
+    requireNear(runtime.currentPropVisualWidth(), 36.0, "大号徽章视觉尺寸应按旧版 12 * scale 缩放");
     bridge.submitPropExpired();
     runtime.handleAnimationFinished();
 
@@ -774,7 +774,7 @@ int main(int argc, char *argv[])
     requireNear(runtime.currentPropStartX(), 1.0, "迷你徽章左向起点应按旧版 scale=1 缩放");
     requireNear(runtime.currentPropStartY(), 16.0, "迷你徽章左向纵向起点应按旧版 scale=1 缩放");
     requireNear(runtime.currentPropEndX(), -749.0, "迷你徽章左向终点应按旧版 -(600 + 150 * scale) 计算");
-    requireNear(runtime.currentPropVisualWidth(), 35.0, "迷你徽章视觉尺寸应按旧版 scale=1 缩放");
+    requireNear(runtime.currentPropVisualWidth(), 12.0, "迷你徽章视觉尺寸应按旧版 12 * scale 缩放");
     bridge.submitPropExpired();
     runtime.handleAnimationFinished();
 
@@ -786,6 +786,7 @@ int main(int argc, char *argv[])
     waitForMilliseconds(750);
     require(runtime.currentPropVisible(), "Take that 延迟后应飞出检察官徽章");
     require(runtime.currentPropId() == "prosecutor_badge", "飞出的 Prop 应是检察官徽章");
+    requireNear(runtime.currentPropVisualWidth(), 24.0, "中号徽章视觉尺寸应按 v1 实测 24px 显示");
     bridge.submitPropClicked();
     require(!runtime.currentPropVisible(), "点击徽章后应隐藏 Prop");
     require(runtime.currentActionId() == "bow", "点击徽章后应触发鞠躬");

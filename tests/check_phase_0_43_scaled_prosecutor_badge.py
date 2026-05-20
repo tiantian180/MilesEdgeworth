@@ -27,8 +27,8 @@ def main() -> int:
     for field in ["visualWidth", "visualHeight", "travelBase", "travelPerScale"]:
         require(field in badge, f"prosecutor_badge 缺少缩放字段 {field}")
 
-    require(badge.get("visualWidth") == 70, "prosecutor_badge visualWidth 应保留原始 PNG 视觉宽度")
-    require(badge.get("visualHeight") == 70, "prosecutor_badge visualHeight 应保留原始 PNG 视觉高度")
+    require(badge.get("visualWidth") == 24, "prosecutor_badge visualWidth 应匹配 v1 中号 24px 显示尺寸")
+    require(badge.get("visualHeight") == 24, "prosecutor_badge visualHeight 应匹配 v1 中号 24px 显示尺寸")
     require(badge["travelBase"]["right"]["x"] == 600, "右向徽章基础飞行距离应来自旧版 600")
     require(badge["travelPerScale"]["right"]["x"] == 150, "右向徽章每 scale 飞行补偿应来自旧版 150")
     require(badge["travelBase"]["left"]["x"] == -600, "左向徽章基础飞行距离应来自旧版 -600")
@@ -74,8 +74,10 @@ def main() -> int:
     for token in [
         "大号徽章右向起点应按旧版 scale=3 缩放",
         "大号徽章右向终点应按旧版 600 + 150 * scale 计算",
+        "大号徽章视觉尺寸应按旧版 12 * scale 缩放",
         "迷你徽章左向起点应按旧版 scale=1 缩放",
         "迷你徽章左向终点应按旧版 -(600 + 150 * scale) 计算",
+        "中号徽章视觉尺寸应按 v1 实测 24px 显示",
     ]:
         require(token in smoke, f"PetRuntimeSmoke 缺少徽章缩放覆盖：{token}")
 
