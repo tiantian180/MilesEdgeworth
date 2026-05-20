@@ -42,6 +42,21 @@ git diff --check
 
 当前桌宠本体不再加载 `PetWindow.qml` 作为主窗口，所以日常改 C++ / manifest / 文档时不把 `qmllint` 作为必跑门禁。后续新增 QML 聊天窗口或设置窗口时，再为对应 QML 文件恢复专门 lint。
 
+## 皮肤包加载
+
+v2 支持从文件系统加载皮肤包。皮肤包是一个普通目录，至少包含：
+
+```text
+my-skin/
+  skin.json
+  manifest.json
+  assets/
+```
+
+右键桌宠 → `皮肤` → `打开皮肤目录` 可以打开当前用户皮肤目录。把皮肤目录放进去后，选择 `重载当前皮肤` 或重启应用即可重新扫描。
+
+内置 Miles 皮肤仍打包在应用内；文件系统里出现同 id 皮肤时，用户皮肤优先。
+
 ## Cursor / clangd 代码提示
 
 如果 C++ 代码里 `#include <QGuiApplication>`、`QWindow` 等 Qt 类型飘红，通常不是 Qt Extension Pack 没装好，而是 clangd 没读到 CMake 生成的 `compile_commands.json`。
@@ -89,7 +104,7 @@ Phase 1 框架主干已经完成，当前重点是进入 Phase 2 AI 接入前的
 - 旧版 clickTimer 风格的单双击判定，避免双击后补触发单击反应。
 - 旧版静音音量语义，静音时正在播放的语音也会立即降到 0。
 - 站立循环后的随机待机触发概率已迁入皮肤 manifest，不再写死在运行时。
-- Miles GIF、语音和检察官徽章图片已迁入皮肤包 `assets/`，运行时继续通过稳定 qrc alias 加载。
+- Miles GIF、语音和检察官徽章图片已迁入皮肤包 `assets/`；manifest 使用 `skin:assets/...`，运行时按内置或文件系统皮肤根路径解析。
 - 右键菜单已移除开发测试入口；Miles 红茶从皮肤定制命令进入，睡觉/唤醒继续作为通用 sleep/rest 能力保留。
 - `PetRuntime` 已开始拆分：manifest 数据结构、JSON 加载、候选池选择、behavior trigger 选择、单击 hit zone 命中逻辑、皮肤命令解析、Prop 状态管理，以及 QML 事件到 ActionRequest 的主干已移出单体运行时。
 - Custom Interaction Host API 已接入，Miles 旧版双击概率“看招”丢检察官徽章已作为皮肤侧高级交互回归。
@@ -101,7 +116,7 @@ Phase 1 框架主干已经完成，当前重点是进入 Phase 2 AI 接入前的
 - HitZone 坐标错位和点击空洞。
 - 拖拽晃动触发不稳定。
 - 检察官徽章尺寸和起点需要按 v1 实测值校准。
-- 皮肤包仍主要通过 qrc 进入二进制；后续要支持文件系统皮肤包和 `skin:` URL，让用户无需 C++/Qt 环境即可换皮肤。
+- 文件系统皮肤包已接入；后续重点是完善 HitZone schema、连续缩放控件和 Pet Skin Studio。
 
 当前仍是技术验证，不是完整可发布的 v2 AI 桌宠。后续会继续实现 Pet Runtime、聊天窗口、设置中心、模型 Provider、皮肤 manifest 和 Agent Runtime。
 

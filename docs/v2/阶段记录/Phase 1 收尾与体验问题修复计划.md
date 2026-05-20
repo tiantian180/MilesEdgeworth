@@ -130,7 +130,7 @@ left facing 按 x 轴镜像：left_x = 240 − right_x（对称轴 x=120）。
 
 ### 2.6 文件系统皮肤包（去编译化分发，优先级：高，结构性）
 
-**问题**：当前皮肤通过 qrc 编进二进制，意味着每个想换皮肤的用户都得安装 C++/Qt 编译环境。这不符合"皮肤是数据"的初衷，也阻塞 Pet Skin Studio 落地（Studio 无法编辑编进二进制的资源）。
+**问题**：Step 4 前，皮肤只能通过 qrc 编进二进制，意味着每个想换皮肤的用户都得安装 C++/Qt 编译环境。这不符合"皮肤是数据"的初衷，也阻塞 Pet Skin Studio 落地（Studio 无法编辑编进二进制的资源）。
 
 **目标**：让最终用户**只调整素材和配置就能换皮肤**，无需任何编译工具。
 
@@ -162,7 +162,7 @@ Step 2  排查 GestureTracker 晃动参数
 Step 3  调整徽章 visualWidth / visualHeight + startOffsets
         ↓ 验证徽章尺寸与 v1 一致
 ─────────────── 以上为 Phase 1 必修 bug ───────────────
-Step 4  文件系统皮肤包（§2.6，结构性，不阻塞但应尽早）
+Step 4  文件系统皮肤包（§2.6，结构性，已完成）
         ├─ SkinManifestLoader 加 loadFromDirectory + skin: scheme
         ├─ 皮肤发现：扫描 user / portable / qrc 三路径
         ├─ Miles manifest 改用 skin: URL（兼容期保留 qrc:）
@@ -186,7 +186,7 @@ Step 8  Pet Skin Studio: HitZone Panel 首发
 
 **说明**：
 - Step 1–3 是 Phase 2 的硬前置（影响 demo 体验）
-- Step 4 是结构性改造，建议在 Phase 2 之前完成，否则 Phase 2 的 AI demo 也会被"换皮肤要重新编译"的循环拖慢
+- Step 4 是结构性改造，已经完成；Phase 2 的 AI demo 可以直接使用文件系统皮肤做快速迭代
 - Step 6–8 可以和 Phase 2 AI 接入并行推进；Step 8 依赖 Step 4 + Step 6 完成
 
 ---
@@ -203,7 +203,7 @@ Step 8  Pet Skin Studio: HitZone Panel 首发
 | 单击分区动画正确 | ⬜ Step 1 修复 |
 | 拖拽晃动生效 | ⬜ Step 2 修复 |
 | 检察官徽章尺寸正确 | ⬜ Step 3 修复 |
-| 文件系统皮肤包（去编译化） | ⬜ Step 4，建议在 Phase 2 前完成 |
+| 文件系统皮肤包（去编译化） | ✅ Step 4 已完成 |
 | HitZone 坐标系重设计 | ⬜ Step 6，可与 Phase 2 并行 |
 | 连续缩放控件 | ⬜ Step 7，可与 Phase 2 并行 |
 | Pet Skin Studio: HitZone Panel | ⬜ Step 8，依赖 Step 4 + Step 6 |
@@ -293,3 +293,27 @@ ctest --test-dir build --output-on-failure -R 'check_phase_0_(13|29|30|32|43|66|
 ```
 
 完整验证在本轮收尾时再统一执行并记录结果。
+
+## Step 4 实施记录：文件系统皮肤包
+
+- 新增 `skin.json` 元信息层。
+- 新增 `SkinDescriptor`、`loadFromDirectory()`、`discoverAll()` 和 `skin:` URL 解析。
+- 内置 Miles 通过 `qrc:/skins/miles-edgeworth/` 暴露，同时保留历史 `qrc:/pet` / `qrc:/audio` alias。
+- 右键菜单新增 `皮肤` 子菜单，支持切换皮肤、重载当前皮肤、打开用户皮肤目录。
+- Miles manifest 已迁移到 `skin:assets/...`，文件系统皮肤和内置皮肤共用同一套 manifest URL 写法。
+
+验证命令：
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+git diff --check
+```
+
+补充文件系统皮肤冒烟：
+
+- 复制内置 Miles 到应用同级 `skins/miles-edgeworth`。
+- 修改 `skin.json` 名称和一处 manifest 文案，确认加载来源可以变成文件系统皮肤。
+- 启动 `build/apps/desktop/MilesEdgeworthDesktop.app`，确认桌宠进程正常运行。
+- 删除临时便携皮肤目录，避免污染本机后续测试。
