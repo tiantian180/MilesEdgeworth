@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """检查 Phase 0.12 的双击动作和音效骨架。
 
-旧版双击会随机触发 Hold it / Take that / Objection / Eureka，并播放对应语音。
-这一阶段先恢复动作与声音，检察官徽章作为后续 Prop Runtime 接入。
+旧版双击会触发 Hold it / Take that / Objection / Eureka，并播放对应语音。
+Phase 0.71 起，Take that 丢徽章由 Custom Interaction 概率触发，不再放在默认双击随机池里。
 """
 
 from __future__ import annotations
@@ -47,7 +47,8 @@ def main() -> int:
     double_click_pool = action_pools.get("doubleClick.random", {})
     require(double_click_pool, "actionPools 缺少 doubleClick.random")
     double_click_recipe_ids = {entry.get("recipe") for entry in double_click_pool.get("entries", [])}
-    require(set(expected_recipes.keys()) <= double_click_recipe_ids, "doubleClick.random 应包含四种旧版双击语音动作")
+    require({"doubleClick.holdIt", "doubleClick.objection", "doubleClick.eureka"} <= double_click_recipe_ids, "doubleClick.random 应包含默认双击语音动作")
+    require("doubleClick.takeThat" not in double_click_recipe_ids, "Take that 丢徽章应由 Custom Interaction 概率触发")
 
     qrc = read("apps/desktop/resources/pet_assets.qrc")
     for alias in [

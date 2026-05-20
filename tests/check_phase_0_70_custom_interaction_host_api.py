@@ -56,6 +56,7 @@ def main() -> int:
         "emitPool",
         "emitReturnToIdle",
         "spawnProp",
+        "hideCurrentProp",
         "playSound",
         "random()",
         "scheduleAfter",
@@ -85,11 +86,14 @@ def main() -> int:
         "QRandomGenerator",
         "try",
         "catch",
+        "当前 v2 只有一个 PetRuntime 实例",
         "supportedEvents().contains",
         "manifest.customInteractions",
         "manifest.customInteractionConfigs",
     ]:
         require(token in registry_h + registry_cpp, f"Registry 实现缺少：{token}")
+
+    require("manifestConfig(const QString" not in registry_h + registry_cpp, "manifestConfig 应只读取当前 handler 自己的配置")
 
     for token in [
         "ActionRequestKind::SpawnProp",
@@ -120,10 +124,16 @@ def main() -> int:
     for token in [
         "ObserverCustomInteraction",
         "SkipDefaultCustomInteraction",
+        "StatefulCustomInteraction",
+        "ScheduledCustomInteraction",
+        "ThrowingCustomInteraction",
         "CustomInteractionRegistry::registerInteraction",
         "CustomInteractionRegistry::clearForTest",
         "bridge.submitDoubleClick()",
         "runtime.currentActionId() == \"bow\"",
+        "scheduleAfter 回调应回到 Qt 事件循环执行",
+        "抛异常的 CI 不应阻断默认单击行为",
+        "stopPropagation CI 应阻止后续 handler",
     ]:
         require(token in smoke_test, f"Smoke 测试缺少 CI 行为覆盖：{token}")
 

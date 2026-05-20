@@ -3,6 +3,7 @@
 #include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/PetRuntime.h"
 #include "pet/surface/PetSurfaceWindow.h"
+#include "skins/miles-edgeworth/MilesEdgeworthInteractions.h"
 
 #include <QApplication>
 #include <QTimer>
@@ -20,6 +21,7 @@ int main(int argc, char *argv[])
 
     PetRuntime petRuntime;
     CustomInteractionRegistry::registerBuiltins(petRuntime.manifest());
+    registerMilesEdgeworthInteractions(petRuntime.manifest());
     PetRuntimeForeign::s_instance = &petRuntime;
     PetEventBridge petEventBridge(&petRuntime);
     PetEventBridgeForeign::s_instance = &petEventBridge;

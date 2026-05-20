@@ -527,5 +527,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_70_custom_interaction_host_api.py
         )
+
+        # Phase 0.71 的 Miles 示例高级交互检查：检察官徽章只能通过
+        # 皮肤侧 Custom Interaction 接入，不能写回通用运行时或交互管线。
+        add_test(
+            NAME check_phase_0_71_prosecutor_badge_interaction
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_71_prosecutor_badge_interaction.py
+        )
     endif()
 endif()

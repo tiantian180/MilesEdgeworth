@@ -36,6 +36,7 @@ public:
     Q_INVOKABLE void submitIdleLoopFinished();
     Q_INVOKABLE void submitPropClicked();
     Q_INVOKABLE void submitPropExpired();
+    void submitDoubleClickForTest(double randomValue);
     void submitIdleLoopFinishedForTest(double randomValue);
 
 signals:

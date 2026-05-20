@@ -54,6 +54,10 @@ set(DESKTOP_SOURCES
     src/pet/surface/PetSurfaceWindow.h
     src/pet/surface/PropSurfaceWindow.cpp
     src/pet/surface/PropSurfaceWindow.h
+    src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
+    src/skins/miles-edgeworth/MilesEdgeworthInteractions.h
+    src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.cpp
+    src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.h
     resources/pet_assets.qrc
 )
 
@@ -137,6 +141,10 @@ if(BUILD_TESTING)
         src/pet/runtime/RuntimeSnapshot.h
         src/pet/selection/ActionPoolSelector.cpp
         src/pet/selection/ActionPoolSelector.h
+        src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
+        src/skins/miles-edgeworth/MilesEdgeworthInteractions.h
+        src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.cpp
+        src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.h
         resources/pet_assets.qrc
     )
 

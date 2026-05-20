@@ -197,6 +197,9 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
         // 可以在同一个列表里先声明高级交互，再声明普通 action pool 兜底。
         for (const ClickBehaviorEntry &entry : manifest.clickBehaviors.doubleClick) {
             if (entry.when.isEmpty() || entry.when == "default") {
+                if (entry.request.kind == ActionRequestKind::None) {
+                    continue;
+                }
                 appendIfPlayable(requests, entry.request);
                 break;
             }

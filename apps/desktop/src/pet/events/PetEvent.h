@@ -52,6 +52,14 @@ struct PetEvent
         return event;
     }
 
+    static PetEvent pointerDoubleClick(double random)
+    {
+        PetEvent event = pointerDoubleClick();
+        event.randomValue = random;
+        event.hasRandomValue = true;
+        return event;
+    }
+
     static PetEvent pointerDragShake()
     {
         PetEvent event;

@@ -46,6 +46,11 @@ void PetEventBridge::submitDoubleClick()
     submitEvent(PetEvent::pointerDoubleClick());
 }
 
+void PetEventBridge::submitDoubleClickForTest(double randomValue)
+{
+    submitEvent(PetEvent::pointerDoubleClick(randomValue));
+}
+
 void PetEventBridge::submitDragStarted(double globalX)
 {
     if (m_runtime == nullptr) {

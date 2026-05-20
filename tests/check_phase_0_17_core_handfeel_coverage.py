@@ -75,10 +75,16 @@ def main() -> int:
     ], "单击分区顺序应覆盖旧版区域和肚子/腿部子区域")
 
     double_click_recipes = {entry.get("recipe") for entry in action_pools.get("doubleClick.random", {}).get("entries", [])}
-    for recipe_id in ["doubleClick.holdIt", "doubleClick.takeThat", "doubleClick.objection", "doubleClick.eureka"]:
+    for recipe_id in ["doubleClick.holdIt", "doubleClick.objection", "doubleClick.eureka"]:
         recipe = recipes.get(recipe_id, {})
         require(recipe_id in double_click_recipes, f"doubleClick.random 缺少 {recipe_id}")
         require(recipe.get("sounds"), f"{recipe_id} 应声明多语言语音")
+    require("doubleClick.takeThat" not in double_click_recipes, "看招丢徽章应由 Custom Interaction 概率触发")
+    require("prosecutor_badge" in {
+        item.get("id") if isinstance(item, dict) else item
+        for item in manifest.get("customInteractions", [])
+    }, "manifest 应声明检察官徽章 Custom Interaction")
+    require(recipes.get("doubleClick.takeThat", {}).get("sounds"), "Take that recipe 应保留多语言语音定义")
 
     menu_tea_recipes = {entry.get("recipe") for entry in action_pools.get("menu.tea", {}).get("entries", [])}
     require({"tea.once", "teaAlt.once"} <= menu_tea_recipes, "菜单喝茶应随机覆盖旧版两组茶杯动作")

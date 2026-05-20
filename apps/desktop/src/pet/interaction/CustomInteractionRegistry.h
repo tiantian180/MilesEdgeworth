@@ -44,10 +44,11 @@ public:
     void emitReturnToIdle();
     void spawnProp(const QString &propId, const QVariantMap &overrides = {});
     void playSound(const QUrl &url);
+    void hideCurrentProp();
     double random();
     void scheduleAfter(int delayMs, std::function<void()> callback);
     RuntimeSnapshot snapshot() const;
-    QVariantMap manifestConfig(const QString &handlerId) const;
+    QVariantMap manifestConfig() const;
     void setState(const QString &key, const QVariant &value);
     QVariant getState(const QString &key) const;
     bool hasState(const QString &key) const;

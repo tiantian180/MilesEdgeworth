@@ -21,6 +21,20 @@
   "audio": {
     "defaultVoiceLanguage": "jp"
   },
+  "customInteractions": [
+    { "id": "prosecutor_badge" }
+  ],
+  "customInteractionConfig": {
+    "prosecutor_badge": {
+      "takeThatProbability": 0.35,
+      "objectingAction": "objecting",
+      "takeThatSound": "qrc:/audio/takethat0.wav",
+      "badgePropId": "prosecutor_badge",
+      "badgeDelayMs": 700,
+      "clickedRecipe": "bow.once",
+      "expiredRecipe": "pickup.once"
+    }
+  },
   "movementFacingMap": {
     "east": "right",
     "northEast": "right",
@@ -262,6 +276,7 @@
       { "zone": "legs_look_down", "pool": "click.legsLookDownArea" }
     ],
     "doubleClick": [
+      { "when": "default", "customInteraction": "prosecutor_badge" },
       { "when": "default", "pool": "doubleClick.random" }
     ]
   },
@@ -1522,10 +1537,6 @@
           "weight": 1
         },
         {
-          "recipe": "doubleClick.takeThat",
-          "weight": 1
-        },
-        {
           "recipe": "doubleClick.objection",
           "weight": 1
         },
@@ -1540,10 +1551,6 @@
       "entries": [
         {
           "recipe": "doubleClick.holdIt",
-          "weight": 1
-        },
-        {
-          "recipe": "doubleClick.takeThat",
           "weight": 1
         },
         {

@@ -2,6 +2,7 @@
 #include "pet/events/PetEventBridge.h"
 #include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/requests/ActionRequest.h"
+#include "skins/miles-edgeworth/MilesEdgeworthInteractions.h"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -14,6 +15,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 
 namespace {
 
@@ -123,6 +125,97 @@ public:
     }
 };
 
+class StatefulCustomInteraction final : public CustomInteraction
+{
+public:
+    QString id() const override
+    {
+        return QStringLiteral("test.stateful");
+    }
+
+    QSet<PetEventType> supportedEvents() const override
+    {
+        return {PetEventType::PointerDoubleClick};
+    }
+
+    CustomInteractionResult handleEvent(
+        const PetEvent &,
+        const RuntimeSnapshot &,
+        CustomInteractionHostApi &host
+    ) override
+    {
+        const int count = host.getState(QStringLiteral("count")).toInt() + 1;
+        host.setState(QStringLiteral("count"), count);
+        host.emitAction(count == 1 ? QStringLiteral("bow") : QStringLiteral("idle_thinking_once"));
+        host.skipDefault();
+        host.stopPropagation();
+        return {};
+    }
+};
+
+class ScheduledCustomInteraction final : public CustomInteraction
+{
+public:
+    explicit ScheduledCustomInteraction(int *callbackCount)
+        : m_callbackCount(callbackCount)
+    {
+    }
+
+    QString id() const override
+    {
+        return QStringLiteral("test.scheduled");
+    }
+
+    QSet<PetEventType> supportedEvents() const override
+    {
+        return {PetEventType::PointerDoubleClick};
+    }
+
+    CustomInteractionResult handleEvent(
+        const PetEvent &,
+        const RuntimeSnapshot &,
+        CustomInteractionHostApi &host
+    ) override
+    {
+        int *callbackCount = m_callbackCount;
+        host.scheduleAfter(10, [callbackCount]() {
+            if (callbackCount != nullptr) {
+                ++(*callbackCount);
+            }
+        });
+        host.emitAction(QStringLiteral("bow"));
+        host.skipDefault();
+        host.stopPropagation();
+        return {};
+    }
+
+private:
+    int *m_callbackCount = nullptr;
+};
+
+class ThrowingCustomInteraction final : public CustomInteraction
+{
+public:
+    QString id() const override
+    {
+        return QStringLiteral("test.throwing");
+    }
+
+    QSet<PetEventType> supportedEvents() const override
+    {
+        return {PetEventType::PointerSingleClick};
+    }
+
+    CustomInteractionResult handleEvent(
+        const PetEvent &,
+        const RuntimeSnapshot &,
+        CustomInteractionHostApi &
+    ) override
+    {
+        throw std::runtime_error("intentional smoke failure");
+    }
+};
+
 void requireSignedDelta(double value, int expectedSign, const QString &recipeId, const char *axis)
 {
     if (expectedSign > 0 && value > 0) {
@@ -208,6 +301,69 @@ int main(int argc, char *argv[])
     bridge.submitDoubleClick();
     require(runtime.currentActionId() == "bow", "skipDefault CI 应能跳过默认双击并提交自己的动作请求");
     CustomInteractionRegistry::clearForTest();
+    runtime.returnToIdle();
+
+    CustomInteractionRegistry::registerInteraction(std::make_unique<StatefulCustomInteraction>());
+    bridge.submitDoubleClick();
+    require(runtime.currentActionId() == "bow", "CI 第一次事件应能写入 per-handler 状态");
+    bridge.submitDoubleClick();
+    require(runtime.currentActionId() == "idle_thinking_once", "CI 第二次事件应能读到上一次写入的状态");
+    CustomInteractionRegistry::clearForTest();
+    runtime.returnToIdle();
+
+    int scheduledCallbacks = 0;
+    CustomInteractionRegistry::registerInteraction(std::make_unique<ScheduledCustomInteraction>(&scheduledCallbacks));
+    bridge.submitDoubleClick();
+    waitForMilliseconds(30);
+    require(scheduledCallbacks == 1, "CI scheduleAfter 回调应回到 Qt 事件循环执行");
+    CustomInteractionRegistry::clearForTest();
+    runtime.returnToIdle();
+
+    int propagatedEvents = 0;
+    CustomInteractionRegistry::registerInteraction(std::make_unique<SkipDefaultCustomInteraction>());
+    CustomInteractionRegistry::registerInteraction(std::make_unique<ObserverCustomInteraction>(&propagatedEvents));
+    bridge.submitDoubleClick();
+    require(runtime.currentActionId() == "bow", "stopPropagation CI 应提交自己的动作");
+    require(propagatedEvents == 0, "stopPropagation CI 应阻止后续 handler 处理同一事件");
+    CustomInteractionRegistry::clearForTest();
+    runtime.returnToIdle();
+
+    int observerAfterException = 0;
+    CustomInteractionRegistry::registerInteraction(std::make_unique<ThrowingCustomInteraction>());
+    CustomInteractionRegistry::registerInteraction(std::make_unique<ObserverCustomInteraction>(&observerAfterException));
+    runtime.setFacing("right");
+    bridge.submitPrimaryClick(145, 40, 240, 240);
+    require(observerAfterException == 1, "抛异常的 CI 不应阻断后续 handler");
+    require(runtime.currentActionId() == "scared", "抛异常的 CI 不应阻断默认单击行为");
+    CustomInteractionRegistry::clearForTest();
+    runtime.returnToIdle();
+
+    registerMilesEdgeworthInteractions(runtime.manifest());
+    runtime.setFacing("right");
+    bridge.submitDoubleClickForTest(0.0);
+    require(runtime.currentActionId() == "objecting", "确定性随机命中时应由徽章 CI 播放 objecting");
+    require(runtime.currentSoundUrl().toString() == "qrc:/audio/takethat0.wav", "确定性随机命中时应播放看招语音");
+    waitForMilliseconds(750);
+    require(runtime.currentPropId() == "prosecutor_badge", "确定性随机命中后应飞出检察官徽章");
+    bridge.submitPropClicked();
+    require(!runtime.currentPropVisible(), "点击徽章后应隐藏 Prop");
+    require(runtime.currentActionId() == "bow", "点击徽章后应触发鞠躬");
+    runtime.handleAnimationFinished();
+
+    runtime.returnToIdle();
+    bridge.submitDoubleClickForTest(0.0);
+    waitForMilliseconds(750);
+    require(runtime.currentPropId() == "prosecutor_badge", "第二次确定性随机命中后仍应飞出检察官徽章");
+    bridge.submitPropExpired();
+    require(!runtime.currentPropVisible(), "徽章自然消失后应隐藏 Prop");
+    require(runtime.currentActionId() == "pickup_badge", "徽章自然消失后应触发捡徽章");
+    runtime.handleAnimationFinished();
+
+    runtime.returnToIdle();
+    bridge.submitDoubleClickForTest(0.99);
+    waitForMilliseconds(750);
+    require(!runtime.currentPropVisible(), "确定性随机落空时不应飞出检察官徽章");
+    require(runtime.currentRecipeId() != "doubleClick.takeThat", "确定性随机落空时应回落到默认双击池");
     runtime.returnToIdle();
 
     require(runtime.petSizeId() == "medium", "默认尺寸档位应为中");

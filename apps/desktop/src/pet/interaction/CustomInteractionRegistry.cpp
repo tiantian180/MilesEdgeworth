@@ -9,6 +9,9 @@
 #include <vector>
 
 namespace {
+// 当前 v2 只有一个 PetRuntime 实例，因此 CI 注册表和 handler 状态先放在进程级容器中。
+// 如果后续支持多只桌宠或多皮肤并存，这里需要下沉到每个 Runtime / SkinSession 持有，
+// 否则不同实例会共享 handler 列表和 per-handler 内存状态。
 std::vector<std::unique_ptr<CustomInteraction>> &registeredInteractions()
 {
     static std::vector<std::unique_ptr<CustomInteraction>> interactions;
@@ -117,6 +120,11 @@ void CustomInteractionHostApi::playSound(const QUrl &url)
     m_result.requests.append(ActionRequest::playSound(url));
 }
 
+void CustomInteractionHostApi::hideCurrentProp()
+{
+    m_result.requests.append(ActionRequest::none().withHiddenCurrentProp());
+}
+
 double CustomInteractionHostApi::random()
 {
     if (m_event.hasRandomValue) {
@@ -140,10 +148,9 @@ RuntimeSnapshot CustomInteractionHostApi::snapshot() const
     return m_snapshot;
 }
 
-QVariantMap CustomInteractionHostApi::manifestConfig(const QString &handlerId) const
+QVariantMap CustomInteractionHostApi::manifestConfig() const
 {
-    const QString normalizedId = handlerId.trimmed().isEmpty() ? m_handlerId : handlerId.trimmed();
-    return m_manifest.customInteractionConfigs.value(normalizedId);
+    return m_manifest.customInteractionConfigs.value(m_handlerId);
 }
 
 void CustomInteractionHostApi::setState(const QString &key, const QVariant &value)

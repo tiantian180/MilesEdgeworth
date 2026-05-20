@@ -30,7 +30,8 @@ def main() -> int:
     zh_pool = action_pools.get("doubleClick.random.zh", {})
     require(zh_pool, "中文语音应有 doubleClick.random.zh 候选池")
     zh_recipes = {entry.get("recipe") for entry in zh_pool.get("entries", [])}
-    require({"doubleClick.holdIt", "doubleClick.takeThat", "doubleClick.objection"} <= zh_recipes, "中文双击池应保留前三类旧版动作")
+    require({"doubleClick.holdIt", "doubleClick.objection"} <= zh_recipes, "中文双击池应保留普通双击语音动作")
+    require("doubleClick.takeThat" not in zh_recipes, "中文双击池不应直接包含看招丢徽章")
     require("doubleClick.eureka" not in zh_recipes, "中文双击池不应包含 Eureka")
 
     pool_selector_h = read("apps/desktop/src/pet/selection/ActionPoolSelector.h")
