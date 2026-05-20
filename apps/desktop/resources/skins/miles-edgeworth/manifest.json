@@ -19,7 +19,12 @@
     { "id": "big", "label": "大", "scale": 3.0 }
   ],
   "audio": {
-    "defaultVoiceLanguage": "jp"
+    "defaultVoiceLanguage": "jp",
+    "voiceLanguages": [
+      { "id": "jp", "label": "日语" },
+      { "id": "en", "label": "英语" },
+      { "id": "zh", "label": "中文" }
+    ]
   },
   "customInteractions": [
     { "id": "prosecutor_badge" }

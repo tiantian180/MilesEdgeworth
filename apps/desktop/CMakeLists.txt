@@ -25,6 +25,8 @@ set(DESKTOP_SOURCES
     src/pet/commands/SkinCommand.h
     src/pet/commands/SkinCommandResolver.cpp
     src/pet/commands/SkinCommandResolver.h
+    src/pet/effects/AudioController.cpp
+    src/pet/effects/AudioController.h
     src/pet/effects/PropController.cpp
     src/pet/effects/PropController.h
     src/pet/effects/PropState.h
@@ -118,6 +120,8 @@ if(BUILD_TESTING)
         src/pet/commands/SkinCommand.h
         src/pet/commands/SkinCommandResolver.cpp
         src/pet/commands/SkinCommandResolver.h
+        src/pet/effects/AudioController.cpp
+        src/pet/effects/AudioController.h
         src/pet/effects/PropController.cpp
         src/pet/effects/PropController.h
         src/pet/effects/PropState.h

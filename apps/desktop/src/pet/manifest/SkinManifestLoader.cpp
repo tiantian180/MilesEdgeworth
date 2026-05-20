@@ -113,6 +113,24 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
 
     const QJsonObject audio = root.value("audio").toObject();
     manifest.audio.defaultVoiceLanguage = audio.value("defaultVoiceLanguage").toString();
+    const QJsonArray voiceLanguages = audio.value("voiceLanguages").toArray();
+    for (const QJsonValue &languageValue : voiceLanguages) {
+        AudioLanguageDefinition language;
+        if (languageValue.isObject()) {
+            const QJsonObject languageObject = languageValue.toObject();
+            language.id = languageObject.value("id").toString().trimmed();
+            language.label = languageObject.value("label").toString().trimmed();
+        } else if (languageValue.isString()) {
+            language.id = languageValue.toString().trimmed();
+        }
+
+        if (!language.id.isEmpty()) {
+            if (language.label.isEmpty()) {
+                language.label = language.id;
+            }
+            manifest.audio.voiceLanguages.append(language);
+        }
+    }
 
     const QJsonObject capabilities = root.value("capabilities").toObject();
     const QJsonObject rest = capabilities.value("rest").toObject();
@@ -530,6 +548,7 @@ SkinManifest SkinManifestLoader::fallbackManifest()
     manifest.canvas.idleLoopActionId = kFallbackActionId;
     manifest.defaultSizeId = "medium";
     manifest.audio.defaultVoiceLanguage = "jp";
+    manifest.audio.voiceLanguages.append(AudioLanguageDefinition {"jp", QStringLiteral("日语")});
     manifest.sizes.append(PetSizeDefinition {"medium", QStringLiteral("中"), 2.0});
     manifest.facings = {"right", "left"};
     manifest.movementDirections = {"east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"};

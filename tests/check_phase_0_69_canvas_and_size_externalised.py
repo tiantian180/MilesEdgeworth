@@ -49,7 +49,7 @@ def main() -> int:
     require(manifest.get("defaultSize") == "medium", "manifest.defaultSize 应声明默认尺寸档位")
 
     audio = manifest.get("audio", {})
-    require(audio.get("defaultVoiceLanguage") == "jp", "manifest.audio.defaultVoiceLanguage 应声明临时默认语音语言")
+    require(audio.get("defaultVoiceLanguage") == "jp", "manifest.audio.defaultVoiceLanguage 应声明默认语音语言")
 
     for token in [
         "CanvasDefinition",
@@ -91,7 +91,7 @@ def main() -> int:
     ]:
         require(token not in runtime_h + runtime_cpp, f"PetRuntime 不应继续硬编码：{token}")
 
-    require("voiceLanguage" not in snapshot_h, "RuntimeSnapshot 不应保留临时 voiceLanguage 字段")
+    require("voiceLanguage" not in snapshot_h, "RuntimeSnapshot 不应保留旧的 voiceLanguage 字段")
     require("manifest.canvas.windowSize * m_petScale" in runtime_h, "petWindowSize 应读取 manifest.canvas.windowSize")
     require("manifest.canvas.imageSize * m_petScale" in runtime_h, "petImageSize 应读取 manifest.canvas.imageSize")
     require("availablePetSizes" in runtime_h + runtime_cpp, "PetRuntime 应向原生菜单暴露 manifest sizes")

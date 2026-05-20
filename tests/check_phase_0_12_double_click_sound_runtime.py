@@ -69,19 +69,26 @@ def main() -> int:
         "soundPlaybackSerial() const",
         "currentSoundUrlChanged",
         "soundPlaybackSerialChanged",
-        "soundUrl",
-        "playSoundForRecipe",
+        "m_audioController",
     ]:
         require(token in pet_runtime_h, f"PetRuntime.h 缺少 {token}")
 
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    audio_controller_h = read("apps/desktop/src/pet/effects/AudioController.h")
+    audio_controller_cpp = read("apps/desktop/src/pet/effects/AudioController.cpp")
     pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     for token in [
         "playSoundForRecipe",
-        "m_currentSoundUrl",
-        "m_soundPlaybackSerial",
     ]:
         require(token in pet_runtime_cpp, f"PetRuntime.cpp 缺少 {token}")
+    for token in [
+        "currentSoundUrl",
+        "playbackSerial",
+        "soundUrlForRecipe",
+        "playSoundForRecipe",
+        "playSound",
+    ]:
+        require(token in audio_controller_h + audio_controller_cpp, f"AudioController 缺少 {token}")
     require("manifest.clickBehaviors.doubleClick" in pipeline_cpp, "双击事件应由 InteractionPipeline 读取 manifest 默认请求")
     require('"doubleClick.random"' not in pipeline_cpp, "双击默认池不应硬编码在 InteractionPipeline")
 

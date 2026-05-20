@@ -25,6 +25,8 @@ PetRuntime::PetRuntime(QObject *parent)
         m_manifest = SkinManifestLoader::fallbackManifest();
     }
 
+    m_audioController.setAudioDefinition(m_manifest.audio);
+
     m_currentFacing = m_manifest.defaultFacing;
     if (!m_manifest.movementDirections.isEmpty()) {
         m_currentMovementDirection = m_manifest.movementDirections.constFirst();
@@ -192,7 +194,7 @@ void PetRuntime::playRecipe(const QString &recipeId)
 
 void PetRuntime::playActionFromPool(const QString &poolId)
 {
-    const QString normalizedPoolId = ActionPoolSelector::resolvePoolId(m_manifest.actionPools, poolId, m_manifest.audio.defaultVoiceLanguage);
+    const QString normalizedPoolId = ActionPoolSelector::resolvePoolId(m_manifest.actionPools, poolId, m_audioController.currentLanguageId());
     if (!m_manifest.actionPools.contains(normalizedPoolId)) {
         return;
     }
@@ -236,43 +238,30 @@ void PetRuntime::submitActionRequest(const ActionRequest &request)
         m_propController.spawnFromRequest(m_manifest, request.targetId, m_currentFacing, m_petScale, request.options);
         return;
     case ActionRequestKind::PlaySound:
-        if (!m_audioMuted && !request.targetId.isEmpty()) {
-            m_currentSoundUrl = QUrl(request.targetId);
-            ++m_soundPlaybackSerial;
-            emit currentSoundUrlChanged();
+    {
+        bool soundChanged = false;
+        if (m_audioController.playSound(QUrl(request.targetId), &soundChanged)) {
+            if (soundChanged) {
+                emit currentSoundUrlChanged();
+            }
             emit soundPlaybackSerialChanged();
         }
         return;
     }
-}
-
-QVariantMap PetRuntime::consumeFrameMovementDelta() const
-{
-    QVariantMap delta;
-    delta.insert("dx", 0.0);
-    delta.insert("dy", 0.0);
-
-    if (!m_autoMovementEnabled) {
-        return delta;
     }
-
-    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
-    if (action.movementDeltas.isEmpty()) {
-        return delta;
-    }
-
-    const QString movementKey = (action.category == "locomotion") ? m_currentMovementDirection : m_currentFacing;
-    const QPointF movementDelta = action.movementDeltas.value(movementKey, QPointF(0, 0));
-    const QPointF scaledMovementDelta = movementDelta * movementScaleFactor();
-    delta.insert("dx", scaledMovementDelta.x());
-    delta.insert("dy", scaledMovementDelta.y());
-    return delta;
 }
 
 void PetRuntime::toggleAudioMuted()
 {
-    m_audioMuted = !m_audioMuted;
+    m_audioController.toggleMuted();
     emit audioMutedChanged();
+}
+
+void PetRuntime::setAudioLanguage(const QString &languageId)
+{
+    if (m_audioController.setLanguage(languageId)) {
+        emit currentAudioLanguageChanged();
+    }
 }
 
 void PetRuntime::toggleAutoMovementEnabled()
@@ -312,6 +301,29 @@ void PetRuntime::setPetSize(const QString &sizeId)
 void PetRuntime::startStartupSequence()
 {
     submitRuntimeEvent(PetEvent::runtimeStarted());
+}
+
+QVariantMap PetRuntime::consumeFrameMovementDelta() const
+{
+    QVariantMap delta;
+    delta.insert("dx", 0.0);
+    delta.insert("dy", 0.0);
+
+    if (!m_autoMovementEnabled) {
+        return delta;
+    }
+
+    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
+    if (action.movementDeltas.isEmpty()) {
+        return delta;
+    }
+
+    const QString movementKey = (action.category == "locomotion") ? m_currentMovementDirection : m_currentFacing;
+    const QPointF movementDelta = action.movementDeltas.value(movementKey, QPointF(0, 0));
+    const QPointF scaledMovementDelta = movementDelta * movementScaleFactor();
+    delta.insert("dx", scaledMovementDelta.x());
+    delta.insert("dy", scaledMovementDelta.y());
+    return delta;
 }
 
 void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
@@ -411,20 +423,6 @@ QUrl PetRuntime::variantForAction(const ActionDefinition &action) const
     return variantForFacing(action.variants, m_currentFacing);
 }
 
-QUrl PetRuntime::soundUrlForRecipe(const RecipeDefinition &recipe) const
-{
-    const QString defaultLanguage = m_manifest.audio.defaultVoiceLanguage;
-    if (!defaultLanguage.isEmpty() && recipe.soundUrls.contains(defaultLanguage)) {
-        return recipe.soundUrls.value(defaultLanguage);
-    }
-
-    if (!recipe.soundUrls.isEmpty()) {
-        return recipe.soundUrls.constBegin().value();
-    }
-
-    return recipe.soundUrl;
-}
-
 bool PetRuntime::acceptsPointerInteraction() const
 {
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
@@ -433,19 +431,10 @@ bool PetRuntime::acceptsPointerInteraction() const
 
 void PetRuntime::playSoundForRecipe(const RecipeDefinition &recipe)
 {
-    if (m_audioMuted) {
+    bool soundChanged = false;
+    if (!m_audioController.playSoundForRecipe(recipe, &soundChanged)) {
         return;
     }
-
-    const QUrl nextSoundUrl = soundUrlForRecipe(recipe);
-    if (nextSoundUrl.isEmpty()) {
-        return;
-    }
-
-    const bool soundChanged = (m_currentSoundUrl != nextSoundUrl);
-    m_currentSoundUrl = nextSoundUrl;
-    ++m_soundPlaybackSerial;
-
     if (soundChanged) {
         emit currentSoundUrlChanged();
     }

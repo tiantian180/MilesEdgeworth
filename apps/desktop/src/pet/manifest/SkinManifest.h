@@ -159,9 +159,16 @@ struct PetSizeDefinition
     double scale = 1.0;
 };
 
+struct AudioLanguageDefinition
+{
+    QString id;
+    QString label;
+};
+
 struct AudioDefinition
 {
     QString defaultVoiceLanguage;
+    QList<AudioLanguageDefinition> voiceLanguages;
 };
 
 struct HitZoneDefinition

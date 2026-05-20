@@ -535,5 +535,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_71_prosecutor_badge_interaction.py
         )
+
+        # Phase 0.72 的 Audio Capability 检查：语音语言由皮肤 manifest
+        # 可选声明，菜单动态生成，通用 Runtime 不写死 jp/en/zh。
+        add_test(
+            NAME check_phase_0_72_audio_capability
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_72_audio_capability.py
+        )
     endif()
 endif()

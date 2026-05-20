@@ -1,4 +1,5 @@
 #include "pet/PetRuntime.h"
+#include "pet/effects/AudioController.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/requests/ActionRequest.h"
@@ -263,6 +264,16 @@ void waitForMilliseconds(int milliseconds)
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
+
+    AudioDefinition defaultOnlyAudio;
+    defaultOnlyAudio.defaultVoiceLanguage = "jp";
+    AudioController defaultOnlyAudioController;
+    defaultOnlyAudioController.setAudioDefinition(defaultOnlyAudio);
+    RecipeDefinition defaultOnlyRecipe;
+    defaultOnlyRecipe.soundUrls.insert("jp", QUrl("qrc:/audio/holdit0.wav"));
+    require(defaultOnlyAudioController.availableLanguages().isEmpty(), "未声明 voiceLanguages 时不应生成语言菜单数据");
+    require(defaultOnlyAudioController.currentLanguageId() == "jp", "只声明 defaultVoiceLanguage 时仍应按默认语言选择声音");
+    require(defaultOnlyAudioController.soundUrlForRecipe(defaultOnlyRecipe).toString() == "qrc:/audio/holdit0.wav", "默认语言应能选择对应 soundUrls");
 
     PetRuntime runtime;
     PetEventBridge bridge(&runtime);
@@ -577,6 +588,17 @@ int main(int argc, char *argv[])
     bridge.submitMenuCommand("runtime.facing.toggle");
     require(runtime.currentFacing() != facingBeforeToggle, "切换朝向菜单事件应通过 ActionRequest 切换 facing");
 
+    require(runtime.currentAudioLanguageId() == "jp", "默认语音语言应来自 manifest.audio.defaultVoiceLanguage");
+    require(runtime.availableAudioLanguages().size() == 3, "Miles 应暴露三种可选语音语言");
+    runtime.setAudioLanguage("zh");
+    runtime.playRecipe("doubleClick.holdIt");
+    require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit2.wav", "中文语音应选择 holdit2");
+
+    runtime.setAudioLanguage("en");
+    runtime.playRecipe("doubleClick.holdIt");
+    require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit1.wav", "英语语音应选择 holdit1");
+
+    runtime.setAudioLanguage("jp");
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit0.wav", "Hold it 应播放默认语音");

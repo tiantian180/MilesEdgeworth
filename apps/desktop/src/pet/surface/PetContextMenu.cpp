@@ -83,6 +83,31 @@ void PetContextMenu::show(
     muteAction->setChecked(runtime->audioMuted());
     QObject::connect(muteAction, &QAction::triggered, runtime, &PetRuntime::toggleAudioMuted);
 
+    const QVariantList audioLanguages = runtime->availableAudioLanguages();
+    if (!audioLanguages.isEmpty()) {
+        QMenu *audioMenu = menu.addMenu(QStringLiteral("语音"));
+        auto *audioGroup = new QActionGroup(audioMenu);
+        audioGroup->setExclusive(true);
+        for (const QVariant &languageValue : audioLanguages) {
+            const QVariantMap language = languageValue.toMap();
+            const QString languageId = language.value(QStringLiteral("id")).toString();
+            const QString label = language.value(QStringLiteral("label")).toString();
+            if (languageId.isEmpty()) {
+                continue;
+            }
+
+            QAction *languageAction = addCheckedAction(
+                audioMenu,
+                audioGroup,
+                label.isEmpty() ? languageId : label,
+                runtime->currentAudioLanguageId() == languageId
+            );
+            QObject::connect(languageAction, &QAction::triggered, runtime, [runtime, languageId]() {
+                runtime->setAudioLanguage(languageId);
+            });
+        }
+    }
+
     const QVariantList skinCommands = eventBridge->enabledSkinCommands();
     if (!skinCommands.isEmpty()) {
         menu.addSeparator();

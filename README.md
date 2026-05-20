@@ -79,6 +79,7 @@ Phase 0 已完成最小桌面壳层验证：
 - 右键菜单已移除开发测试入口；Miles 红茶从皮肤定制命令进入，睡觉/唤醒继续作为通用 sleep/rest 能力保留。
 - `PetRuntime` 已开始拆分：manifest 数据结构、JSON 加载、候选池选择、behavior trigger 选择、单击 hit zone 命中逻辑、皮肤命令解析、Prop 状态管理，以及 QML 事件到 ActionRequest 的主干已移出单体运行时。
 - Custom Interaction Host API 已接入，Miles 旧版双击概率“看招”丢检察官徽章已作为皮肤侧高级交互回归。
+- 语音语言已改为可选 Audio Capability，Miles 皮肤通过 manifest 声明日语、英语、中文，右键菜单按声明动态生成语音子菜单。
 - 透明窗口留白已接入基于动画首帧 alpha 的输入 mask，减少方形透明区域拦截鼠标的问题。
 
 当前仍是技术验证，不是完整可发布的 v2 AI 桌宠。后续会继续实现 Pet Runtime、聊天窗口、设置中心、模型 Provider、皮肤 manifest 和 Agent Runtime。

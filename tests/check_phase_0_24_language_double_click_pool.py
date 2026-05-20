@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """检查双击语音动作保留语言覆盖池配置。
 
-Phase 0.69 移除了 Runtime 里的临时 voiceLanguage 状态。语言菜单和动态语言
-切换会在 Audio Capability 阶段回归；这里先守住 manifest 数据和 selector 能力。
+Phase 0.72 已将语言切换恢复为可选 Audio Capability。这里守住 manifest
+数据、selector 语言覆盖池，以及 Runtime 不再暴露旧的 setVoiceLanguage 入口。
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def main() -> int:
     require('"doubleClick.random"' not in interaction_pipeline_cpp, "双击随机池不应硬编码在 InteractionPipeline.cpp")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
-    require("setVoiceLanguage" not in pet_runtime_h, "语言切换入口应等 Audio Capability 阶段回归")
+    require("setVoiceLanguage" not in pet_runtime_h, "Runtime 不应暴露旧的 setVoiceLanguage 入口")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_24_language_double_click_pool" in root_cmake, "CTest 未注册 Phase 0.24 检查")

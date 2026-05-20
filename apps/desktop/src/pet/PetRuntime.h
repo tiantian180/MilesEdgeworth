@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pet/manifest/SkinManifest.h"
+#include "pet/effects/AudioController.h"
 #include "pet/effects/PropController.h"
 #include "pet/events/PetEvent.h"
 #include "pet/requests/ActionRequest.h"
@@ -42,6 +43,8 @@ class PetRuntime : public QObject
     Q_PROPERTY(QString currentLoopMode READ currentLoopMode NOTIFY currentLoopModeChanged)
     Q_PROPERTY(bool currentAutoReturnToIdle READ currentAutoReturnToIdle NOTIFY currentAutoReturnToIdleChanged)
     Q_PROPERTY(bool audioMuted READ audioMuted NOTIFY audioMutedChanged)
+    Q_PROPERTY(QString currentAudioLanguageId READ currentAudioLanguageId NOTIFY currentAudioLanguageChanged)
+    Q_PROPERTY(QVariantList availableAudioLanguages READ availableAudioLanguages CONSTANT)
     Q_PROPERTY(bool autoMovementEnabled READ autoMovementEnabled NOTIFY autoMovementEnabledChanged)
     Q_PROPERTY(QString petSizeId READ petSizeId NOTIFY petScaleChanged)
     Q_PROPERTY(QVariantList availablePetSizes READ availablePetSizes CONSTANT)
@@ -80,7 +83,9 @@ public:
     QString currentMovementDirection() const { return m_currentMovementDirection; }
     QString currentLoopMode() const { return m_currentLoopMode; }
     bool currentAutoReturnToIdle() const { return m_currentAutoReturnToIdle; }
-    bool audioMuted() const { return m_audioMuted; }
+    bool audioMuted() const { return m_audioController.muted(); }
+    QString currentAudioLanguageId() const { return m_audioController.currentLanguageId(); }
+    QVariantList availableAudioLanguages() const { return m_audioController.availableLanguages(); }
     bool autoMovementEnabled() const { return m_autoMovementEnabled; }
     QString petSizeId() const { return m_petSizeId; }
     QVariantList availablePetSizes() const;
@@ -93,7 +98,7 @@ public:
     bool sleeping() const;
     bool sleepTransitioning() const;
     QUrl currentAnimationUrl() const { return m_currentAnimationUrl; }
-    QUrl currentSoundUrl() const { return m_currentSoundUrl; }
+    QUrl currentSoundUrl() const { return m_audioController.currentSoundUrl(); }
     bool currentPropVisible() const { return m_propController.current().visible; }
     QString currentPropId() const { return m_propController.current().id; }
     QUrl currentPropImageUrl() const { return m_propController.current().imageUrl; }
@@ -108,7 +113,7 @@ public:
     int currentPropDurationMs() const { return m_propController.current().durationMs; }
     int currentPropPlaybackSerial() const { return m_propController.playbackSerial(); }
     int playbackSerial() const { return m_playbackSerial; }
-    int soundPlaybackSerial() const { return m_soundPlaybackSerial; }
+    int soundPlaybackSerial() const { return m_audioController.playbackSerial(); }
     const SkinManifest &manifest() const { return m_manifest; }
     RuntimeSnapshot snapshot() const;
 
@@ -121,6 +126,7 @@ public:
     Q_INVOKABLE void playActionFromPool(const QString &poolId);
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void toggleAudioMuted();
+    Q_INVOKABLE void setAudioLanguage(const QString &languageId);
     Q_INVOKABLE void toggleAutoMovementEnabled();
     Q_INVOKABLE void setPetSize(const QString &sizeId);
     Q_INVOKABLE void startStartupSequence();
@@ -138,6 +144,7 @@ signals:
     void currentLoopModeChanged();
     void currentAutoReturnToIdleChanged();
     void audioMutedChanged();
+    void currentAudioLanguageChanged();
     void autoMovementEnabledChanged();
     void petScaleChanged();
     void pointerInteractionEnabledChanged();
@@ -153,7 +160,6 @@ private:
     QString actionForState(const QString &state) const;
     QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
     QUrl variantForAction(const ActionDefinition &action) const;
-    QUrl soundUrlForRecipe(const RecipeDefinition &recipe) const;
     bool acceptsPointerInteraction() const;
     void playSoundForRecipe(const RecipeDefinition &recipe);
     void hideCurrentProp();
@@ -181,15 +187,13 @@ private:
     QString m_currentMovementDirection;
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
-    bool m_audioMuted = false;
+    AudioController m_audioController;
     bool m_autoMovementEnabled = true;
     QString m_petSizeId;
     double m_petScale = 2.0;
     QUrl m_currentAnimationUrl;
-    QUrl m_currentSoundUrl;
     PropController m_propController;
     int m_playbackSerial = 0;
-    int m_soundPlaybackSerial = 0;
 };
 
 // 与 DesktopShellControllerForeign 一样，这个 wrapper 让 QML 看到一个名为
