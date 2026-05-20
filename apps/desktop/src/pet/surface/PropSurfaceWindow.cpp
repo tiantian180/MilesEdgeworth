@@ -1,10 +1,15 @@
 #include "pet/surface/PropSurfaceWindow.h"
 
+#ifdef Q_OS_MACOS
+#include "platform/MacPetWindowBehavior.h"
+#endif
+
 #include <QImage>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QRect>
 #include <QRegion>
+#include <QWindow>
 #include <QtGlobal>
 
 namespace {
@@ -16,11 +21,17 @@ PropSurfaceWindow::PropSurfaceWindow(QWidget *parent)
 {
     setAttribute(Qt::WA_TranslucentBackground, true);
     setAttribute(Qt::WA_NoSystemBackground, true);
+    setAttribute(Qt::WA_ShowWithoutActivating, true);
     setWindowFlags(Qt::FramelessWindowHint
         | Qt::NoDropShadowWindowHint
-        | Qt::Tool
-        | Qt::WindowStaysOnTopHint);
+        | Qt::Tool);
     setCursor(Qt::PointingHandCursor);
+}
+
+void PropSurfaceWindow::setAlwaysOnTop(bool alwaysOnTop)
+{
+    m_alwaysOnTop = alwaysOnTop;
+    applyPlatformWindowBehavior();
 }
 
 void PropSurfaceWindow::showPixmap(
@@ -35,6 +46,7 @@ void PropSurfaceWindow::showPixmap(
     setFixedSize(windowSize);
     move(globalPosition);
     applyPixmapMask();
+    applyPlatformWindowBehavior();
     show();
     raise();
     update();
@@ -69,6 +81,30 @@ void PropSurfaceWindow::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
     QWidget::mouseReleaseEvent(event);
+}
+
+void PropSurfaceWindow::applyPlatformWindowBehavior()
+{
+#ifdef Q_OS_MACOS
+    // QWidget 只有拿到 native handle 后，AppKit 层才能找到 NSWindow。
+    // Prop 是桌宠的临时视觉对象，窗口策略必须跟桌宠本体一致：
+    // 应用失焦不隐藏，且“始终置顶”开关改变时同步调整层级。
+    winId();
+    QWindow *window = windowHandle();
+    if (window == nullptr) {
+        return;
+    }
+
+    applyMacPetWindowBaseBehavior(window);
+    setMacPetWindowAlwaysOnTop(window, m_alwaysOnTop);
+#else
+    const bool wasVisible = isVisible();
+    setWindowFlag(Qt::WindowStaysOnTopHint, m_alwaysOnTop);
+    if (wasVisible) {
+        show();
+        raise();
+    }
+#endif
 }
 
 void PropSurfaceWindow::applyPixmapMask()

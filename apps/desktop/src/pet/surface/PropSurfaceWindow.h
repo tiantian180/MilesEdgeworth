@@ -15,6 +15,7 @@ class PropSurfaceWindow final : public QWidget
 public:
     explicit PropSurfaceWindow(QWidget *parent = nullptr);
 
+    void setAlwaysOnTop(bool alwaysOnTop);
     void showPixmap(
         const QString &path,
         const QSize &windowSize,
@@ -28,9 +29,11 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
+    void applyPlatformWindowBehavior();
     void applyPixmapMask();
 
     QPixmap m_pixmap;
     QSize m_visualSize;
+    bool m_alwaysOnTop = true;
     std::function<void()> m_clickedCallback;
 };

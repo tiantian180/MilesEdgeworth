@@ -83,6 +83,7 @@ PetSurfaceWindow::PetSurfaceWindow(
         hidePropWindow();
         m_eventBridge->submitPropClicked();
     });
+    m_propWindow->setAlwaysOnTop(m_shellController->alwaysOnTop());
 
     connect(m_movie, &QMovie::frameChanged, this, &PetSurfaceWindow::handleMovieFrameChanged);
     connect(m_runtime, &PetRuntime::petScaleChanged, this, &PetSurfaceWindow::syncSizeFromRuntime);
@@ -96,6 +97,9 @@ PetSurfaceWindow::PetSurfaceWindow(
         if (!m_runtime->currentPropVisible()) {
             hidePropWindow();
         }
+    });
+    connect(m_shellController, &DesktopShellController::alwaysOnTopChanged, this, [this]() {
+        m_propWindow->setAlwaysOnTop(m_shellController->alwaysOnTop());
     });
 
     syncSizeFromRuntime();

@@ -551,5 +551,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_73_expression_mapping.py
         )
+
+        # Phase 1.1 的 Prop 窗口行为检查：检察官徽章等临时对象应复用
+        # 桌宠窗口的失焦不隐藏、置顶可切换策略，而不是退回普通 Tool 窗口。
+        add_test(
+            NAME check_phase_1_1_prop_surface_window_behavior
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_1_prop_surface_window_behavior.py
+        )
     endif()
 endif()
