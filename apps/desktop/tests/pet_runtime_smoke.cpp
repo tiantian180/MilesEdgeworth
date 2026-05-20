@@ -377,6 +377,15 @@ int main(int argc, char *argv[])
     require(runtime.currentRecipeId() != "doubleClick.takeThat", "确定性随机落空时应回落到默认双击池");
     runtime.returnToIdle();
 
+    runtime.setAudioLanguage("zh");
+    bridge.submitDoubleClickForTest(0.0);
+    require(runtime.currentSoundUrl().toString() == "qrc:/audio/takethat2.wav", "徽章 CI 应沿用当前语音语言选择看招音频");
+    waitForMilliseconds(750);
+    bridge.submitPropExpired();
+    runtime.handleAnimationFinished();
+    runtime.setAudioLanguage("jp");
+    runtime.returnToIdle();
+
     require(runtime.petSizeId() == "medium", "默认尺寸档位应为中");
     requireNear(runtime.petScale(), 2.0, "默认 scale 应对应旧版中号 scale=2");
     requireNear(runtime.petWindowSize(), 240.0, "默认窗口尺寸应对应旧版中号 scale=2");
@@ -605,6 +614,9 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
     runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
     require(runtime.currentActionId() == "idle_stand", "未知 expression 应降级到 neutral 映射");
+    runtime.playAction("bow");
+    runtime.submitExpressionRequest("unknown-state", "neutral", 0.0);
+    require(runtime.currentActionId() == "idle_stand", "未知 expression state 应回退到当前 PetState");
 
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");

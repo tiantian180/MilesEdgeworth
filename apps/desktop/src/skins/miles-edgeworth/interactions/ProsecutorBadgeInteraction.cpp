@@ -1,6 +1,5 @@
 #include "skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.h"
 
-#include <QUrl>
 #include <QVariantMap>
 
 namespace {
@@ -9,13 +8,6 @@ constexpr auto kInteractionId = "prosecutor_badge";
 QString configString(const QVariantMap &config, const QString &key)
 {
     return config.value(key).toString().trimmed();
-}
-
-int configInt(const QVariantMap &config, const QString &key, int fallback)
-{
-    bool ok = false;
-    const int value = config.value(key).toInt(&ok);
-    return ok ? value : fallback;
 }
 
 double configDouble(const QVariantMap &config, const QString &key, double fallback)
@@ -64,20 +56,14 @@ CustomInteractionOutcome ProsecutorBadgeInteraction::handleEvent(
             return {};
         }
 
-        const QString objectingAction = configString(config, QStringLiteral("objectingAction"));
-        const QString soundUrl = configString(config, QStringLiteral("takeThatSound"));
-        const int badgeDelayMs = configInt(config, QStringLiteral("badgeDelayMs"), 0);
-
-        if (!objectingAction.isEmpty()) {
-            host.emitAction(objectingAction);
-        }
-        if (!soundUrl.isEmpty()) {
-            host.playSound(QUrl(soundUrl));
+        const QString takeThatRecipe = configString(config, QStringLiteral("takeThatRecipe"));
+        if (takeThatRecipe.isEmpty()) {
+            return {};
         }
 
-        QVariantMap overrides;
-        overrides.insert(QStringLiteral("delayMs"), badgeDelayMs);
-        host.spawnProp(badgePropId, overrides);
+        // 看招本身仍由 manifest recipe 描述。这样动作、语音语言和 Prop 延迟
+        // 都复用通用播放链路，CI 只负责概率分支和是否接管双击事件。
+        host.emitRecipe(takeThatRecipe);
         host.skipDefault();
         host.stopPropagation();
         return {};

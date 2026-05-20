@@ -113,6 +113,8 @@ def main() -> int:
         'runtime.currentActionId() == "bow"',
         'runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0)',
         'runtime.currentActionId() == "idle_stand"',
+        'runtime.submitExpressionRequest("unknown-state", "neutral", 0.0)',
+        '未知 expression state 应回退到当前 PetState',
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少 expression 回归：{token}")
 

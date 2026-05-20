@@ -311,14 +311,18 @@ void PetRuntime::requestExpression(const QString &state, const QString &expressi
 void PetRuntime::submitExpressionRequest(const QString &state, const QString &expression, double randomValue)
 {
     const QString requestedState = state.trimmed();
+    QString eventState = m_currentState;
     if (!requestedState.isEmpty() && m_manifest.stateToAction.contains(requestedState) && requestedState != m_currentState) {
         // expression 请求来自未来的聊天 / agent 层。这里先更新 PetState，
         // 再把“表达选择”交给 InteractionPipeline 转成 ActionRequest。
         m_currentState = requestedState;
+        eventState = requestedState;
         emit currentStateChanged();
+    } else if (!requestedState.isEmpty() && m_manifest.stateToAction.contains(requestedState)) {
+        eventState = requestedState;
     }
 
-    submitRuntimeEvent(PetEvent::agentExpressionRequested(requestedState, expression, randomValue));
+    submitRuntimeEvent(PetEvent::agentExpressionRequested(eventState, expression, randomValue));
 }
 
 QVariantMap PetRuntime::consumeFrameMovementDelta() const

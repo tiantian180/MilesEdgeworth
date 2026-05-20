@@ -78,10 +78,8 @@
   "customInteractionConfig": {
     "prosecutor_badge": {
       "takeThatProbability": 0.35,
-      "objectingAction": "objecting",
-      "takeThatSound": "qrc:/audio/takethat0.wav",
+      "takeThatRecipe": "doubleClick.takeThat",
       "badgePropId": "prosecutor_badge",
-      "badgeDelayMs": 700,
       "clickedRecipe": "bow.once",
       "expiredRecipe": "pickup.once"
     }

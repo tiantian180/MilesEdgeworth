@@ -45,15 +45,14 @@ def main() -> int:
     config = manifest.get("customInteractionConfig", {}).get("prosecutor_badge", {})
     for key in [
         "takeThatProbability",
-        "objectingAction",
-        "takeThatSound",
+        "takeThatRecipe",
         "badgePropId",
-        "badgeDelayMs",
         "clickedRecipe",
         "expiredRecipe",
     ]:
         require(key in config, f"prosecutor_badge 配置缺少 {key}")
     require(0 < config.get("takeThatProbability") < 1, "takeThatProbability 应是 0-1 之间的概率")
+    require(config.get("takeThatRecipe") == "doubleClick.takeThat", "takeThatRecipe 应复用 manifest recipe")
     require(config.get("badgePropId") == "prosecutor_badge", "badgePropId 应指向 manifest props.prosecutor_badge")
 
     double_click = manifest.get("clickBehaviors", {}).get("doubleClick", [])
@@ -75,9 +74,7 @@ def main() -> int:
         "PetEventType::PropExpired",
         "host.manifestConfig()",
         "host.random()",
-        "host.emitAction",
-        "host.playSound",
-        "host.spawnProp",
+        "host.emitRecipe(takeThatRecipe)",
         "host.hideCurrentProp",
         "host.emitRecipe",
         "host.skipDefault",
@@ -113,6 +110,7 @@ def main() -> int:
         "bridge.submitDoubleClickForTest(0.0)",
         "bridge.submitDoubleClickForTest(0.99)",
         "runtime.currentPropId() == \"prosecutor_badge\"",
+        "徽章 CI 应沿用当前语音语言选择看招音频",
         "点击徽章后应触发鞠躬",
         "徽章自然消失后应触发捡徽章",
     ]:
