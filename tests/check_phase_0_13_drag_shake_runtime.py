@@ -72,8 +72,8 @@ def main() -> None:
 
     gesture_tracker = read("apps/desktop/src/pet/interaction/GestureTracker.cpp")
     for token in [
-        "m_dragShakeClock.elapsed() > 1000",
-        "m_dragShakeTurns >= 5",
+        "m_dragShakeClock.elapsed() > kShakeWindowMs",
+        "m_dragShakeTurns >= kShakeTurnThreshold",
         "m_dragHoldAnimationCompleted",
     ]:
         require(token in gesture_tracker, f"GestureTracker.cpp 缺少 {token}")

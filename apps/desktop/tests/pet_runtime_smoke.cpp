@@ -548,6 +548,18 @@ int main(int argc, char *argv[])
     // 松手时再根据蹲下动画是否播到末帧，选择快速站起或完整站起。
     runtime.returnToIdle();
     bridge.submitDragStarted(100);
+    bridge.submitDragMoved(110);
+    bridge.submitDragMoved(104);
+    bridge.submitDragMoved(112);
+    bridge.submitDragMoved(103);
+    bridge.submitDragMoved(113);
+    bridge.submitDragMoved(102);
+    require(runtime.currentActionId() == "drag_crouch", "连续左右换向但未跨过初始点时也应触发晃动");
+    bridge.submitDragEnded();
+    runtime.handleAnimationFinished();
+
+    runtime.returnToIdle();
+    bridge.submitDragStarted(100);
     bridge.submitDragMoved(90);
     bridge.submitDragMoved(110);
     bridge.submitDragMoved(85);

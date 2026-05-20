@@ -37,8 +37,8 @@ def main() -> int:
         require(token in tracker_h + tracker_cpp, f"GestureTracker 缺少接口或实现标记：{token}")
     for token in [
         "QElapsedTimer",
-        "elapsed() > 1000",
-        "m_dragShakeTurns >= 5",
+        "elapsed() > kShakeWindowMs",
+        "m_dragShakeTurns >= kShakeTurnThreshold",
         "m_dragHoldAnimationCompleted",
     ]:
         require(token in tracker_cpp + tracker_h, f"GestureTracker 缺少旧版晃动判定状态：{token}")

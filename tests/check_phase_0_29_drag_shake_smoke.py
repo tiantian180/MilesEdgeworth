@@ -34,6 +34,7 @@ def main() -> int:
         'runtime.currentActionId() == "drag_crouch"',
         'runtime.currentActionId() == "drag_stand_up_quick"',
         'runtime.currentActionId() == "drag_stand_up_full"',
+        "连续左右换向但未跨过初始点时也应触发晃动",
         "未蹲到底时松手应快速站起",
         "蹲到底后松手应完整站起",
     ]:
