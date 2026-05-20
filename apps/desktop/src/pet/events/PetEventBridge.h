@@ -24,18 +24,26 @@ class PetEventBridge : public QObject
 public:
     explicit PetEventBridge(PetRuntime *runtime, QObject *parent = nullptr);
 
+    // 返回当前皮肤声明且可用的菜单命令列表（按 SkinCommandResolver 过滤）。
     QVariantList enabledSkinCommands() const;
 
+    // ---- 鼠标 / 拖拽事件入口 ----
     Q_INVOKABLE void submitPrimaryClick(double x, double y, double width, double height);
     Q_INVOKABLE void submitDoubleClick();
     Q_INVOKABLE void submitDragStarted(double globalX);
+    // 每次 mouseMove 调用一次；返回是否刚好触发了 dragShake（一秒内连续反向移动达阈值）。
     Q_INVOKABLE void submitDragMoved(double globalX);
     Q_INVOKABLE void submitDragEnded();
+    // hold 类动画（如 drag_crouch）播完最后一帧时由表层 / Recipe 调用一次，影响 dragReleased 后选择 quick / full 起身。
     Q_INVOKABLE void submitHoldAnimationReachedEnd();
+
+    // ---- 菜单与状态事件入口 ----
     Q_INVOKABLE void submitMenuCommand(const QString &commandId);
     Q_INVOKABLE void submitIdleLoopFinished();
     Q_INVOKABLE void submitPropClicked();
     Q_INVOKABLE void submitPropExpired();
+
+    // ---- 测试用入口：手动注入 randomValue 以稳定双击概率 / idle 抽取结果 ----
     void submitDoubleClickForTest(double randomValue);
     void submitIdleLoopFinishedForTest(double randomValue);
 

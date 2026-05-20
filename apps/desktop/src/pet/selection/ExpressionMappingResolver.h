@@ -5,6 +5,8 @@
 
 #include <QString>
 
+// ExpressionMappingContext 是 expression 解析时需要的运行时上下文。
+// state 用于过滤 allowedStates；randomValue 在 weighted_random 选择模式下决定抽取结果。
 struct ExpressionMappingContext
 {
     QString state;

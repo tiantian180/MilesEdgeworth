@@ -75,6 +75,7 @@ class PetRuntime : public QObject
 public:
     explicit PetRuntime(QObject *parent = nullptr);
 
+    // ---- 只读状态 getter（也是暴露给 QML 的 Q_PROPERTY 后端）----
     QString currentState() const { return m_currentState; }
     QString currentActionId() const { return m_currentActionId; }
     QString currentRecipeId() const { return m_currentRecipeId; }
@@ -115,24 +116,35 @@ public:
     int playbackSerial() const { return m_playbackSerial; }
     int soundPlaybackSerial() const { return m_audioController.playbackSerial(); }
     const SkinManifest &manifest() const { return m_manifest; }
+
+    // 给交互层读取的只读快照。InteractionPipeline / CustomInteraction 只能用这个，不能直读私有成员。
     RuntimeSnapshot snapshot() const;
 
+    // ---- 设置类接口：菜单或 QML 直接调用，不走事件管线 ----
     Q_INVOKABLE void setState(const QString &state);
     Q_INVOKABLE void setFacing(const QString &facing);
     Q_INVOKABLE void toggleFacing();
-    Q_INVOKABLE void playAction(const QString &actionId);
-    Q_INVOKABLE void playLocomotion(const QString &actionId, const QString &movementDirection);
-    Q_INVOKABLE void playRecipe(const QString &recipeId);
-    Q_INVOKABLE void playActionFromPool(const QString &poolId);
-    Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void toggleAudioMuted();
     Q_INVOKABLE void setAudioLanguage(const QString &languageId);
     Q_INVOKABLE void toggleAutoMovementEnabled();
     Q_INVOKABLE void setPetSize(const QString &sizeId);
+
+    // ---- 底层播放入口：高层应优先用 submitActionRequest，这些方法供 RecipeRunner / 测试使用 ----
+    Q_INVOKABLE void playAction(const QString &actionId);
+    Q_INVOKABLE void playLocomotion(const QString &actionId, const QString &movementDirection);
+    Q_INVOKABLE void playRecipe(const QString &recipeId);
+    Q_INVOKABLE void playActionFromPool(const QString &poolId);
+    // 取走当前帧累积的位移增量（walk/run 等需要驱动窗口移动的动作）。
+    Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void startStartupSequence();
+    // returnToIdle：在 idle 已经稳定时是 no-op，避免 fallback 点击重启 idle 动画。
     Q_INVOKABLE void returnToIdle();
+    // 由 agent / 模型提交一个表达请求；走 ExpressionMappingResolver 转成 ActionRequest。
     Q_INVOKABLE void requestExpression(const QString &state, const QString &expression);
+    // 表层（QMovie）报告当前动画播完，触发后续 recipe step / action.completed 行为触发。
     Q_INVOKABLE void handleAnimationFinished();
+
+    // ---- 主要外部入口：交互管线产出的 ActionRequest 全部从这里进入 ----
     void submitActionRequest(const ActionRequest &request);
     void submitExpressionRequest(const QString &state, const QString &expression, double randomValue);
 
