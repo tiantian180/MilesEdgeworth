@@ -15,15 +15,39 @@ Phase 0.66 将 HitZone 从 `PetRuntime` 中抽出，由 manifest 声明、`HitZo
 - `HitZoneMatcher` 将窗口点击坐标映射到逻辑坐标：`logicalX = x * hitZoneSize / windowWidth`
 - 支持 `variants`（per-facing rect/polygon）
 
+> **当前代码状态（Phase 1 收官后）**：运行时代码仍使用 `canvas.hitZoneSize` + `hitZones[*].variants`，并按 `clickBehaviors.singleClick` 的顺序命中第一个 zone。Miles manifest 已保留 `fallback` zone，并使用修正后的 240×240 分区值。本文后半部分的 `windowWidth/imageWidth/perFacing` 是下一版 HitZone 坐标系设计，尚未落地。
+
+当前命中链路：
+
+```mermaid
+sequenceDiagram
+    participant Surface as PetSurfaceWindow
+    participant Bridge as PetEventBridge
+    participant Pipeline as InteractionPipeline
+    participant Matcher as HitZoneMatcher
+    participant Manifest as SkinManifest
+    participant Runtime as PetRuntime
+
+    Surface->>Bridge: submitPrimaryClick(x, y, width, height)
+    Bridge->>Runtime: snapshot()
+    Bridge->>Pipeline: PetEvent(pointer.singleClick)
+    Pipeline->>Manifest: clickBehaviors.singleClick
+    Pipeline->>Matcher: hitZoneIdForPoint(... candidateZoneIds ...)
+    Matcher->>Manifest: hitZones + variants
+    Matcher-->>Pipeline: zoneId
+    Pipeline-->>Bridge: ActionRequest(pool / recipe / action)
+    Bridge->>Runtime: submitActionRequest(request)
+```
+
 ### 1.2 存在的问题
 
-**问题 A：Zone 边界系统性错位（Miles 皮肤 bug）**
+**历史问题 A：Zone 边界系统性错位（Miles 皮肤 bug，已用旧坐标系修正）**
 
 对比 v1 实现（`macos-build-support` 分支，直接 if-else 判断），当前 manifest 中各 zone 的 y 边界整体下移 30–40px，导致点击腰部触发胸部动画、腿部区域点击无响应等问题。
 
-根因：manifest 中的坐标是在 240×240 空间下目视标注的，但没有系统地从 v1 的条件表达式推算，导致各 zone 边界与 v1 不一致。
+根因：manifest 中的坐标是在 240×240 空间下目视标注的，但没有系统地从 v1 的条件表达式推算，导致各 zone 边界与 v1 不一致。最新 manifest 已把 Miles 仍用 240 坐标系的分区值改为修正版，后续若迁新坐标系应以本文件 §9.2 的 100 空间值为起点。
 
-**问题 B：Zone 覆盖有空洞**
+**历史问题 B：Zone 覆盖有空洞（Miles 已通过 fallback zone 收口）**
 
 v1 是级联 if-else，每个点一定会落入某个分支（穷尽覆盖）。v2 用独立 rect/polygon，若区域定义不覆盖某个点，则该点击不生成 ActionRequest，桌宠无响应。
 
@@ -297,8 +321,8 @@ flowchart TD
     D -- 否 --> C
     D -- 是, rect --> E[直接命中]
     D -- 是, polygon --> F{凸多边形?}
-    F -- 是 --> G[叉积符号法 O(n)]
-    F -- 否 --> H[射线法 O(n)]
+    F -- 是 --> G["叉积符号法 O(n)"]
+    F -- 否 --> H["射线法 O(n)"]
     G --> I{命中?}
     H --> I
     I -- 否 --> C
@@ -558,14 +582,14 @@ manifest 作者可以选择整批迁移（一次性把所有 zone 转到 0–ima
 
 ```mermaid
 flowchart LR
-    A[SkinManifest.h\n新增 imageWidth/imageHeight\n删除 hitZoneSize]
-    B[SkinManifestLoader.cpp\n解析新 canvas 字段\nperFacing 解析\nAABB 预计算]
-    C[HitZoneMatcher.h/.cpp\n新坐标转换\nAABB 预筛]
-    D[HitZoneMatchContext\n字段重构]
-    E[InteractionPipeline.cpp\n传入新 context]
-    F[RuntimeSnapshot.h\n新增 petScale]
-    G[PetRuntime.cpp\n更新 snapshot()]
-    H[apps/hit-zone-editor/\n新工具 app]
+    A["SkinManifest.h<br/>新增 imageWidth/imageHeight<br/>删除 hitZoneSize"]
+    B["SkinManifestLoader.cpp<br/>解析新 canvas 字段<br/>perFacing 解析<br/>AABB 预计算"]
+    C["HitZoneMatcher.h/.cpp<br/>新坐标转换<br/>AABB 预筛"]
+    D["HitZoneMatchContext<br/>字段重构"]
+    E["InteractionPipeline.cpp<br/>传入新 context"]
+    F["RuntimeSnapshot.h<br/>新增 petScale"]
+    G["PetRuntime.cpp<br/>更新 snapshot()"]
+    H["apps/hit-zone-editor/<br/>新工具 app"]
 
     A --> B --> C
     D --> C --> E
@@ -585,17 +609,19 @@ flowchart LR
 > 2. 对不一致的区域，使用 HitZone 编辑器（开发后）或在桌宠应用里加临时的 "zone debug 叠加层" 实测调整。
 > 3. 验证通过后才能视作长期值；在此之前，本节数值视为"初始猜测，待回归测试"。
 
-### 9.1 当前问题汇总（240 坐标系）
+### 9.1 修复前问题汇总（240 坐标系）
 
 基于 v1 `singleClickEvent` 逻辑反推（scale=2，假设 v1 窗口 200×200，v2 窗口 240×240 含 20px offset）：
 
-| Zone | v1 推算正确值（240 空间） | 当前 manifest 值 | 偏差 |
+| Zone | v1 推算正确值（240 空间） | 修复前 manifest 值 | 偏差 |
 | --- | --- | --- | --- |
 | chest y | 66–96 | 72–**126** | 下边界超出 30px |
 | belly_bow y | 96–112 | **126**–148 | 整体下移 30px |
 | belly_pointing y | 112–126 | **148**–170 | 整体下移 36px |
 | legs y 起点 | 126 | **166** | 起点下移 40px |
 | head x | 20–220（全宽） | 78–162（过窄） | 两侧各缺约 60px |
+
+最新 `apps/desktop/resources/skins/miles-edgeworth/manifest.json` 已在旧 240 坐标系下使用这些修正值，并保留 `fallback` 区域作为兜底。后续迁到新 100 空间时，不应再从修复前数值推导。
 
 ### 9.2 新坐标系下的修正值（100 空间，scale=1 图像坐标）
 
