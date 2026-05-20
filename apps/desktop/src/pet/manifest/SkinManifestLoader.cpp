@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QSet>
 #include <QStandardPaths>
 
 namespace {
@@ -649,14 +650,12 @@ void resolveManifestUrls(SkinManifest &manifest, const QUrl &rootUrl)
     }
 }
 
-SkinDescriptor descriptorFromDirectory(const QDir &skinDir)
+SkinDescriptor descriptorFromSkinJson(
+    const QString &skinJsonPath,
+    const QUrl &rootUrl,
+    bool builtin
+)
 {
-    const QString skinJsonPath = skinDir.absoluteFilePath(QStringLiteral("skin.json"));
-    const QString manifestPath = skinDir.absoluteFilePath(QStringLiteral("manifest.json"));
-    if (!QFile::exists(skinJsonPath) || !QFile::exists(manifestPath)) {
-        return {};
-    }
-
     QFile file(skinJsonPath);
     if (!file.open(QIODevice::ReadOnly)) {
         return {};
@@ -668,24 +667,45 @@ SkinDescriptor descriptorFromDirectory(const QDir &skinDir)
         return {};
     }
 
-    const QJsonObject root = document.object();
+    const QJsonObject object = document.object();
     SkinDescriptor descriptor;
-    descriptor.id = root.value("id").toString().trimmed();
-    descriptor.name = root.value("name").toString().trimmed();
-    descriptor.version = root.value("version").toString().trimmed();
-    descriptor.author = root.value("author").toString().trimmed();
-    descriptor.license = root.value("license").toString().trimmed();
-    descriptor.manifestVersion = root.value("manifestVersion").toInt(1);
-    descriptor.minAppVersion = root.value("minAppVersion").toString().trimmed();
-    descriptor.rootUrl = QUrl::fromLocalFile(skinDir.absolutePath() + QLatin1Char('/'));
-    descriptor.thumbnailUrl = SkinManifestLoader::resolveSkinUrl(root.value("thumbnail").toString(), descriptor.rootUrl);
-    descriptor.manifestPath = manifestPath;
-    descriptor.builtin = false;
+    descriptor.id = object.value(QStringLiteral("id")).toString().trimmed();
+    descriptor.name = object.value(QStringLiteral("name")).toString().trimmed();
+    descriptor.version = object.value(QStringLiteral("version")).toString().trimmed();
+    descriptor.author = object.value(QStringLiteral("author")).toString().trimmed();
+    descriptor.license = object.value(QStringLiteral("license")).toString().trimmed();
+    descriptor.manifestVersion = object.value(QStringLiteral("manifestVersion")).toInt(1);
+    descriptor.minAppVersion = object.value(QStringLiteral("minAppVersion")).toString().trimmed();
+    descriptor.rootUrl = rootUrl;
+    descriptor.builtin = builtin;
+    descriptor.thumbnailUrl = SkinManifestLoader::resolveSkinUrl(
+        object.value(QStringLiteral("thumbnail")).toString(),
+        rootUrl
+    );
 
     if (descriptor.id.isEmpty()) {
         return {};
     }
+    if (descriptor.name.isEmpty()) {
+        descriptor.name = descriptor.id;
+    }
     return descriptor;
+}
+
+bool hasReadableManifest(const QString &manifestPath)
+{
+    return QFileInfo::exists(manifestPath) && QFileInfo(manifestPath).isFile();
+}
+
+void completeFilesystemDescriptor(
+    SkinDescriptor &descriptor,
+    const QString &manifestPath
+)
+{
+    descriptor.manifestPath = manifestPath;
+    if (!hasReadableManifest(descriptor.manifestPath)) {
+        descriptor.id.clear();
+    }
 }
 } // namespace
 
@@ -771,12 +791,61 @@ SkinManifest SkinManifestLoader::fallbackManifest()
 
 QList<SkinDescriptor> SkinManifestLoader::discoverAll()
 {
-    return discoverInDirectories(QStringList{portableSkinDirectoryPath(), userSkinDirectoryPath()});
+    return discoverInDirectories(
+        QStringList{userSkinDirectoryPath(), portableSkinDirectoryPath()},
+        true
+    );
 }
 
 QList<SkinDescriptor> SkinManifestLoader::discoverInDirectories(const QStringList &directories, bool includeBuiltins)
 {
-    QList<SkinDescriptor> descriptors;
+    QList<SkinDescriptor> result;
+    QSet<QString> seenIds;
+
+    auto appendDescriptor = [&](const SkinDescriptor &descriptor) {
+        if (descriptor.id.isEmpty() || seenIds.contains(descriptor.id)) {
+            return;
+        }
+        seenIds.insert(descriptor.id);
+        result.append(descriptor);
+    };
+
+    for (const QString &directoryPath : directories) {
+        QDir root(directoryPath);
+        if (!root.exists()) {
+            continue;
+        }
+
+        const QFileInfo rootSkinJson(root.filePath(QStringLiteral("skin.json")));
+        if (rootSkinJson.exists()) {
+            SkinDescriptor descriptor = descriptorFromSkinJson(
+                rootSkinJson.absoluteFilePath(),
+                QUrl::fromLocalFile(root.absolutePath() + QLatin1Char('/')),
+                false
+            );
+            completeFilesystemDescriptor(descriptor, root.filePath(QStringLiteral("manifest.json")));
+            if (!descriptor.id.isEmpty()) {
+                appendDescriptor(descriptor);
+                continue;
+            }
+        }
+
+        const QFileInfoList children = root.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
+        for (const QFileInfo &child : children) {
+            const QDir childDir(child.absoluteFilePath());
+            const QString skinJsonPath = childDir.filePath(QStringLiteral("skin.json"));
+            if (!QFileInfo::exists(skinJsonPath)) {
+                continue;
+            }
+            SkinDescriptor descriptor = descriptorFromSkinJson(
+                skinJsonPath,
+                QUrl::fromLocalFile(child.absoluteFilePath() + QLatin1Char('/')),
+                false
+            );
+            completeFilesystemDescriptor(descriptor, childDir.filePath(QStringLiteral("manifest.json")));
+            appendDescriptor(descriptor);
+        }
+    }
 
     if (includeBuiltins) {
         SkinDescriptor miles;
@@ -791,35 +860,10 @@ QList<SkinDescriptor> SkinManifestLoader::discoverInDirectories(const QStringLis
         miles.thumbnailUrl = resolveSkinUrl(QStringLiteral("skin:assets/body/idle/stand-right.gif"), miles.rootUrl);
         miles.manifestPath = QStringLiteral(":/skins/miles-edgeworth/manifest.json");
         miles.builtin = true;
-        descriptors.append(miles);
+        appendDescriptor(miles);
     }
 
-    for (const QString &directoryPath : directories) {
-        if (directoryPath.trimmed().isEmpty()) {
-            continue;
-        }
-
-        const QDir directory(directoryPath);
-        if (!directory.exists()) {
-            continue;
-        }
-
-        const SkinDescriptor directDescriptor = descriptorFromDirectory(directory);
-        if (!directDescriptor.id.isEmpty()) {
-            descriptors.append(directDescriptor);
-            continue;
-        }
-
-        const QFileInfoList entries = directory.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
-        for (const QFileInfo &entry : entries) {
-            const SkinDescriptor descriptor = descriptorFromDirectory(QDir(entry.absoluteFilePath()));
-            if (!descriptor.id.isEmpty()) {
-                descriptors.append(descriptor);
-            }
-        }
-    }
-
-    return descriptors;
+    return result;
 }
 
 QString SkinManifestLoader::userSkinDirectoryPath()

@@ -97,5 +97,64 @@ int main(int argc, char **argv)
     require(descriptors.first().id == QStringLiteral("test-skin"), "descriptor id should come from skin.json");
     require(descriptors.first().rootUrl.isLocalFile(), "filesystem descriptor root should be a file URL");
 
+    QTemporaryDir userDir;
+    QTemporaryDir portableDir;
+    require(userDir.isValid() && portableDir.isValid(), "precedence dirs should be valid");
+    QDir userSkin(userDir.path() + QStringLiteral("/miles-edgeworth"));
+    QDir portableSkin(portableDir.path() + QStringLiteral("/miles-edgeworth"));
+    require(userSkin.mkpath(QStringLiteral(".")), "user skin dir should be created");
+    require(portableSkin.mkpath(QStringLiteral(".")), "portable skin dir should be created");
+    require(writeFile(userSkin.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{"id":"same-id","name":"用户版本","version":"1.0.0","manifestVersion":1}
+)JSON")), "user skin.json should be written");
+    require(writeFile(portableSkin.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{"id":"same-id","name":"便携版本","version":"1.0.0","manifestVersion":1}
+)JSON")), "portable skin.json should be written");
+    require(writeFile(userSkin.filePath(QStringLiteral("manifest.json")), QStringLiteral("{}")), "user manifest should be written");
+    require(writeFile(portableSkin.filePath(QStringLiteral("manifest.json")), QStringLiteral("{}")), "portable manifest should be written");
+
+    QList<SkinDescriptor> precedence = SkinManifestLoader::discoverInDirectories(
+        QStringList{userDir.path(), portableDir.path()},
+        false
+    );
+    require(precedence.size() == 1, "same id should be deduplicated");
+    require(precedence.first().name == QStringLiteral("用户版本"), "earlier directory should win on duplicate skin id");
+
+    QTemporaryDir incompleteOverrideDir;
+    require(incompleteOverrideDir.isValid(), "incomplete override dir should be valid");
+    QDir incompleteMiles(incompleteOverrideDir.path() + QStringLiteral("/miles-edgeworth"));
+    require(incompleteMiles.mkpath(QStringLiteral(".")), "incomplete miles override dir should be created");
+    require(writeFile(incompleteMiles.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{"id":"miles-edgeworth","name":"残缺用户版本","version":"1.0.0","manifestVersion":1}
+)JSON")), "incomplete miles skin.json should be written");
+
+    QList<SkinDescriptor> withBuiltinFallback = SkinManifestLoader::discoverInDirectories(
+        QStringList{incompleteOverrideDir.path()},
+        true
+    );
+    require(!withBuiltinFallback.isEmpty(), "built-in skin should remain discoverable");
+    require(withBuiltinFallback.first().id == QStringLiteral("miles-edgeworth"), "built-in miles id should be present");
+    require(withBuiltinFallback.first().builtin, "missing manifest override must not shadow built-in miles");
+
+    QTemporaryDir invalidRootDir;
+    require(invalidRootDir.isValid(), "invalid root dir should be valid");
+    QDir invalidRoot(invalidRootDir.path());
+    require(writeFile(invalidRoot.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{"name":"无 id 的根目录皮肤","version":"1.0.0","manifestVersion":1}
+)JSON")), "invalid root skin.json should be written");
+    QDir validChild(invalidRoot.filePath(QStringLiteral("valid-child")));
+    require(validChild.mkpath(QStringLiteral(".")), "valid child skin dir should be created");
+    require(writeFile(validChild.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{"id":"valid-child","name":"有效子皮肤","version":"1.0.0","manifestVersion":1}
+)JSON")), "valid child skin.json should be written");
+    require(writeFile(validChild.filePath(QStringLiteral("manifest.json")), QStringLiteral("{}")), "valid child manifest should be written");
+
+    QList<SkinDescriptor> afterInvalidRoot = SkinManifestLoader::discoverInDirectories(
+        QStringList{invalidRootDir.path()},
+        false
+    );
+    require(afterInvalidRoot.size() == 1, "invalid root skin.json should not block child discovery");
+    require(afterInvalidRoot.first().id == QStringLiteral("valid-child"), "valid child skin should still be discovered");
+
     return 0;
 }
