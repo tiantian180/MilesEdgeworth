@@ -131,8 +131,10 @@ public:
     Q_INVOKABLE void setPetSize(const QString &sizeId);
     Q_INVOKABLE void startStartupSequence();
     Q_INVOKABLE void returnToIdle();
+    Q_INVOKABLE void requestExpression(const QString &state, const QString &expression);
     Q_INVOKABLE void handleAnimationFinished();
     void submitActionRequest(const ActionRequest &request);
+    void submitExpressionRequest(const QString &state, const QString &expression, double randomValue);
 
 signals:
     void currentStateChanged();

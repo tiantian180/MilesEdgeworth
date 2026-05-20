@@ -45,7 +45,7 @@ def main() -> int:
     ]:
         require(token in inventory, f"资源盘点缺少 {token}")
 
-    require(manifest.get("schemaVersion") == 2, "manifest 应升级到 schemaVersion 2")
+    require(manifest.get("schemaVersion", 0) >= 2, "manifest schemaVersion 不应低于 2")
     require(manifest.get("facings") == ["right", "left"], "manifest 应声明 right/left 朝向")
     require(manifest.get("defaultFacing") == "right", "默认朝向应为 right")
 

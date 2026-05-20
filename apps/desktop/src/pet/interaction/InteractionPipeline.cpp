@@ -4,6 +4,7 @@
 #include "pet/commands/SkinCommandResolver.h"
 #include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/interaction/HitZoneMatcher.h"
+#include "pet/selection/ExpressionMappingResolver.h"
 
 namespace {
 constexpr auto kSleepToggleCommandId = "runtime.sleep.toggle";
@@ -259,6 +260,15 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
             requests.append(ActionRequest::recipe(snapshot.currentPropExpiredRecipeId).withHiddenCurrentProp());
         }
         return requests;
+
+    case PetEventType::AgentExpressionRequested: {
+        const ExpressionMappingContext context {
+            event.state.isEmpty() ? snapshot.currentState : event.state,
+            event.randomValue,
+        };
+        appendIfPlayable(requests, ExpressionMappingResolver::resolve(manifest, context, event.expression));
+        return requests;
+    }
     }
 
     return requests;

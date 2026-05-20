@@ -171,6 +171,29 @@ struct AudioDefinition
     QList<AudioLanguageDefinition> voiceLanguages;
 };
 
+struct ExpressionDefinition
+{
+    QString id;
+    QString label;
+    QString description;
+    QStringList allowedStates;
+    int priority = 0;
+};
+
+struct ExpressionMappingEntry
+{
+    ActionRequest request;
+    QStringList allowedStates;
+    int weight = 1;
+};
+
+struct ExpressionMappingDefinition
+{
+    QString selection = "first_available";
+    QString fallbackExpressionId = "neutral";
+    QList<ExpressionMappingEntry> actions;
+};
+
 struct HitZoneDefinition
 {
     QString id;
@@ -205,6 +228,8 @@ struct SkinManifest
     QHash<QString, ActionDefinition> actions;
     QHash<QString, RecipeDefinition> recipes;
     QHash<QString, ActionPoolDefinition> actionPools;
+    QHash<QString, ExpressionDefinition> expressions;
+    QHash<QString, ExpressionMappingDefinition> expressionMappings;
     QHash<QString, BehaviorTriggerDefinition> behaviorTriggers;
     QList<BehaviorRuleDefinition> behaviorRules;
     QHash<QString, PropDefinition> props;

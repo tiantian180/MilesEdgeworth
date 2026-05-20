@@ -19,6 +19,7 @@ enum class PetEventType
     ActionCompleted,
     PropClicked,
     PropExpired,
+    AgentExpressionRequested,
 };
 
 struct PetEvent
@@ -26,6 +27,8 @@ struct PetEvent
     PetEventType type = PetEventType::MenuCommand;
     QString commandId;
     QString propId;
+    QString state;
+    QString expression;
     double x = 0.0;
     double y = 0.0;
     double width = 0.0;
@@ -121,6 +124,17 @@ struct PetEvent
         PetEvent event;
         event.type = PetEventType::PropExpired;
         event.propId = id.trimmed();
+        return event;
+    }
+
+    static PetEvent agentExpressionRequested(const QString &stateId, const QString &expressionId, double random)
+    {
+        PetEvent event;
+        event.type = PetEventType::AgentExpressionRequested;
+        event.state = stateId.trimmed();
+        event.expression = expressionId.trimmed();
+        event.randomValue = random;
+        event.hasRandomValue = true;
         return event;
     }
 };

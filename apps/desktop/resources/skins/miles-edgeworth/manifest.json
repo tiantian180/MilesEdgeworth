@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "miles-edgeworth",
   "name": "Miles Edgeworth",
   "version": 1,
@@ -25,6 +25,52 @@
       { "id": "en", "label": "英语" },
       { "id": "zh", "label": "中文" }
     ]
+  },
+  "expressions": [
+    {
+      "id": "neutral",
+      "label": "默认",
+      "description": "没有更合适表达时使用的平稳站立表达",
+      "allowedStates": ["idle", "thinking", "speaking"],
+      "priority": 0
+    },
+    {
+      "id": "objection",
+      "label": "异议",
+      "description": "强烈反驳、指出漏洞、语气锐利时使用",
+      "allowedStates": ["speaking"],
+      "priority": 90
+    },
+    {
+      "id": "polite",
+      "label": "礼貌",
+      "description": "礼貌回应、致意或收束话题时使用",
+      "allowedStates": ["idle", "speaking"],
+      "priority": 40
+    }
+  ],
+  "expressionMappings": {
+    "neutral": {
+      "selection": "first_available",
+      "actions": [
+        { "action": "idle_stand", "allowedStates": ["idle", "thinking", "speaking"] }
+      ]
+    },
+    "objection": {
+      "selection": "weighted_random",
+      "fallback": "neutral",
+      "actions": [
+        { "action": "objecting", "weight": 3, "allowedStates": ["speaking"] },
+        { "recipe": "doubleClick.holdIt", "weight": 1, "allowedStates": ["speaking"] }
+      ]
+    },
+    "polite": {
+      "selection": "first_available",
+      "fallback": "neutral",
+      "actions": [
+        { "action": "bow", "allowedStates": ["idle", "speaking"] }
+      ]
+    }
   },
   "customInteractions": [
     { "id": "prosecutor_badge" }

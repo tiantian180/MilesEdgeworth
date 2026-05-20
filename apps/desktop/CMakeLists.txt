@@ -50,6 +50,8 @@ set(DESKTOP_SOURCES
     src/pet/runtime/RuntimeSnapshot.h
     src/pet/selection/ActionPoolSelector.cpp
     src/pet/selection/ActionPoolSelector.h
+    src/pet/selection/ExpressionMappingResolver.cpp
+    src/pet/selection/ExpressionMappingResolver.h
     src/pet/surface/PetContextMenu.cpp
     src/pet/surface/PetContextMenu.h
     src/pet/surface/PetSurfaceWindow.cpp
@@ -145,6 +147,8 @@ if(BUILD_TESTING)
         src/pet/runtime/RuntimeSnapshot.h
         src/pet/selection/ActionPoolSelector.cpp
         src/pet/selection/ActionPoolSelector.h
+        src/pet/selection/ExpressionMappingResolver.cpp
+        src/pet/selection/ExpressionMappingResolver.h
         src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
         src/skins/miles-edgeworth/MilesEdgeworthInteractions.h
         src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.cpp

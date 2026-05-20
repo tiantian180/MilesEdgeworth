@@ -85,6 +85,18 @@ BehaviorRuleCondition behaviorRuleConditionFromJsonObject(const QJsonObject &obj
     }
     return condition;
 }
+
+QStringList stringListFromJsonArray(const QJsonArray &array)
+{
+    QStringList values;
+    for (const QJsonValue &value : array) {
+        const QString item = value.toString().trimmed();
+        if (!item.isEmpty() && !values.contains(item)) {
+            values.append(item);
+        }
+    }
+    return values;
+}
 } // namespace
 
 SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
@@ -182,6 +194,46 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
 
     if (manifest.defaultSizeId.isEmpty() && !manifest.sizes.isEmpty()) {
         manifest.defaultSizeId = manifest.sizes.constFirst().id;
+    }
+
+    const QJsonArray expressions = root.value("expressions").toArray();
+    for (const QJsonValue &value : expressions) {
+        const QJsonObject expressionObject = value.toObject();
+        ExpressionDefinition expression;
+        expression.id = expressionObject.value("id").toString().trimmed();
+        expression.label = expressionObject.value("label").toString(expression.id).trimmed();
+        expression.description = expressionObject.value("description").toString().trimmed();
+        expression.allowedStates = stringListFromJsonArray(expressionObject.value("allowedStates").toArray());
+        expression.priority = expressionObject.value("priority").toInt(0);
+
+        if (!expression.id.isEmpty()) {
+            manifest.expressions.insert(expression.id, expression);
+        }
+    }
+
+    const QJsonObject expressionMappings = root.value("expressionMappings").toObject();
+    for (auto it = expressionMappings.constBegin(); it != expressionMappings.constEnd(); ++it) {
+        const QJsonObject mappingObject = it.value().toObject();
+        ExpressionMappingDefinition mapping;
+        mapping.selection = mappingObject.value("selection").toString("first_available").trimmed();
+        mapping.fallbackExpressionId = mappingObject.value("fallback").toString("neutral").trimmed();
+
+        const QJsonArray actions = mappingObject.value("actions").toArray();
+        for (const QJsonValue &actionValue : actions) {
+            const QJsonObject actionObject = actionValue.toObject();
+            ExpressionMappingEntry entry;
+            entry.request = requestFromJsonObject(actionObject);
+            entry.allowedStates = stringListFromJsonArray(actionObject.value("allowedStates").toArray());
+            entry.weight = actionObject.value("weight").toInt(1);
+
+            if (entry.request.kind != ActionRequestKind::None) {
+                mapping.actions.append(entry);
+            }
+        }
+
+        if (!it.key().isEmpty() && !mapping.actions.isEmpty()) {
+            manifest.expressionMappings.insert(it.key(), mapping);
+        }
     }
 
     const QJsonObject hitZones = root.value("hitZones").toObject();
@@ -549,6 +601,12 @@ SkinManifest SkinManifestLoader::fallbackManifest()
     manifest.defaultSizeId = "medium";
     manifest.audio.defaultVoiceLanguage = "jp";
     manifest.audio.voiceLanguages.append(AudioLanguageDefinition {"jp", QStringLiteral("日语")});
+    manifest.expressions.insert("neutral", ExpressionDefinition {"neutral", QStringLiteral("默认"), QStringLiteral("默认站立表达"), {}, 0});
+    ExpressionMappingDefinition neutralMapping;
+    neutralMapping.selection = "first_available";
+    neutralMapping.fallbackExpressionId.clear();
+    neutralMapping.actions.append(ExpressionMappingEntry {ActionRequest::action(kFallbackActionId), {}, 1});
+    manifest.expressionMappings.insert("neutral", neutralMapping);
     manifest.sizes.append(PetSizeDefinition {"medium", QStringLiteral("中"), 2.0});
     manifest.facings = {"right", "left"};
     manifest.movementDirections = {"east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"};

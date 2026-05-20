@@ -543,5 +543,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_72_audio_capability.py
         )
+
+        # Phase 0.73 的 ExpressionMapping 检查：AI / agent 只请求
+        # expression，具体动作由当前皮肤 manifest 映射成 ActionRequest。
+        add_test(
+            NAME check_phase_0_73_expression_mapping
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_73_expression_mapping.py
+        )
     endif()
 endif()

@@ -599,6 +599,13 @@ int main(int argc, char *argv[])
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit1.wav", "英语语音应选择 holdit1");
 
     runtime.setAudioLanguage("jp");
+    runtime.submitExpressionRequest("speaking", "objection", 0.0);
+    require(runtime.currentActionId() == "objecting", "speaking + objection 应映射到异议动作");
+    runtime.submitExpressionRequest("idle", "polite", 0.0);
+    require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
+    runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
+    require(runtime.currentActionId() == "idle_stand", "未知 expression 应降级到 neutral 映射");
+
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");
     require(runtime.currentSoundUrl().toString() == "qrc:/audio/holdit0.wav", "Hold it 应播放默认语音");
