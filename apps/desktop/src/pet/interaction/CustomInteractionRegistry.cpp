@@ -230,10 +230,15 @@ void CustomInteractionRegistry::registerBuiltins(const SkinManifest &manifest)
     }
 }
 
-void CustomInteractionRegistry::clearForTest()
+void CustomInteractionRegistry::reset()
 {
     registeredInteractions().clear();
     interactionStates().clear();
+}
+
+void CustomInteractionRegistry::clearForTest()
+{
+    reset();
 }
 
 CustomInteractionResult CustomInteractionRegistry::handleEvent(

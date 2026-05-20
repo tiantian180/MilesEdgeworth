@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pet/manifest/SkinDescriptor.h"
 #include "pet/manifest/SkinManifest.h"
 #include "pet/effects/AudioController.h"
 #include "pet/effects/PropController.h"
@@ -35,6 +36,8 @@ class PetRuntime : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString currentState READ currentState NOTIFY currentStateChanged)
+    Q_PROPERTY(QString activeSkinId READ activeSkinId NOTIFY activeSkinChanged)
+    Q_PROPERTY(QVariantList availableSkins READ availableSkins NOTIFY availableSkinsChanged)
     Q_PROPERTY(QString currentActionId READ currentActionId NOTIFY currentActionChanged)
     Q_PROPERTY(QString currentRecipeId READ currentRecipeId NOTIFY currentRecipeChanged)
     Q_PROPERTY(QString currentPhaseId READ currentPhaseId NOTIFY currentPhaseChanged)
@@ -44,10 +47,10 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool currentAutoReturnToIdle READ currentAutoReturnToIdle NOTIFY currentAutoReturnToIdleChanged)
     Q_PROPERTY(bool audioMuted READ audioMuted NOTIFY audioMutedChanged)
     Q_PROPERTY(QString currentAudioLanguageId READ currentAudioLanguageId NOTIFY currentAudioLanguageChanged)
-    Q_PROPERTY(QVariantList availableAudioLanguages READ availableAudioLanguages CONSTANT)
+    Q_PROPERTY(QVariantList availableAudioLanguages READ availableAudioLanguages NOTIFY availableAudioLanguagesChanged)
     Q_PROPERTY(bool autoMovementEnabled READ autoMovementEnabled NOTIFY autoMovementEnabledChanged)
     Q_PROPERTY(QString petSizeId READ petSizeId NOTIFY petScaleChanged)
-    Q_PROPERTY(QVariantList availablePetSizes READ availablePetSizes CONSTANT)
+    Q_PROPERTY(QVariantList availablePetSizes READ availablePetSizes NOTIFY availablePetSizesChanged)
     Q_PROPERTY(double petScale READ petScale NOTIFY petScaleChanged)
     Q_PROPERTY(double petWindowSize READ petWindowSize NOTIFY petScaleChanged)
     Q_PROPERTY(double petImageSize READ petImageSize NOTIFY petScaleChanged)
@@ -116,6 +119,8 @@ public:
     int playbackSerial() const { return m_playbackSerial; }
     int soundPlaybackSerial() const { return m_audioController.playbackSerial(); }
     const SkinManifest &manifest() const { return m_manifest; }
+    QString activeSkinId() const;
+    QVariantList availableSkins() const;
 
     // 给交互层读取的只读快照。InteractionPipeline / CustomInteraction 只能用这个，不能直读私有成员。
     RuntimeSnapshot snapshot() const;
@@ -128,6 +133,8 @@ public:
     Q_INVOKABLE void setAudioLanguage(const QString &languageId);
     Q_INVOKABLE void toggleAutoMovementEnabled();
     Q_INVOKABLE void setPetSize(const QString &sizeId);
+    Q_INVOKABLE bool setActiveSkin(const QString &skinId);
+    Q_INVOKABLE bool reloadActiveSkin();
 
     // ---- 底层播放入口：高层应优先用 submitActionRequest，这些方法供 RecipeRunner / 测试使用 ----
     Q_INVOKABLE void playAction(const QString &actionId);
@@ -169,6 +176,11 @@ signals:
     void currentPropPlaybackSerialChanged();
     void playbackSerialChanged();
     void soundPlaybackSerialChanged();
+    void activeSkinChanged();
+    void availableSkinsChanged();
+    void availableAudioLanguagesChanged();
+    void availablePetSizesChanged();
+    void skinManifestReloaded();
 
 private:
     QString actionForState(const QString &state) const;
@@ -190,8 +202,15 @@ private:
     void playPhase(const QString &actionId, const QString &phaseId);
     void setCurrentAction(const QString &actionId, const ActionDefinition &action);
     void setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase);
+    void applyManifestState();
+    bool activateSkin(const QString &skinId, bool persistSelection);
+    bool loadSkinDescriptor(const SkinDescriptor &descriptor);
+    SkinDescriptor descriptorForSkinId(const QString &skinId) const;
+    void refreshAvailableSkins();
 
     SkinManifest m_manifest;
+    QList<SkinDescriptor> m_availableSkinDescriptors;
+    QString m_activeSkinId;
     QString m_currentState = "idle";
     QString m_currentActionId;
     QString m_currentRecipeId;

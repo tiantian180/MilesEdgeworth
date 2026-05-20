@@ -46,6 +46,7 @@ set(DESKTOP_SOURCES
     src/pet/manifest/SkinManifestLoader.h
     src/pet/PetRuntime.cpp
     src/pet/PetRuntime.h
+    src/pet/PetRuntimeSkin.cpp
     src/pet/requests/ActionRequest.h
     src/pet/runtime/RuntimeSnapshot.h
     src/pet/selection/ActionPoolSelector.cpp
@@ -160,6 +161,7 @@ if(BUILD_TESTING)
         src/pet/manifest/SkinManifestLoader.h
         src/pet/PetRuntime.cpp
         src/pet/PetRuntime.h
+        src/pet/PetRuntimeSkin.cpp
         src/pet/requests/ActionRequest.h
         src/pet/runtime/RuntimeSnapshot.h
         src/pet/selection/ActionPoolSelector.cpp

@@ -5,11 +5,11 @@
 #include "pet/selection/ActionPoolSelector.h"
 
 #include <QRandomGenerator>
+#include <QSettings>
 #include <QtGlobal>
 #include <QVariantMap>
 
 namespace {
-constexpr auto kManifestPath = ":/pet/manifest.json";
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
 } // namespace
 
@@ -19,22 +19,26 @@ PetRuntime::PetRuntime(QObject *parent)
     connect(&m_propController, &PropController::currentPropChanged, this, &PetRuntime::currentPropChanged);
     connect(&m_propController, &PropController::currentPropPlaybackSerialChanged, this, &PetRuntime::currentPropPlaybackSerialChanged);
 
-    m_manifest = SkinManifestLoader::loadFromResource(QString::fromUtf8(kManifestPath));
+    refreshAvailableSkins();
+    const QString savedSkinId = QSettings()
+        .value(QStringLiteral("skin/activeSkinId"), QStringLiteral("miles-edgeworth"))
+        .toString();
 
-    if (m_manifest.actions.isEmpty()) {
+    // 构造阶段只读取用户上次选择，不回写 QSettings。
+    // 用户主动切换皮肤时才持久化，避免测试或失败回退污染真实偏好。
+    if (!activateSkin(savedSkinId, false)
+            && !activateSkin(QStringLiteral("miles-edgeworth"), false)) {
         m_manifest = SkinManifestLoader::fallbackManifest();
+        m_activeSkinId = QStringLiteral("miles-edgeworth");
+        applyManifestState();
+        setState(QStringLiteral("idle"));
+        startStartupSequence();
     }
+}
 
-    m_audioController.setAudioDefinition(m_manifest.audio);
-
-    m_currentFacing = m_manifest.defaultFacing;
-    if (!m_manifest.movementDirections.isEmpty()) {
-        m_currentMovementDirection = m_manifest.movementDirections.constFirst();
-    }
-    setPetSize(m_manifest.defaultSizeId);
-
-    setState("idle");
-    startStartupSequence();
+QString PetRuntime::activeSkinId() const
+{
+    return m_activeSkinId;
 }
 
 RuntimeSnapshot PetRuntime::snapshot() const
@@ -78,19 +82,6 @@ bool PetRuntime::currentActionAcceptsIdleLoopFinished() const
         && m_currentActionId == m_manifest.canvas.idleLoopActionId
         && m_currentLoopMode == QStringLiteral("loop")
         && m_currentRecipeId.isEmpty();
-}
-
-QVariantList PetRuntime::availablePetSizes() const
-{
-    QVariantList sizes;
-    for (const PetSizeDefinition &size : m_manifest.sizes) {
-        QVariantMap item;
-        item.insert(QStringLiteral("id"), size.id);
-        item.insert(QStringLiteral("label"), size.label);
-        item.insert(QStringLiteral("scale"), size.scale);
-        sizes.append(item);
-    }
-    return sizes;
 }
 
 void PetRuntime::setState(const QString &state)
@@ -362,10 +353,7 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
 
     if (!m_manifest.actions.contains(nextActionId)) {
         m_manifest = SkinManifestLoader::fallbackManifest();
-        m_currentFacing = m_manifest.defaultFacing;
-        if (!m_manifest.movementDirections.isEmpty()) {
-            m_currentMovementDirection = m_manifest.movementDirections.constFirst();
-        }
+        applyManifestState();
         nextActionId = m_manifest.fallbackAction;
     }
 

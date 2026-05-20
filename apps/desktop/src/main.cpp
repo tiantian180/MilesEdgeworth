@@ -20,8 +20,13 @@ int main(int argc, char *argv[])
     DesktopShellControllerForeign::s_instance = &shellController;
 
     PetRuntime petRuntime;
-    CustomInteractionRegistry::registerBuiltins(petRuntime.manifest());
-    registerMilesEdgeworthInteractions(petRuntime.manifest());
+    auto registerCurrentSkinInteractions = [&petRuntime]() {
+        CustomInteractionRegistry::reset();
+        CustomInteractionRegistry::registerBuiltins(petRuntime.manifest());
+        registerMilesEdgeworthInteractions(petRuntime.manifest());
+    };
+    registerCurrentSkinInteractions();
+    QObject::connect(&petRuntime, &PetRuntime::skinManifestReloaded, &app, registerCurrentSkinInteractions);
     PetRuntimeForeign::s_instance = &petRuntime;
     PetEventBridge petEventBridge(&petRuntime);
     PetEventBridgeForeign::s_instance = &petEventBridge;

@@ -127,6 +127,7 @@ class CustomInteractionRegistry
 public:
     static void registerInteraction(std::unique_ptr<CustomInteraction> interaction);
     static void registerBuiltins(const SkinManifest &manifest);
+    static void reset();
     static void clearForTest();
 
     // 把事件依次发给注册的 handler，合并它们的产出并返回最终 Outcome。

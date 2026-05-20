@@ -21,6 +21,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     runtime_header = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    runtime_skin_cpp = read("apps/desktop/src/pet/PetRuntimeSkin.cpp")
     pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     root_cmake = read("CMakeLists.txt")
@@ -68,14 +69,16 @@ def main() -> int:
     ]:
         require(token not in runtime_header + runtime_cpp, f"PetRuntime 不应继续承担 manifest JSON 解析：{token}")
 
-    require("SkinManifestLoader::loadFromResource" in runtime_cpp, "PetRuntime 应调用 SkinManifestLoader 加载资源 manifest")
-    require("SkinManifestLoader::fallbackManifest" in runtime_cpp, "PetRuntime 应调用 SkinManifestLoader fallback")
+    runtime_sources = runtime_cpp + runtime_skin_cpp
+    require("SkinManifestLoader::loadFromResource" in runtime_sources or "SkinManifestLoader::loadFromDescriptor" in runtime_sources, "PetRuntime 应调用 SkinManifestLoader 加载 manifest")
+    require("SkinManifestLoader::fallbackManifest" in runtime_sources, "PetRuntime 应调用 SkinManifestLoader fallback")
     require("ActionPoolSelector::resolvePoolId" in runtime_cpp, "PetRuntime 应委托 ActionPoolSelector 解析候选池")
     require("ActionPoolSelector::selectEntry" in runtime_cpp, "PetRuntime 应委托 ActionPoolSelector 权重抽取")
     require("BehaviorTriggerEngine::matches" in pipeline_cpp, "InteractionPipeline 应委托 BehaviorTriggerEngine 匹配触发条件")
     require("BehaviorTriggerEngine::selectEntry" in pipeline_cpp, "InteractionPipeline 应委托 BehaviorTriggerEngine 权重抽取")
     require("src/pet/manifest/SkinManifestLoader.cpp" in desktop_cmake, "桌面 CMake 应编译 SkinManifestLoader.cpp")
     require("src/pet/manifest/SkinManifestLoader.h" in desktop_cmake, "桌面 CMake 应列出 SkinManifestLoader.h")
+    require("src/pet/PetRuntimeSkin.cpp" in desktop_cmake, "桌面 CMake 应编译 PetRuntimeSkin.cpp")
     require("src/pet/selection/ActionPoolSelector.cpp" in desktop_cmake, "桌面 CMake 应编译 ActionPoolSelector.cpp")
     require("src/pet/selection/ActionPoolSelector.h" in desktop_cmake, "桌面 CMake 应列出 ActionPoolSelector.h")
     require("src/pet/behavior/BehaviorTriggerEngine.cpp" in desktop_cmake, "桌面 CMake 应编译 BehaviorTriggerEngine.cpp")

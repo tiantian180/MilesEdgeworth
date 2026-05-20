@@ -7,6 +7,7 @@
 
 #include <QCoreApplication>
 #include <QEventLoop>
+#include <QSettings>
 #include <QStringList>
 #include <QTimer>
 #include <QVariantList>
@@ -264,6 +265,9 @@ void waitForMilliseconds(int milliseconds)
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
+    QCoreApplication::setOrganizationName(QStringLiteral("MilesEdgeworthTests"));
+    QCoreApplication::setApplicationName(QStringLiteral("PetRuntimeSmoke"));
+    QSettings().clear();
 
     AudioDefinition defaultOnlyAudio;
     defaultOnlyAudio.defaultVoiceLanguage = "jp";
@@ -276,6 +280,10 @@ int main(int argc, char *argv[])
     require(defaultOnlyAudioController.soundUrlForRecipe(defaultOnlyRecipe).toString() == "qrc:/audio/holdit0.wav", "默认语言应能选择对应 soundUrls");
 
     PetRuntime runtime;
+    require(!runtime.activeSkinId().isEmpty(), "runtime should have an active skin id");
+    require(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"), "built-in Miles should be active by default");
+    require(!runtime.availableSkins().isEmpty(), "runtime should expose available skins");
+    require(runtime.reloadActiveSkin(), "runtime should reload active skin");
     PetEventBridge bridge(&runtime);
 
     // 启动时应进入旧版公文包入场序列，而不是直接静止站立。

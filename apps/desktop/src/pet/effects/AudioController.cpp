@@ -55,6 +55,17 @@ bool AudioController::setLanguage(const QString &languageId)
     return true;
 }
 
+bool AudioController::clearCurrentSound()
+{
+    if (m_currentSoundUrl.isEmpty()) {
+        return false;
+    }
+
+    m_currentSoundUrl = QUrl();
+    ++m_playbackSerial;
+    return true;
+}
+
 QUrl AudioController::soundUrlForRecipe(const RecipeDefinition &recipe) const
 {
     if (!m_currentLanguageId.isEmpty() && recipe.soundUrls.contains(m_currentLanguageId)) {

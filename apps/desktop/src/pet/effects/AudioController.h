@@ -27,6 +27,7 @@ public:
     // 最近一次成功播放的音效 URL；每次播放都会递增 playbackSerial，便于 QML 重播。
     QUrl currentSoundUrl() const { return m_currentSoundUrl; }
     int playbackSerial() const { return m_playbackSerial; }
+    bool clearCurrentSound();
 
     // 根据当前语音语言从 RecipeDefinition.soundUrls 里挑出对应 URL（或回退到 soundUrl）。
     QUrl soundUrlForRecipe(const RecipeDefinition &recipe) const;
