@@ -535,6 +535,7 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
             const QJsonObject entryObject = entryValue.toObject();
 
             ActionPoolEntry entry;
+            entry.request = requestFromJsonObject(entryObject);
             entry.recipeId = entryObject.value("recipe").toString();
             entry.actionId = entryObject.value("action").toString();
             entry.weight = entryObject.value("weight").toInt(1);
@@ -542,7 +543,9 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
                 entry.weight = 1;
             }
 
-            if (!entry.recipeId.isEmpty() || !entry.actionId.isEmpty()) {
+            if (entry.request.kind != ActionRequestKind::None
+                    || !entry.recipeId.isEmpty()
+                    || !entry.actionId.isEmpty()) {
                 pool.entries.append(entry);
             }
         }

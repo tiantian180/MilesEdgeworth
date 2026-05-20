@@ -674,6 +674,11 @@ int main(int argc, char *argv[])
 
     runtime.returnToIdle();
     runtime.setFacing("right");
+    bridge.submitPrimaryClick(50, 40, 240, 240);
+    requireActionIn(runtime.currentActionId(), {"idle_tapping_head", "idle_look_up"}, "右朝向头部左侧不应有点击空洞");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
     bridge.submitPrimaryClick(100, 40, 240, 240);
     requireActionIn(runtime.currentActionId(), {"idle_tapping_head", "idle_look_up"}, "点击头部应触发头部候选动作");
 
@@ -694,12 +699,12 @@ int main(int argc, char *argv[])
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    bridge.submitPrimaryClick(120, 138, 240, 240);
-    require(runtime.currentActionId() == "bow", "点击肚子上半应触发鞠躬");
+    bridge.submitPrimaryClick(120, 104, 240, 240);
+    require(runtime.currentActionId() == "bow", "点击腰部上半应触发鞠躬而不是胸口动作");
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    bridge.submitPrimaryClick(120, 158, 240, 240);
+    bridge.submitPrimaryClick(120, 118, 240, 240);
     require(runtime.currentActionId() == "idle_pointing", "点击肚子下半应触发指点");
 
     runtime.returnToIdle();
@@ -721,6 +726,14 @@ int main(int argc, char *argv[])
     runtime.setFacing("left");
     bridge.submitPrimaryClick(95, 200, 240, 240);
     require(runtime.currentActionId() == "idle_look_down", "左朝向点击左侧腿部应触发低头看");
+
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    require(runtime.manifest().actionPools.contains("click.fallback"), "manifest 应加载 click.fallback 动作池");
+    const int playbackSerialBeforeFallback = runtime.playbackSerial();
+    bridge.submitPrimaryClick(10, 10, 240, 240);
+    require(runtime.currentActionId() == "idle_stand", "fallback 点击应保持待机动作");
+    require(runtime.playbackSerial() == playbackSerialBeforeFallback, "fallback returnToIdle 不应重启 idle_stand 动画");
 
     const QString soundBeforeMutedPlay = runtime.currentSoundUrl().toString();
     runtime.toggleAudioMuted();

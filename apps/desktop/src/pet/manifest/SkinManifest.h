@@ -82,6 +82,7 @@ struct PropDefinition
 
 struct ActionPoolEntry
 {
+    ActionRequest request;
     QString recipeId;
     QString actionId;
     int weight = 1;

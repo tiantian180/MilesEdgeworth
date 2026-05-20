@@ -28,24 +28,28 @@ def main() -> int:
 
     for token in [
         "requireActionIn",
+        "右朝向头部左侧不应有点击空洞",
         "点击头部应触发头部候选动作",
         "点击大臂应触发转身",
         "点击小臂应触发小臂候选动作",
         "点击胸口应触发抱臂思考",
-        "点击肚子上半应触发鞠躬",
+        "点击腰部上半应触发鞠躬而不是胸口动作",
         "点击肚子下半应触发指点",
         "右朝向点击左侧腿部应触发后退",
         "右朝向点击右侧腿部应触发低头看",
         "左朝向点击右侧腿部应触发后退",
         "左朝向点击左侧腿部应触发低头看",
+        "fallback returnToIdle 不应重启 idle_stand 动画",
+        "bridge.submitPrimaryClick(50, 40, 240, 240)",
         "bridge.submitPrimaryClick(100, 40, 240, 240)",
         "bridge.submitPrimaryClick(60, 85, 240, 240)",
         "bridge.submitPrimaryClick(60, 130, 240, 240)",
         "bridge.submitPrimaryClick(120, 85, 240, 240)",
-        "bridge.submitPrimaryClick(120, 138, 240, 240)",
-        "bridge.submitPrimaryClick(120, 158, 240, 240)",
+        "bridge.submitPrimaryClick(120, 104, 240, 240)",
+        "bridge.submitPrimaryClick(120, 118, 240, 240)",
         "bridge.submitPrimaryClick(95, 200, 240, 240)",
         "bridge.submitPrimaryClick(145, 200, 240, 240)",
+        "bridge.submitPrimaryClick(10, 10, 240, 240)",
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少单击分区行为覆盖：{token}")
 

@@ -124,10 +124,10 @@
           "width": 42,
           "height": 44,
           "polygon": [
-            { "x": 148, "y": 0 },
-            { "x": 240, "y": 0 },
-            { "x": 240, "y": 56 },
-            { "x": 102, "y": 56 }
+            { "x": 143, "y": 20 },
+            { "x": 220, "y": 20 },
+            { "x": 220, "y": 66 },
+            { "x": 105, "y": 66 }
           ]
         },
         "left": {
@@ -136,181 +136,188 @@
           "width": 42,
           "height": 44,
           "polygon": [
-            { "x": 0, "y": 0 },
-            { "x": 87, "y": 0 },
-            { "x": 133, "y": 56 },
-            { "x": 0, "y": 56 }
+            { "x": 20, "y": 20 },
+            { "x": 97, "y": 20 },
+            { "x": 135, "y": 66 },
+            { "x": 20, "y": 66 }
           ]
         }
       }
     },
     "head": {
       "type": "rect",
-      "x": 78,
+      "x": 20,
       "y": 20,
-      "width": 84,
-      "height": 50,
+      "width": 200,
+      "height": 46,
       "variants": {
         "right": {
-          "x": 78,
+          "x": 20,
           "y": 20,
-          "width": 84,
-          "height": 50
+          "width": 200,
+          "height": 46
         },
         "left": {
-          "x": 78,
+          "x": 20,
           "y": 20,
-          "width": 84,
-          "height": 50
+          "width": 200,
+          "height": 46
         }
       }
     },
     "upper_arm": {
       "type": "rect",
-      "x": 42,
-      "y": 70,
-      "width": 54,
-      "height": 44,
+      "x": 20,
+      "y": 66,
+      "width": 86,
+      "height": 34,
       "variants": {
         "right": {
-          "x": 42,
-          "y": 70,
-          "width": 54,
-          "height": 44
+          "x": 20,
+          "y": 66,
+          "width": 86,
+          "height": 34
         },
         "left": {
-          "x": 144,
-          "y": 70,
-          "width": 54,
-          "height": 44
+          "x": 134,
+          "y": 66,
+          "width": 86,
+          "height": 34
         }
       }
     },
     "forearm": {
       "type": "rect",
-      "x": 42,
-      "y": 96,
-      "width": 64,
-      "height": 46,
+      "x": 20,
+      "y": 100,
+      "width": 86,
+      "height": 34,
       "variants": {
         "right": {
-          "x": 42,
-          "y": 96,
-          "width": 64,
-          "height": 46
+          "x": 20,
+          "y": 100,
+          "width": 86,
+          "height": 34
         },
         "left": {
           "x": 134,
-          "y": 96,
-          "width": 64,
-          "height": 46
+          "y": 100,
+          "width": 86,
+          "height": 34
         }
       }
     },
     "chest": {
       "type": "rect",
-      "x": 92,
-      "y": 72,
-      "width": 62,
-      "height": 54,
+      "x": 106,
+      "y": 66,
+      "width": 114,
+      "height": 30,
       "variants": {
         "right": {
-          "x": 92,
-          "y": 72,
-          "width": 62,
-          "height": 54
+          "x": 106,
+          "y": 66,
+          "width": 114,
+          "height": 30
         },
         "left": {
-          "x": 86,
-          "y": 72,
-          "width": 62,
-          "height": 54
+          "x": 20,
+          "y": 66,
+          "width": 114,
+          "height": 30
         }
       }
     },
     "belly_bow": {
       "type": "rect",
-      "x": 86,
-      "y": 126,
-      "width": 74,
-      "height": 22,
+      "x": 106,
+      "y": 96,
+      "width": 114,
+      "height": 16,
       "variants": {
         "right": {
-          "x": 86,
-          "y": 126,
-          "width": 74,
-          "height": 22
+          "x": 106,
+          "y": 96,
+          "width": 114,
+          "height": 16
         },
         "left": {
-          "x": 80,
-          "y": 126,
-          "width": 74,
-          "height": 22
+          "x": 20,
+          "y": 96,
+          "width": 114,
+          "height": 16
         }
       }
     },
     "belly_pointing": {
       "type": "rect",
-      "x": 86,
-      "y": 148,
-      "width": 74,
-      "height": 22,
+      "x": 106,
+      "y": 112,
+      "width": 114,
+      "height": 14,
       "variants": {
         "right": {
-          "x": 86,
-          "y": 148,
-          "width": 74,
-          "height": 22
+          "x": 106,
+          "y": 112,
+          "width": 114,
+          "height": 14
         },
         "left": {
-          "x": 80,
-          "y": 148,
-          "width": 74,
-          "height": 22
+          "x": 20,
+          "y": 112,
+          "width": 114,
+          "height": 14
         }
       }
     },
     "legs_back": {
       "type": "rect",
-      "x": 74,
-      "y": 166,
-      "width": 46,
-      "height": 58,
+      "x": 20,
+      "y": 126,
+      "width": 100,
+      "height": 98,
       "variants": {
         "right": {
-          "x": 74,
-          "y": 166,
-          "width": 46,
-          "height": 58
+          "x": 20,
+          "y": 126,
+          "width": 100,
+          "height": 98
         },
         "left": {
           "x": 120,
-          "y": 166,
-          "width": 46,
-          "height": 58
+          "y": 126,
+          "width": 100,
+          "height": 98
         }
       }
     },
     "legs_look_down": {
       "type": "rect",
       "x": 120,
-      "y": 166,
-      "width": 46,
-      "height": 58,
+      "y": 126,
+      "width": 100,
+      "height": 98,
       "variants": {
         "right": {
           "x": 120,
-          "y": 166,
-          "width": 46,
-          "height": 58
+          "y": 126,
+          "width": 100,
+          "height": 98
         },
         "left": {
-          "x": 74,
-          "y": 166,
-          "width": 46,
-          "height": 58
+          "x": 20,
+          "y": 126,
+          "width": 100,
+          "height": 98
         }
       }
+    },
+    "fallback": {
+      "type": "rect",
+      "x": 0,
+      "y": 0,
+      "width": 240,
+      "height": 240
     }
   },
   "clickBehaviors": {
@@ -323,7 +330,8 @@
       { "zone": "belly_bow", "pool": "click.bellyBow" },
       { "zone": "belly_pointing", "pool": "click.bellyPointingArea" },
       { "zone": "legs_back", "pool": "click.legsBackArea" },
-      { "zone": "legs_look_down", "pool": "click.legsLookDownArea" }
+      { "zone": "legs_look_down", "pool": "click.legsLookDownArea" },
+      { "zone": "fallback", "pool": "click.fallback" }
     ],
     "doubleClick": [
       { "when": "default", "customInteraction": "prosecutor_badge" },
@@ -1575,6 +1583,15 @@
       "entries": [
         {
           "recipe": "click.legsLookDown",
+          "weight": 1
+        }
+      ]
+    },
+    "click.fallback": {
+      "label": "无特定区域",
+      "entries": [
+        {
+          "type": "returnToIdle",
           "weight": 1
         }
       ]

@@ -200,6 +200,11 @@ void PetRuntime::playActionFromPool(const QString &poolId)
     }
 
     const ActionPoolEntry entry = ActionPoolSelector::selectEntry(m_manifest.actionPools.value(normalizedPoolId));
+    if (entry.request.kind != ActionRequestKind::None) {
+        submitActionRequest(entry.request);
+        return;
+    }
+
     if (!entry.recipeId.isEmpty() && m_manifest.recipes.contains(entry.recipeId)) {
         playRecipe(entry.recipeId);
         return;
@@ -373,6 +378,14 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
 
 void PetRuntime::returnToIdle()
 {
+    const QString idleAction = actionForState(QStringLiteral("idle"));
+    if (m_currentRecipeId.isEmpty()
+            && m_currentState == QStringLiteral("idle")
+            && !idleAction.isEmpty()
+            && m_currentActionId == idleAction) {
+        return;
+    }
+
     clearActiveRecipe();
 
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
