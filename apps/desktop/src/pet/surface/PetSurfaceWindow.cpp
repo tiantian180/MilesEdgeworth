@@ -251,7 +251,9 @@ void PetSurfaceWindow::restartMovieFromRuntime()
 
     m_movie->stop();
     m_movie->setFileName(path);
-    m_movie->jumpToFrame(0);
+    // 不要先 jumpToFrame(0) 再 start()：Qt 会同步发出 frame 0，
+    // 随后 start() 立刻进入 frame 1，walk/run 的首帧就没有正常显示时长。
+    // 直接 start() 可让 QMovie 以正常节奏从首帧开始。
     m_movie->start();
     applyCurrentFrameMask();
 }

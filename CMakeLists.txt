@@ -559,5 +559,13 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_1_prop_surface_window_behavior.py
         )
+
+        # Phase 1.2 的 QMovie 启动时序检查：walk/run 不能因为
+        # jumpToFrame(0) + start() 连续触发 frame 0/1 而跳过首帧时长。
+        add_test(
+            NAME check_phase_1_2_locomotion_qmovie_start
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_2_locomotion_qmovie_start.py
+        )
     endif()
 endif()
