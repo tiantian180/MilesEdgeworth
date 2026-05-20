@@ -291,6 +291,12 @@ struct ClickBehaviorDefinition
 // 不直接读 manifest.json，也不允许在运行时修改它。
 struct SkinManifest
 {
+    // 当前加载的皮肤元信息。Runtime 和菜单只读这些字段，不直接读取 skin.json。
+    QString skinId;
+    QString skinName;
+    QUrl skinRootUrl;
+    bool builtin = false;
+
     CanvasDefinition canvas;
     AudioDefinition audio;
     CapabilityDefinition capabilities;

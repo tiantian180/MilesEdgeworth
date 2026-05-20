@@ -567,5 +567,6 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_2_locomotion_qmovie_start.py
         )
+
     endif()
 endif()
