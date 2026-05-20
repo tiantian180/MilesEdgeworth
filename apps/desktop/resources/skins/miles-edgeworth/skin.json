@@ -1,0 +1,10 @@
+{
+  "id": "miles-edgeworth",
+  "name": "御剑怜侍",
+  "version": "0.2.0",
+  "author": "tiantian180",
+  "license": "fan-project",
+  "manifestVersion": 1,
+  "minAppVersion": "0.2.0",
+  "thumbnail": "skin:assets/body/idle/stand-right.gif"
+}
