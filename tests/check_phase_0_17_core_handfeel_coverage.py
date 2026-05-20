@@ -72,6 +72,7 @@ def main() -> int:
         "click.bellyPointingArea",
         "click.legsBackArea",
         "click.legsLookDownArea",
+        "click.fallback",
     ], "单击分区顺序应覆盖旧版区域和肚子/腿部子区域")
 
     double_click_recipes = {entry.get("recipe") for entry in action_pools.get("doubleClick.random", {}).get("entries", [])}

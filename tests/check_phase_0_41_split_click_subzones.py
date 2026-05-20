@@ -38,6 +38,7 @@ def main() -> int:
         "click.bellyPointingArea",
         "click.legsBackArea",
         "click.legsLookDownArea",
+        "click.fallback",
     ]
     require([entry.get("pool") for entry in click_order] == expected, "singleClick 应按旧版优先级包含确定性肚子/腿部子区域")
 
@@ -61,7 +62,7 @@ def main() -> int:
 
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     for token in [
-        "点击肚子上半应触发鞠躬",
+        "点击腰部上半应触发鞠躬而不是胸口动作",
         "点击肚子下半应触发指点",
         "右朝向点击左侧腿部应触发后退",
         "右朝向点击右侧腿部应触发低头看",

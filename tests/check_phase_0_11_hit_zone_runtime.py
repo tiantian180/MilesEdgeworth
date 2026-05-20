@@ -23,6 +23,7 @@ HIT_ZONES = [
     "belly_pointing",
     "legs_back",
     "legs_look_down",
+    "fallback",
 ]
 CLICK_POOLS = [
     "click.face",
@@ -34,6 +35,7 @@ CLICK_POOLS = [
     "click.bellyPointingArea",
     "click.legsBackArea",
     "click.legsLookDownArea",
+    "click.fallback",
 ]
 
 
@@ -74,7 +76,10 @@ def main() -> int:
         require(pool_id in action_pools, f"actionPools 缺少 {pool_id}")
         entries = action_pools[pool_id].get("entries", [])
         require(entries, f"{pool_id} 至少需要一个候选动作")
-        require(all("recipe" in entry for entry in entries), f"{pool_id} 候选应引用 recipe")
+        if pool_id == "click.fallback":
+            require(entries == [{"type": "returnToIdle", "weight": 1}], "click.fallback 应只请求 returnToIdle")
+        else:
+            require(all("recipe" in entry for entry in entries), f"{pool_id} 候选应引用 recipe")
 
     expected_recipes = {
         "click.faceScared": "scared",
