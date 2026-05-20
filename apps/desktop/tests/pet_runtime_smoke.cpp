@@ -1,5 +1,6 @@
 #include "pet/PetRuntime.h"
 #include "pet/events/PetEventBridge.h"
+#include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/requests/ActionRequest.h"
 
 #include <QCoreApplication>
@@ -12,6 +13,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 
 namespace {
 
@@ -58,6 +60,67 @@ struct RecipeActionCase
 {
     const char *recipeId;
     const char *actionId;
+};
+
+class ObserverCustomInteraction final : public CustomInteraction
+{
+public:
+    explicit ObserverCustomInteraction(int *seenEvents)
+        : m_seenEvents(seenEvents)
+    {
+    }
+
+    QString id() const override
+    {
+        return QStringLiteral("test.observer");
+    }
+
+    QSet<PetEventType> supportedEvents() const override
+    {
+        return {PetEventType::PointerSingleClick, PetEventType::PointerDoubleClick};
+    }
+
+    CustomInteractionResult handleEvent(
+        const PetEvent &,
+        const RuntimeSnapshot &,
+        CustomInteractionHostApi &
+    ) override
+    {
+        if (m_seenEvents != nullptr) {
+            ++(*m_seenEvents);
+        }
+        return {};
+    }
+
+private:
+    int *m_seenEvents = nullptr;
+};
+
+class SkipDefaultCustomInteraction final : public CustomInteraction
+{
+public:
+    QString id() const override
+    {
+        return QStringLiteral("test.skipDefault");
+    }
+
+    QSet<PetEventType> supportedEvents() const override
+    {
+        return {PetEventType::PointerDoubleClick};
+    }
+
+    CustomInteractionResult handleEvent(
+        const PetEvent &,
+        const RuntimeSnapshot &,
+        CustomInteractionHostApi &host
+    ) override
+    {
+        // Host API 只生成 ActionRequest，不直接碰 PetRuntime。
+        host.emitAction(QStringLiteral("bow"));
+        host.skipDefault();
+        host.stopPropagation();
+        return {};
+    }
 };
 
 void requireSignedDelta(double value, int expectedSign, const QString &recipeId, const char *axis)
@@ -129,6 +192,23 @@ int main(int argc, char *argv[])
     runtime.handleAnimationFinished();
     require(runtime.currentActionId() == "idle_stand", "公文包停下后应进入 idle_stand");
     require(runtime.currentRecipeId().isEmpty(), "启动序列结束后应清空 currentRecipeId");
+
+    CustomInteractionRegistry::clearForTest();
+    int observerEvents = 0;
+    CustomInteractionRegistry::registerInteraction(std::make_unique<ObserverCustomInteraction>(&observerEvents));
+    runtime.returnToIdle();
+    runtime.setFacing("right");
+    bridge.submitPrimaryClick(145, 40, 240, 240);
+    require(observerEvents == 1, "观察型 CI 应收到单击事件");
+    require(runtime.currentActionId() == "scared", "观察型 CI 不应改变默认单击行为");
+
+    CustomInteractionRegistry::clearForTest();
+    CustomInteractionRegistry::registerInteraction(std::make_unique<SkipDefaultCustomInteraction>());
+    runtime.returnToIdle();
+    bridge.submitDoubleClick();
+    require(runtime.currentActionId() == "bow", "skipDefault CI 应能跳过默认双击并提交自己的动作请求");
+    CustomInteractionRegistry::clearForTest();
+    runtime.returnToIdle();
 
     require(runtime.petSizeId() == "medium", "默认尺寸档位应为中");
     requireNear(runtime.petScale(), 2.0, "默认 scale 应对应旧版中号 scale=2");

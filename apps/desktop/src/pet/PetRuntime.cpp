@@ -232,6 +232,17 @@ void PetRuntime::submitActionRequest(const ActionRequest &request)
     case ActionRequestKind::ToggleFacing:
         toggleFacing();
         return;
+    case ActionRequestKind::SpawnProp:
+        m_propController.spawnFromRequest(m_manifest, request.targetId, m_currentFacing, m_petScale, request.options);
+        return;
+    case ActionRequestKind::PlaySound:
+        if (!m_audioMuted && !request.targetId.isEmpty()) {
+            m_currentSoundUrl = QUrl(request.targetId);
+            ++m_soundPlaybackSerial;
+            emit currentSoundUrlChanged();
+            emit soundPlaybackSerialChanged();
+        }
+        return;
     }
 }
 

@@ -4,6 +4,7 @@
 #include "pet/manifest/SkinManifest.h"
 
 #include <QObject>
+#include <QVariantMap>
 
 class PropController : public QObject
 {
@@ -21,6 +22,13 @@ public:
         const RecipeDefinition &recipe,
         const QString &facing,
         double petScale
+    );
+    void spawnFromRequest(
+        const SkinManifest &manifest,
+        const QString &propId,
+        const QString &facing,
+        double petScale,
+        const QVariantMap &overrides = {}
     );
     void hide();
 

@@ -10,6 +10,7 @@
 #include <QString>
 #include <QStringList>
 #include <QUrl>
+#include <QVariantMap>
 
 // SkinManifest 保存皮肤包 manifest.json 解析后的结构化数据。
 //
@@ -203,6 +204,8 @@ struct SkinManifest
     QHash<QString, HitZoneDefinition> hitZones;
     QHash<QString, SkinCommandDefinition> skinCommands;
     ClickBehaviorDefinition clickBehaviors;
+    QStringList customInteractions;
+    QHash<QString, QVariantMap> customInteractionConfigs;
     QHash<QString, QString> movementFacingMap;
     QString fallbackAction = "idle_stand";
     QStringList facings = {"right", "left"};

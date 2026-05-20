@@ -218,6 +218,27 @@ SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
         }
     }
 
+    const QJsonArray customInteractions = root.value("customInteractions").toArray();
+    for (const QJsonValue &value : customInteractions) {
+        QString interactionId;
+        if (value.isObject()) {
+            interactionId = value.toObject().value("id").toString();
+        } else {
+            interactionId = value.toString();
+        }
+
+        if (!interactionId.isEmpty() && !manifest.customInteractions.contains(interactionId)) {
+            manifest.customInteractions.append(interactionId);
+        }
+    }
+
+    const QJsonObject customInteractionConfig = root.value("customInteractionConfig").toObject();
+    for (auto it = customInteractionConfig.constBegin(); it != customInteractionConfig.constEnd(); ++it) {
+        if (!it.key().isEmpty() && it.value().isObject()) {
+            manifest.customInteractionConfigs.insert(it.key(), it.value().toObject().toVariantMap());
+        }
+    }
+
     const QJsonObject skinCommands = root.value("skinCommands").toObject();
     for (auto it = skinCommands.constBegin(); it != skinCommands.constEnd(); ++it) {
         const QJsonObject commandObject = it.value().toObject();

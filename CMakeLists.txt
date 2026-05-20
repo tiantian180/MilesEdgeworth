@@ -479,17 +479,14 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_64_surface_menu_regressions.py
         )
 
-        # Phase 0.65 的架构门禁：把当前已知的 Miles 专属硬编码点
-        # 转成可执行断言。此阶段它们是有意存在的技术债，所以先用
-        # WILL_FAIL 保持总测试绿色；后续每完成一个去定制化 Phase，
-        # 就把对应断言翻成普通通过项。
+        # Phase 0.65 的架构门禁：把当前已知的框架边界债务转成可执行断言。
+        # 已收口的债务会迁入对应 Phase 的正常检查，避免长期保留临时失败标记。
         add_test(
             NAME check_phase_0_65_architecture_guardrails
             COMMAND ${CMAKE_COMMAND}
                     -DPROJECT_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
                     -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_65_architecture_guardrails.cmake
         )
-        set_tests_properties(check_phase_0_65_architecture_guardrails PROPERTIES WILL_FAIL TRUE)
 
         # Phase 0.66 的 ClickBehavior 配置化检查：单击 zone 到动作池、
         # 双击默认动作池都应来自 manifest，HitZoneMatcher 不再知道 click.* 命名。
@@ -521,6 +518,14 @@ if(BUILD_TESTING)
             NAME check_phase_0_69_canvas_and_size_externalised
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_69_canvas_and_size_externalised.py
+        )
+
+        # Phase 0.70 的 CustomInteraction Host API 检查：Registry 必须从
+        # 空壳变成可注册、可分发、可通过受控 Host API 产生请求的扩展点。
+        add_test(
+            NAME check_phase_0_70_custom_interaction_host_api
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_70_custom_interaction_host_api.py
         )
     endif()
 endif()

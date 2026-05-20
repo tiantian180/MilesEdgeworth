@@ -1,5 +1,6 @@
 #include "DesktopShellController.h"
 #include "pet/events/PetEventBridge.h"
+#include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/PetRuntime.h"
 #include "pet/surface/PetSurfaceWindow.h"
 
@@ -18,6 +19,7 @@ int main(int argc, char *argv[])
     DesktopShellControllerForeign::s_instance = &shellController;
 
     PetRuntime petRuntime;
+    CustomInteractionRegistry::registerBuiltins(petRuntime.manifest());
     PetRuntimeForeign::s_instance = &petRuntime;
     PetEventBridge petEventBridge(&petRuntime);
     PetEventBridgeForeign::s_instance = &petEventBridge;

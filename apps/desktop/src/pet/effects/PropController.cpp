@@ -51,6 +51,49 @@ void PropController::scheduleForRecipe(
     });
 }
 
+void PropController::spawnFromRequest(
+    const SkinManifest &manifest,
+    const QString &propId,
+    const QString &facing,
+    double petScale,
+    const QVariantMap &overrides
+)
+{
+    if (propId.isEmpty() || !manifest.props.contains(propId)) {
+        ++m_requestSerial;
+        return;
+    }
+
+    PropDefinition prop = manifest.props.value(propId);
+    if (overrides.contains(QStringLiteral("delayMs"))) {
+        bool ok = false;
+        const int delayMs = overrides.value(QStringLiteral("delayMs")).toInt(&ok);
+        if (ok) {
+            prop.delayMs = delayMs;
+        }
+    }
+    if (overrides.contains(QStringLiteral("durationMs"))) {
+        bool ok = false;
+        const int durationMs = overrides.value(QStringLiteral("durationMs")).toInt(&ok);
+        if (ok) {
+            prop.durationMs = durationMs;
+        }
+    }
+
+    const QString defaultFacing = manifest.defaultFacing;
+    const int requestSerial = ++m_requestSerial;
+
+    // Custom Interaction 只能请求一个 manifest 已声明的 Prop。
+    // overrides 只覆盖运行时参数，不允许绕过皮肤包的资源和尺寸定义。
+    QTimer::singleShot(qMax(0, prop.delayMs), this, [this, prop, facing, defaultFacing, petScale, requestSerial]() {
+        if (requestSerial != m_requestSerial) {
+            return;
+        }
+
+        spawn(prop, facing, defaultFacing, petScale);
+    });
+}
+
 void PropController::hide()
 {
     ++m_requestSerial;

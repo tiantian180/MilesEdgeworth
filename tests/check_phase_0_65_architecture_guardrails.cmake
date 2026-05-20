@@ -1,8 +1,7 @@
 # Phase 0.65 架构门禁：把阶段记录里的“已知硬编码点”变成可执行检查。
 #
-# 当前阶段这些检查预期会失败，所以 CTest 里会暂时标记 WILL_FAIL。
-# 后续 Phase 0.70-0.73 每消掉一组硬编码，就把对应断言从 WILL_FAIL 债务
-# 翻成普通通过项，避免通用框架继续混入 Miles 皮肤专属逻辑。
+# 随着 Phase 0.66-0.70 逐步收口，当前已知硬编码点已经转入正常测试。
+# 后续如果发现新的框架边界债务，再在这里追加明确断言。
 
 if(NOT DEFINED PROJECT_SOURCE_DIR)
     message(FATAL_ERROR "PROJECT_SOURCE_DIR is required")
@@ -42,13 +41,6 @@ function(_check_absent ITEM_ID PHASE FILE_PATH TOKEN DESCRIPTION)
         set(_HAS_FAILURE TRUE PARENT_SCOPE)
     endif()
 endfunction()
-
-# 10. CustomInteractionRegistry 不应停留在空壳。
-_check_absent(10 0.70
-    "apps/desktop/src/pet/interaction/CustomInteractionRegistry.cpp"
-    "Q_UNUSED(event)"
-    "custom interaction registry must dispatch real handlers"
-)
 
 if(_HAS_FAILURE)
     message(FATAL_ERROR "Phase 0.65 architecture guardrails found known framework boundary debt")

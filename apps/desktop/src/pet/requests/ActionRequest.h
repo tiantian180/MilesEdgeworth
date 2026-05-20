@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QString>
+#include <QUrl>
+#include <QVariantMap>
 
 // ActionRequest 描述“最终要让运行时做什么”。
 //
@@ -20,6 +22,8 @@ enum class ActionRequestKind
     Action,
     ReturnToIdle,
     ToggleFacing,
+    SpawnProp,
+    PlaySound,
 };
 
 struct ActionRequest
@@ -27,6 +31,7 @@ struct ActionRequest
     ActionRequestKind kind = ActionRequestKind::None;
     InterruptHint interruptHint = InterruptHint::Immediate;
     QString targetId;
+    QVariantMap options;
     bool hideCurrentProp = false;
 
     static ActionRequest none()
@@ -69,6 +74,23 @@ struct ActionRequest
     {
         ActionRequest request;
         request.kind = ActionRequestKind::ToggleFacing;
+        return request;
+    }
+
+    static ActionRequest spawnProp(const QString &propId, const QVariantMap &overrides = {})
+    {
+        ActionRequest request;
+        request.kind = ActionRequestKind::SpawnProp;
+        request.targetId = propId.trimmed();
+        request.options = overrides;
+        return request;
+    }
+
+    static ActionRequest playSound(const QUrl &url)
+    {
+        ActionRequest request;
+        request.kind = ActionRequestKind::PlaySound;
+        request.targetId = url.toString();
         return request;
     }
 
