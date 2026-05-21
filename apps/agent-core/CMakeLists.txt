@@ -2,7 +2,10 @@ cmake_minimum_required(VERSION 3.21)
 
 project(MilesAgentCore LANGUAGES NONE)
 
-find_program(GO_EXECUTABLE go REQUIRED)
+find_program(GO_EXECUTABLE go)
+if(NOT GO_EXECUTABLE)
+    message(FATAL_ERROR "Go toolchain is required to build miles-agent")
+endif()
 
 set(MILES_AGENT_OUTPUT
     "${CMAKE_CURRENT_BINARY_DIR}/miles-agent${CMAKE_EXECUTABLE_SUFFIX}"
