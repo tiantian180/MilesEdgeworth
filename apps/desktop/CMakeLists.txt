@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia Network QuickControls2)
 include(CTest)
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -211,4 +211,66 @@ if(BUILD_TESTING)
         NAME pet_runtime_smoke
         COMMAND PetRuntimeSmoke
     )
+
+    qt_add_executable(ChatControllerSmoke
+        tests/chat_controller_smoke.cpp
+        src/chat/ChatController.cpp
+        src/chat/ChatController.h
+        src/chat/ChatStreamEvent.cpp
+        src/chat/ChatStreamEvent.h
+        src/pet/behavior/BehaviorTriggerEngine.cpp
+        src/pet/behavior/BehaviorTriggerEngine.h
+        src/pet/commands/SkinCommand.h
+        src/pet/commands/SkinCommandResolver.cpp
+        src/pet/commands/SkinCommandResolver.h
+        src/pet/effects/AudioController.cpp
+        src/pet/effects/AudioController.h
+        src/pet/effects/PropController.cpp
+        src/pet/effects/PropController.h
+        src/pet/effects/PropState.h
+        src/pet/events/PetEvent.h
+        src/pet/events/PetEventBridge.cpp
+        src/pet/events/PetEventBridge.h
+        src/pet/interaction/CustomInteractionRegistry.cpp
+        src/pet/interaction/CustomInteractionRegistry.h
+        src/pet/interaction/GestureTracker.cpp
+        src/pet/interaction/GestureTracker.h
+        src/pet/interaction/HitZoneMatcher.cpp
+        src/pet/interaction/HitZoneMatcher.h
+        src/pet/interaction/InteractionPipeline.cpp
+        src/pet/interaction/InteractionPipeline.h
+        src/pet/manifest/SkinManifest.h
+        src/pet/manifest/SkinManifestLoader.cpp
+        src/pet/manifest/SkinManifestLoader.h
+        src/pet/PetRuntime.cpp
+        src/pet/PetRuntime.h
+        src/pet/PetRuntimeSkin.cpp
+        src/pet/requests/ActionRequest.h
+        src/pet/runtime/RuntimeSnapshot.h
+        src/pet/selection/ActionPoolSelector.cpp
+        src/pet/selection/ActionPoolSelector.h
+        src/pet/selection/ExpressionMappingResolver.cpp
+        src/pet/selection/ExpressionMappingResolver.h
+        src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
+        src/skins/miles-edgeworth/MilesEdgeworthInteractions.h
+        src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.cpp
+        src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.h
+        resources/pet_assets.qrc
+    )
+
+    target_include_directories(ChatControllerSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/pet/events
+    )
+
+    target_link_libraries(ChatControllerSmoke
+        PRIVATE
+            Qt6::Core
+            Qt6::Qml
+            Qt6::Network
+    )
+
+    add_test(NAME chat_controller_smoke COMMAND ChatControllerSmoke)
 endif()
