@@ -17,3 +17,7 @@ void applyMacPetWindowBaseBehavior(QWindow *window);
 // 注意：这里故意不使用 SkyLight 私有 Space。SkyLight 更适合未来单独做
 // “固定在屏幕最上层”的实验模式，不适合这个需要可随时取消的普通开关。
 void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop);
+
+// 聊天窗口是普通工作窗口，打开时应让应用显示在 Dock；关闭后恢复桌宠
+// 辅助应用模式，避免只剩桌宠本体时占用普通应用位置。
+void setMacApplicationDockVisible(bool visible);

@@ -43,6 +43,7 @@ public slots:
     Q_INVOKABLE void movePetWindowTo(double x, double y);
     Q_INVOKABLE void setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize);
     Q_INVOKABLE void clearPetInputMask();
+    Q_INVOKABLE void setChatWindowDockVisible(bool visible);
 
 signals:
     void alwaysOnTopChanged();

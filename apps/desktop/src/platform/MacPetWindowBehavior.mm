@@ -89,3 +89,11 @@ void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop)
     // 取消置顶只改变之后的覆盖规则，不主动把桌宠丢到窗口栈底部。
     // 这样用户手滑点错时，桌宠仍停在原地，后续自然可以被其他窗口覆盖。
 }
+
+void setMacApplicationDockVisible(bool visible)
+{
+    [NSApp setActivationPolicy:visible ? NSApplicationActivationPolicyRegular : NSApplicationActivationPolicyAccessory];
+    if (visible) {
+        [NSApp activateIgnoringOtherApps:YES];
+    }
+}

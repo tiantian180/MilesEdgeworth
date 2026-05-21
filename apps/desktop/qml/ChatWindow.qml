@@ -11,8 +11,11 @@ ApplicationWindow {
     minimumWidth: 360
     minimumHeight: 420
     visible: false
+    flags: Qt.Window
     title: "Miles Chat"
     color: "#f7f4ef"
+
+    onVisibleChanged: App.DesktopShell.setChatWindowDockVisible(visible)
 
     function open() {
         show()

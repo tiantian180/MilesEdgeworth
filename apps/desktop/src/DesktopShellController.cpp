@@ -176,6 +176,15 @@ void DesktopShellController::clearPetInputMask()
     WindowInputMaskController::clearMask(m_petWindow);
 }
 
+void DesktopShellController::setChatWindowDockVisible(bool visible)
+{
+#ifdef Q_OS_MACOS
+    setMacApplicationDockVisible(visible);
+#else
+    Q_UNUSED(visible);
+#endif
+}
+
 void DesktopShellController::createTrayIcon()
 {
     if (m_trayIcon != nullptr) {
