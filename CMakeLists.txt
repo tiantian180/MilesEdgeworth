@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(CTest)
 
+add_subdirectory(apps/agent-core)
 add_subdirectory(apps/desktop)
 
 if(BUILD_TESTING)
