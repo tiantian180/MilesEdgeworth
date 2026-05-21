@@ -44,5 +44,17 @@ int main()
     require(events[0].value.value("state").toString() == "speaking", "custom state should parse");
     require(events[0].value.value("expression").toString() == "objection", "custom expression should parse");
 
+    events = parser.ingest("data: {not-json}\n\n");
+    require(events.isEmpty(), "malformed JSON should be ignored");
+
+    events = parser.ingest(":\n\n");
+    require(events.isEmpty(), "comment-only frame should be ignored");
+
+    events = parser.ingest("\n\n");
+    require(events.isEmpty(), "blank frame should be ignored");
+
+    events = parser.ingest("data: {\"runId\":\"missing-type\"}\n\n");
+    require(events.isEmpty(), "event without type should be ignored");
+
     return 0;
 }

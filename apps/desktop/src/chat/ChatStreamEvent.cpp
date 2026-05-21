@@ -84,7 +84,10 @@ QList<ChatStreamEvent> ChatStreamEventParser::ingest(const QByteArray &chunk)
             QJsonParseError error;
             const QJsonDocument document = QJsonDocument::fromJson(payload, &error);
             if (error.error == QJsonParseError::NoError && document.isObject()) {
-                events.append(eventFromObject(document.object()));
+                const ChatStreamEvent event = eventFromObject(document.object());
+                if (!event.type.isEmpty()) {
+                    events.append(event);
+                }
             }
         }
 
