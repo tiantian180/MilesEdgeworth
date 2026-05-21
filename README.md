@@ -87,7 +87,7 @@ CMake: Delete Cache and Reconfigure
 
 ## 当前状态
 
-Phase 1 框架主干已经完成，当前重点是进入 Phase 2 AI 接入前的手感收尾和皮肤包去编译化准备。
+Phase 1 框架主干和收尾体验修复已经完成，当前主线进入 Phase 2：AI 聊天桌宠最小闭环。
 
 已完成的主干能力：
 
@@ -111,12 +111,12 @@ Phase 1 框架主干已经完成，当前重点是进入 Phase 2 AI 接入前的
 - 语音语言已改为可选 Audio Capability，Miles 皮肤通过 manifest 声明日语、英语、中文，右键菜单按声明动态生成语音子菜单。
 - ExpressionMapping schema 已接入，后续 AI / Agent 可以请求当前皮肤声明的 expression，由运行时映射到具体动作。
 
-进入 Phase 2 前需要优先处理：
+Phase 2 期间可以并行处理的框架债务：
 
-- HitZone 坐标错位和点击空洞。
-- 拖拽晃动触发不稳定。
-- 检察官徽章尺寸和起点需要按 v1 实测值校准。
-- 文件系统皮肤包已接入；后续重点是完善 HitZone schema、连续缩放控件和 Pet Skin Studio。
+- HitZone schema 迁到 image-space。
+- 连续缩放控件。
+- Pet Skin Studio。
+- `PetRuntime` 内部继续拆 `PlaybackController` / `RecipeRunner`。
 
 当前仍是技术验证，不是完整可发布的 v2 AI 桌宠。后续会继续实现 Pet Runtime、聊天窗口、设置中心、模型 Provider、皮肤 manifest 和 Agent Runtime。
 
@@ -133,5 +133,6 @@ Phase 1 框架主干已经完成，当前重点是进入 Phase 2 AI 接入前的
 - [第0阶段桌面壳验证](docs/v2/阶段记录/第0阶段桌面壳验证.md)
 - [Phase 0.65-0.73 工作报告](docs/v2/阶段记录/Phase%200.65-0.73%20工作报告.md)
 - [Phase 1 收尾与体验问题修复计划](docs/v2/阶段记录/Phase%201%20收尾与体验问题修复计划.md)
+- [Phase 2 AI 聊天粗规划](docs/v2/阶段记录/Phase%202%20AI%20聊天粗规划.md)
 
 图片素材和音频素材来自游戏《逆转裁判》和《逆转检事》。本项目仅用于个人学习和技术验证。
