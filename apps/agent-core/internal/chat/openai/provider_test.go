@@ -139,6 +139,56 @@ func TestStreamReplyHappyPath(t *testing.T) {
 	mustFind(func(e chat.StreamEvent) bool { return e.Type == "RUN_FINISHED" }, "RUN_FINISHED")
 }
 
+func TestStreamReplyAcceptsVersionedBaseURL(t *testing.T) {
+	seenPath := ""
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenPath = r.URL.Path
+		if seenPath != "/v1/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL+"/v1", "sk-test", "test-model", 0.5, 256)
+	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	if err != nil {
+		t.Fatalf("StreamReply: %v", err)
+	}
+	for range events {
+	}
+	if seenPath != "/v1/chat/completions" {
+		t.Fatalf("requested path = %q, want /v1/chat/completions", seenPath)
+	}
+}
+
+func TestStreamReplyAcceptsFullChatCompletionsURL(t *testing.T) {
+	seenPath := ""
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenPath = r.URL.Path
+		if seenPath != "/custom/v1/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL+"/custom/v1/chat/completions", "sk-test", "test-model", 0.5, 256)
+	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	if err != nil {
+		t.Fatalf("StreamReply: %v", err)
+	}
+	for range events {
+	}
+	if seenPath != "/custom/v1/chat/completions" {
+		t.Fatalf("requested path = %q, want /custom/v1/chat/completions", seenPath)
+	}
+}
+
 func TestStreamReply4xxBecomesRunError(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":{"message":"invalid api key"}}`, http.StatusUnauthorized)

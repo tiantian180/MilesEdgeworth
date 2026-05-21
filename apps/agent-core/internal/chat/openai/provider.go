@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -27,12 +28,34 @@ type Provider struct {
 
 func NewProvider(baseURL, apiKey, model string, temperature float64, maxTokens int) *Provider {
 	return &Provider{
-		baseURL:     strings.TrimRight(baseURL, "/"),
+		baseURL:     normalizeChatCompletionsURL(baseURL),
 		apiKey:      apiKey,
 		model:       model,
 		temperature: temperature,
 		maxTokens:   maxTokens,
 		httpClient:  &http.Client{Timeout: 120 * time.Second},
+	}
+}
+
+func normalizeChatCompletionsURL(raw string) string {
+	trimmed := strings.TrimRight(strings.TrimSpace(raw), "/")
+	if trimmed == "" {
+		return trimmed
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Path == "" {
+		return trimmed + "/v1/chat/completions"
+	}
+
+	path := strings.TrimRight(parsed.Path, "/")
+	switch {
+	case strings.HasSuffix(path, "/chat/completions"):
+		return trimmed
+	case strings.HasSuffix(path, "/v1"):
+		return trimmed + "/chat/completions"
+	default:
+		return trimmed + "/v1/chat/completions"
 	}
 }
 
@@ -109,7 +132,7 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		p.baseURL+"/v1/chat/completions", bytes.NewReader(encoded))
+		p.baseURL, bytes.NewReader(encoded))
 	if err != nil {
 		close(events)
 		return events, err
