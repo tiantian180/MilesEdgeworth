@@ -1,0 +1,2 @@
+# Python 测试脚本用于质量保障，不计入 GitHub 语言比例。
+tests/*.py linguist-detectable=false
