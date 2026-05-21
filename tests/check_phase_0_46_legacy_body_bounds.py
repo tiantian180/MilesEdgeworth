@@ -24,7 +24,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    old_cpp = read_from_git("main", "MilesEdgeworth.cpp")
+    old_cpp = read_from_git("origin/legacy/v1-qt-widgets", "MilesEdgeworth.cpp")
     for token in [
         "QPoint topLeft = newPos + QPoint(36 * scale, 10 * scale)",
         "QPoint topRight = newPos + QPoint(63 * scale, 10 * scale)",

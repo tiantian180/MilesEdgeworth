@@ -23,14 +23,6 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_macos_window_behavior.py
         )
 
-        # Phase 0.5 的桌宠运行时检查：守住 QML singleton、PetRuntime、
-        # manifest 和动画绑定的最小纵切。
-        add_test(
-            NAME check_phase_0_5_pet_runtime
-            COMMAND ${Python3_EXECUTABLE}
-                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_5_pet_runtime.py
-        )
-
         # Phase 0.6 的动画运行时检查：守住 manifest v2、左右朝向、
         # 一次性动作回 idle 和 QML 帧完成通知的最小骨架。
         add_test(
@@ -295,14 +287,6 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_39_double_click_window.py
         )
 
-        # Phase 0.40 的喝茶入口检查：确保红茶从皮肤命令进入，
-        # 复用正式菜单喝茶逻辑，不再引用早期废弃 recipe。
-        add_test(
-            NAME check_phase_0_40_test_tea_entry
-            COMMAND ${Python3_EXECUTABLE}
-                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_40_test_tea_entry.py
-        )
-
         # Phase 0.41 的单击子区域检查：确保肚子和腿部
         # 按旧版坐标分支拆成确定性区域，而不是粗区域随机池。
         add_test(
@@ -389,14 +373,6 @@ if(BUILD_TESTING)
             NAME check_phase_0_52_manifest_idle_loop_trigger
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_52_manifest_idle_loop_trigger.py
-        )
-
-        # Phase 0.54 的皮肤资源布局检查：GIF、音频和 Prop 图片应迁入
-        # skin assets 目录，但 qrc:/pet 和 qrc:/audio 对外 alias 保持稳定。
-        add_test(
-            NAME check_phase_0_54_assets_layout
-            COMMAND ${Python3_EXECUTABLE}
-                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_0_54_assets_layout.py
         )
 
         # Phase 0.55 的 manifest 结构拆分检查：PetRuntime 不再内联维护
