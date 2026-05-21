@@ -138,3 +138,61 @@ func TestStreamReplyHappyPath(t *testing.T) {
 	}, "idle afterCurrent expression")
 	mustFind(func(e chat.StreamEvent) bool { return e.Type == "RUN_FINISHED" }, "RUN_FINISHED")
 }
+
+func TestStreamReply4xxBecomesRunError(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":{"message":"invalid api key"}}`, http.StatusUnauthorized)
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-bad", "any", 0.7, 128)
+	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	if err != nil {
+		t.Fatalf("StreamReply returned err: %v", err)
+	}
+	var got []chat.StreamEvent
+	for e := range events {
+		got = append(got, e)
+	}
+	if len(got) != 1 || got[0].Type != "RUN_ERROR" {
+		t.Fatalf("expected single RUN_ERROR, got %+v", got)
+	}
+	if !strings.Contains(got[0].Error, "401") {
+		t.Fatalf("RUN_ERROR should mention status code, got %q", got[0].Error)
+	}
+}
+
+func TestStreamReplySkipsMalformedChunks(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher := w.(http.Flusher)
+		for _, line := range []string{
+			"data: {not-json}",
+			`data: {"choices":[{"delta":{"content":"[EXPR:polite]ok"}}]}`,
+			"data: [DONE]",
+		} {
+			fmt.Fprintf(w, "%s\n\n", line)
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "any", 0.7, 128)
+	events, err := p.StreamReply(context.Background(), chat.Request{
+		Message:     "hi",
+		Expressions: []chat.ExpressionInfo{{ID: "polite"}},
+	})
+	if err != nil {
+		t.Fatalf("StreamReply: %v", err)
+	}
+	gotPolite := false
+	for e := range events {
+		if e.Type == "CUSTOM" && e.Value["expression"] == "polite" {
+			gotPolite = true
+		}
+	}
+	if !gotPolite {
+		t.Fatal("expected polite expression after malformed chunk was skipped")
+	}
+}
