@@ -577,5 +577,13 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_1_provider.py
         )
 
+        # Phase 2.2 的用户配置与安全存储检查：守住设置面板、Keychain
+        # 路由、msPerChar 持久化以及 ChatController QProcess env 注入。
+        add_test(
+            NAME check_phase_2_2_settings
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_2_settings.py
+        )
+
     endif()
 endif()
