@@ -160,6 +160,7 @@ void ChatController::cancelCurrentReply()
     }
 
     m_cancelled = true;
+    m_holdBuffer.clear();
     if (m_currentReply) {
         QNetworkReply *reply = m_currentReply;
         m_currentReply.clear();
@@ -256,15 +257,26 @@ void ChatController::appendAssistantDelta(const QString &delta)
         return;
     }
 
+    m_holdBuffer.append(delta);
+    flushHoldBuffer();
+}
+
+void ChatController::flushHoldBuffer()
+{
+    if (m_cancelled || m_holdBuffer.isEmpty()) {
+        return;
+    }
+
     if (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size()) {
         appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
         m_assistantMessageIndex = m_messages.size() - 1;
     }
 
     QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
-    message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + delta);
+    message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + m_holdBuffer);
     message.insert(QStringLiteral("pending"), true);
     m_messages[m_assistantMessageIndex] = message;
+    m_holdBuffer.clear();
     emit messagesChanged();
 }
 
@@ -351,6 +363,7 @@ void ChatController::finishCurrentReply()
     }
 
     m_assistantMessageIndex = -1;
+    m_holdBuffer.clear();
     m_currentReply.clear();
     setSending(false);
     setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
