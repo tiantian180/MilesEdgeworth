@@ -76,6 +76,8 @@ if(APPLE)
     list(APPEND DESKTOP_SOURCES
         src/platform/MacPetWindowBehavior.h
         src/platform/MacPetWindowBehavior.mm
+        src/settings/MacSecretStore.h
+        src/settings/MacSecretStore.mm
     )
 endif()
 
@@ -113,6 +115,11 @@ target_link_libraries(MilesEdgeworthDesktop
         Qt6::Network
         Qt6::QuickControls2
 )
+
+if(APPLE)
+    target_link_libraries(MilesEdgeworthDesktop PRIVATE "-framework Security")
+    target_compile_definitions(MilesEdgeworthDesktop PRIVATE MILES_HAS_MAC_SECRET_STORE)
+endif()
 
 set_target_properties(MilesEdgeworthDesktop PROPERTIES
     MACOSX_BUNDLE TRUE
