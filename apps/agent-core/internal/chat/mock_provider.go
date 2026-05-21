@@ -33,8 +33,8 @@ func (p *MockProvider) StreamReply(ctx context.Context, req Request) (<-chan Str
 			Name:  "miles.pet.expression.requested",
 			RunID: runID,
 			Value: map[string]any{
-				"state":   "thinking",
-				"variant": "neutral",
+				"state":      "thinking",
+				"expression": "neutral",
 			},
 		}) {
 			return
@@ -52,8 +52,8 @@ func (p *MockProvider) StreamReply(ctx context.Context, req Request) (<-chan Str
 			Name:  "miles.pet.expression.requested",
 			RunID: runID,
 			Value: map[string]any{
-				"state":   "speaking",
-				"variant": "objection",
+				"state":      "speaking",
+				"expression": "objection",
 			},
 		}) {
 			return
@@ -82,8 +82,8 @@ func (p *MockProvider) StreamReply(ctx context.Context, req Request) (<-chan Str
 			Name:  "miles.pet.expression.requested",
 			RunID: runID,
 			Value: map[string]any{
-				"state":   "idle",
-				"variant": "neutral",
+				"state":      "idle",
+				"expression": "neutral",
 			},
 		}) {
 			return
