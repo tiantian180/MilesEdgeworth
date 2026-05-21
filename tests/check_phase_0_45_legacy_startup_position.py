@@ -24,7 +24,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    old_cpp = read_from_git("main", "MilesEdgeworth.cpp")
+    old_cpp = read_from_git("origin/legacy/v1-qt-widgets", "MilesEdgeworth.cpp")
     for token in [
         "BRIEFCASEIN",
         "desktopRect.x() - 45 * scale",

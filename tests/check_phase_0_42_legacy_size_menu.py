@@ -25,7 +25,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    old_header = read_from_git("main", "MilesEdgeworth.h")
+    old_header = read_from_git("origin/legacy/v1-qt-widgets", "MilesEdgeworth.h")
     for token in [
         "const double MINI = 1",
         "const double SMALL = 1.5",

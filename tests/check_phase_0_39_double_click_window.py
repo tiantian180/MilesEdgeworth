@@ -21,7 +21,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")
-    main_cpp = read_from_git("main", "MilesEdgeworth.cpp")
+    main_cpp = read_from_git("origin/legacy/v1-qt-widgets", "MilesEdgeworth.cpp")
 
     require("clickTimer->setInterval(300)" in main_cpp, "旧版双击判定窗口应为 300ms")
     require("QTimer m_singleClickTimer" in surface_h, "原生表面应保留单击延迟确认 Timer")
