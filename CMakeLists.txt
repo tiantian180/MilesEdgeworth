@@ -569,5 +569,13 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_0_ai_chat_mvp.py
         )
 
+        # Phase 2.1 的 OpenAI-compatible provider 检查：守住
+        # provider 配置、[EXPR:x] 解析、Qt 请求表达清单和阶段记录。
+        add_test(
+            NAME check_phase_2_1_provider
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_1_provider.py
+        )
+
     endif()
 endif()
