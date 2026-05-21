@@ -1,6 +1,7 @@
 #include "pet/surface/PetContextMenu.h"
 
 #include "DesktopShellController.h"
+#include "chat/ChatController.h"
 #include "pet/PetRuntime.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/manifest/SkinManifestLoader.h"
@@ -31,6 +32,7 @@ void PetContextMenu::show(
     PetRuntime *runtime,
     PetEventBridge *eventBridge,
     DesktopShellController *shellController,
+    ChatController *chatController,
     const QPoint &globalPosition
 )
 {
@@ -86,6 +88,13 @@ void PetContextMenu::show(
     muteAction->setCheckable(true);
     muteAction->setChecked(runtime->audioMuted());
     QObject::connect(muteAction, &QAction::triggered, runtime, &PetRuntime::toggleAudioMuted);
+
+    QAction *chatAction = menu.addAction(QStringLiteral("聊天"));
+    QObject::connect(chatAction, &QAction::triggered, parent, [chatController]() {
+        if (chatController != nullptr) {
+            chatController->openWindow();
+        }
+    });
 
     const QVariantList audioLanguages = runtime->availableAudioLanguages();
     if (!audioLanguages.isEmpty()) {

@@ -70,14 +70,16 @@ flowchart LR
 
     User --> Chat
     Chat --> Controller
-    Controller --> Sidecar
+    Controller -- POST /v1/chat/messages --> Sidecar
     Sidecar --> Provider
-    Sidecar -- stream delta / expression --> Controller
+    Sidecar -- SSE stream（同一 HTTP 连接） --> Controller
     Controller --> Chat
     Controller -- requestExpression --> PetBridge
     PetBridge --> PetRuntime["PetRuntime"]
     PetRuntime --> Pet
 ```
+
+`Controller → Sidecar` 是 POST 发送一次请求，`Sidecar → Controller` 是同一条 HTTP 连接上的 `text/event-stream`，**不是双工**，也不是两次独立的连接。
 
 职责边界：
 
@@ -135,7 +137,12 @@ flowchart LR
 
 - 基础设置窗口或设置面板。
 - provider、base URL、API key、model、temperature、max tokens。
-- API key 存储策略：macOS Keychain / Windows Credential Manager / Linux Secret Service 或明确 fallback。
+- API key 存储策略：macOS Keychain / Windows Credential Manager / Linux Secret Service。
+  - **TODO（Phase 2.2 详细计划时拍板）**：当 keychain / credential manager / secret service 不可用时的兜底——三选一：
+    - A：拒绝启动并提示用户手动配置
+    - B：fallback 到加密配置文件 + 显式警告
+    - C：fallback 到仅环境变量读取（不在磁盘留任何 key）
+  - 粗规划阶段不预先选定；Phase 2.2 plan 写具体方案时一并决定。
 
 验收：
 
@@ -194,3 +201,5 @@ flowchart LR
 - 先让架构路径正确，再接真实 provider。
 
 如果这个粗规划确认无误，下一步写 Phase 2.0 详细执行计划。
+
+> **子阶段顺序可调整**：上述 2.0 → 2.1 → 2.2 → 2.3 → 2.4 是默认推进顺序，但 Phase 2.0 demo 跑通后如果发现某个子阶段的范围不合适（例如真实 provider 接入难度比想象大、或用户先关心人设而不是历史），允许重新切分。每个子阶段在写详细 plan 时确认前置依赖即可。

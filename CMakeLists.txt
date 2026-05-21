@@ -10,6 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 include(CTest)
 
+add_subdirectory(apps/agent-core)
 add_subdirectory(apps/desktop)
 
 if(BUILD_TESTING)
@@ -558,6 +559,14 @@ if(BUILD_TESTING)
             NAME phase_1_4_skin_url_migration
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_1_4_skin_url_migration.py
+        )
+
+        # Phase 2.0 的 AI Chat MVP 骨架检查：守住 Go sidecar、
+        # ChatController、QML ChatWindow 和 PetRuntime expression 桥接闭环。
+        add_test(
+            NAME check_phase_2_0_ai_chat_mvp
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_0_ai_chat_mvp.py
         )
 
     endif()

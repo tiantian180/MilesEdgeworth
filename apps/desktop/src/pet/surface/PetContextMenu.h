@@ -3,6 +3,7 @@
 #include <QPoint>
 
 class DesktopShellController;
+class ChatController;
 class PetEventBridge;
 class PetRuntime;
 class QWidget;
@@ -17,6 +18,7 @@ public:
         PetRuntime *runtime,
         PetEventBridge *eventBridge,
         DesktopShellController *shellController,
+        ChatController *chatController,
         const QPoint &globalPosition
     );
 };

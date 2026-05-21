@@ -5,6 +5,7 @@
 #include <QWidget>
 
 class DesktopShellController;
+class ChatController;
 class QLabel;
 class QContextMenuEvent;
 class QMouseEvent;
@@ -30,6 +31,7 @@ public:
         PetRuntime *runtime,
         PetEventBridge *eventBridge,
         DesktopShellController *shellController,
+        ChatController *chatController,
         QWidget *parent = nullptr
     );
 
@@ -61,6 +63,7 @@ private:
     PetRuntime *m_runtime = nullptr;
     PetEventBridge *m_eventBridge = nullptr;
     DesktopShellController *m_shellController = nullptr;
+    ChatController *m_chatController = nullptr;
     QLabel *m_petLabel = nullptr;
     QMovie *m_movie = nullptr;
     QSoundEffect *m_soundEffect = nullptr;

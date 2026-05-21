@@ -1,6 +1,7 @@
 #include "pet/surface/PetSurfaceWindow.h"
 
 #include "DesktopShellController.h"
+#include "chat/ChatController.h"
 #include "pet/PetRuntime.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/surface/PetContextMenu.h"
@@ -29,12 +30,14 @@ PetSurfaceWindow::PetSurfaceWindow(
     PetRuntime *runtime,
     PetEventBridge *eventBridge,
     DesktopShellController *shellController,
+    ChatController *chatController,
     QWidget *parent
 )
     : QWidget(parent)
     , m_runtime(runtime)
     , m_eventBridge(eventBridge)
     , m_shellController(shellController)
+    , m_chatController(chatController)
     , m_petLabel(new QLabel(this))
     , m_movie(new QMovie(this))
     , m_soundEffect(new QSoundEffect(this))
@@ -379,7 +382,7 @@ QRegion PetSurfaceWindow::regionFromCurrentFrame() const
 
 void PetSurfaceWindow::showContextMenuAt(const QPoint &globalPosition)
 {
-    PetContextMenu::show(this, m_runtime, m_eventBridge, m_shellController, globalPosition);
+    PetContextMenu::show(this, m_runtime, m_eventBridge, m_shellController, m_chatController, globalPosition);
 }
 
 void PetSurfaceWindow::playSoundFromRuntime()
