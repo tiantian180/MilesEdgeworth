@@ -96,6 +96,8 @@ flowchart LR
 
 第一版通信使用 HTTP + SSE。WebSocket / JSON-RPC / AG-UI 可以以后再评估；Phase 2 不直接引入完整 AG-UI 协议，但事件命名应保持可映射。
 
+模型回复与桌宠动画的**同步编排协议**（`[EXPR:tag]` 标记、ChatController 状态机、PetRuntime `cleanFinish` / `boundary` 接口、字符速率限制器）由独立长期文档 `docs/v2/设计方案/AI 聊天动画编排设计.md` 定义。本粗规划只描述子阶段范围与验收；协议细节以该设计文档为准，§11 列出了子阶段到设计文档章节的分摊。
+
 ## 6. 子阶段拆分
 
 ### Phase 2.0：AI Chat MVP 骨架 ✓
@@ -106,19 +108,26 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 ### Phase 2.1：OpenAI-compatible Provider
 
-目标：用真实大模型完成一轮流式聊天。
+目标：用真实大模型完成一轮流式聊天，并落地 `[EXPR:tag]` 协议骨架。
 
 范围：
 
-- Go sidecar 增加 provider interface。
+- Go sidecar 增加 provider interface（`internal/chat/openai/`）。
 - 第一版接 OpenAI-compatible Chat Completions。
-- 配置来源先使用环境变量或本地开发配置文件。
-- 不在 CI 中调用真实外部 API。
+- `internal/chat/expression/` 实现 `[EXPR:tag]` 标记的流式 token 解析器：跨 chunk 边界、未知 tag 降级到 `neutral`。详见《AI 聊天动画编排设计》§3、§4。
+- 基础 persona prompt 注入当前皮肤的 expressions 列表（完整 persona 在 2.3）。
+- Qt `ChatController` 在请求体中携带当前 manifest 的 expressions，让 sidecar 组装 system prompt 和合法 tag 集合。
+- Qt `ChatController` 拆出 hold buffer 雏形，立即 flush；完整状态机在 2.3 落地。
+- 配置先用环境变量（`MILES_PROVIDER_BASE_URL` / `MILES_PROVIDER_API_KEY` / `MILES_PROVIDER_MODEL` 等）；图形配置在 2.2。
+- 无 API key 时 fallback 到 mock provider，`/health` 标 `provider: "mock-fallback"`。
+- 不在 CI 中调用真实外部 API（`httptest` mock 上游）。
 
 验收：
 
-- 用户本机配置 base URL / API key / model 后可以真实流式回复。
-- 无 API key、网络失败、provider 错误时 ChatWindow 和桌宠都有明确错误状态。
+- 用户本机配置 base URL / API key / model 后可以真实流式回复，桌宠按 `[EXPR:x]` 切换动画。
+- 无 API key 时 fallback 到 mock，UI 有清楚提示。
+- 网络失败、provider 4xx/5xx 都能转化为 `RUN_ERROR` 事件并在 UI 显示。
+- 模型不按 `[EXPR:x]` 格式输出时不崩，首段默认 `neutral`。
 
 ### Phase 2.2：用户配置与安全存储
 
@@ -128,6 +137,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 - 基础设置窗口或设置面板。
 - provider、base URL、API key、model、temperature、max tokens。
+- 字符速率限制器参数 `msPerChar` 也在设置中暴露（默认 80ms，范围 40–200ms）。详见《AI 聊天动画编排设计》§7.2。
 - API key 存储策略：macOS Keychain / Windows Credential Manager / Linux Secret Service。
   - **TODO（Phase 2.2 详细计划时拍板）**：当 keychain / credential manager / secret service 不可用时的兜底——三选一：
     - A：拒绝启动并提示用户手动配置
@@ -142,28 +152,33 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 ### Phase 2.3：会话历史与人设
 
-目标：让 Miles 有稳定人设和基础上下文。
+目标：让 Miles 有稳定人设和基础上下文，并完整落地动画-文字同步状态机。
 
 范围：
 
-- 默认 Miles persona prompt。
-- 会话历史保存。
+- 完整 Miles persona prompt（包含表达约定、风格、禁忌等），替换 2.1 的最小版本。
+- 会话历史保存（SQLite）。
 - 新建 / 清空会话。
 - 历史摘要或截断策略。
+- ChatController 完整状态机：`IDLE` / `BUFFERING_FOR_START` / `STREAMING` / `GATED` / `WAITING_FOR_ANIMATION_END`。详见《AI 聊天动画编排设计》§5。
+- 字符速率限制器实现：`QTimer` + hold buffer drain + 积压追平。详见《AI 聊天动画编排设计》§7。
 
 验收：
 
 - 重启后能看到历史会话。
 - 长对话不会无限增长请求体。
+- 多 expression 切换时，前一段动画 loop 一轮播完才放行后一段文字。
+- 文字流出节奏稳定，模型 dump 整段时不会瞬间全显。
 
 ### Phase 2.4：Phased 动画与动画链
 
-目标：让 thinking / speaking 动画可以维持任意长度，并支持链式动画编排。
+目标：让 thinking / speaking 动画可以维持任意长度，支持链式动画编排，并升级 PetRuntime 的"干净收尾"行为。
 
 范围：
 
 - enter / loop / exit 三段动画系统：Qt 运行时支持 GIF 帧段播放或 asset compiler 预切分。
 - 动画链（例如异议动作 → speaking enter/loop 直到流结束 → exit）通过 Recipe `steps` 表达。
+- PetRuntime `requestCleanFinishAndNotify` / `requestBoundaryAndNotify` 升级为真正播 exit 段，不再"播完一轮 loop 就硬切"。详见《AI 聊天动画编排设计》§6。
 - manifest schema 校验（JSON Schema）同步实现，防止 manifest 格式错误静默失败。
 - expression fallback 和异常解析完善。
 
@@ -171,6 +186,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 - thinking 状态动画在模型回复期间可以无限循环保持，收到 done 后播放 exit 段自然退出。
 - 链式 recipe 可在 manifest 中声明并被 ChatController 触发。
+- expression 切换时观察到 exit 段被播完才进入下一个动画。
 - 输出未知 expression 时走 fallback，不打断聊天。
 
 ### Phase 2.5：Movement API
@@ -219,4 +235,6 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 ## 8. 后续入口
 
-Phase 2.0 已完成，下一步写 Phase 2.1 详细执行计划。子阶段顺序为默认推进顺序，如发现范围不合适允许重新切分，每个子阶段在写详细 plan 时确认前置依赖即可。
+Phase 2.0 已完成，Phase 2.1 详细执行计划见 `docs/superpowers/plans/2026-05-22-phase-2-1-openai-provider.md`。
+
+子阶段顺序为默认推进顺序，如发现范围不合适允许重新切分，每个子阶段在写详细 plan 时确认前置依赖即可。涉及动画-文字同步协议的部分必须先读《AI 聊天动画编排设计》，再写执行计划。
