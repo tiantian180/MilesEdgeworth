@@ -1,6 +1,7 @@
 #pragma once
 
 #include "chat/ChatStreamEvent.h"
+#include "pet/requests/ActionRequest.h"
 
 #include <QJSEngine>
 #include <QList>
@@ -55,7 +56,11 @@ private:
     void setSidecarReady(bool ready);
     void setSending(bool sending);
     void setStatusText(const QString &statusText);
-    void requestPetExpression(const QString &state, const QString &expression);
+    void requestPetExpression(
+        const QString &state,
+        const QString &expression,
+        InterruptHint interruptHint = InterruptHint::Immediate
+    );
     QString sidecarExecutablePath() const;
     void handleStreamBytes(const QByteArray &bytes);
     void finishCurrentReply();

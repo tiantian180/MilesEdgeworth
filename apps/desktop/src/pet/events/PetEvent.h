@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pet/requests/ActionRequest.h"
+
 #include <QString>
 
 // PetEvent 描述“发生了什么”，不描述要播放什么。
@@ -34,6 +36,7 @@ struct PetEvent
     QString propId;
     QString state;
     QString expression;
+    InterruptHint interruptHint = InterruptHint::Immediate;
     double x = 0.0;
     double y = 0.0;
     double width = 0.0;
@@ -132,12 +135,18 @@ struct PetEvent
         return event;
     }
 
-    static PetEvent agentExpressionRequested(const QString &stateId, const QString &expressionId, double random)
+    static PetEvent agentExpressionRequested(
+        const QString &stateId,
+        const QString &expressionId,
+        double random,
+        InterruptHint hint = InterruptHint::Immediate
+    )
     {
         PetEvent event;
         event.type = PetEventType::AgentExpressionRequested;
         event.state = stateId.trimmed();
         event.expression = expressionId.trimmed();
+        event.interruptHint = hint;
         event.randomValue = random;
         event.hasRandomValue = true;
         return event;
