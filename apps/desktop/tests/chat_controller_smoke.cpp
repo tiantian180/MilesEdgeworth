@@ -58,13 +58,16 @@ int main()
     require(runtime.currentActionId() == QStringLiteral("objecting")
                 || runtime.currentActionId() == QStringLiteral("crossed"),
             "speaking objection should play a valid speaking action");
+    const QString speakingAction = runtime.currentActionId();
+    require(runtime.currentAutoReturnToIdle(), "speaking objection action should return to idle after animation completion");
 
     ChatStreamEvent finished;
     finished.type = QStringLiteral("RUN_FINISHED");
     finished.runId = QStringLiteral("mock-run");
     controller.applyStreamEvent(finished);
     require(!controller.sending(), "RUN_FINISHED should clear sending");
-    require(runtime.currentState() == QStringLiteral("idle"), "RUN_FINISHED should return pet to idle");
+    require(runtime.currentState() == QStringLiteral("speaking"), "RUN_FINISHED should not interrupt the current speaking state");
+    require(runtime.currentActionId() == speakingAction, "RUN_FINISHED should not restart or replace the current speaking action");
 
     ChatStreamEvent errorEvent;
     errorEvent.type = QStringLiteral("RUN_ERROR");

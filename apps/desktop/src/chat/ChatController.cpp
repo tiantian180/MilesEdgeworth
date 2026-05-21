@@ -344,7 +344,6 @@ void ChatController::finishCurrentReply()
     m_currentReply.clear();
     setSending(false);
     setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
-    requestPetExpression(QStringLiteral("idle"), QStringLiteral("neutral"));
 }
 
 void ChatController::failCurrentReply(const QString &message)
