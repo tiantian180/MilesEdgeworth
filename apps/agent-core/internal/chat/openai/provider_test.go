@@ -216,11 +216,17 @@ func TestStreamReplyAcceptsFullChatCompletionsURL(t *testing.T) {
 
 func TestStreamReply4xxBecomesRunError(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, `{"error":{"message":"invalid api key"}}`, http.StatusUnauthorized)
+		if r.URL.Path != "/custom/v1/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("X-Error-Code", "InvalidEndpointOrModel.NotFound")
+		w.Header().Set("X-Request-Id", "req-123")
+		http.Error(w, `{"error":{"message":"model not found"}}`, http.StatusNotFound)
 	}))
 	defer upstream.Close()
 
-	p := openai.NewProvider(upstream.URL, "sk-bad", "any", 0.7, 128)
+	p := openai.NewProvider(upstream.URL+"/custom/v1", "sk-bad", "any", 0.7, 128)
 	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
 	if err != nil {
 		t.Fatalf("StreamReply returned err: %v", err)
@@ -232,7 +238,44 @@ func TestStreamReply4xxBecomesRunError(t *testing.T) {
 	if len(got) != 1 || got[0].Type != "RUN_ERROR" {
 		t.Fatalf("expected single RUN_ERROR, got %+v", got)
 	}
-	if !strings.Contains(got[0].Error, "401") {
+	for _, want := range []string{
+		"404",
+		upstream.URL + "/custom/v1/chat/completions",
+		"x-error-code=InvalidEndpointOrModel.NotFound",
+		"x-request-id=req-123",
+		"model not found",
+	} {
+		if !strings.Contains(got[0].Error, want) {
+			t.Fatalf("RUN_ERROR should mention %q, got %q", want, got[0].Error)
+		}
+	}
+	if strings.Contains(got[0].Error, "sk-bad") {
+		t.Fatalf("RUN_ERROR must not leak the API key, got %q", got[0].Error)
+	}
+}
+
+func TestStreamReply4xxSanitizesEndpointDiagnostics(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "denied", http.StatusForbidden)
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(strings.Replace(upstream.URL, "://", "://user:pass@", 1), "sk-test", "any", 0.7, 128)
+	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	if err != nil {
+		t.Fatalf("StreamReply returned err: %v", err)
+	}
+	var got []chat.StreamEvent
+	for e := range events {
+		got = append(got, e)
+	}
+	if len(got) != 1 || got[0].Type != "RUN_ERROR" {
+		t.Fatalf("expected single RUN_ERROR, got %+v", got)
+	}
+	if strings.Contains(got[0].Error, "user:pass") {
+		t.Fatalf("RUN_ERROR must not leak URL userinfo, got %q", got[0].Error)
+	}
+	if !strings.Contains(got[0].Error, upstream.URL+"/v1/chat/completions") {
 		t.Fatalf("RUN_ERROR should mention status code, got %q", got[0].Error)
 	}
 }

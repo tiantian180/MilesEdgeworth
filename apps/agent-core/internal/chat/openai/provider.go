@@ -155,7 +155,7 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 			defer close(events)
 			send(ctx, events, chat.StreamEvent{
 				Type:  "RUN_ERROR",
-				Error: fmt.Sprintf("provider returned %d: %s", resp.StatusCode, strings.TrimSpace(string(sample))),
+				Error: providerErrorMessage(resp, p.baseURL, sample),
 			})
 		}()
 		return events, nil
@@ -168,6 +168,35 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 
 	go p.pipe(ctx, resp, events, knownTags)
 	return events, nil
+}
+
+func providerErrorMessage(resp *http.Response, endpoint string, sample []byte) string {
+	message := fmt.Sprintf("provider returned %d from %s", resp.StatusCode, sanitizeEndpoint(endpoint))
+	var diagnostics []string
+	if errorCode := strings.TrimSpace(resp.Header.Get("X-Error-Code")); errorCode != "" {
+		diagnostics = append(diagnostics, "x-error-code="+errorCode)
+	}
+	if requestID := strings.TrimSpace(resp.Header.Get("X-Request-Id")); requestID != "" {
+		diagnostics = append(diagnostics, "x-request-id="+requestID)
+	}
+	if len(diagnostics) > 0 {
+		message += " (" + strings.Join(diagnostics, ", ") + ")"
+	}
+	if body := strings.TrimSpace(string(sample)); body != "" {
+		message += ": " + body
+	}
+	return message
+}
+
+func sanitizeEndpoint(endpoint string) string {
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return endpoint
+	}
+	parsed.User = nil
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String()
 }
 
 func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- chat.StreamEvent, knownTags []string) {

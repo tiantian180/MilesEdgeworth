@@ -126,15 +126,17 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 qt_finalize_executable(MilesEdgeworthDesktop)
 
 if(TARGET MilesAgentCore)
-    add_dependencies(MilesEdgeworthDesktop MilesAgentCore)
-    add_custom_command(
-        TARGET MilesEdgeworthDesktop
-        POST_BUILD
+    add_custom_target(CopyMilesAgentSidecar
+        ALL
+        DEPENDS MilesAgentCore
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:MilesEdgeworthDesktop>"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${MILES_AGENT_BINARY}"
                 "$<TARGET_FILE_DIR:MilesEdgeworthDesktop>/miles-agent${CMAKE_EXECUTABLE_SUFFIX}"
         VERBATIM
     )
+    add_dependencies(MilesEdgeworthDesktop CopyMilesAgentSidecar)
 endif()
 
 if(BUILD_TESTING)
