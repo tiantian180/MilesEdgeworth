@@ -24,9 +24,9 @@ Phase 1 已具备以下前置条件：
 | --- | --- |
 | Phase 0.x | 已完成历史阶段，不再新增。 |
 | Phase 1.x | v1 手感回归、桌宠框架、皮肤系统收尾，可保留少量并行债务。 |
-| Phase 2.x | AI 聊天桌宠主线。 |
-| Phase 3.x | 轻量 tools / agent runtime。 |
-| Phase 4.x | 权限、MCP、插件和更完整的 agent harness。 |
+| Phase 2.x | AI 聊天桌宠主线，目标是"活人感"里程碑。 |
+| Phase 3.x | 记忆与基础 Agent（长期记忆、本地沙箱、Skills）。 |
+| Phase 4.x | 完整 Agent Harness（MCP、权限、插件、Agent 框架）。 |
 
 因此接下来直接进入 `Phase 2.0`，不是“朝 Phase 2 前进”。
 
@@ -39,8 +39,11 @@ Phase 2 的目标是做出“可自行接入大模型 API 聊天的 AI 桌宠”
 1. 用户能打开聊天窗口，与 Miles 进行流式对话。
 2. 回复期间桌宠能进入 thinking / speaking / idle / error 等状态。
 3. 模型输出或本地解析得到的 expression 能驱动当前皮肤动作。
-4. 模型 provider、base URL、API key、model name 等配置有明确入口，第一版可以先简化，但不能写死在代码里。
+4. 模型 provider、base URL、API key、model name 等配置有明确入口，不写死在代码里。
 5. Go sidecar 与 Qt 桌面壳层边界清楚，后续 tools、skills、MCP 不需要推翻 Phase 2 架构。
+6. thinking / speaking 动画支持任意长度（enter / loop / exit phased 动画），并可链式编排。
+7. 桌宠可以响应模型请求移动到指定位置或移动一段距离。
+8. 用户可以在聊天中发送图片（当 provider 支持视觉时）。
 
 ## 4. 非目标
 
@@ -52,7 +55,8 @@ Phase 2 不做以下内容：
 - JS / TS Custom Interaction 沙箱。
 - Pet Skin Studio。
 - 多角色市场、zip 签名、自动升级。
-- 完整多模态和长期记忆。
+- 视频、音频、实时视觉等完整多模态（Phase 2.6 只做图片输入）。
+- 长期记忆（Phase 3.0）。
 
 这些能力放到 Phase 3+，避免第一版 AI 聊天被过度架构拖慢。
 
@@ -94,24 +98,11 @@ flowchart LR
 
 ## 6. 子阶段拆分
 
-### Phase 2.0：AI Chat MVP 骨架
+### Phase 2.0：AI Chat MVP 骨架 ✓
 
-目标：打通 Qt ChatWindow、C++ ChatController、Go sidecar 和 PetRuntime expression 的最小链路。
+> 已完成。详见 `阶段记录/Phase 2.0 AI Chat MVP 骨架.md`。
 
-范围：
-
-- 新增 Go sidecar 工程。
-- Qt 启动 sidecar，检测 `/health`。
-- 新增最小 ChatWindow。
-- 先接 mock provider，验证流式 UI 和桌宠状态联动。
-- 定义 sidecar stream event envelope。
-- ChatController 能把 `thinking`、`speaking`、`error` 映射到 `requestExpression(...)`。
-
-验收：
-
-- 无需真实 API key，也能跑通 mock 流式回复。
-- 发送消息后桌宠进入 thinking，收到 token 后进入 speaking，结束后回 idle。
-- CTest / Go test 覆盖 sidecar health、mock stream 和 Qt 侧基础桥接。
+Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mock provider 和 expression 联动均已落地，HTTP + SSE 链路验证通过。
 
 ### Phase 2.1：OpenAI-compatible Provider
 
@@ -165,41 +156,67 @@ flowchart LR
 - 重启后能看到历史会话。
 - 长对话不会无限增长请求体。
 
-### Phase 2.4：Expression 与回复体验打磨
+### Phase 2.4：Phased 动画与动画链
 
-目标：让模型回复更自然地驱动桌宠动作。
+目标：让 thinking / speaking 动画可以维持任意长度，并支持链式动画编排。
 
 范围：
 
-- 约定模型输出 expression 的方式。
-- expression fallback 和异常解析。
-- 气泡摘要、错误提示、任务完成提示的第一版。
+- enter / loop / exit 三段动画系统：Qt 运行时支持 GIF 帧段播放或 asset compiler 预切分。
+- 动画链（例如异议动作 → speaking enter/loop 直到流结束 → exit）通过 Recipe `steps` 表达。
+- manifest schema 校验（JSON Schema）同步实现，防止 manifest 格式错误静默失败。
+- expression fallback 和异常解析完善。
 
 验收：
 
-- 模型不输出 expression 时仍有稳定默认状态。
+- thinking 状态动画在模型回复期间可以无限循环保持，收到 done 后播放 exit 段自然退出。
+- 链式 recipe 可在 manifest 中声明并被 ChatController 触发。
 - 输出未知 expression 时走 fallback，不打断聊天。
+
+### Phase 2.5：Movement API
+
+目标：桌宠可以响应模型请求自主移动。
+
+范围：
+
+- `MotionController` 落地：`moveTo(target, mode)`、`moveBy(delta, mode)`、`wander()`、`stop()`。
+- 走 / 跑模式，8 方向动画，接近目标后吸附并切回 idle。
+- Go sidecar 增加 `miles.pet.motion.requested` 事件；Qt 侧 `ChatController` 接收后转给 `MotionController`。
+
+验收：
+
+- 模型通过工具调用请求桌宠移动到屏幕指定位置，桌宠播放对应方向的走/跑动画并到达目标。
+- 移动被用户拖拽打断时正确停止。
+
+### Phase 2.6：多模态
+
+目标：支持图片输入，当 provider 具备视觉能力时可在聊天中发送截图或图片。
+
+范围：
+
+- ChatWindow 支持粘贴、拖拽图片到输入框。
+- Go sidecar 引入 [models.dev](https://models.dev/) 数据源（后台静默同步 + 本地磁盘缓存，TTL 7 天）自动检测模型 `supports_vision`；未知模型可手动 override。
+- 附图按钮始终可见，unsupported 时置灰并 tooltip 提示前往设置启用。
+- 图片发送时按 OpenAI 多模态格式构建 `content` 数组（text + image_url）。
+
+验收：
+
+- 支持视觉的 provider 可以正常接收图片并回复。
+- 不支持视觉时按钮置灰，用户点击有明确提示，不静默失败。
+
+> **Phase 2.6 完成 = "活人感"里程碑**：任意长度动画、动画链、桌宠移动、多模态聊天、流畅表达。
 
 ## 7. 技术债并行队列
 
-这些任务重要，但不阻塞 Phase 2.0：
+以下工作不阻塞主线子阶段，等有具体需求或维护痛点时再做：
 
-- HitZone schema 迁到 image-space。
-- 连续缩放控件。
-- Pet Skin Studio HitZone Panel。
-- `PetRuntime` 内部继续拆 `PlaybackController` / `RecipeRunner`。
-- `CustomInteractionRegistry` 从进程级 static 下沉到 per-runtime / per-skin session。
-- MotionController：将来支持 Agent 控制桌宠移动到指定位置。
+- HitZone schema 迁到 image-space 坐标系。
+- Pet Skin Studio HitZone Panel 和 Asset 浏览。
+- `PetRuntime` 内部拆 `PlaybackController` / `RecipeRunner`。
+- `behavior.json` 从 `manifest.json` 拆分（当出现多皮肤共享行为或多档位行为需求时）。
 
-## 8. 第一份执行计划建议
+注：`CustomInteractionRegistry` 进程级 static 问题应在 Phase 3 开始前解决，多 agent 场景会踩。
 
-下一份详细计划应写 `Phase 2.0：AI Chat MVP 骨架`，并严格控制范围：
+## 8. 后续入口
 
-- 先 mock provider，不依赖真实 API key。
-- 先 HTTP + SSE，不引入 WebSocket / JSON-RPC。
-- 先做到 ChatWindow + sidecar + expression 联动，不做 Dashboard。
-- 先让架构路径正确，再接真实 provider。
-
-如果这个粗规划确认无误，下一步写 Phase 2.0 详细执行计划。
-
-> **子阶段顺序可调整**：上述 2.0 → 2.1 → 2.2 → 2.3 → 2.4 是默认推进顺序，但 Phase 2.0 demo 跑通后如果发现某个子阶段的范围不合适（例如真实 provider 接入难度比想象大、或用户先关心人设而不是历史），允许重新切分。每个子阶段在写详细 plan 时确认前置依赖即可。
+Phase 2.0 已完成，下一步写 Phase 2.1 详细执行计划。子阶段顺序为默认推进顺序，如发现范围不合适允许重新切分，每个子阶段在写详细 plan 时确认前置依赖即可。
