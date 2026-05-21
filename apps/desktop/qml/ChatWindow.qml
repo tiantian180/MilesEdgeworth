@@ -26,6 +26,12 @@ ApplicationWindow {
         function onOpenWindowRequested() {
             chatWindow.open()
         }
+
+        function onMessagesChanged() {
+            Qt.callLater(function() {
+                transcript.positionViewAtEnd()
+            })
+        }
     }
 
     ColumnLayout {
@@ -155,6 +161,7 @@ ApplicationWindow {
                 id: sendButton
 
                 text: App.ChatController.sending ? "停止" : "发送"
+                enabled: App.ChatController.sending || App.ChatController.sidecarReady
                 Layout.preferredWidth: 76
                 Layout.preferredHeight: 72
 
