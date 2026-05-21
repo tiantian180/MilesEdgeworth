@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
@@ -112,6 +113,30 @@ void ChatController::sendMessage(const QString &message)
     QJsonObject body;
     body.insert(QStringLiteral("conversationId"), QStringLiteral("default"));
     body.insert(QStringLiteral("message"), trimmed);
+    if (m_runtime != nullptr) {
+        QJsonArray expressionsArray;
+        const auto &manifestExpressions = m_runtime->manifest().expressions;
+        for (auto it = manifestExpressions.constBegin(); it != manifestExpressions.constEnd(); ++it) {
+            const auto &def = it.value();
+            QJsonObject entry;
+            entry.insert(QStringLiteral("id"), def.id);
+            if (!def.label.isEmpty()) {
+                entry.insert(QStringLiteral("label"), def.label);
+            }
+            if (!def.description.isEmpty()) {
+                entry.insert(QStringLiteral("description"), def.description);
+            }
+            if (!def.allowedStates.isEmpty()) {
+                QJsonArray allowedStates;
+                for (const QString &state : def.allowedStates) {
+                    allowedStates.append(state);
+                }
+                entry.insert(QStringLiteral("allowedStates"), allowedStates);
+            }
+            expressionsArray.append(entry);
+        }
+        body.insert(QStringLiteral("expressions"), expressionsArray);
+    }
 
     if (QCoreApplication::instance() == nullptr) {
         return;
