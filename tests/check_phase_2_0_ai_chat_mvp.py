@@ -93,6 +93,10 @@ def main() -> int:
     require("background: Rectangle" in chat_qml, "ChatWindow input and buttons must use explicit backgrounds")
     require("contentItem: Text" in chat_qml, "ChatWindow buttons must use readable explicit text content")
     require("ChatControllerForeign::s_instance" in main_cpp, "main must expose ChatController singleton")
+    require(
+        "QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership)" in controller_h,
+        "ChatController singleton must keep C++ ownership so QQmlEngine does not delete the stack instance",
+    )
     require("#include <QQuickStyle>" in main_cpp, "main must include QQuickStyle for chat controls styling")
     require(
         'QQuickStyle::setStyle("Basic")' in main_cpp,
@@ -114,6 +118,10 @@ def main() -> int:
         "NSApplicationActivationPolicyRegular" in mac_behavior_mm
         and "NSApplicationActivationPolicyAccessory" in mac_behavior_mm,
         "macOS chat Dock control must switch between Regular and Accessory activation policies",
+    )
+    require(
+        "setMacApplicationDockVisible(false)" in main_cpp,
+        "main must start macOS in accessory mode until the chat window is visible",
     )
     require("loadFromModule(\"MilesEdgeworth\", \"ChatWindow\")" in main_cpp, "main must load ChatWindow QML")
     require("聊天" in menu_cpp, "native pet context menu must include chat entry")

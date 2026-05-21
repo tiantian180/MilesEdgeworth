@@ -6,6 +6,10 @@
 #include "pet/surface/PetSurfaceWindow.h"
 #include "skins/miles-edgeworth/MilesEdgeworthInteractions.h"
 
+#ifdef Q_OS_MACOS
+#include "platform/MacPetWindowBehavior.h"
+#endif
+
 #include <QApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
@@ -19,6 +23,9 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
     QQuickStyle::setStyle("Basic");
+#ifdef Q_OS_MACOS
+    setMacApplicationDockVisible(false);
+#endif
 
     DesktopShellController shellController;
     DesktopShellControllerForeign::s_instance = &shellController;

@@ -97,8 +97,13 @@ public:
     // 与 PetRuntimeForeign / PetEventBridgeForeign / DesktopShellControllerForeign 保持一致，使用 inline static 就地定义。
     inline static ChatController *s_instance = nullptr;
 
-    static ChatController *create(QQmlEngine *, QJSEngine *)
+    static ChatController *create(QQmlEngine *, QJSEngine *scriptEngine)
     {
+        Q_ASSERT(s_instance != nullptr);
+        Q_ASSERT(scriptEngine->thread() == s_instance->thread());
+
+        // 单例对象由 main.cpp 持有，QML 引擎只借用，不负责 delete。
+        QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership);
         return s_instance;
     }
 };
