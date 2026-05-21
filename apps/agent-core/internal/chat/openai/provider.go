@@ -44,18 +44,18 @@ func normalizeChatCompletionsURL(raw string) string {
 	}
 
 	parsed, err := url.Parse(trimmed)
-	if err != nil || parsed.Path == "" {
+	if err != nil {
 		return trimmed + "/v1/chat/completions"
 	}
 
 	path := strings.TrimRight(parsed.Path, "/")
 	switch {
+	case path == "":
+		return trimmed + "/v1/chat/completions"
 	case strings.HasSuffix(path, "/chat/completions"):
 		return trimmed
-	case strings.HasSuffix(path, "/v1"):
-		return trimmed + "/chat/completions"
 	default:
-		return trimmed + "/v1/chat/completions"
+		return trimmed + "/chat/completions"
 	}
 }
 

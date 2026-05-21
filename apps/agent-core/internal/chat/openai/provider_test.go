@@ -164,6 +164,31 @@ func TestStreamReplyAcceptsVersionedBaseURL(t *testing.T) {
 	}
 }
 
+func TestStreamReplyAcceptsProviderVersionPrefix(t *testing.T) {
+	seenPath := ""
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenPath = r.URL.Path
+		if seenPath != "/api/v3/chat/completions" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL+"/api/v3", "sk-test", "test-model", 0.5, 256)
+	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	if err != nil {
+		t.Fatalf("StreamReply: %v", err)
+	}
+	for range events {
+	}
+	if seenPath != "/api/v3/chat/completions" {
+		t.Fatalf("requested path = %q, want /api/v3/chat/completions", seenPath)
+	}
+}
+
 func TestStreamReplyAcceptsFullChatCompletionsURL(t *testing.T) {
 	seenPath := ""
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
