@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia)
+include(CTest)
 
 qt_standard_project_setup(REQUIRES 6.5)
 if(Qt6_VERSION VERSION_GREATER_EQUAL "6.8.0")
@@ -116,6 +117,24 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 qt_finalize_executable(MilesEdgeworthDesktop)
 
 if(BUILD_TESTING)
+    add_executable(ChatStreamEventParserSmoke
+        tests/chat_stream_event_parser_smoke.cpp
+        src/chat/ChatStreamEvent.cpp
+        src/chat/ChatStreamEvent.h
+    )
+
+    target_include_directories(ChatStreamEventParserSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(ChatStreamEventParserSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    add_test(NAME chat_stream_event_parser_smoke COMMAND ChatStreamEventParserSmoke)
+
     add_executable(SkinManifestLoaderSmoke
         tests/skin_manifest_loader_smoke.cpp
         src/pet/manifest/SkinManifestLoader.cpp
