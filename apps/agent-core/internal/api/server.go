@@ -8,12 +8,26 @@ import (
 	"milesedgeworth/agent-core/internal/chat"
 )
 
+const (
+	// DefaultListenAddr is the localhost:port the desktop app expects the sidecar on.
+	// Kept in sync with apps/desktop/src/chat/ChatController.cpp.
+	DefaultListenAddr = "127.0.0.1:39710"
+
+	// MaxRequestBodyBytes caps incoming chat request bodies to avoid runaway upstreams
+	// or accidental large payloads pinning sidecar memory.
+	MaxRequestBodyBytes = 1 * 1024 * 1024
+)
+
 type Server struct {
-	provider chat.Provider
+	provider      chat.Provider
+	providerLabel string
 }
 
-func NewServer(provider chat.Provider) *Server {
-	return &Server{provider: provider}
+func NewServer(provider chat.Provider, providerLabel string) *Server {
+	if providerLabel == "" {
+		providerLabel = "unknown"
+	}
+	return &Server{provider: provider, providerLabel: providerLabel}
 }
 
 func (s *Server) Routes() http.Handler {
@@ -31,7 +45,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":       true,
-		"provider": "mock",
+		"provider": s.providerLabel,
 		"service":  "miles-agent",
 	})
 }
@@ -42,6 +56,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBodyBytes)
 	var req chat.Request
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON"})
