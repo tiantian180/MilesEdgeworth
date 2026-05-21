@@ -96,3 +96,7 @@ func TestChatStreamRejectsEmptyMessage(t *testing.T) {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
 	}
 }
+
+func TestChatStreamForwardsExpressions(t *testing.T) {
+	t.Skip("enabled in Task 9 once api.NewServer accepts a provider label")
+}
