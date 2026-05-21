@@ -55,7 +55,9 @@ int main()
     expressionEvent.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
     controller.applyStreamEvent(expressionEvent);
     require(runtime.currentState() == QStringLiteral("speaking"), "custom expression event should update runtime state");
-    require(runtime.currentActionId() == QStringLiteral("objecting"), "speaking objection should play objecting action");
+    require(runtime.currentActionId() == QStringLiteral("objecting")
+                || runtime.currentActionId() == QStringLiteral("crossed"),
+            "speaking objection should play a valid speaking action");
 
     ChatStreamEvent finished;
     finished.type = QStringLiteral("RUN_FINISHED");

@@ -296,7 +296,7 @@ void ChatController::requestPetExpression(const QString &state, const QString &e
 
     const QString nextState = state.trimmed().isEmpty() ? QStringLiteral("idle") : state.trimmed();
     const QString nextExpression = expression.trimmed().isEmpty() ? QStringLiteral("neutral") : expression.trimmed();
-    m_runtime->submitExpressionRequest(nextState, nextExpression, 0.0);
+    m_runtime->requestExpression(nextState, nextExpression);
 }
 
 QString ChatController::sidecarExecutablePath() const
