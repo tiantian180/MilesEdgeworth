@@ -16,6 +16,7 @@
 
 class QNetworkReply;
 class PetRuntime;
+class SettingsService;
 
 class ChatController : public QObject
 {
@@ -26,7 +27,7 @@ class ChatController : public QObject
     Q_PROPERTY(QVariantList messages READ messages NOTIFY messagesChanged)
 
 public:
-    explicit ChatController(PetRuntime *runtime, QObject *parent = nullptr);
+    explicit ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent = nullptr);
     ~ChatController() override;
 
     bool sidecarReady() const { return m_sidecarReady; }
@@ -36,11 +37,15 @@ public:
 
     Q_INVOKABLE void openWindow();
     Q_INVOKABLE void startSidecar();
+    Q_INVOKABLE void restartSidecar();
     Q_INVOKABLE void checkHealth();
     Q_INVOKABLE void sendMessage(const QString &message);
     Q_INVOKABLE void cancelCurrentReply();
 
     void applyStreamEvent(const ChatStreamEvent &event);
+
+public slots:
+    void handleSettingsSaved();
 
 signals:
     void sidecarReadyChanged();
@@ -68,6 +73,7 @@ private:
     void failCurrentReply(const QString &message);
 
     PetRuntime *m_runtime = nullptr;
+    SettingsService *m_settings = nullptr;
     QNetworkAccessManager m_network;
     QProcess m_sidecarProcess;
     QPointer<QNetworkReply> m_currentReply;

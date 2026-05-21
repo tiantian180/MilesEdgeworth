@@ -1,6 +1,7 @@
 #include "chat/ChatController.h"
 
 #include "pet/PetRuntime.h"
+#include "settings/SettingsService.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -11,6 +12,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
+#include <QProcessEnvironment>
 
 namespace {
 constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
@@ -27,9 +29,10 @@ InterruptHint interruptHintFromValue(const QVariantMap &value)
 }
 } // namespace
 
-ChatController::ChatController(PetRuntime *runtime, QObject *parent)
+ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent)
     : QObject(parent)
     , m_runtime(runtime)
+    , m_settings(settings)
 {
     connect(&m_sidecarProcess, &QProcess::started, this, [this]() {
         setStatusText(QStringLiteral("连接中"));
@@ -79,8 +82,52 @@ void ChatController::startSidecar()
         return;
     }
 
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if (m_settings != nullptr) {
+        const QString baseUrl = m_settings->baseUrl();
+        if (!baseUrl.isEmpty()) {
+            env.insert(QStringLiteral("MILES_PROVIDER_BASE_URL"), baseUrl);
+        }
+
+        const QString apiKey = m_settings->apiKey();
+        if (!apiKey.isEmpty()) {
+            env.insert(QStringLiteral("MILES_PROVIDER_API_KEY"), apiKey);
+        }
+
+        const QString model = m_settings->model();
+        if (!model.isEmpty()) {
+            env.insert(QStringLiteral("MILES_PROVIDER_MODEL"), model);
+        }
+
+        env.insert(QStringLiteral("MILES_PROVIDER_TEMPERATURE"), QString::number(m_settings->temperature()));
+        env.insert(QStringLiteral("MILES_PROVIDER_MAX_TOKENS"), QString::number(m_settings->maxTokens()));
+    }
+
+    m_sidecarProcess.setProcessEnvironment(env);
     setStatusText(QStringLiteral("启动中"));
     m_sidecarProcess.start(executablePath, {QStringLiteral("-addr"), QStringLiteral("127.0.0.1:39710")});
+}
+
+void ChatController::restartSidecar()
+{
+    cancelCurrentReply();
+    setSidecarReady(false);
+    setStatusText(QStringLiteral("重启中"));
+
+    if (m_sidecarProcess.state() != QProcess::NotRunning) {
+        m_sidecarProcess.terminate();
+        if (!m_sidecarProcess.waitForFinished(1000)) {
+            m_sidecarProcess.kill();
+            m_sidecarProcess.waitForFinished(1000);
+        }
+    }
+
+    startSidecar();
+}
+
+void ChatController::handleSettingsSaved()
+{
+    restartSidecar();
 }
 
 void ChatController::checkHealth()

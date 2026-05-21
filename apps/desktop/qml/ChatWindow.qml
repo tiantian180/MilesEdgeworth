@@ -77,6 +77,28 @@ ApplicationWindow {
             }
 
             Button {
+                id: settingsButton
+
+                text: "设置"
+                font.pixelSize: 13
+                Layout.preferredWidth: 76
+                Layout.preferredHeight: 36
+                contentItem: Text {
+                    text: settingsButton.text
+                    color: settingsButton.enabled ? "#5a4031" : "#9a9086"
+                    font: settingsButton.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 6
+                    color: settingsButton.down ? "#e1d8ce" : "#f3ede5"
+                    border.color: "#bfae9e"
+                }
+                onClicked: App.SettingsController.openWindow()
+            }
+
+            Button {
                 id: reconnectButton
 
                 text: "重连"

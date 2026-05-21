@@ -257,6 +257,10 @@ if(BUILD_TESTING)
         src/chat/ChatController.h
         src/chat/ChatStreamEvent.cpp
         src/chat/ChatStreamEvent.h
+        src/settings/SecretStore.cpp
+        src/settings/SecretStore.h
+        src/settings/SettingsService.cpp
+        src/settings/SettingsService.h
         src/pet/behavior/BehaviorTriggerEngine.cpp
         src/pet/behavior/BehaviorTriggerEngine.h
         src/pet/commands/SkinCommand.h
