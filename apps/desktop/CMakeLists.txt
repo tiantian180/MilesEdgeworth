@@ -18,6 +18,10 @@ endif()
 set(DESKTOP_SOURCES
     src/DesktopShellController.cpp
     src/DesktopShellController.h
+    src/chat/ChatController.cpp
+    src/chat/ChatController.h
+    src/chat/ChatStreamEvent.cpp
+    src/chat/ChatStreamEvent.h
     src/main.cpp
     src/window/WindowInputMaskController.cpp
     src/window/WindowInputMaskController.h
@@ -84,9 +88,11 @@ qt_add_qml_module(MilesEdgeworthDesktop
     URI MilesEdgeworth
     VERSION 1.0
     QML_FILES
+        qml/ChatWindow.qml
         qml/PetWindow.qml
     SOURCES
         src/DesktopShellController.h
+        src/chat/ChatController.h
         src/pet/events/PetEventBridge.h
         src/pet/PetRuntime.h
 )
@@ -94,6 +100,7 @@ qt_add_qml_module(MilesEdgeworthDesktop
 target_include_directories(MilesEdgeworthDesktop
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/chat
         ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
         ${CMAKE_CURRENT_SOURCE_DIR}/src/pet/events
 )
@@ -103,6 +110,8 @@ target_link_libraries(MilesEdgeworthDesktop
         Qt6::Quick
         Qt6::Widgets
         Qt6::Multimedia
+        Qt6::Network
+        Qt6::QuickControls2
 )
 
 set_target_properties(MilesEdgeworthDesktop PROPERTIES

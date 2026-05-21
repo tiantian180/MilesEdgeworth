@@ -1,4 +1,5 @@
 #include "DesktopShellController.h"
+#include "chat/ChatController.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/PetRuntime.h"
@@ -6,6 +7,7 @@
 #include "skins/miles-edgeworth/MilesEdgeworthInteractions.h"
 
 #include <QApplication>
+#include <QQmlApplicationEngine>
 #include <QTimer>
 #include <QWindow>
 
@@ -31,12 +33,22 @@ int main(int argc, char *argv[])
     PetEventBridge petEventBridge(&petRuntime);
     PetEventBridgeForeign::s_instance = &petEventBridge;
 
+    ChatController chatController(&petRuntime);
+    ChatControllerForeign::s_instance = &chatController;
+
+    QQmlApplicationEngine chatEngine;
+    chatEngine.loadFromModule("MilesEdgeworth", "ChatWindow");
+    if (chatEngine.rootObjects().isEmpty()) {
+        return 1;
+    }
+    chatController.startSidecar();
+
     shellController.setPetScale(petRuntime.petScale());
     QObject::connect(&petRuntime, &PetRuntime::petScaleChanged, &shellController, [&shellController, &petRuntime]() {
         shellController.setPetScale(petRuntime.petScale());
     });
 
-    PetSurfaceWindow petSurfaceWindow(&petRuntime, &petEventBridge, &shellController);
+    PetSurfaceWindow petSurfaceWindow(&petRuntime, &petEventBridge, &shellController, &chatController);
     petSurfaceWindow.show();
     petSurfaceWindow.winId();
 
