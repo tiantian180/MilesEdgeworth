@@ -35,6 +35,8 @@ ApplicationWindow {
     }
 
     ColumnLayout {
+        id: chatLayout
+
         anchors.fill: parent
         anchors.margins: 12
         spacing: 10
@@ -72,8 +74,25 @@ ApplicationWindow {
             }
 
             Button {
+                id: reconnectButton
+
                 text: "重连"
                 enabled: !App.ChatController.sending
+                font.pixelSize: 13
+                Layout.preferredWidth: 76
+                Layout.preferredHeight: 36
+                contentItem: Text {
+                    text: reconnectButton.text
+                    color: reconnectButton.enabled ? "#5a4031" : "#9a9086"
+                    font: reconnectButton.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 6
+                    color: reconnectButton.enabled ? (reconnectButton.down ? "#e1d8ce" : "#f3ede5") : "#eee9e2"
+                    border.color: reconnectButton.enabled ? "#bfae9e" : "#d8d1c8"
+                }
                 onClicked: {
                     App.ChatController.startSidecar()
                     App.ChatController.checkHealth()
@@ -146,13 +165,27 @@ ApplicationWindow {
                 Layout.preferredHeight: 72
                 wrapMode: TextArea.Wrap
                 placeholderText: "输入消息"
+                placeholderTextColor: "#82786e"
+                color: "#26201b"
+                selectionColor: "#b9d0f2"
+                selectedTextColor: "#26201b"
                 enabled: App.ChatController.sidecarReady && !App.ChatController.sending
+                leftPadding: 12
+                rightPadding: 12
+                topPadding: 10
+                bottomPadding: 10
+                background: Rectangle {
+                    radius: 6
+                    color: input.enabled ? "#fffdf8" : "#eee9e2"
+                    border.color: input.activeFocus ? "#7b604c" : "#d8d1c8"
+                    border.width: input.activeFocus ? 2 : 1
+                }
 
                 Keys.onPressed: function(event) {
                     if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                             && (event.modifiers & Qt.ShiftModifier) === 0) {
                         event.accepted = true
-                        submitInput()
+                        chatLayout.submitInput()
                     }
                 }
             }
@@ -161,11 +194,25 @@ ApplicationWindow {
                 id: sendButton
 
                 text: App.ChatController.sending ? "停止" : "发送"
-                enabled: App.ChatController.sending || App.ChatController.sidecarReady
+                enabled: App.ChatController.sending || (App.ChatController.sidecarReady && input.text.trim().length > 0)
+                font.pixelSize: 14
+                font.weight: Font.DemiBold
                 Layout.preferredWidth: 76
                 Layout.preferredHeight: 72
+                contentItem: Text {
+                    text: sendButton.text
+                    color: sendButton.enabled ? "#fffdf8" : "#9a9086"
+                    font: sendButton.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 6
+                    color: sendButton.enabled ? (sendButton.down ? "#4b372b" : "#6f4f3e") : "#eee9e2"
+                    border.color: sendButton.enabled ? "#5a4031" : "#d8d1c8"
+                }
 
-                onClicked: submitInput()
+                onClicked: chatLayout.submitInput()
             }
         }
     }

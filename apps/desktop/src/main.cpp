@@ -8,6 +8,7 @@
 
 #include <QApplication>
 #include <QQmlApplicationEngine>
+#include <QQuickStyle>
 #include <QTimer>
 #include <QWindow>
 
@@ -17,6 +18,7 @@ int main(int argc, char *argv[])
     // 因此桌面壳层使用 QApplication，而不是更轻的 QGuiApplication。
     QApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
+    QQuickStyle::setStyle("Basic");
 
     DesktopShellController shellController;
     DesktopShellControllerForeign::s_instance = &shellController;

@@ -75,7 +75,20 @@ def main() -> int:
     require("import QtQuick.Controls" in chat_qml, "ChatWindow must use Qt Quick Controls")
     require("App.ChatController.sendMessage" in chat_qml, "ChatWindow must send through ChatController")
     require("onOpenWindowRequested" in chat_qml, "ChatWindow must react to controller open signal")
+    require("id: chatLayout" in chat_qml, "ChatWindow submit handler must be addressable by id")
+    require(
+        "chatLayout.submitInput()" in chat_qml,
+        "ChatWindow send actions must call the addressable submit handler",
+    )
+    require("placeholderTextColor" in chat_qml, "ChatWindow input must set readable placeholder color")
+    require("background: Rectangle" in chat_qml, "ChatWindow input and buttons must use explicit backgrounds")
+    require("contentItem: Text" in chat_qml, "ChatWindow buttons must use readable explicit text content")
     require("ChatControllerForeign::s_instance" in main_cpp, "main must expose ChatController singleton")
+    require("#include <QQuickStyle>" in main_cpp, "main must include QQuickStyle for chat controls styling")
+    require(
+        'QQuickStyle::setStyle("Basic")' in main_cpp,
+        "main must use a customizable Qt Quick Controls style before loading ChatWindow",
+    )
     require("loadFromModule(\"MilesEdgeworth\", \"ChatWindow\")" in main_cpp, "main must load ChatWindow QML")
     require("聊天" in menu_cpp, "native pet context menu must include chat entry")
     require('"error"' in manifest, "Miles manifest must expose error state for chat failures")
