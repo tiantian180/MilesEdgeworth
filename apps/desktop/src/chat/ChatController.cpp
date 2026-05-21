@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFileInfo>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
@@ -112,6 +113,30 @@ void ChatController::sendMessage(const QString &message)
     QJsonObject body;
     body.insert(QStringLiteral("conversationId"), QStringLiteral("default"));
     body.insert(QStringLiteral("message"), trimmed);
+    if (m_runtime != nullptr) {
+        QJsonArray expressionsArray;
+        const auto &manifestExpressions = m_runtime->manifest().expressions;
+        for (auto it = manifestExpressions.constBegin(); it != manifestExpressions.constEnd(); ++it) {
+            const auto &def = it.value();
+            QJsonObject entry;
+            entry.insert(QStringLiteral("id"), def.id);
+            if (!def.label.isEmpty()) {
+                entry.insert(QStringLiteral("label"), def.label);
+            }
+            if (!def.description.isEmpty()) {
+                entry.insert(QStringLiteral("description"), def.description);
+            }
+            if (!def.allowedStates.isEmpty()) {
+                QJsonArray allowedStates;
+                for (const QString &state : def.allowedStates) {
+                    allowedStates.append(state);
+                }
+                entry.insert(QStringLiteral("allowedStates"), allowedStates);
+            }
+            expressionsArray.append(entry);
+        }
+        body.insert(QStringLiteral("expressions"), expressionsArray);
+    }
 
     if (QCoreApplication::instance() == nullptr) {
         return;
@@ -160,6 +185,7 @@ void ChatController::cancelCurrentReply()
     }
 
     m_cancelled = true;
+    m_holdBuffer.clear();
     if (m_currentReply) {
         QNetworkReply *reply = m_currentReply;
         m_currentReply.clear();
@@ -256,15 +282,26 @@ void ChatController::appendAssistantDelta(const QString &delta)
         return;
     }
 
+    m_holdBuffer.append(delta);
+    flushHoldBuffer();
+}
+
+void ChatController::flushHoldBuffer()
+{
+    if (m_cancelled || m_holdBuffer.isEmpty()) {
+        return;
+    }
+
     if (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size()) {
         appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
         m_assistantMessageIndex = m_messages.size() - 1;
     }
 
     QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
-    message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + delta);
+    message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + m_holdBuffer);
     message.insert(QStringLiteral("pending"), true);
     m_messages[m_assistantMessageIndex] = message;
+    m_holdBuffer.clear();
     emit messagesChanged();
 }
 
@@ -351,6 +388,7 @@ void ChatController::finishCurrentReply()
     }
 
     m_assistantMessageIndex = -1;
+    m_holdBuffer.clear();
     m_currentReply.clear();
     setSending(false);
     setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));

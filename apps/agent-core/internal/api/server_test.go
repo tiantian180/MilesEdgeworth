@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,7 +16,7 @@ import (
 )
 
 func TestHealth(t *testing.T) {
-	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0)).Routes())
+	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0), "mock").Routes())
 	defer server.Close()
 
 	resp, err := http.Get(server.URL + "/health")
@@ -41,7 +42,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestMockChatStream(t *testing.T) {
-	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0)).Routes())
+	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0), "mock").Routes())
 	defer server.Close()
 
 	payload := []byte(`{"conversationId":"default","message":"hello miles"}`)
@@ -83,7 +84,7 @@ func TestMockChatStream(t *testing.T) {
 }
 
 func TestChatStreamRejectsEmptyMessage(t *testing.T) {
-	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(time.Millisecond)).Routes())
+	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(time.Millisecond), "mock").Routes())
 	defer server.Close()
 
 	resp, err := http.Post(server.URL+"/v1/chat/messages", "application/json", strings.NewReader(`{"message":"   "}`))
@@ -94,5 +95,44 @@ func TestChatStreamRejectsEmptyMessage(t *testing.T) {
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestChatStreamForwardsExpressions(t *testing.T) {
+	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0), "mock").Routes())
+	defer server.Close()
+
+	payload := []byte(`{
+		"conversationId": "default",
+		"message": "hi",
+		"expressions": [
+			{"id": "objection", "description": "strong rebuttal"},
+			{"id": "polite"}
+		]
+	}`)
+	resp, err := http.Post(server.URL+"/v1/chat/messages", "application/json", bytes.NewReader(payload))
+	if err != nil {
+		t.Fatalf("POST failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	// Mock doesn't currently echo expressions; we just verify decoding doesn't blow up.
+}
+
+func TestChatStreamRejectsOversizedBody(t *testing.T) {
+	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0), "mock").Routes())
+	defer server.Close()
+
+	huge := strings.Repeat("x", 2*1024*1024)
+	body := fmt.Sprintf(`{"message":"%s"}`, huge)
+	resp, err := http.Post(server.URL+"/v1/chat/messages", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusRequestEntityTooLarge && resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 413 or 400", resp.StatusCode)
 	}
 }

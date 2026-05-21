@@ -51,6 +51,11 @@ def main() -> int:
 
     for token in ["Network", "QuickControls2", "ChatController.cpp", "ChatStreamEvent.cpp", "ChatWindow.qml"]:
         require(token in desktop_cmake, f"desktop CMake missing {token}")
+    require(
+        "CopyMilesAgentSidecar" in desktop_cmake
+        and "add_dependencies(MilesEdgeworthDesktop CopyMilesAgentSidecar)" in desktop_cmake,
+        "desktop CMake must copy miles-agent through a sidecar target so provider-only rebuilds update the app bundle",
+    )
 
     require("go 1.22" in go_mod, "agent-core go.mod must target Go 1.22")
     require("find_program(GO_EXECUTABLE go)" in agent_cmake, "agent-core CMake must find go")
@@ -93,6 +98,10 @@ def main() -> int:
     require("background: Rectangle" in chat_qml, "ChatWindow input and buttons must use explicit backgrounds")
     require("contentItem: Text" in chat_qml, "ChatWindow buttons must use readable explicit text content")
     require("ChatControllerForeign::s_instance" in main_cpp, "main must expose ChatController singleton")
+    require(
+        "QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership)" in controller_h,
+        "ChatController singleton must keep C++ ownership so QQmlEngine does not delete the stack instance",
+    )
     require("#include <QQuickStyle>" in main_cpp, "main must include QQuickStyle for chat controls styling")
     require(
         'QQuickStyle::setStyle("Basic")' in main_cpp,
@@ -114,6 +123,10 @@ def main() -> int:
         "NSApplicationActivationPolicyRegular" in mac_behavior_mm
         and "NSApplicationActivationPolicyAccessory" in mac_behavior_mm,
         "macOS chat Dock control must switch between Regular and Accessory activation policies",
+    )
+    require(
+        "setMacApplicationDockVisible(false)" in main_cpp,
+        "main must start macOS in accessory mode until the chat window is visible",
     )
     require("loadFromModule(\"MilesEdgeworth\", \"ChatWindow\")" in main_cpp, "main must load ChatWindow QML")
     require("聊天" in menu_cpp, "native pet context menu must include chat entry")

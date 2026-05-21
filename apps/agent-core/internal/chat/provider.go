@@ -2,9 +2,19 @@ package chat
 
 import "context"
 
+// ExpressionInfo describes one expression tag the current skin makes available
+// to the model. Sent from Qt to the sidecar with each chat request.
+type ExpressionInfo struct {
+	ID            string   `json:"id"`
+	Label         string   `json:"label,omitempty"`
+	Description   string   `json:"description,omitempty"`
+	AllowedStates []string `json:"allowedStates,omitempty"`
+}
+
 type Request struct {
-	ConversationID string
-	Message        string
+	ConversationID string           `json:"conversationId"`
+	Message        string           `json:"message"`
+	Expressions    []ExpressionInfo `json:"expressions,omitempty"`
 }
 
 type StreamEvent struct {

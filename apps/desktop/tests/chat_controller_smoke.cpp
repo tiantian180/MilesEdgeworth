@@ -103,5 +103,34 @@ int main()
     require(controller.messages().size() == messagesBeforeCancel,
             "stream content after cancel must not append a new assistant message");
 
+    // Hold buffer round-trip: feed a delta while the controller is in its default
+    // "immediate flush" mode (Phase 2.1 plumbing -- full GATED logic lands in 2.3).
+    PetRuntime hbRuntime;
+    ChatController hbController(&hbRuntime);
+
+    ChatStreamEvent hbStarted;
+    hbStarted.type = QStringLiteral("RUN_STARTED");
+    hbController.applyStreamEvent(hbStarted);
+
+    ChatStreamEvent hbStart;
+    hbStart.type = QStringLiteral("TEXT_MESSAGE_START");
+    hbStart.role = QStringLiteral("assistant");
+    hbController.applyStreamEvent(hbStart);
+
+    ChatStreamEvent hbContent;
+    hbContent.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+    hbContent.delta = QStringLiteral("片段一");
+    hbController.applyStreamEvent(hbContent);
+
+    require(hbController.messages().constFirst().toMap().value("text").toString()
+                == QStringLiteral("片段一"),
+            "hold buffer should flush content immediately in phase 2.1");
+
+    hbContent.delta = QStringLiteral("片段二");
+    hbController.applyStreamEvent(hbContent);
+    require(hbController.messages().constFirst().toMap().value("text").toString()
+                == QStringLiteral("片段一片段二"),
+            "subsequent deltas should append through the hold buffer");
+
     return 0;
 }

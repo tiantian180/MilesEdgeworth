@@ -53,6 +53,7 @@ private:
     QVariantMap messageObject(const QString &role, const QString &text, bool pending, bool error) const;
     void appendMessage(const QVariantMap &message);
     void appendAssistantDelta(const QString &delta);
+    void flushHoldBuffer();
     void setSidecarReady(bool ready);
     void setSending(bool sending);
     void setStatusText(const QString &statusText);
@@ -72,6 +73,10 @@ private:
     QPointer<QNetworkReply> m_currentReply;
     ChatStreamEventParser m_parser;
     QVariantList m_messages;
+    // Phase 2.1 plumbing: accumulate streamed deltas before pushing to m_messages.
+    // Phase 2.3 will gate this buffer on PetRuntime animation boundaries; for now
+    // every Feed flushes immediately, matching the previous direct-append behavior.
+    QString m_holdBuffer;
     bool m_sidecarReady = false;
     bool m_sending = false;
     // 用户取消后，剩余 SSE chunks 必须被丢弃，否则会拼到新建的 assistant 消息里产生"幽灵回复"。
@@ -92,8 +97,13 @@ public:
     // 与 PetRuntimeForeign / PetEventBridgeForeign / DesktopShellControllerForeign 保持一致，使用 inline static 就地定义。
     inline static ChatController *s_instance = nullptr;
 
-    static ChatController *create(QQmlEngine *, QJSEngine *)
+    static ChatController *create(QQmlEngine *, QJSEngine *scriptEngine)
     {
+        Q_ASSERT(s_instance != nullptr);
+        Q_ASSERT(scriptEngine->thread() == s_instance->thread());
+
+        // 单例对象由 main.cpp 持有，QML 引擎只借用，不负责 delete。
+        QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership);
         return s_instance;
     }
 };
