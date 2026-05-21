@@ -130,7 +130,9 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 - 网络失败、provider 4xx/5xx 都能转化为 `RUN_ERROR` 事件并在 UI 显示。
 - 模型不按 `[EXPR:x]` 格式输出时不崩，首段默认 `neutral`。
 
-### Phase 2.2：用户配置与安全存储
+### Phase 2.2：用户配置与安全存储 ✓
+
+> 已完成。详见 `阶段记录/Phase 2.2 用户配置与安全存储.md`。
 
 目标：把临时配置升级为用户可维护配置。
 
@@ -139,12 +141,8 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 - 基础设置窗口或设置面板。
 - provider、base URL、API key、model、temperature、max tokens。
 - 字符速率限制器参数 `msPerChar` 也在设置中暴露（默认 80ms，范围 40–200ms）。详见《AI 聊天动画编排设计》§7.2。
-- API key 存储策略：macOS Keychain / Windows Credential Manager / Linux Secret Service。
-  - **TODO（Phase 2.2 详细计划时拍板）**：当 keychain / credential manager / secret service 不可用时的兜底——三选一：
-    - A：拒绝启动并提示用户手动配置
-    - B：fallback 到加密配置文件 + 显式警告
-    - C：fallback 到仅环境变量读取（不在磁盘留任何 key）
-  - 粗规划阶段不预先选定；Phase 2.2 plan 写具体方案时一并决定。
+- API key 存储策略：macOS Keychain 已落地；Windows Credential Manager / Linux Secret Service 留到对应平台支持时实现。
+- 当系统密钥存储不可用时，本阶段选择“不落盘”兜底：当前进程内可用，重启后需要重新输入，或继续使用外部环境变量。
 
 验收：
 
