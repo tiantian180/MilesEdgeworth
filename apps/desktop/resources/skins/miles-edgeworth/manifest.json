@@ -1,0 +1,1653 @@
+{
+  "schemaVersion": 3,
+  "id": "miles-edgeworth",
+  "name": "Miles Edgeworth",
+  "version": 1,
+  "defaultFacing": "right",
+  "facings": ["right", "left"],
+  "movementDirections": ["east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"],
+  "canvas": {
+    "windowSize": 120,
+    "imageSize": 100,
+    "hitZoneSize": 240,
+    "idleLoopAction": "idle_stand"
+  },
+  "defaultSize": "medium",
+  "sizes": [
+    { "id": "mini", "label": "迷你", "scale": 1.0 },
+    { "id": "small", "label": "小", "scale": 1.5 },
+    { "id": "medium", "label": "中", "scale": 2.0 },
+    { "id": "big", "label": "大", "scale": 3.0 }
+  ],
+  "audio": {
+    "defaultVoiceLanguage": "jp",
+    "voiceLanguages": [
+      { "id": "jp", "label": "日语" },
+      { "id": "en", "label": "英语" },
+      { "id": "zh", "label": "中文" }
+    ]
+  },
+  "expressions": [
+    {
+      "id": "neutral",
+      "label": "默认",
+      "description": "没有更合适表达时使用的平稳站立表达",
+      "allowedStates": ["idle", "thinking", "speaking"],
+      "priority": 0
+    },
+    {
+      "id": "objection",
+      "label": "异议",
+      "description": "强烈反驳、指出漏洞、语气锐利时使用",
+      "allowedStates": ["speaking"],
+      "priority": 90
+    },
+    {
+      "id": "polite",
+      "label": "礼貌",
+      "description": "礼貌回应、致意或收束话题时使用",
+      "allowedStates": ["idle", "speaking"],
+      "priority": 40
+    }
+  ],
+  "expressionMappings": {
+    "neutral": {
+      "selection": "first_available",
+      "actions": [
+        { "action": "idle_stand", "allowedStates": ["idle", "thinking", "speaking"] }
+      ]
+    },
+    "objection": {
+      "selection": "weighted_random",
+      "fallback": "neutral",
+      "actions": [
+        { "action": "objecting", "weight": 3, "allowedStates": ["speaking"] },
+        { "recipe": "doubleClick.holdIt", "weight": 1, "allowedStates": ["speaking"] }
+      ]
+    },
+    "polite": {
+      "selection": "first_available",
+      "fallback": "neutral",
+      "actions": [
+        { "action": "bow", "allowedStates": ["idle", "speaking"] }
+      ]
+    }
+  },
+  "customInteractions": [
+    { "id": "prosecutor_badge" }
+  ],
+  "customInteractionConfig": {
+    "prosecutor_badge": {
+      "takeThatProbability": 0.35,
+      "takeThatRecipe": "doubleClick.takeThat",
+      "badgePropId": "prosecutor_badge",
+      "clickedRecipe": "bow.once",
+      "expiredRecipe": "pickup.once"
+    }
+  },
+  "movementFacingMap": {
+    "east": "right",
+    "northEast": "right",
+    "southEast": "right",
+    "west": "left",
+    "northWest": "left",
+    "southWest": "left"
+  },
+  "capabilities": {
+    "rest": {
+      "enterRecipe": "sleep.enterLoopExit",
+      "loopAction": "sleep"
+    }
+  },
+  "states": {
+    "idle": {
+      "action": "idle_stand"
+    },
+    "thinking": {
+      "action": "thinking"
+    },
+    "speaking": {
+      "action": "objecting"
+    }
+  },
+  "hitZones": {
+    "face": {
+      "type": "polygon",
+      "x": 122,
+      "y": 24,
+      "width": 42,
+      "height": 44,
+      "variants": {
+        "right": {
+          "x": 122,
+          "y": 24,
+          "width": 42,
+          "height": 44,
+          "polygon": [
+            { "x": 143, "y": 20 },
+            { "x": 220, "y": 20 },
+            { "x": 220, "y": 66 },
+            { "x": 105, "y": 66 }
+          ]
+        },
+        "left": {
+          "x": 76,
+          "y": 24,
+          "width": 42,
+          "height": 44,
+          "polygon": [
+            { "x": 20, "y": 20 },
+            { "x": 97, "y": 20 },
+            { "x": 135, "y": 66 },
+            { "x": 20, "y": 66 }
+          ]
+        }
+      }
+    },
+    "head": {
+      "type": "rect",
+      "x": 20,
+      "y": 20,
+      "width": 200,
+      "height": 46,
+      "variants": {
+        "right": {
+          "x": 20,
+          "y": 20,
+          "width": 200,
+          "height": 46
+        },
+        "left": {
+          "x": 20,
+          "y": 20,
+          "width": 200,
+          "height": 46
+        }
+      }
+    },
+    "upper_arm": {
+      "type": "rect",
+      "x": 20,
+      "y": 66,
+      "width": 86,
+      "height": 34,
+      "variants": {
+        "right": {
+          "x": 20,
+          "y": 66,
+          "width": 86,
+          "height": 34
+        },
+        "left": {
+          "x": 134,
+          "y": 66,
+          "width": 86,
+          "height": 34
+        }
+      }
+    },
+    "forearm": {
+      "type": "rect",
+      "x": 20,
+      "y": 100,
+      "width": 86,
+      "height": 34,
+      "variants": {
+        "right": {
+          "x": 20,
+          "y": 100,
+          "width": 86,
+          "height": 34
+        },
+        "left": {
+          "x": 134,
+          "y": 100,
+          "width": 86,
+          "height": 34
+        }
+      }
+    },
+    "chest": {
+      "type": "rect",
+      "x": 106,
+      "y": 66,
+      "width": 114,
+      "height": 30,
+      "variants": {
+        "right": {
+          "x": 106,
+          "y": 66,
+          "width": 114,
+          "height": 30
+        },
+        "left": {
+          "x": 20,
+          "y": 66,
+          "width": 114,
+          "height": 30
+        }
+      }
+    },
+    "belly_bow": {
+      "type": "rect",
+      "x": 106,
+      "y": 96,
+      "width": 114,
+      "height": 16,
+      "variants": {
+        "right": {
+          "x": 106,
+          "y": 96,
+          "width": 114,
+          "height": 16
+        },
+        "left": {
+          "x": 20,
+          "y": 96,
+          "width": 114,
+          "height": 16
+        }
+      }
+    },
+    "belly_pointing": {
+      "type": "rect",
+      "x": 106,
+      "y": 112,
+      "width": 114,
+      "height": 14,
+      "variants": {
+        "right": {
+          "x": 106,
+          "y": 112,
+          "width": 114,
+          "height": 14
+        },
+        "left": {
+          "x": 20,
+          "y": 112,
+          "width": 114,
+          "height": 14
+        }
+      }
+    },
+    "legs_back": {
+      "type": "rect",
+      "x": 20,
+      "y": 126,
+      "width": 100,
+      "height": 98,
+      "variants": {
+        "right": {
+          "x": 20,
+          "y": 126,
+          "width": 100,
+          "height": 98
+        },
+        "left": {
+          "x": 120,
+          "y": 126,
+          "width": 100,
+          "height": 98
+        }
+      }
+    },
+    "legs_look_down": {
+      "type": "rect",
+      "x": 120,
+      "y": 126,
+      "width": 100,
+      "height": 98,
+      "variants": {
+        "right": {
+          "x": 120,
+          "y": 126,
+          "width": 100,
+          "height": 98
+        },
+        "left": {
+          "x": 20,
+          "y": 126,
+          "width": 100,
+          "height": 98
+        }
+      }
+    },
+    "fallback": {
+      "type": "rect",
+      "x": 0,
+      "y": 0,
+      "width": 240,
+      "height": 240
+    }
+  },
+  "clickBehaviors": {
+    "singleClick": [
+      { "zone": "face", "pool": "click.face" },
+      { "zone": "head", "pool": "click.head" },
+      { "zone": "upper_arm", "pool": "click.upperArm" },
+      { "zone": "forearm", "pool": "click.forearm" },
+      { "zone": "chest", "pool": "click.chest" },
+      { "zone": "belly_bow", "pool": "click.bellyBow" },
+      { "zone": "belly_pointing", "pool": "click.bellyPointingArea" },
+      { "zone": "legs_back", "pool": "click.legsBackArea" },
+      { "zone": "legs_look_down", "pool": "click.legsLookDownArea" },
+      { "zone": "fallback", "pool": "click.fallback" }
+    ],
+    "doubleClick": [
+      { "when": "default", "customInteraction": "prosecutor_badge" },
+      { "when": "default", "pool": "doubleClick.random" }
+    ]
+  },
+  "skinCommands": {
+    "miles.feedTea": {
+      "label": "喂食红茶",
+      "enabledWhen": {
+        "notAction": "sleep"
+      },
+      "request": {
+        "type": "pool",
+        "pool": "menu.tea"
+      }
+    }
+  },
+  "props": {
+    "prosecutor_badge": {
+      "asset": "skin:assets/props/prosecutor_badge/prosecutor-badge.png",
+      "width": 94,
+      "height": 94,
+      "visualWidth": 24,
+      "visualHeight": 24,
+      "delayMs": 700,
+      "durationMs": 1500,
+      "clickedRecipe": "bow.once",
+      "expiredRecipe": "pickup.once",
+      "startOffsets": {
+        "right": { "x": 172, "y": 32 },
+        "left": { "x": 2, "y": 32 }
+      },
+      "travel": {
+        "right": { "x": 900, "y": 0 },
+        "left": { "x": -900, "y": 0 }
+      },
+      "travelBase": {
+        "right": { "x": 600, "y": 0 },
+        "left": { "x": -600, "y": 0 }
+      },
+      "travelPerScale": {
+        "right": { "x": 150, "y": 0 },
+        "left": { "x": -150, "y": 0 }
+      }
+    }
+  },
+  "actions": {
+    "idle_stand": {
+      "label": "站立",
+      "category": "idle",
+      "loopMode": "loop",
+      "priority": 0,
+      "tags": ["idle", "standing"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/idle/stand-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/idle/stand-left.gif"
+        }
+      }
+    },
+    "briefcase_in": {
+      "label": "公文包入场",
+      "category": "startup",
+      "loopMode": "once",
+      "priority": 80,
+      "blocksPointerInteraction": true,
+      "tags": ["startup", "briefcase", "walking"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/startup/briefcase-in-right.gif",
+          "movement": { "dx": 11.2, "dy": 0 }
+        }
+      }
+    },
+    "briefcase_stop": {
+      "label": "公文包停下",
+      "category": "startup",
+      "loopMode": "once",
+      "priority": 80,
+      "tags": ["startup", "briefcase", "standing"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/startup/briefcase-stop-right.gif"
+        }
+      }
+    },
+    "turn_around": {
+      "label": "转身",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 15,
+      "tags": ["idle", "turn"],
+      "facingAfter": {
+        "right": "left",
+        "left": "right"
+      },
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/turn-right-to-left.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/turn-left-to-right.gif"
+        }
+      }
+    },
+    "walk": {
+      "label": "走路",
+      "category": "locomotion",
+      "loopMode": "onceThenIdle",
+      "priority": 8,
+      "tags": ["walk", "moving"],
+      "variants": {
+        "east": {
+          "animation": "skin:assets/body/locomotion/walk-east.gif",
+          "movement": { "dx": 8.4, "dy": 0 }
+        },
+        "west": {
+          "animation": "skin:assets/body/locomotion/walk-west.gif",
+          "movement": { "dx": -8.4, "dy": 0 }
+        },
+        "northEast": {
+          "animation": "skin:assets/body/locomotion/walk-north-east.gif",
+          "movement": { "dx": 6, "dy": -6 }
+        },
+        "northWest": {
+          "animation": "skin:assets/body/locomotion/walk-north-west.gif",
+          "movement": { "dx": -6, "dy": -6 }
+        },
+        "southEast": {
+          "animation": "skin:assets/body/locomotion/walk-south-east.gif",
+          "movement": { "dx": 6, "dy": 6 }
+        },
+        "southWest": {
+          "animation": "skin:assets/body/locomotion/walk-south-west.gif",
+          "movement": { "dx": -6, "dy": 6 }
+        },
+        "north": {
+          "animation": "skin:assets/body/locomotion/walk-north.gif",
+          "movement": { "dx": 0, "dy": -6 }
+        },
+        "south": {
+          "animation": "skin:assets/body/locomotion/walk-south.gif",
+          "movement": { "dx": 0, "dy": 6 }
+        }
+      }
+    },
+    "run": {
+      "label": "跑步",
+      "category": "locomotion",
+      "loopMode": "onceThenIdle",
+      "priority": 8,
+      "tags": ["run", "moving"],
+      "variants": {
+        "east": {
+          "animation": "skin:assets/body/locomotion/run-east.gif",
+          "movement": { "dx": 11.2, "dy": 0 }
+        },
+        "west": {
+          "animation": "skin:assets/body/locomotion/run-west.gif",
+          "movement": { "dx": -11.2, "dy": 0 }
+        },
+        "northEast": {
+          "animation": "skin:assets/body/locomotion/run-north-east.gif",
+          "movement": { "dx": 8, "dy": -8 }
+        },
+        "northWest": {
+          "animation": "skin:assets/body/locomotion/run-north-west.gif",
+          "movement": { "dx": -8, "dy": -8 }
+        },
+        "southEast": {
+          "animation": "skin:assets/body/locomotion/run-south-east.gif",
+          "movement": { "dx": 8, "dy": 8 }
+        },
+        "southWest": {
+          "animation": "skin:assets/body/locomotion/run-south-west.gif",
+          "movement": { "dx": -8, "dy": 8 }
+        },
+        "north": {
+          "animation": "skin:assets/body/locomotion/run-north.gif",
+          "movement": { "dx": 0, "dy": -8 }
+        },
+        "south": {
+          "animation": "skin:assets/body/locomotion/run-south.gif",
+          "movement": { "dx": 0, "dy": 8 }
+        }
+      }
+    },
+    "thinking": {
+      "label": "抱胸思考",
+      "category": "cognitive",
+      "loopMode": "loop",
+      "priority": 20,
+      "tags": ["thinking", "cognitive"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/thinking-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/thinking-left.gif"
+        }
+      }
+    },
+    "idle_thinking_once": {
+      "label": "随机抱胸思考",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 12,
+      "tags": ["idle", "thinking", "cognitive"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/thinking-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/thinking-left.gif"
+        }
+      }
+    },
+    "idle_tapping_head": {
+      "label": "轻敲脑袋",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "tapping_head"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/tapping-head-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/tapping-head-left.gif"
+        }
+      }
+    },
+    "idle_shrug": {
+      "label": "耸肩摊手",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "shrug", "confident"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/shrug-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/shrug-left.gif"
+        }
+      }
+    },
+    "idle_check_watch": {
+      "label": "看手表",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "watch", "waiting"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/check-watch-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/check-watch-left.gif"
+        }
+      }
+    },
+    "idle_pointing": {
+      "label": "指指点点",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "pointing", "lecture"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/pointing-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/pointing-left.gif"
+        }
+      }
+    },
+    "idle_sitting_tea": {
+      "label": "坐下喝茶",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "tea", "rest"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/sitting-tea-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/sitting-tea-left.gif"
+        }
+      }
+    },
+    "idle_phone_call": {
+      "label": "接电话",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "phone", "call"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/phone-call-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/phone-call-left.gif"
+        }
+      }
+    },
+    "idle_look_back": {
+      "label": "回头看",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "look_back"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/look-back-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/look-back-left.gif"
+        }
+      }
+    },
+    "idle_look_up": {
+      "label": "抬头看",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "look_up", "head"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/look-up-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/look-up-left.gif"
+        }
+      }
+    },
+    "idle_look_down": {
+      "label": "低头看",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["idle", "look_down", "legs"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/gestures/look-down-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/gestures/look-down-left.gif"
+        }
+      }
+    },
+    "scared": {
+      "label": "受惊",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 35,
+      "tags": ["click", "face", "scared"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/scared-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/scared-left.gif"
+        }
+      }
+    },
+    "back_away": {
+      "label": "后退",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 25,
+      "tags": ["click", "legs", "back"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/back-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/back-left.gif"
+        }
+      }
+    },
+    "drag_crouch": {
+      "label": "拖拽晃动后蹲下",
+      "category": "interaction",
+      "loopMode": "hold",
+      "priority": 45,
+      "tags": ["drag", "shake", "crouch", "scared"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/crouch-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/crouch-left.gif"
+        }
+      }
+    },
+    "drag_stand_up_full": {
+      "label": "蹲下后完整站起",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 45,
+      "tags": ["drag", "shake", "recover"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/stand-up-full-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/stand-up-full-left.gif"
+        }
+      }
+    },
+    "drag_stand_up_quick": {
+      "label": "受惊未蹲下时快速站起",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 45,
+      "tags": ["drag", "shake", "recover", "quick"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/stand-up-quick-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/stand-up-quick-left.gif"
+        }
+      }
+    },
+    "crossed": {
+      "label": "抱臂等待",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 40,
+      "tags": ["double_click", "hold_it", "crossed"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/crossed-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/crossed-left.gif"
+        }
+      }
+    },
+    "objecting": {
+      "label": "异议",
+      "category": "gesture",
+      "loopMode": "onceThenIdle",
+      "priority": 40,
+      "tags": ["objecting", "speaking", "emphasis"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/objecting-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/objecting-left.gif"
+        }
+      }
+    },
+    "bow": {
+      "label": "鞠躬",
+      "category": "gesture",
+      "loopMode": "onceThenIdle",
+      "priority": 30,
+      "tags": ["bow", "polite"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/bow-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/bow-left.gif"
+        }
+      }
+    },
+    "pickup_badge": {
+      "label": "捡起检察官徽章",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "priority": 35,
+      "tags": ["prop", "badge", "pickup"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/interaction/pickup-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/interaction/pickup-left.gif"
+        }
+      }
+    },
+    "tea": {
+      "label": "喝茶",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["tea", "rest"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/menu/tea-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/menu/tea-left.gif"
+        }
+      }
+    },
+    "tea_alt": {
+      "label": "喝茶候选动作",
+      "category": "idle",
+      "loopMode": "onceThenIdle",
+      "priority": 10,
+      "tags": ["tea", "rest"],
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/menu/tea-alt-right.gif"
+        },
+        "left": {
+          "animation": "skin:assets/body/menu/tea-alt-left.gif"
+        }
+      }
+    },
+    "sleep": {
+      "label": "睡觉",
+      "category": "idle",
+      "priority": 10,
+      "tags": ["sleep", "idle"],
+      "initialPhase": "enter",
+      "exitPhase": "exit",
+      "phases": {
+        "enter": {
+          "loopMode": "once",
+          "nextPhase": "loop",
+          "variants": {
+            "right": {
+              "animation": "skin:assets/body/rest/sleep-right.gif"
+            },
+            "left": {
+              "animation": "skin:assets/body/rest/sleep-left.gif"
+            }
+          }
+        },
+        "loop": {
+          "loopMode": "loop",
+          "variants": {
+            "right": {
+              "animation": "skin:assets/body/rest/sleeping-right.gif"
+            },
+            "left": {
+              "animation": "skin:assets/body/rest/sleeping-left.gif"
+            }
+          }
+        },
+        "exit": {
+          "loopMode": "onceThenIdle",
+          "variants": {
+            "right": {
+              "animation": "skin:assets/body/rest/wake-right.gif"
+            },
+            "left": {
+              "animation": "skin:assets/body/rest/wake-left.gif"
+            }
+          }
+        }
+      }
+    }
+  },
+  "recipes": {
+    "startup.briefcase": {
+      "label": "公文包启动入场",
+      "scope": "startup",
+      "steps": [
+        {
+          "action": "briefcase_in"
+        },
+        {
+          "action": "briefcase_stop"
+        },
+        {
+          "action": "idle_stand"
+        }
+      ]
+    },
+    "idle.stand": {
+      "label": "待机站立",
+      "scope": "state",
+      "action": "idle_stand"
+    },
+    "idle.flipStand": {
+      "label": "随机反向站立",
+      "scope": "idle",
+      "action": "idle_stand",
+      "facing": "$opposite"
+    },
+    "walk.current": {
+      "label": "沿当前方向继续走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "$current"
+    },
+    "run.current": {
+      "label": "沿当前方向继续跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "$current"
+    },
+    "idle.randomThinking": {
+      "label": "随机思考",
+      "scope": "idle",
+      "action": "idle_thinking_once"
+    },
+    "turn.once": {
+      "label": "转身一次",
+      "scope": "idle",
+      "action": "turn_around"
+    },
+    "walk.east": {
+      "label": "向右走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "east"
+    },
+    "walk.west": {
+      "label": "向左走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "west"
+    },
+    "walk.northEast": {
+      "label": "向右上走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "northEast"
+    },
+    "walk.northWest": {
+      "label": "向左上走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "northWest"
+    },
+    "walk.southEast": {
+      "label": "向右下走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "southEast"
+    },
+    "walk.southWest": {
+      "label": "向左下走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "southWest"
+    },
+    "walk.north": {
+      "label": "向上走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "north"
+    },
+    "walk.south": {
+      "label": "向下走",
+      "scope": "locomotion",
+      "action": "walk",
+      "movementDirection": "south"
+    },
+    "run.east": {
+      "label": "向右跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "east"
+    },
+    "run.west": {
+      "label": "向左跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "west"
+    },
+    "run.northEast": {
+      "label": "向右上跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "northEast"
+    },
+    "run.northWest": {
+      "label": "向左上跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "northWest"
+    },
+    "run.southEast": {
+      "label": "向右下跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "southEast"
+    },
+    "run.southWest": {
+      "label": "向左下跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "southWest"
+    },
+    "run.north": {
+      "label": "向上跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "north"
+    },
+    "run.south": {
+      "label": "向下跑",
+      "scope": "locomotion",
+      "action": "run",
+      "movementDirection": "south"
+    },
+    "idle.tappingHead": {
+      "label": "随机轻敲脑袋",
+      "scope": "idle",
+      "action": "idle_tapping_head"
+    },
+    "idle.shrug": {
+      "label": "随机耸肩",
+      "scope": "idle",
+      "action": "idle_shrug"
+    },
+    "idle.checkWatch": {
+      "label": "随机看表",
+      "scope": "idle",
+      "action": "idle_check_watch"
+    },
+    "idle.pointing": {
+      "label": "随机指点",
+      "scope": "idle",
+      "action": "idle_pointing"
+    },
+    "idle.sittingTea": {
+      "label": "随机坐下喝茶",
+      "scope": "idle",
+      "action": "idle_sitting_tea"
+    },
+    "idle.phoneCall": {
+      "label": "随机接电话",
+      "scope": "idle",
+      "action": "idle_phone_call"
+    },
+    "idle.lookBack": {
+      "label": "随机回头看",
+      "scope": "idle",
+      "action": "idle_look_back"
+    },
+    "idle.lookDown": {
+      "label": "随机低头看",
+      "scope": "idle",
+      "action": "idle_look_down"
+    },
+    "idle.lookUp": {
+      "label": "随机抬头看",
+      "scope": "idle",
+      "action": "idle_look_up"
+    },
+    "click.faceScared": {
+      "label": "点脸受惊",
+      "scope": "click",
+      "action": "scared"
+    },
+    "click.headTap": {
+      "label": "点头轻敲脑袋",
+      "scope": "click",
+      "action": "idle_tapping_head"
+    },
+    "click.headLookUp": {
+      "label": "点头抬头看",
+      "scope": "click",
+      "action": "idle_look_up"
+    },
+    "click.forearmWatch": {
+      "label": "点小臂看表",
+      "scope": "click",
+      "action": "idle_check_watch"
+    },
+    "click.forearmShrug": {
+      "label": "点小臂耸肩",
+      "scope": "click",
+      "action": "idle_shrug"
+    },
+    "click.chestThinking": {
+      "label": "点胸口思考",
+      "scope": "click",
+      "action": "idle_thinking_once"
+    },
+    "click.bellyPointing": {
+      "label": "点肚子指点",
+      "scope": "click",
+      "action": "idle_pointing"
+    },
+    "click.legsBack": {
+      "label": "点腿后退",
+      "scope": "click",
+      "action": "back_away"
+    },
+    "click.legsLookDown": {
+      "label": "点腿低头看",
+      "scope": "click",
+      "action": "idle_look_down"
+    },
+    "doubleClick.holdIt": {
+      "label": "等等",
+      "scope": "doubleClick",
+      "action": "crossed",
+      "sound": "skin:assets/audio/voice/holdit0.wav",
+      "sounds": {
+        "jp": "skin:assets/audio/voice/holdit0.wav",
+        "en": "skin:assets/audio/voice/holdit1.wav",
+        "zh": "skin:assets/audio/voice/holdit2.wav"
+      }
+    },
+    "doubleClick.takeThat": {
+      "label": "看招",
+      "scope": "doubleClick",
+      "action": "objecting",
+      "sound": "skin:assets/audio/voice/takethat0.wav",
+      "sounds": {
+        "jp": "skin:assets/audio/voice/takethat0.wav",
+        "en": "skin:assets/audio/voice/takethat1.wav",
+        "zh": "skin:assets/audio/voice/takethat2.wav"
+      },
+      "prop": "prosecutor_badge"
+    },
+    "doubleClick.objection": {
+      "label": "异议",
+      "scope": "doubleClick",
+      "action": "objecting",
+      "sound": "skin:assets/audio/voice/objection0.wav",
+      "sounds": {
+        "jp": "skin:assets/audio/voice/objection0.wav",
+        "en": "skin:assets/audio/voice/objection1.wav",
+        "zh": "skin:assets/audio/voice/objection2.wav"
+      }
+    },
+    "doubleClick.eureka": {
+      "label": "就是这个",
+      "scope": "doubleClick",
+      "action": "objecting",
+      "sound": "skin:assets/audio/voice/eureka0.wav",
+      "sounds": {
+        "jp": "skin:assets/audio/voice/eureka0.wav",
+        "en": "skin:assets/audio/voice/eureka1.wav",
+        "zh": "skin:assets/audio/voice/objection2.wav"
+      }
+    },
+    "objecting.once": {
+      "label": "异议一次",
+      "scope": "interaction",
+      "action": "objecting"
+    },
+    "bow.once": {
+      "label": "鞠躬一次",
+      "scope": "interaction",
+      "action": "bow"
+    },
+    "pickup.once": {
+      "label": "捡起检察官徽章",
+      "scope": "prop",
+      "action": "pickup_badge"
+    },
+    "tea.once": {
+      "label": "喝茶",
+      "scope": "menu",
+      "action": "tea"
+    },
+    "teaAlt.once": {
+      "label": "喝茶候选动作",
+      "scope": "menu",
+      "action": "tea_alt"
+    },
+    "sleep.enterLoopExit": {
+      "label": "睡觉",
+      "scope": "state",
+      "action": "sleep"
+    }
+  },
+  "behaviorTriggers": {
+    "runtime.started": {
+      "label": "运行时启动后的入场动作",
+      "entries": [
+        {
+          "type": "recipe",
+          "recipe": "startup.briefcase",
+          "weight": 1
+        }
+      ]
+    },
+    "idle.loopFinished": {
+      "label": "站立循环完成后的待机调度",
+      "when": {
+        "state": "idle",
+        "action": "idle_stand",
+        "requiresNoActiveRecipe": true
+      },
+      "entries": [
+        {
+          "type": "pool",
+          "pool": "idle.random",
+          "weight": 70
+        },
+        {
+          "type": "none",
+          "weight": 30
+        }
+      ]
+    },
+    "action.completed": {
+      "label": "动作完成后的续接调度",
+      "entries": [
+        {
+          "when": {
+            "action": "walk"
+          },
+          "type": "pool",
+          "pool": "walk.finished",
+          "weight": 1
+        },
+        {
+          "when": {
+            "action": "run"
+          },
+          "type": "pool",
+          "pool": "run.finished",
+          "weight": 1
+        }
+      ]
+    }
+  },
+  "behaviorRules": [
+    {
+      "event": "pointer.dragShake",
+      "action": "drag_crouch"
+    },
+    {
+      "event": "pointer.dragReleased",
+      "when": {
+        "action": "drag_crouch",
+        "holdCompleted": true
+      },
+      "action": "drag_stand_up_full"
+    },
+    {
+      "event": "pointer.dragReleased",
+      "when": {
+        "action": "drag_crouch",
+        "holdCompleted": false
+      },
+      "action": "drag_stand_up_quick"
+    }
+  ],
+  "actionPools": {
+    "idle.random": {
+      "label": "随机待机动作",
+      "entries": [
+        {
+          "recipe": "idle.randomThinking",
+          "weight": 24
+        },
+        {
+          "recipe": "turn.once",
+          "weight": 48
+        },
+        {
+          "recipe": "idle.flipStand",
+          "weight": 32
+        },
+        {
+          "recipe": "idle.tappingHead",
+          "weight": 24
+        },
+        {
+          "recipe": "idle.shrug",
+          "weight": 24
+        },
+        {
+          "recipe": "idle.checkWatch",
+          "weight": 24
+        },
+        {
+          "recipe": "idle.pointing",
+          "weight": 24
+        },
+        {
+          "recipe": "idle.sittingTea",
+          "weight": 24
+        },
+        {
+          "recipe": "idle.phoneCall",
+          "weight": 24
+        },
+        {
+          "recipe": "idle.lookBack",
+          "weight": 24
+        },
+        {
+          "recipe": "idle.lookDown",
+          "weight": 24
+        },
+        {
+          "recipe": "idle.lookUp",
+          "weight": 24
+        },
+        {
+          "recipe": "walk.east",
+          "weight": 5
+        },
+        {
+          "recipe": "walk.west",
+          "weight": 5
+        },
+        {
+          "recipe": "walk.northEast",
+          "weight": 5
+        },
+        {
+          "recipe": "walk.northWest",
+          "weight": 5
+        },
+        {
+          "recipe": "walk.southEast",
+          "weight": 5
+        },
+        {
+          "recipe": "walk.southWest",
+          "weight": 5
+        },
+        {
+          "recipe": "walk.north",
+          "weight": 5
+        },
+        {
+          "recipe": "walk.south",
+          "weight": 5
+        },
+        {
+          "recipe": "run.east",
+          "weight": 5
+        },
+        {
+          "recipe": "run.west",
+          "weight": 5
+        },
+        {
+          "recipe": "run.northEast",
+          "weight": 5
+        },
+        {
+          "recipe": "run.northWest",
+          "weight": 5
+        },
+        {
+          "recipe": "run.southEast",
+          "weight": 5
+        },
+        {
+          "recipe": "run.southWest",
+          "weight": 5
+        },
+        {
+          "recipe": "run.north",
+          "weight": 5
+        },
+        {
+          "recipe": "run.south",
+          "weight": 5
+        }
+      ]
+    },
+    "walk.finished": {
+      "label": "走路结束后的续行动作",
+      "entries": [
+        {
+          "recipe": "run.current",
+          "weight": 80
+        },
+        {
+          "recipe": "walk.current",
+          "weight": 400
+        },
+        {
+          "recipe": "walk.east",
+          "weight": 15
+        },
+        {
+          "recipe": "walk.west",
+          "weight": 15
+        },
+        {
+          "recipe": "walk.northEast",
+          "weight": 15
+        },
+        {
+          "recipe": "walk.northWest",
+          "weight": 15
+        },
+        {
+          "recipe": "walk.southEast",
+          "weight": 15
+        },
+        {
+          "recipe": "walk.southWest",
+          "weight": 15
+        },
+        {
+          "recipe": "walk.north",
+          "weight": 15
+        },
+        {
+          "recipe": "walk.south",
+          "weight": 15
+        },
+        {
+          "recipe": "idle.stand",
+          "weight": 200
+        }
+      ]
+    },
+    "run.finished": {
+      "label": "跑步结束后的续行动作",
+      "entries": [
+        {
+          "recipe": "walk.current",
+          "weight": 80
+        },
+        {
+          "recipe": "run.current",
+          "weight": 400
+        },
+        {
+          "recipe": "run.east",
+          "weight": 10
+        },
+        {
+          "recipe": "run.west",
+          "weight": 10
+        },
+        {
+          "recipe": "run.northEast",
+          "weight": 10
+        },
+        {
+          "recipe": "run.northWest",
+          "weight": 10
+        },
+        {
+          "recipe": "run.southEast",
+          "weight": 10
+        },
+        {
+          "recipe": "run.southWest",
+          "weight": 10
+        },
+        {
+          "recipe": "run.north",
+          "weight": 10
+        },
+        {
+          "recipe": "run.south",
+          "weight": 10
+        },
+        {
+          "recipe": "idle.stand",
+          "weight": 240
+        }
+      ]
+    },
+    "click.face": {
+      "label": "点击脸部",
+      "entries": [
+        {
+          "recipe": "click.faceScared",
+          "weight": 1
+        }
+      ]
+    },
+    "click.head": {
+      "label": "点击头部",
+      "entries": [
+        {
+          "recipe": "click.headTap",
+          "weight": 1
+        },
+        {
+          "recipe": "click.headLookUp",
+          "weight": 1
+        }
+      ]
+    },
+    "click.upperArm": {
+      "label": "点击大臂",
+      "entries": [
+        {
+          "recipe": "turn.once",
+          "weight": 1
+        }
+      ]
+    },
+    "click.forearm": {
+      "label": "点击小臂",
+      "entries": [
+        {
+          "recipe": "click.forearmWatch",
+          "weight": 1
+        },
+        {
+          "recipe": "click.forearmShrug",
+          "weight": 1
+        }
+      ]
+    },
+    "click.chest": {
+      "label": "点击胸口",
+      "entries": [
+        {
+          "recipe": "click.chestThinking",
+          "weight": 1
+        }
+      ]
+    },
+    "click.bellyBow": {
+      "label": "点击肚子上半",
+      "entries": [
+        {
+          "recipe": "bow.once",
+          "weight": 1
+        }
+      ]
+    },
+    "click.bellyPointingArea": {
+      "label": "点击肚子下半",
+      "entries": [
+        {
+          "recipe": "click.bellyPointing",
+          "weight": 1
+        }
+      ]
+    },
+    "click.legsBackArea": {
+      "label": "点击腿部后侧",
+      "entries": [
+        {
+          "recipe": "click.legsBack",
+          "weight": 1
+        }
+      ]
+    },
+    "click.legsLookDownArea": {
+      "label": "点击腿部前侧",
+      "entries": [
+        {
+          "recipe": "click.legsLookDown",
+          "weight": 1
+        }
+      ]
+    },
+    "click.fallback": {
+      "label": "无特定区域",
+      "entries": [
+        {
+          "type": "returnToIdle",
+          "weight": 1
+        }
+      ]
+    },
+    "doubleClick.random": {
+      "label": "双击随机语音动作",
+      "entries": [
+        {
+          "recipe": "doubleClick.holdIt",
+          "weight": 1
+        },
+        {
+          "recipe": "doubleClick.objection",
+          "weight": 1
+        },
+        {
+          "recipe": "doubleClick.eureka",
+          "weight": 1
+        }
+      ]
+    },
+    "doubleClick.random.zh": {
+      "label": "中文双击随机语音动作",
+      "entries": [
+        {
+          "recipe": "doubleClick.holdIt",
+          "weight": 1
+        },
+        {
+          "recipe": "doubleClick.objection",
+          "weight": 2
+        }
+      ]
+    },
+    "menu.tea": {
+      "label": "菜单喝茶",
+      "entries": [
+        {
+          "recipe": "tea.once",
+          "weight": 1
+        },
+        {
+          "recipe": "teaAlt.once",
+          "weight": 1
+        }
+      ]
+    },
+    "ai.thinking": {
+      "label": "模型思考",
+      "entries": [
+        {
+          "recipe": "idle.randomThinking",
+          "weight": 1
+        }
+      ]
+    }
+  },
+  "fallbackAction": "idle_stand"
+}

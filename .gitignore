@@ -1,0 +1,16 @@
+.DS_Store
+
+# Local editor / language-server caches
+.cache/
+
+# CMake build directories
+build/
+cmake-build-*/
+*-cmake-build/
+
+# Local Qt Creator state
+CMakeUserPresets.json
+*.user.*
+
+# Local brainstorming / visual companion artifacts
+.superpowers/

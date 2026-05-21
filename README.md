@@ -1,32 +1,137 @@
-使用Qt 6.5.1 + Visual Studio 2022.
+# MilesEdgeworth
 
-图片素材和音频素材均来自游戏《逆转裁判》和《逆转检事》.
+MilesEdgeworth 正在从旧版 Qt Widgets 桌宠，升级为 Qt 6 驱动的可换肤 AI 桌宠应用。
 
-b站有演示：https://www.bilibili.com/video/BV1Rz42187m2/
+当前 `v2-ai-pet` 分支处在 v2 框架建设阶段。桌宠本体已经从 Qt Quick/QML Window 切换为原生 `QWidget` / `QMovie` surface，用逐帧 alpha mask 解决透明像素拦截鼠标的问题；后续聊天窗口、设置中心和开发者工具仍可以继续使用 QML 或其他更适合的 UI 技术。
 
-这是我第一次从零开始一个项目一直到发布，还有很多不完善的地方，请大家多多包涵。在这里记录一下实现的内容和一点心得:
+当前 `v2-ai-pet` 分支只保留新版主线代码和可复用素材：
 
-0. 窗口（桌宠本体）无边框透明置顶，不在任务栏显示（Qt::Tool），在状态栏显示(QSystemTrayIcon)，拖拽移动窗口.
-    注意窗口类型设置为Qt::Tool之后关闭窗口不会退出程序，我的解决方法是重写`closeEvent()`关闭时发送信号给QApplication，让它执行`quit()`
-   
-1. 按照一定规律随机播放gif
-   
-2. 单击不同区域触发不同动画
-   
-3. 双击触发动画并播放语音（此处涉及到单击、双击和拖拽的区分，想了挺久的）
-   
-   3.1 “看招”时飞出检察官徽章涉及到多窗口问题，窗口的自动移动使用了QPropertyAnimation
-   
-   3.2 播放语音使用QSoundEffect，需要Qt的multimedia模块
-   
-4. 右键菜单的若干功能
-   
-5. 图片置顶查看器：以QGraphicsView为基础。支持多开，上限10个。此处涉及多窗口问题
-   
-   5.1 采用了双向链表结构来管理打开的若干图片查看器窗口，打开时new，关闭时delete。退出桌宠时全部delete
-   
-   5.2 在调试过程中发现QPixmap随着图片切换会占越来越多内存，后来查资料发现是因为加载图片时图片数据加入到QPixmapCache缓冲区上，所以通过及时调用`QPixmapCache::clear()`，就能解决内存占用过大的问题
+- `apps/desktop/`：Qt 6 桌面壳层、Pet Runtime、原生桌宠 surface、系统菜单和平台窗口适配。
+- `apps/desktop/resources/skins/miles-edgeworth/assets/`：Miles 皮肤包资源，包括动画、语音、Prop 图片和源素材。
+- `docs/v2/`：新版文档，按设计方案、参考资料、阶段记录分类。
+- `icon/`：图标素材。
 
-6. 支持双屏模式下的拖拽和跨屏走动. 右键设置双屏选项, 选择"单屏"则限制走动范围在当前所在窗口, 选择"主屏幕在左侧"则在跑步时可跨越主屏幕右边界穿越到第二屏幕的左边界, 选择"主屏幕在右侧"则在跑步时可跨越主屏幕左边界穿越到第二屏幕的右边界. 选项不影响拖拽, 拖拽始终跟随鼠标.
+旧版 Qt Widgets 源码、Visual Studio 工程、图片置顶查看器和旧版 macOS 打包脚本已经从该分支移除，避免干扰 v2 阅读和开发。需要参考旧版实现时，可以查看仓库历史或旧分支。
 
-7. 快速晃动触发害怕地震的小动画。主要也是靠的重写press,move和release的鼠标事件来实现，还搭配了一个计时器。
+## 构建 v2 桌面壳层
+
+macOS Apple Silicon + Homebrew 环境：
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew
+cmake --build build
+open build/apps/desktop/MilesEdgeworthDesktop.app
+```
+
+也可以继续使用独立的外部 build 目录：
+
+```bash
+cmake -S apps/desktop -B /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew
+cmake --build /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build
+open /Users/tian/projects/my-projects/MilesEdgeworth-v2-desktop-build/MilesEdgeworthDesktop.app
+```
+
+Intel Mac 的 Homebrew 默认路径通常是 `/usr/local`，对应把 `CMAKE_PREFIX_PATH` 改为 `/usr/local`。
+
+常用验证命令：
+
+```bash
+ctest --test-dir build --output-on-failure
+git diff --check
+```
+
+当前桌宠本体不再加载 `PetWindow.qml` 作为主窗口，所以日常改 C++ / manifest / 文档时不把 `qmllint` 作为必跑门禁。后续新增 QML 聊天窗口或设置窗口时，再为对应 QML 文件恢复专门 lint。
+
+## 皮肤包加载
+
+v2 支持从文件系统加载皮肤包。皮肤包是一个普通目录，至少包含：
+
+```text
+my-skin/
+  skin.json
+  manifest.json
+  assets/
+```
+
+右键桌宠 → `皮肤` → `打开皮肤目录` 可以打开当前用户皮肤目录。把皮肤目录放进去后，选择 `重载当前皮肤` 或重启应用即可重新扫描。
+
+内置 Miles 皮肤仍打包在应用内；文件系统里出现同 id 皮肤时，用户皮肤优先。
+
+## Cursor / clangd 代码提示
+
+如果 C++ 代码里 `#include <QGuiApplication>`、`QWindow` 等 Qt 类型飘红，通常不是 Qt Extension Pack 没装好，而是 clangd 没读到 CMake 生成的 `compile_commands.json`。
+
+先从仓库根目录配置一次 CMake：
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=/opt/homebrew
+```
+
+确认文件存在：
+
+```bash
+ls build/compile_commands.json
+```
+
+然后在 Cursor 命令面板执行：
+
+```text
+clangd: Restart language server
+```
+
+必要时再执行：
+
+```text
+CMake: Delete Cache and Reconfigure
+```
+
+## 当前状态
+
+Phase 1 框架主干已经完成，当前重点是进入 Phase 2 AI 接入前的手感收尾和皮肤包去编译化准备。
+
+已完成的主干能力：
+
+- 透明无边框桌宠窗口。
+- macOS 下跨 Spaces / 全屏应用置顶的技术验证。
+- 原生 `PetSurfaceWindow` / `PropSurfaceWindow`，使用当前动画帧 alpha mask 让透明像素尽量鼠标穿透。
+- 左键拖拽。
+- 系统原生右键菜单。
+- 系统托盘图标和托盘退出入口。
+- 旧版左下角公文包入场启动位置。
+- 旧版身体点位移动边界，允许透明留白略微越界。
+- 旧版“双屏选项”菜单和双屏横向移动边界。
+- 鼠标移入桌宠时显示旧版手型光标。
+- 旧版 clickTimer 风格的单双击判定，避免双击后补触发单击反应。
+- 旧版静音音量语义，静音时正在播放的语音也会立即降到 0。
+- 站立循环后的随机待机触发概率已迁入皮肤 manifest，不再写死在运行时。
+- Miles GIF、语音和检察官徽章图片已迁入皮肤包 `assets/`；manifest 使用 `skin:assets/...`，运行时按内置或文件系统皮肤根路径解析。
+- 右键菜单已移除开发测试入口；Miles 红茶从皮肤定制命令进入，睡觉/唤醒继续作为通用 sleep/rest 能力保留。
+- `PetRuntime` 已开始拆分：manifest 数据结构、JSON 加载、候选池选择、behavior trigger 选择、单击 hit zone 命中逻辑、皮肤命令解析、Prop 状态管理，以及 QML 事件到 ActionRequest 的主干已移出单体运行时。
+- Custom Interaction Host API 已接入，Miles 旧版双击概率“看招”丢检察官徽章已作为皮肤侧高级交互回归。
+- 语音语言已改为可选 Audio Capability，Miles 皮肤通过 manifest 声明日语、英语、中文，右键菜单按声明动态生成语音子菜单。
+- ExpressionMapping schema 已接入，后续 AI / Agent 可以请求当前皮肤声明的 expression，由运行时映射到具体动作。
+
+进入 Phase 2 前需要优先处理：
+
+- HitZone 坐标错位和点击空洞。
+- 拖拽晃动触发不稳定。
+- 检察官徽章尺寸和起点需要按 v1 实测值校准。
+- 文件系统皮肤包已接入；后续重点是完善 HitZone schema、连续缩放控件和 Pet Skin Studio。
+
+当前仍是技术验证，不是完整可发布的 v2 AI 桌宠。后续会继续实现 Pet Runtime、聊天窗口、设置中心、模型 Provider、皮肤 manifest 和 Agent Runtime。
+
+## 文档
+
+- [v2 文档索引](docs/v2/文档索引.md)
+- [总体架构设计](docs/v2/设计方案/总体架构设计.md)
+- [桌宠运行时与动画调度设计](docs/v2/设计方案/桌宠运行时与动画调度设计.md)
+- [桌宠运行时职责拆分设计](docs/v2/设计方案/桌宠运行时职责拆分设计.md)
+- [皮肤包播放行为设计](docs/v2/设计方案/皮肤包播放行为设计.md)
+- [皮肤包分发与加载机制设计](docs/v2/设计方案/皮肤包分发与加载机制设计.md)
+- [HitZone 交互区域系统设计](docs/v2/设计方案/HitZone%20交互区域系统设计.md)
+- [动画素材盘点](docs/v2/参考资料/动画素材盘点.md)
+- [第0阶段桌面壳验证](docs/v2/阶段记录/第0阶段桌面壳验证.md)
+- [Phase 0.65-0.73 工作报告](docs/v2/阶段记录/Phase%200.65-0.73%20工作报告.md)
+- [Phase 1 收尾与体验问题修复计划](docs/v2/阶段记录/Phase%201%20收尾与体验问题修复计划.md)
+
+图片素材和音频素材来自游戏《逆转裁判》和《逆转检事》。本项目仅用于个人学习和技术验证。
