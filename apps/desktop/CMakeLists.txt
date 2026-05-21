@@ -23,6 +23,12 @@ set(DESKTOP_SOURCES
     src/chat/ChatStreamEvent.cpp
     src/chat/ChatStreamEvent.h
     src/main.cpp
+    src/settings/SecretStore.cpp
+    src/settings/SecretStore.h
+    src/settings/SettingsController.cpp
+    src/settings/SettingsController.h
+    src/settings/SettingsService.cpp
+    src/settings/SettingsService.h
     src/window/WindowInputMaskController.cpp
     src/window/WindowInputMaskController.h
     src/pet/behavior/BehaviorTriggerEngine.cpp
@@ -92,11 +98,13 @@ qt_add_qml_module(MilesEdgeworthDesktop
     QML_FILES
         qml/ChatWindow.qml
         qml/PetWindow.qml
+        qml/SettingsWindow.qml
     SOURCES
         src/DesktopShellController.h
         src/chat/ChatController.h
         src/pet/events/PetEventBridge.h
         src/pet/PetRuntime.h
+        src/settings/SettingsController.h
 )
 
 target_include_directories(MilesEdgeworthDesktop
@@ -105,6 +113,7 @@ target_include_directories(MilesEdgeworthDesktop
         ${CMAKE_CURRENT_SOURCE_DIR}/src/chat
         ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
         ${CMAKE_CURRENT_SOURCE_DIR}/src/pet/events
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/settings
 )
 
 target_link_libraries(MilesEdgeworthDesktop
