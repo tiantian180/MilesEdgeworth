@@ -303,4 +303,24 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME chat_controller_smoke COMMAND ChatControllerSmoke)
+
+    qt_add_executable(SettingsServiceSmoke
+        tests/settings_service_smoke.cpp
+        src/settings/SettingsService.cpp
+        src/settings/SettingsService.h
+        src/settings/SecretStore.cpp
+        src/settings/SecretStore.h
+    )
+
+    target_include_directories(SettingsServiceSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(SettingsServiceSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    add_test(NAME settings_service_smoke COMMAND SettingsServiceSmoke)
 endif()
