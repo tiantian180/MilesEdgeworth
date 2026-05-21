@@ -37,6 +37,7 @@ struct ActionRequest
 {
     ActionRequestKind kind = ActionRequestKind::None;
     InterruptHint interruptHint = InterruptHint::Immediate;
+    QString petState;
     QString targetId;
     QVariantMap options;
     bool hideCurrentProp = false;
@@ -107,6 +108,20 @@ struct ActionRequest
     {
         ActionRequest copy = *this;
         copy.hideCurrentProp = true;
+        return copy;
+    }
+
+    ActionRequest withInterruptHint(InterruptHint hint) const
+    {
+        ActionRequest copy = *this;
+        copy.interruptHint = hint;
+        return copy;
+    }
+
+    ActionRequest withPetState(const QString &state) const
+    {
+        ActionRequest copy = *this;
+        copy.petState = state.trimmed();
         return copy;
     }
 };

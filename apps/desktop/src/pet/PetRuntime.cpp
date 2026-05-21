@@ -208,9 +208,32 @@ void PetRuntime::playActionFromPool(const QString &poolId)
 
 void PetRuntime::submitActionRequest(const ActionRequest &request)
 {
+    if (request.kind == ActionRequestKind::None) {
+        if (request.hideCurrentProp) {
+            executeActionRequest(request);
+        }
+        return;
+    }
+
+    if (request.interruptHint == InterruptHint::AfterCurrent && shouldDeferActionRequest(request)) {
+        m_pendingRequest = request;
+        return;
+    }
+
+    if (request.interruptHint == InterruptHint::Immediate) {
+        m_pendingRequest = ActionRequest::none();
+    }
+
+    executeActionRequest(request);
+}
+
+void PetRuntime::executeActionRequest(const ActionRequest &request)
+{
     if (request.hideCurrentProp) {
         hideCurrentProp();
     }
+
+    applyRequestState(request);
 
     switch (request.kind) {
     case ActionRequestKind::None:
@@ -301,24 +324,38 @@ void PetRuntime::startStartupSequence()
 
 void PetRuntime::requestExpression(const QString &state, const QString &expression)
 {
-    submitExpressionRequest(state, expression, QRandomGenerator::global()->generateDouble());
+    requestExpression(state, expression, InterruptHint::Immediate);
+}
+
+void PetRuntime::requestExpression(const QString &state, const QString &expression, InterruptHint interruptHint)
+{
+    submitExpressionRequest(state, expression, QRandomGenerator::global()->generateDouble(), interruptHint);
 }
 
 void PetRuntime::submitExpressionRequest(const QString &state, const QString &expression, double randomValue)
 {
+    submitExpressionRequest(state, expression, randomValue, InterruptHint::Immediate);
+}
+
+void PetRuntime::submitExpressionRequest(
+    const QString &state,
+    const QString &expression,
+    double randomValue,
+    InterruptHint interruptHint
+)
+{
     const QString requestedState = state.trimmed();
     QString eventState = m_currentState;
-    if (!requestedState.isEmpty() && m_manifest.stateToAction.contains(requestedState) && requestedState != m_currentState) {
-        // expression 请求来自未来的聊天 / agent 层。这里先更新 PetState，
-        // 再把“表达选择”交给 InteractionPipeline 转成 ActionRequest。
-        m_currentState = requestedState;
-        eventState = requestedState;
-        emit currentStateChanged();
-    } else if (!requestedState.isEmpty() && m_manifest.stateToAction.contains(requestedState)) {
+    if (!requestedState.isEmpty() && m_manifest.stateToAction.contains(requestedState)) {
         eventState = requestedState;
     }
 
-    submitRuntimeEvent(PetEvent::agentExpressionRequested(eventState, expression, randomValue));
+    if (interruptHint == InterruptHint::Immediate && eventState != m_currentState) {
+        m_currentState = eventState;
+        emit currentStateChanged();
+    }
+
+    submitRuntimeEvent(PetEvent::agentExpressionRequested(eventState, expression, randomValue, interruptHint));
 }
 
 QVariantMap PetRuntime::consumeFrameMovementDelta() const
@@ -404,6 +441,11 @@ void PetRuntime::handleAnimationFinished()
         }
 
         clearActiveRecipe();
+    }
+
+    if (m_pendingRequest.kind != ActionRequestKind::None) {
+        submitPendingActionRequest();
+        return;
     }
 
     if (m_currentAutoReturnToIdle) {
@@ -598,6 +640,44 @@ bool PetRuntime::submitRuntimeEvent(const PetEvent &event)
         submitActionRequest(request);
     }
     return !requests.isEmpty();
+}
+
+bool PetRuntime::shouldDeferActionRequest(const ActionRequest &request) const
+{
+    if (request.kind == ActionRequestKind::None) {
+        return false;
+    }
+
+    if (m_currentActionId.isEmpty()) {
+        return false;
+    }
+
+    return m_currentAutoReturnToIdle
+        || !m_currentRecipeId.isEmpty()
+        || m_currentLoopMode == QStringLiteral("once");
+}
+
+void PetRuntime::submitPendingActionRequest()
+{
+    ActionRequest request = m_pendingRequest;
+    m_pendingRequest = ActionRequest::none();
+    request.interruptHint = InterruptHint::Immediate;
+    executeActionRequest(request);
+}
+
+void PetRuntime::applyRequestState(const ActionRequest &request)
+{
+    const QString requestedState = request.petState.trimmed();
+    if (requestedState.isEmpty() || !m_manifest.stateToAction.contains(requestedState)) {
+        return;
+    }
+
+    if (m_currentState == requestedState) {
+        return;
+    }
+
+    m_currentState = requestedState;
+    emit currentStateChanged();
 }
 
 void PetRuntime::applyFacingAfterCurrentAction(const ActionDefinition &action)

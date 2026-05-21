@@ -77,6 +77,18 @@ func (p *MockProvider) StreamReply(ctx context.Context, req Request) (<-chan Str
 		}) {
 			return
 		}
+		if !send(ctx, events, p.delay, StreamEvent{
+			Type:  "CUSTOM",
+			Name:  "miles.pet.expression.requested",
+			RunID: runID,
+			Value: map[string]any{
+				"state":         "idle",
+				"expression":    "neutral",
+				"interruptHint": "afterCurrent",
+			},
+		}) {
+			return
+		}
 		send(ctx, events, p.delay, StreamEvent{Type: "RUN_FINISHED", RunID: runID})
 	}()
 

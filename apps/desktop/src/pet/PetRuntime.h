@@ -148,12 +148,19 @@ public:
     Q_INVOKABLE void returnToIdle();
     // 由 agent / 模型提交一个表达请求；走 ExpressionMappingResolver 转成 ActionRequest。
     Q_INVOKABLE void requestExpression(const QString &state, const QString &expression);
+    void requestExpression(const QString &state, const QString &expression, InterruptHint interruptHint);
     // 表层（QMovie）报告当前动画播完，触发后续 recipe step / action.completed 行为触发。
     Q_INVOKABLE void handleAnimationFinished();
 
     // ---- 主要外部入口：交互管线产出的 ActionRequest 全部从这里进入 ----
     void submitActionRequest(const ActionRequest &request);
     void submitExpressionRequest(const QString &state, const QString &expression, double randomValue);
+    void submitExpressionRequest(
+        const QString &state,
+        const QString &expression,
+        double randomValue,
+        InterruptHint interruptHint
+    );
 
 signals:
     void currentStateChanged();
@@ -197,6 +204,10 @@ private:
     QString resolveRecipeFacing(const QString &facing) const;
     double movementScaleFactor() const;
     bool submitRuntimeEvent(const PetEvent &event);
+    bool shouldDeferActionRequest(const ActionRequest &request) const;
+    void executeActionRequest(const ActionRequest &request);
+    void submitPendingActionRequest();
+    void applyRequestState(const ActionRequest &request);
     void applyFacingAfterCurrentAction(const ActionDefinition &action);
     void updateFacingFromMovementDirection(const QString &movementDirection);
     void playPhase(const QString &actionId, const QString &phaseId);
@@ -227,6 +238,7 @@ private:
     QUrl m_currentAnimationUrl;
     PropController m_propController;
     int m_playbackSerial = 0;
+    ActionRequest m_pendingRequest;
 };
 
 // 与 DesktopShellControllerForeign 一样，这个 wrapper 让 QML 看到一个名为

@@ -72,14 +72,13 @@ func TestMockChatStream(t *testing.T) {
 		`"expression":"objection"`,
 		`"type":"TEXT_MESSAGE_CONTENT"`,
 		`"type":"TEXT_MESSAGE_END"`,
+		`"state":"idle"`,
+		`"interruptHint":"afterCurrent"`,
 		`"type":"RUN_FINISHED"`,
 	} {
 		if !strings.Contains(body, token) {
 			t.Fatalf("stream missing %s in:\n%s", token, body)
 		}
-	}
-	if strings.Contains(body, `"state":"idle"`) {
-		t.Fatalf("normal chat completion must not request idle expression; stream was:\n%s", body)
 	}
 }
 

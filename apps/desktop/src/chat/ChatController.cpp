@@ -15,6 +15,15 @@ namespace {
 constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
 constexpr auto kExpressionRequestedEvent = "miles.pet.expression.requested";
+
+InterruptHint interruptHintFromValue(const QVariantMap &value)
+{
+    if (value.value(QStringLiteral("interruptHint")).toString() == QStringLiteral("afterCurrent")) {
+        return InterruptHint::AfterCurrent;
+    }
+
+    return InterruptHint::Immediate;
+}
 } // namespace
 
 ChatController::ChatController(PetRuntime *runtime, QObject *parent)
@@ -220,7 +229,8 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
 
     if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kExpressionRequestedEvent)) {
         requestPetExpression(event.value.value(QStringLiteral("state")).toString(),
-                             event.value.value(QStringLiteral("expression")).toString());
+                             event.value.value(QStringLiteral("expression")).toString(),
+                             interruptHintFromValue(event.value));
     }
 }
 
@@ -288,7 +298,7 @@ void ChatController::setStatusText(const QString &statusText)
     emit statusTextChanged();
 }
 
-void ChatController::requestPetExpression(const QString &state, const QString &expression)
+void ChatController::requestPetExpression(const QString &state, const QString &expression, InterruptHint interruptHint)
 {
     if (m_runtime == nullptr) {
         return;
@@ -296,7 +306,7 @@ void ChatController::requestPetExpression(const QString &state, const QString &e
 
     const QString nextState = state.trimmed().isEmpty() ? QStringLiteral("idle") : state.trimmed();
     const QString nextExpression = expression.trimmed().isEmpty() ? QStringLiteral("neutral") : expression.trimmed();
-    m_runtime->requestExpression(nextState, nextExpression);
+    m_runtime->requestExpression(nextState, nextExpression, interruptHint);
 }
 
 QString ChatController::sidecarExecutablePath() const

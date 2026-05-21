@@ -276,7 +276,12 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
             event.state.isEmpty() ? snapshot.currentState : event.state,
             event.randomValue,
         };
-        appendIfPlayable(requests, ExpressionMappingResolver::resolve(manifest, context, event.expression));
+        appendIfPlayable(
+            requests,
+            ExpressionMappingResolver::resolve(manifest, context, event.expression)
+                .withInterruptHint(event.interruptHint)
+                .withPetState(context.state)
+        );
         return requests;
     }
     }

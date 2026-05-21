@@ -61,6 +61,16 @@ int main()
     const QString speakingAction = runtime.currentActionId();
     require(runtime.currentAutoReturnToIdle(), "speaking objection action should return to idle after animation completion");
 
+    ChatStreamEvent idleAfterCurrentEvent;
+    idleAfterCurrentEvent.type = QStringLiteral("CUSTOM");
+    idleAfterCurrentEvent.name = QStringLiteral("miles.pet.expression.requested");
+    idleAfterCurrentEvent.value.insert(QStringLiteral("state"), QStringLiteral("idle"));
+    idleAfterCurrentEvent.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+    idleAfterCurrentEvent.value.insert(QStringLiteral("interruptHint"), QStringLiteral("afterCurrent"));
+    controller.applyStreamEvent(idleAfterCurrentEvent);
+    require(runtime.currentState() == QStringLiteral("speaking"), "afterCurrent idle expression should not change state immediately");
+    require(runtime.currentActionId() == speakingAction, "afterCurrent idle expression should not interrupt the current speaking action");
+
     ChatStreamEvent finished;
     finished.type = QStringLiteral("RUN_FINISHED");
     finished.runId = QStringLiteral("mock-run");
@@ -68,6 +78,10 @@ int main()
     require(!controller.sending(), "RUN_FINISHED should clear sending");
     require(runtime.currentState() == QStringLiteral("speaking"), "RUN_FINISHED should not interrupt the current speaking state");
     require(runtime.currentActionId() == speakingAction, "RUN_FINISHED should not restart or replace the current speaking action");
+
+    runtime.handleAnimationFinished();
+    require(runtime.currentState() == QStringLiteral("idle"), "pending afterCurrent idle expression should run after speaking animation finishes");
+    require(runtime.currentActionId() == QStringLiteral("idle_stand"), "pending afterCurrent idle expression should return to idle action");
 
     ChatStreamEvent errorEvent;
     errorEvent.type = QStringLiteral("RUN_ERROR");
