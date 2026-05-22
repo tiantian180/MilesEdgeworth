@@ -60,7 +60,7 @@ signals:
     void saved();
 
 private:
-    void syncFromService();
+    void syncFromService(bool includeSecret);
     void setWindowVisible(bool visible);
 
     SettingsService *m_service = nullptr;
@@ -70,6 +70,7 @@ private:
     double m_temperature = 0.7;
     int m_maxTokens = 2048;
     int m_msPerChar = 80;
+    bool m_apiKeyLoaded = false;
     bool m_windowVisible = false;
 };
 

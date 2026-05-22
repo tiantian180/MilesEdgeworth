@@ -6,24 +6,29 @@ SettingsController::SettingsController(SettingsService *service, QObject *parent
     : QObject(parent)
     , m_service(service)
 {
-    syncFromService();
+    syncFromService(false);
 }
 
-void SettingsController::syncFromService()
+void SettingsController::syncFromService(bool includeSecret)
 {
     if (m_service == nullptr) {
         return;
     }
 
     m_baseUrl = m_service->baseUrl();
-    m_apiKey = m_service->apiKey();
     m_model = m_service->model();
     m_temperature = m_service->temperature();
     m_maxTokens = m_service->maxTokens();
     m_msPerChar = m_service->msPerChar();
+    if (includeSecret) {
+        m_apiKey = m_service->apiKey();
+        m_apiKeyLoaded = true;
+    }
 
     emit baseUrlChanged();
-    emit apiKeyChanged();
+    if (includeSecret) {
+        emit apiKeyChanged();
+    }
     emit modelChanged();
     emit temperatureChanged();
     emit maxTokensChanged();
@@ -45,6 +50,7 @@ void SettingsController::setApiKey(const QString &value)
         return;
     }
     m_apiKey = value;
+    m_apiKeyLoaded = true;
     emit apiKeyChanged();
 }
 
@@ -109,7 +115,7 @@ bool SettingsController::secretStoreAvailable() const
 
 void SettingsController::openWindow()
 {
-    syncFromService();
+    syncFromService(true);
     setWindowVisible(true);
 }
 
@@ -125,7 +131,9 @@ void SettingsController::save()
     }
 
     m_service->setBaseUrl(m_baseUrl);
-    m_service->setApiKey(m_apiKey);
+    if (m_apiKeyLoaded) {
+        m_service->setApiKey(m_apiKey);
+    }
     m_service->setModel(m_model);
     m_service->setTemperature(m_temperature);
     m_service->setMaxTokens(m_maxTokens);
@@ -137,7 +145,7 @@ void SettingsController::save()
 
 void SettingsController::revert()
 {
-    syncFromService();
+    syncFromService(true);
     closeWindow();
 }
 

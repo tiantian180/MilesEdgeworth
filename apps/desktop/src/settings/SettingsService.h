@@ -32,7 +32,7 @@ public:
     int msPerChar() const { return m_msPerChar; }
     void setMsPerChar(int value);
 
-    QString apiKey() const { return m_apiKey; }
+    QString apiKey();
     void setApiKey(const QString &value);
 
     bool secretStoreAvailable() const;
@@ -43,6 +43,7 @@ signals:
 
 private:
     void load();
+    void ensureApiKeyLoaded();
 
     SecretStore *m_secretStore = nullptr;
     QString m_baseUrl;
@@ -52,4 +53,5 @@ private:
     int m_msPerChar = 80;
     QString m_apiKey;
     QString m_savedApiKey;
+    bool m_apiKeyLoaded = false;
 };

@@ -1,4 +1,5 @@
 #include "settings/SecretStore.h"
+#include "settings/SettingsController.h"
 #include "settings/SettingsService.h"
 
 #include <QCoreApplication>
@@ -17,6 +18,7 @@ public:
 
     QString read(const QString &service, const QString &account) override
     {
+        ++m_readCount;
         const auto it = m_store.find({service, account});
         return it == m_store.end() ? QString() : it->second;
     }
@@ -37,8 +39,11 @@ public:
         return true;
     }
 
+    int readCount() const { return m_readCount; }
+
 private:
     std::map<std::pair<QString, QString>, QString> m_store;
+    int m_readCount = 0;
 };
 
 void setupQSettingsScope(QTemporaryDir &dir)
@@ -84,6 +89,25 @@ int main(int argc, char *argv[])
         assert(qFuzzyCompare(service.temperature() + 1.0, 0.3 + 1.0));
         assert(service.maxTokens() == 1024);
         assert(service.msPerChar() == 120);
+    }
+
+    {
+        InMemorySecretStore store;
+        store.write(QString::fromUtf8(SettingsService::kKeychainService),
+                    QString::fromUtf8(SettingsService::kKeychainAccount),
+                    QStringLiteral("sk-secret"));
+        SettingsService service(&store);
+        assert(store.readCount() == 0);
+
+        SettingsController controller(&service);
+        assert(store.readCount() == 0);
+
+        controller.openWindow();
+        assert(store.readCount() == 1);
+        assert(controller.apiKey() == QStringLiteral("sk-secret"));
+
+        controller.openWindow();
+        assert(store.readCount() == 1);
     }
 
     {

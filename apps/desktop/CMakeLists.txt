@@ -364,6 +364,8 @@ if(BUILD_TESTING)
 
     qt_add_executable(SettingsServiceSmoke
         tests/settings_service_smoke.cpp
+        src/settings/SettingsController.cpp
+        src/settings/SettingsController.h
         src/settings/SettingsService.cpp
         src/settings/SettingsService.h
         src/settings/SecretStore.cpp
@@ -378,6 +380,7 @@ if(BUILD_TESTING)
     target_link_libraries(SettingsServiceSmoke
         PRIVATE
             Qt6::Core
+            Qt6::Qml
     )
 
     add_test(NAME settings_service_smoke COMMAND SettingsServiceSmoke)

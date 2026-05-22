@@ -28,6 +28,17 @@ void SettingsService::load()
     m_maxTokens = settings.value(QString::fromLatin1(kMaxTokensKey), 2048).toInt();
     m_msPerChar = settings.value(QString::fromLatin1(kMsPerCharKey), 80).toInt();
 
+    m_savedApiKey.clear();
+    m_apiKey.clear();
+    m_apiKeyLoaded = false;
+}
+
+void SettingsService::ensureApiKeyLoaded()
+{
+    if (m_apiKeyLoaded) {
+        return;
+    }
+
     if (m_secretStore != nullptr && m_secretStore->available()) {
         m_savedApiKey = m_secretStore->read(QString::fromUtf8(kKeychainService),
                                             QString::fromUtf8(kKeychainAccount));
@@ -36,6 +47,8 @@ void SettingsService::load()
         m_savedApiKey.clear();
         m_apiKey.clear();
     }
+
+    m_apiKeyLoaded = true;
 }
 
 void SettingsService::setBaseUrl(const QString &value)
@@ -84,6 +97,13 @@ void SettingsService::setMsPerChar(int value)
 void SettingsService::setApiKey(const QString &value)
 {
     m_apiKey = value;
+    m_apiKeyLoaded = true;
+}
+
+QString SettingsService::apiKey()
+{
+    ensureApiKeyLoaded();
+    return m_apiKey;
 }
 
 bool SettingsService::secretStoreAvailable() const
@@ -102,7 +122,7 @@ void SettingsService::save()
         settings.setValue(QString::fromLatin1(kMsPerCharKey), m_msPerChar);
     }
 
-    if (m_apiKey != m_savedApiKey && m_secretStore != nullptr && m_secretStore->available()) {
+    if (m_apiKeyLoaded && m_apiKey != m_savedApiKey && m_secretStore != nullptr && m_secretStore->available()) {
         if (m_apiKey.isEmpty()) {
             m_secretStore->remove(QString::fromUtf8(kKeychainService),
                                   QString::fromUtf8(kKeychainAccount));
