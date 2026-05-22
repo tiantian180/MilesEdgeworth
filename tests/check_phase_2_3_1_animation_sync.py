@@ -44,7 +44,7 @@ def main() -> int:
     require("pendingCount()" in pacer_h, "ChatTextPacer must expose pendingCount() for tests")
     require("void chunkReady" in pacer_h, "ChatTextPacer must declare chunkReady signal")
     require("QTimer" in pacer_cpp, "ChatTextPacer must drive emission with QTimer")
-    require("maxBacklog" in pacer_cpp.lower() or "backlog" in pacer_cpp.lower(),
+    require("maxbacklog" in pacer_cpp.lower() or "backlog" in pacer_cpp.lower(),
             "ChatTextPacer must implement backlog catch-up")
 
     # ChatController state machine
