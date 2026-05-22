@@ -79,6 +79,10 @@ int main(int argc, char *argv[])
     require(controller.statusText() == QStringLiteral("整理记忆中..."),
             "memory summarizing event should update status text");
 
+    controller.applyStreamEvent(started);
+    require(controller.statusText() == QStringLiteral("正在回复"),
+            "RUN_STARTED should override memory summarizing status");
+
     ChatStreamEvent thinkingEvent;
     thinkingEvent.type = QStringLiteral("CUSTOM");
     thinkingEvent.name = QStringLiteral("miles.pet.expression.requested");
@@ -151,6 +155,36 @@ int main(int argc, char *argv[])
     errorEvent.error = QStringLiteral("mock failure");
     controller.applyStreamEvent(errorEvent);
     require(runtime.currentState() == QStringLiteral("error"), "RUN_ERROR should move pet to error state");
+
+    // 切换会话后，旧 SSE stream 的残留事件不应该写入新会话消息模型。
+    {
+        PetRuntime staleRuntime;
+        ChatController staleController(&staleRuntime, &settings);
+
+        ChatStreamEvent staleStarted;
+        staleStarted.type = QStringLiteral("RUN_STARTED");
+        staleController.applyStreamEvent(staleStarted);
+        staleRuntime.handleAnimationFinished();
+
+        ChatStreamEvent staleStart;
+        staleStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        staleStart.role = QStringLiteral("assistant");
+        staleController.applyStreamEvent(staleStart);
+        require(staleController.messages().size() == 1,
+                "stale stream test should start with one assistant message");
+
+        staleController.switchConversation(QStringLiteral("new-conversation"));
+        require(staleController.messages().isEmpty(),
+                "switchConversation should clear the visible message model");
+
+        ChatStreamEvent staleContent;
+        staleContent.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        staleContent.delta = QStringLiteral("旧回复");
+        staleController.applyStreamEvent(staleContent);
+        waitFor([]() { return false; }, 120);
+        require(staleController.messages().isEmpty(),
+                "stream content after switching conversation must not append to the new message model");
+    }
 
     // 取消后到达的残留事件不应该新建 assistant 消息
     controller.switchConversation(QStringLiteral("smoke-conversation"));

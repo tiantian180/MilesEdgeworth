@@ -104,6 +104,8 @@ private:
     void finishCurrentReply();
     void failCurrentReply(const QString &message);
     void sendMessageInConversation(const QString &trimmed);
+    void abortPendingConversationCreate();
+    void isolateConversationAsyncState();
     void setCurrentConversationId(const QString &id);
     void setConversationSkinState(const QString &skinId);
     void setConversationSkinMismatch(bool mismatch, const QString &hint);
@@ -115,6 +117,7 @@ private:
     QNetworkAccessManager m_network;
     QProcess m_sidecarProcess;
     QPointer<QNetworkReply> m_currentReply;
+    QPointer<QNetworkReply> m_pendingConversationCreateReply;
     ChatStreamEventParser m_parser;
     QVariantList m_messages;
     QVariantList m_conversations;
@@ -143,6 +146,10 @@ private:
     QString m_conversationSkinHint;
     int m_assistantMessageIndex = -1;
     quint64 m_currentStreamId = 1;
+    quint64 m_chatRequestId = 0;
+    quint64 m_pendingCreateRequestId = 0;
+    quint64 m_listRequestId = 0;
+    quint64 m_messageLoadRequestId = 0;
     bool m_conversationSkinMismatch = false;
 };
 

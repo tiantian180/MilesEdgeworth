@@ -102,6 +102,15 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
     m_gateTimeout.setSingleShot(true);
     connect(&m_gateTimeout, &QTimer::timeout,
             this, &ChatController::handleGateTimeout);
+
+    if (m_runtime != nullptr) {
+        connect(m_runtime, &PetRuntime::activeSkinChanged, this, [this]() {
+            setConversationSkinState(m_currentConversationSkinId);
+        });
+        connect(m_runtime, &PetRuntime::skinManifestReloaded, this, [this]() {
+            setConversationSkinState(m_currentConversationSkinId);
+        });
+    }
 }
 
 ChatController::~ChatController()
@@ -258,13 +267,19 @@ void ChatController::checkHealth()
 
 void ChatController::loadConversations()
 {
+    const quint64 requestId = ++m_listRequestId;
     QUrl url(QString::fromLatin1(kConversationsUrl));
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("limit"), QStringLiteral("100"));
     url.setQuery(query);
 
     QNetworkReply *reply = m_network.get(QNetworkRequest(url));
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, requestId]() {
+        if (requestId != m_listRequestId) {
+            reply->deleteLater();
+            return;
+        }
+
         const QByteArray body = reply->readAll();
         const QNetworkReply::NetworkError error = reply->error();
         const QString errorString = reply->errorString();
@@ -325,6 +340,8 @@ void ChatController::switchConversation(const QString &id)
         return;
     }
 
+    isolateConversationAsyncState();
+
     QString skinId;
     for (const QVariant &item : m_conversations) {
         const QVariantMap conversation = item.toMap();
@@ -342,10 +359,16 @@ void ChatController::switchConversation(const QString &id)
     m_assistantMessageIndex = -1;
     emit messagesChanged();
 
+    const quint64 requestId = ++m_messageLoadRequestId;
     const QString encodedId = QString::fromUtf8(QUrl::toPercentEncoding(trimmedId));
     QNetworkReply *reply = m_network.get(QNetworkRequest(
         QUrl(QString::fromLatin1(kConversationsUrl) + QStringLiteral("/") + encodedId + QStringLiteral("/messages"))));
-    connect(reply, &QNetworkReply::finished, this, [this, reply, trimmedId]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, trimmedId, requestId]() {
+        if (requestId != m_messageLoadRequestId) {
+            reply->deleteLater();
+            return;
+        }
+
         const QByteArray body = reply->readAll();
         const QNetworkReply::NetworkError error = reply->error();
         const QString errorString = reply->errorString();
@@ -388,6 +411,7 @@ void ChatController::switchConversation(const QString &id)
 
 void ChatController::newConversation()
 {
+    isolateConversationAsyncState();
     setCurrentConversationId(QString());
     m_currentConversationSkinId.clear();
     setConversationSkinMismatch(false, QString());
@@ -405,10 +429,15 @@ void ChatController::deleteConversation(const QString &id)
         return;
     }
 
+    const bool deletingCurrent = trimmedId == m_currentConversationId;
+    if (deletingCurrent) {
+        isolateConversationAsyncState();
+    }
+
     const QString encodedId = QString::fromUtf8(QUrl::toPercentEncoding(trimmedId));
     QNetworkRequest request(QUrl(QString::fromLatin1(kConversationsUrl) + QStringLiteral("/") + encodedId));
     QNetworkReply *reply = m_network.deleteResource(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, trimmedId]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, trimmedId, deletingCurrent]() {
         const QNetworkReply::NetworkError error = reply->error();
         const QString errorString = reply->errorString();
         reply->deleteLater();
@@ -420,7 +449,7 @@ void ChatController::deleteConversation(const QString &id)
             return;
         }
 
-        if (trimmedId == m_currentConversationId) {
+        if (deletingCurrent) {
             newConversation();
         }
         loadConversations();
@@ -451,11 +480,19 @@ void ChatController::sendMessage(const QString &message)
         QNetworkRequest request(QUrl(QString::fromLatin1(kConversationsUrl)));
         request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
 
+        const quint64 requestId = ++m_pendingCreateRequestId;
         QNetworkReply *reply = m_network.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
-        connect(reply, &QNetworkReply::finished, this, [this, reply, trimmed]() {
+        m_pendingConversationCreateReply = reply;
+        connect(reply, &QNetworkReply::finished, this, [this, reply, trimmed, requestId]() {
+            if (reply != m_pendingConversationCreateReply || requestId != m_pendingCreateRequestId) {
+                reply->deleteLater();
+                return;
+            }
+
             const QByteArray responseBody = reply->readAll();
             const QNetworkReply::NetworkError error = reply->error();
             const QString errorString = reply->errorString();
+            m_pendingConversationCreateReply.clear();
             reply->deleteLater();
 
             if (m_cancelled) {
@@ -554,16 +591,17 @@ void ChatController::sendMessageInConversation(const QString &trimmed)
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     request.setRawHeader("Accept", "text/event-stream");
 
+    const quint64 requestId = ++m_chatRequestId;
     QNetworkReply *reply = m_network.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
     m_currentReply = reply;
 
-    connect(reply, &QNetworkReply::readyRead, this, [this, reply]() {
-        if (reply == m_currentReply) {
+    connect(reply, &QNetworkReply::readyRead, this, [this, reply, requestId]() {
+        if (reply == m_currentReply && requestId == m_chatRequestId) {
             handleStreamBytes(reply->readAll());
         }
     });
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        if (reply != m_currentReply) {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, requestId]() {
+        if (reply != m_currentReply || requestId != m_chatRequestId) {
             reply->deleteLater();
             return;
         }
@@ -589,11 +627,13 @@ void ChatController::sendMessageInConversation(const QString &trimmed)
 void ChatController::cancelCurrentReply()
 {
     const bool activePhase = m_phase != ChatPhase::IDLE;
-    if (!m_sending && m_currentReply.isNull() && !activePhase) {
+    const bool pendingCreate = !m_pendingConversationCreateReply.isNull();
+    if (!m_sending && m_currentReply.isNull() && !pendingCreate && !activePhase) {
         return;
     }
 
     m_cancelled = true;
+    abortPendingConversationCreate();
     m_gateTimeout.stop();
     m_pendingExpression.clear();
     m_pendingState.clear();
@@ -1112,4 +1152,54 @@ void ChatController::failCurrentReply(const QString &message)
     setSending(false);
     setStatusText(QStringLiteral("错误"));
     requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"));
+}
+
+void ChatController::abortPendingConversationCreate()
+{
+    ++m_pendingCreateRequestId;
+    if (m_pendingConversationCreateReply) {
+        QNetworkReply *reply = m_pendingConversationCreateReply;
+        m_pendingConversationCreateReply.clear();
+        reply->abort();
+        reply->deleteLater();
+    }
+}
+
+void ChatController::isolateConversationAsyncState()
+{
+    m_cancelled = true;
+    ++m_chatRequestId;
+    ++m_listRequestId;
+    ++m_messageLoadRequestId;
+    abortPendingConversationCreate();
+
+    m_gateTimeout.stop();
+    m_pendingExpression.clear();
+    m_pendingState.clear();
+    m_finishPendingAfterStart = false;
+    m_holdBuffer.clear();
+    transitionTo(ChatPhase::IDLE);
+
+    ++m_currentStreamId;
+    if (m_pacer != nullptr) {
+        m_pacer->discardBeforeStream(m_currentStreamId);
+    }
+
+    if (m_currentReply) {
+        QNetworkReply *reply = m_currentReply;
+        m_currentReply.clear();
+        reply->abort();
+        reply->deleteLater();
+    }
+
+    if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
+        QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
+        message.insert(QStringLiteral("pending"), false);
+        m_messages[m_assistantMessageIndex] = message;
+        emit messagesChanged();
+    }
+
+    m_assistantMessageIndex = -1;
+    setSending(false);
+    setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
 }
