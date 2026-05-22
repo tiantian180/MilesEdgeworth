@@ -6,8 +6,11 @@
 
 #include <QRandomGenerator>
 #include <QSettings>
+#include <QTimer>
 #include <QtGlobal>
 #include <QVariantMap>
+
+#include <utility>
 
 namespace {
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
@@ -358,6 +361,16 @@ void PetRuntime::submitExpressionRequest(
     submitRuntimeEvent(PetEvent::agentExpressionRequested(eventState, expression, randomValue, interruptHint));
 }
 
+void PetRuntime::requestBoundaryAndNotify(std::function<void()> callback)
+{
+    enqueueBoundaryNotification(std::move(callback));
+}
+
+void PetRuntime::requestCleanFinishAndNotify(std::function<void()> callback)
+{
+    enqueueBoundaryNotification(std::move(callback));
+}
+
 QVariantMap PetRuntime::consumeFrameMovementDelta() const
 {
     QVariantMap delta;
@@ -428,6 +441,10 @@ void PetRuntime::handleAnimationFinished()
     const PhaseDefinition phase = action.phases.value(m_currentPhaseId);
     if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
         playPhase(m_currentActionId, phase.nextPhase);
+        return;
+    }
+
+    if (drainPendingNotifications()) {
         return;
     }
 
@@ -784,4 +801,101 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
         emit sleepStateChanged();
     }
     emit playbackSerialChanged();
+
+    if (atAnimationBoundary()) {
+        drainPendingNotifications();
+    }
+}
+
+bool PetRuntime::atAnimationBoundary() const
+{
+    if (m_currentActionId.isEmpty()) {
+        return true;
+    }
+
+    const QString idleAction = actionForState(QStringLiteral("idle"));
+    if (m_currentRecipeId.isEmpty()
+            && m_currentState == QStringLiteral("idle")
+            && !idleAction.isEmpty()
+            && m_currentActionId == idleAction) {
+        return true;
+    }
+
+    return m_currentLoopMode == QStringLiteral("hold")
+        || m_currentLoopMode == QStringLiteral("onceThenHold");
+}
+
+void PetRuntime::enqueueBoundaryNotification(std::function<void()> callback)
+{
+    if (!callback) {
+        return;
+    }
+
+    if (atAnimationBoundary()) {
+        callback();
+        return;
+    }
+
+    PendingNotification notification;
+    notification.id = ++m_nextPendingNotificationId;
+    notification.callback = std::move(callback);
+    notification.timer = new QTimer(this);
+    notification.timer->setSingleShot(true);
+
+    const quint64 notificationId = notification.id;
+    connect(notification.timer, &QTimer::timeout, this, [this, notificationId]() {
+        triggerPendingNotification(notificationId);
+    });
+
+    notification.timer->start(1500);
+    m_pendingNotifications.append(std::move(notification));
+}
+
+bool PetRuntime::drainPendingNotifications()
+{
+    if (m_pendingNotifications.isEmpty()) {
+        return false;
+    }
+
+    QList<PendingNotification> notifications = std::move(m_pendingNotifications);
+    m_pendingNotifications.clear();
+
+    for (PendingNotification &notification : notifications) {
+        if (notification.timer != nullptr) {
+            notification.timer->stop();
+            notification.timer->deleteLater();
+            notification.timer = nullptr;
+        }
+    }
+
+    for (PendingNotification &notification : notifications) {
+        if (notification.callback) {
+            notification.callback();
+        }
+    }
+
+    return true;
+}
+
+bool PetRuntime::triggerPendingNotification(quint64 notificationId)
+{
+    for (qsizetype index = 0; index < m_pendingNotifications.size(); ++index) {
+        if (m_pendingNotifications.at(index).id != notificationId) {
+            continue;
+        }
+
+        PendingNotification notification = std::move(m_pendingNotifications[index]);
+        m_pendingNotifications.removeAt(index);
+        if (notification.timer != nullptr) {
+            notification.timer->stop();
+            notification.timer->deleteLater();
+            notification.timer = nullptr;
+        }
+        if (notification.callback) {
+            notification.callback();
+        }
+        return true;
+    }
+
+    return false;
 }

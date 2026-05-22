@@ -656,6 +656,26 @@ int main(int argc, char *argv[])
     runtime.submitExpressionRequest("unknown-state", "neutral", 0.0);
     require(runtime.currentActionId() == "idle_stand", "未知 expression state 应回退到当前 PetState");
 
+    {
+        int boundaryCallbacks = 0;
+        runtime.playAction("bow");
+        runtime.requestBoundaryAndNotify([&boundaryCallbacks]() {
+            ++boundaryCallbacks;
+        });
+        require(boundaryCallbacks == 0, "requestBoundaryAndNotify 不应在动作边界前回调");
+        runtime.handleAnimationFinished();
+        require(boundaryCallbacks == 1, "requestBoundaryAndNotify 应在 handleAnimationFinished 自然边界回调");
+
+        int cleanFinishCallbacks = 0;
+        runtime.playAction("idle_thinking_once");
+        runtime.requestCleanFinishAndNotify([&cleanFinishCallbacks]() {
+            ++cleanFinishCallbacks;
+        });
+        require(cleanFinishCallbacks == 0, "requestCleanFinishAndNotify 不应在动作边界前回调");
+        runtime.handleAnimationFinished();
+        require(cleanFinishCallbacks == 1, "requestCleanFinishAndNotify 应在 handleAnimationFinished 自然边界回调");
+    }
+
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");
     require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit0.wav", "Hold it 应播放默认语音");
