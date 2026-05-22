@@ -111,7 +111,7 @@ Phase 1 框架主干和收尾体验修复已经完成，当前主线进入 Phase
 - 语音语言已改为可选 Audio Capability，Miles 皮肤通过 manifest 声明日语、英语、中文，右键菜单按声明动态生成语音子菜单。
 - ExpressionMapping schema 已接入，后续 AI / Agent 可以请求当前皮肤声明的 expression，由运行时映射到具体动作。
 
-Phase 2 期间可以并行处理的框架债务：
+Phase 2 期间可以并行处理的框架债务（统一跟踪见 [技术债务与评审待办](docs/v2/参考资料/技术债务与评审待办.md#readme-同步的框架债务)）：
 
 - HitZone schema 迁到 image-space。
 - 连续缩放控件。

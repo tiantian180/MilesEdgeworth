@@ -31,10 +31,15 @@ def main() -> int:
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     runtime_smoke = read("apps/desktop/tests/pet_runtime_smoke.cpp")
+    pet_logging_h = read("apps/desktop/src/pet/PetLogging.h")
+    pet_logging_cpp = read("apps/desktop/src/pet/PetLogging.cpp")
+    expression_cpp = read("apps/desktop/src/pet/selection/ExpressionMappingResolver.cpp")
     manifest = read("apps/desktop/resources/skins/miles-edgeworth/manifest.json")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     root_cmake = read("CMakeLists.txt")
+    readme = read("README.md")
     stage_doc = read("docs/v2/阶段记录/Phase 2.3.1 动画-文字同步.md")
+    debt_doc = read("docs/v2/参考资料/技术债务与评审待办.md")
     index_doc = read("docs/v2/文档索引.md")
 
     # ChatTextPacer
@@ -96,8 +101,14 @@ def main() -> int:
             "PetRuntime must drain pending notifications at animation boundaries")
     require("finishingPlaybackSerial" in runtime_cpp,
             "PetRuntime must stop stale animation-finished flow when a boundary callback replaces the animation")
-    require("miles.pet.runtime" in runtime_cpp and "miles.pet.expression" in runtime_cpp,
-            "PetRuntime/ExpressionMapping should expose debug categories")
+    require("Q_DECLARE_LOGGING_CATEGORY(petExpressionLog)" in pet_logging_h,
+            "pet expression logging category should be declared once in a shared header")
+    require(pet_logging_cpp.count('Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression", QtInfoMsg)') == 1,
+            "pet expression logging category should be defined once")
+    require('Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression", QtInfoMsg)' not in runtime_cpp + expression_cpp,
+            "PetRuntime and ExpressionMappingResolver should share the declared pet expression logging category")
+    require("PetLogging.cpp" in desktop_cmake,
+            "desktop CMake must list PetLogging.cpp for shared pet logging categories")
 
     # Tests
     require("ChatTextPacer" in pacer_smoke,
@@ -127,6 +138,17 @@ def main() -> int:
 
     # Docs
     require("Phase 2.3.1" in stage_doc, "Phase 2.3.1 stage record must exist")
+    require("技术债务与评审待办" in stage_doc,
+            "Phase 2.3.1 stage record should point to the shared debt backlog")
+    require("AI 聊天动画编排评审待办" in debt_doc and "RUN_FINISHED" in debt_doc,
+            "Phase 2.3.1 animation review debt should live in the shared debt backlog")
+    require("技术债务与评审待办" in readme,
+            "README debt section should point to the shared debt backlog")
+    require("README 同步的框架债务" in debt_doc and "HitZone schema 迁到 image-space" in debt_doc
+            and "Pet Skin Studio" in debt_doc,
+            "README framework debt should live in the shared debt backlog")
+    require("技术债务与评审待办" in index_doc,
+            "doc index must link the shared debt backlog")
     require("Phase 2.3.1" in index_doc, "doc index must link Phase 2.3.1 record")
 
     print("phase 2.3.1 animation-text sync contract ok")

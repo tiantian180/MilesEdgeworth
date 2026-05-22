@@ -2,9 +2,9 @@
 
 #include "pet/interaction/InteractionPipeline.h"
 #include "pet/manifest/SkinManifestLoader.h"
+#include "pet/PetLogging.h"
 #include "pet/selection/ActionPoolSelector.h"
 
-#include <QLoggingCategory>
 #include <QRandomGenerator>
 #include <QSettings>
 #include <QTimer>
@@ -14,9 +14,6 @@
 #include <utility>
 
 namespace {
-Q_LOGGING_CATEGORY(petRuntimeLog, "miles.pet.runtime", QtInfoMsg)
-Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression", QtInfoMsg)
-
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
 constexpr int kBoundarySafetyMs = 1500;
 

@@ -99,6 +99,8 @@ def main() -> int:
             "ChatController logProcessOutput helper must be removed")
     require("MILES_LOG_PAYLOADS" in chat_cpp,
             "ChatController must forward MILES_LOG_PAYLOADS to sidecar")
+    require(chat_cpp.count("QProcessEnvironment::systemEnvironment()") == 1,
+            "ChatController should only read the process environment once before forwarding log env vars")
     require(".noquote()" in chat_cpp,
             "ChatController should use noquote key=value debug logs")
     require(".noquote()" in runtime_cpp,
