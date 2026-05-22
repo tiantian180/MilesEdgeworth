@@ -55,6 +55,14 @@ int main(int argc, char *argv[])
             "ChatController should expose conversations as a Qt property");
     require(metaObject->indexOfProperty("currentConversationId") >= 0,
             "ChatController should expose currentConversationId as a Qt property");
+    require(metaObject->indexOfProperty("conversationSkinMismatch") >= 0,
+            "ChatController should expose conversationSkinMismatch as a Qt property");
+    require(metaObject->indexOfProperty("conversationSkinHint") >= 0,
+            "ChatController should expose conversationSkinHint as a Qt property");
+    require(!controller.conversationSkinMismatch(),
+            "conversation skin mismatch should be false by default");
+    require(controller.conversationSkinHint().isEmpty(),
+            "conversation skin hint should be empty by default");
 
     ChatStreamEvent started;
     started.type = QStringLiteral("RUN_STARTED");
