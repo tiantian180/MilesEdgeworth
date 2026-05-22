@@ -1,9 +1,8 @@
 #pragma once
 
+#include <QMessageLogContext>
+#include <QString>
 #include <QtGlobal>
-
-class QMessageLogContext;
-class QString;
 
 namespace MilesLogHandler {
 

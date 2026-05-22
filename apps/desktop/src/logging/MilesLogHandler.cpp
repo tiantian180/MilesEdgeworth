@@ -9,6 +9,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QTextStream>
+#include <QtLogging>
 
 #include <cstdio>
 #include <memory>
@@ -18,6 +19,7 @@ namespace {
 QtMessageHandler previousHandler = nullptr;
 QMutex logMutex;
 std::unique_ptr<QFile> logFile;
+bool installed = false;
 
 QString levelName(QtMsgType type)
 {
@@ -53,8 +55,17 @@ void writeStderr(const QString &line)
     std::fflush(stderr);
 }
 
+void writeDiagnostic(const QString &message)
+{
+    const QByteArray bytes = message.toLocal8Bit();
+    std::fwrite(bytes.constData(), 1, static_cast<size_t>(bytes.size()), stderr);
+    std::fwrite("\n", 1, 1, stderr);
+    std::fflush(stderr);
+}
+
 void writeFileLine(const QString &line)
 {
+    QMutexLocker locker(&logMutex);
     if (logFile == nullptr || !logFile->isOpen()) {
         return;
     }
@@ -66,7 +77,6 @@ void writeFileLine(const QString &line)
 
 void handleMessage(QtMsgType type, const QMessageLogContext &context, const QString &message)
 {
-    QMutexLocker locker(&logMutex);
     if (MilesLogHandler::isMilesCategory(context.category)) {
         writeStderr(MilesLogHandler::formatMilesMessage(type, context, message, false));
         writeFileLine(MilesLogHandler::formatMilesMessage(type, context, message, true));
@@ -74,8 +84,14 @@ void handleMessage(QtMsgType type, const QMessageLogContext &context, const QStr
     }
 
     const QString defaultLine = qFormatLogMessage(type, context, message);
-    if (previousHandler != nullptr) {
-        previousHandler(type, context, message);
+    QtMessageHandler handler = nullptr;
+    {
+        QMutexLocker locker(&logMutex);
+        handler = previousHandler;
+    }
+
+    if (handler != nullptr) {
+        handler(type, context, message);
     } else {
         writeStderr(defaultLine);
     }
@@ -89,15 +105,31 @@ namespace MilesLogHandler {
 
 void install()
 {
+    QMutexLocker locker(&logMutex);
+    if (installed) {
+        return;
+    }
+
     const QByteArray path = qgetenv("MILES_LOG_FILE").trimmed();
     if (!path.isEmpty()) {
-        logFile = std::make_unique<QFile>(QString::fromLocal8Bit(path));
-        if (!logFile->open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+        const QString filePath = QString::fromLocal8Bit(path);
+        QFile truncateFile(filePath);
+        if (!truncateFile.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text)) {
+            writeDiagnostic(QStringLiteral("MilesLogHandler: failed to truncate MILES_LOG_FILE: ") + filePath);
+        } else {
+            truncateFile.close();
+            logFile = std::make_unique<QFile>(filePath);
+        }
+
+        if (logFile != nullptr
+            && !logFile->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+            writeDiagnostic(QStringLiteral("MilesLogHandler: failed to append MILES_LOG_FILE: ") + filePath);
             logFile.reset();
         }
     }
 
     previousHandler = qInstallMessageHandler(handleMessage);
+    installed = true;
 }
 
 bool isMilesCategory(const char *category)
