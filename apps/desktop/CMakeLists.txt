@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia Network QuickControls2 Test)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia Network QuickControls2)
 include(CTest)
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -158,6 +158,8 @@ if(TARGET MilesAgentCore)
 endif()
 
 if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+
     add_executable(ChatStreamEventParserSmoke
         tests/chat_stream_event_parser_smoke.cpp
         src/chat/ChatStreamEvent.cpp

@@ -38,6 +38,10 @@ void ChatTextPacer::setMsPerChar(int value)
 
 int ChatTextPacer::effectiveInterval() const
 {
+    if (m_queue.size() > kMaxBacklog) {
+        const int sped = static_cast<int>(m_msPerChar * kBacklogSpeedupFactor);
+        return sped < 1 ? 1 : sped;
+    }
     return m_msPerChar;
 }
 
@@ -63,5 +67,11 @@ void ChatTextPacer::tick()
 
     if (m_queue.isEmpty()) {
         m_timer.stop();
+        return;
+    }
+
+    const int next = effectiveInterval();
+    if (m_timer.interval() != next) {
+        m_timer.start(next);
     }
 }
