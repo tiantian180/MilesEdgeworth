@@ -1,6 +1,7 @@
 #include "chat/ChatController.h"
 
 #include "pet/PetRuntime.h"
+#include "settings/SettingsService.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -11,11 +12,15 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
+#include <QProcessEnvironment>
 
 namespace {
 constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
 constexpr auto kExpressionRequestedEvent = "miles.pet.expression.requested";
+constexpr int kSidecarRestartDelayMs = 150;
+constexpr int kSidecarRestartRetryDelayMs = 300;
+constexpr int kSidecarRestartMaxAttempts = 3;
 
 InterruptHint interruptHintFromValue(const QVariantMap &value)
 {
@@ -27,9 +32,10 @@ InterruptHint interruptHintFromValue(const QVariantMap &value)
 }
 } // namespace
 
-ChatController::ChatController(PetRuntime *runtime, QObject *parent)
+ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent)
     : QObject(parent)
     , m_runtime(runtime)
+    , m_settings(settings)
 {
     connect(&m_sidecarProcess, &QProcess::started, this, [this]() {
         setStatusText(QStringLiteral("连接中"));
@@ -37,13 +43,26 @@ ChatController::ChatController(PetRuntime *runtime, QObject *parent)
     });
     connect(&m_sidecarProcess, &QProcess::errorOccurred, this, [this]() {
         setSidecarReady(false);
-        setStatusText(QStringLiteral("未连接"));
+        if (!m_sidecarRestartPending) {
+            setStatusText(QStringLiteral("未连接"));
+        }
     });
     connect(&m_sidecarProcess,
             qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             this,
             [this](int, QProcess::ExitStatus) {
                 setSidecarReady(false);
+                if (m_sidecarStoppingForRestart) {
+                    setStatusText(QStringLiteral("重启中"));
+                    return;
+                }
+                if (m_sidecarRestartPending && m_sidecarRestartAttempts < kSidecarRestartMaxAttempts) {
+                    setStatusText(QStringLiteral("重试中"));
+                    scheduleSidecarStart(kSidecarRestartRetryDelayMs);
+                    return;
+                }
+                m_sidecarRestartPending = false;
+                m_sidecarRestartAttempts = 0;
                 setStatusText(QStringLiteral("未连接"));
             });
 }
@@ -67,6 +86,13 @@ void ChatController::openWindow()
 
 void ChatController::startSidecar()
 {
+    m_sidecarRestartPending = false;
+    m_sidecarRestartAttempts = 0;
+    launchSidecarProcess();
+}
+
+void ChatController::launchSidecarProcess()
+{
     if (m_sidecarProcess.state() != QProcess::NotRunning) {
         checkHealth();
         return;
@@ -74,13 +100,75 @@ void ChatController::startSidecar()
 
     const QString executablePath = sidecarExecutablePath();
     if (executablePath.isEmpty()) {
+        m_sidecarRestartPending = false;
+        m_sidecarRestartAttempts = 0;
         setSidecarReady(false);
         setStatusText(QStringLiteral("找不到 miles-agent"));
         return;
     }
 
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if (m_settings != nullptr) {
+        const QString baseUrl = m_settings->baseUrl();
+        if (!baseUrl.isEmpty()) {
+            env.insert(QStringLiteral("MILES_PROVIDER_BASE_URL"), baseUrl);
+        }
+
+        const QString apiKey = m_settings->apiKey();
+        if (!apiKey.isEmpty()) {
+            env.insert(QStringLiteral("MILES_PROVIDER_API_KEY"), apiKey);
+        }
+
+        const QString model = m_settings->model();
+        if (!model.isEmpty()) {
+            env.insert(QStringLiteral("MILES_PROVIDER_MODEL"), model);
+        }
+
+        env.insert(QStringLiteral("MILES_PROVIDER_TEMPERATURE"), QString::number(m_settings->temperature()));
+        env.insert(QStringLiteral("MILES_PROVIDER_MAX_TOKENS"), QString::number(m_settings->maxTokens()));
+    }
+
+    m_sidecarProcess.setProcessEnvironment(env);
     setStatusText(QStringLiteral("启动中"));
+    if (m_sidecarRestartPending) {
+        ++m_sidecarRestartAttempts;
+    }
     m_sidecarProcess.start(executablePath, {QStringLiteral("-addr"), QStringLiteral("127.0.0.1:39710")});
+}
+
+void ChatController::scheduleSidecarStart(int delayMs)
+{
+    QTimer::singleShot(delayMs, this, [this]() {
+        if (m_sidecarRestartPending) {
+            launchSidecarProcess();
+        }
+    });
+}
+
+void ChatController::restartSidecar()
+{
+    cancelCurrentReply();
+    setSidecarReady(false);
+    setStatusText(QStringLiteral("重启中"));
+    m_sidecarRestartPending = true;
+    m_sidecarRestartAttempts = 0;
+
+    if (m_sidecarProcess.state() != QProcess::NotRunning) {
+        m_sidecarStoppingForRestart = true;
+        m_sidecarProcess.terminate();
+        if (!m_sidecarProcess.waitForFinished(1000)) {
+            m_sidecarProcess.kill();
+            m_sidecarProcess.waitForFinished(1000);
+        }
+        m_sidecarStoppingForRestart = false;
+    }
+
+    scheduleSidecarStart(kSidecarRestartDelayMs);
+}
+
+void ChatController::handleSettingsSaved()
+{
+    restartSidecar();
 }
 
 void ChatController::checkHealth()
@@ -90,6 +178,10 @@ void ChatController::checkHealth()
         const bool healthy = reply->error() == QNetworkReply::NoError;
         reply->deleteLater();
         setSidecarReady(healthy);
+        if (healthy) {
+            m_sidecarRestartPending = false;
+            m_sidecarRestartAttempts = 0;
+        }
         setStatusText(healthy ? QStringLiteral("已连接") : QStringLiteral("未连接"));
     });
 }

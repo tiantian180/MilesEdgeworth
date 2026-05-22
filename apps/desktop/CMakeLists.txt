@@ -23,6 +23,12 @@ set(DESKTOP_SOURCES
     src/chat/ChatStreamEvent.cpp
     src/chat/ChatStreamEvent.h
     src/main.cpp
+    src/settings/SecretStore.cpp
+    src/settings/SecretStore.h
+    src/settings/SettingsController.cpp
+    src/settings/SettingsController.h
+    src/settings/SettingsService.cpp
+    src/settings/SettingsService.h
     src/window/WindowInputMaskController.cpp
     src/window/WindowInputMaskController.h
     src/pet/behavior/BehaviorTriggerEngine.cpp
@@ -76,6 +82,8 @@ if(APPLE)
     list(APPEND DESKTOP_SOURCES
         src/platform/MacPetWindowBehavior.h
         src/platform/MacPetWindowBehavior.mm
+        src/settings/MacSecretStore.h
+        src/settings/MacSecretStore.mm
     )
 endif()
 
@@ -90,11 +98,13 @@ qt_add_qml_module(MilesEdgeworthDesktop
     QML_FILES
         qml/ChatWindow.qml
         qml/PetWindow.qml
+        qml/SettingsWindow.qml
     SOURCES
         src/DesktopShellController.h
         src/chat/ChatController.h
         src/pet/events/PetEventBridge.h
         src/pet/PetRuntime.h
+        src/settings/SettingsController.h
 )
 
 target_include_directories(MilesEdgeworthDesktop
@@ -103,6 +113,7 @@ target_include_directories(MilesEdgeworthDesktop
         ${CMAKE_CURRENT_SOURCE_DIR}/src/chat
         ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
         ${CMAKE_CURRENT_SOURCE_DIR}/src/pet/events
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/settings
 )
 
 target_link_libraries(MilesEdgeworthDesktop
@@ -113,6 +124,11 @@ target_link_libraries(MilesEdgeworthDesktop
         Qt6::Network
         Qt6::QuickControls2
 )
+
+if(APPLE)
+    target_link_libraries(MilesEdgeworthDesktop PRIVATE "-framework Security")
+    target_compile_definitions(MilesEdgeworthDesktop PRIVATE MILES_HAS_MAC_SECRET_STORE)
+endif()
 
 set_target_properties(MilesEdgeworthDesktop PROPERTIES
     MACOSX_BUNDLE TRUE
@@ -241,6 +257,10 @@ if(BUILD_TESTING)
         src/chat/ChatController.h
         src/chat/ChatStreamEvent.cpp
         src/chat/ChatStreamEvent.h
+        src/settings/SecretStore.cpp
+        src/settings/SecretStore.h
+        src/settings/SettingsService.cpp
+        src/settings/SettingsService.h
         src/pet/behavior/BehaviorTriggerEngine.cpp
         src/pet/behavior/BehaviorTriggerEngine.h
         src/pet/commands/SkinCommand.h
@@ -296,4 +316,24 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME chat_controller_smoke COMMAND ChatControllerSmoke)
+
+    qt_add_executable(SettingsServiceSmoke
+        tests/settings_service_smoke.cpp
+        src/settings/SettingsService.cpp
+        src/settings/SettingsService.h
+        src/settings/SecretStore.cpp
+        src/settings/SecretStore.h
+    )
+
+    target_include_directories(SettingsServiceSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(SettingsServiceSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    add_test(NAME settings_service_smoke COMMAND SettingsServiceSmoke)
 endif()

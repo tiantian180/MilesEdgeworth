@@ -16,6 +16,7 @@
 
 class QNetworkReply;
 class PetRuntime;
+class SettingsService;
 
 class ChatController : public QObject
 {
@@ -26,7 +27,7 @@ class ChatController : public QObject
     Q_PROPERTY(QVariantList messages READ messages NOTIFY messagesChanged)
 
 public:
-    explicit ChatController(PetRuntime *runtime, QObject *parent = nullptr);
+    explicit ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent = nullptr);
     ~ChatController() override;
 
     bool sidecarReady() const { return m_sidecarReady; }
@@ -36,11 +37,15 @@ public:
 
     Q_INVOKABLE void openWindow();
     Q_INVOKABLE void startSidecar();
+    Q_INVOKABLE void restartSidecar();
     Q_INVOKABLE void checkHealth();
     Q_INVOKABLE void sendMessage(const QString &message);
     Q_INVOKABLE void cancelCurrentReply();
 
     void applyStreamEvent(const ChatStreamEvent &event);
+
+public slots:
+    void handleSettingsSaved();
 
 signals:
     void sidecarReadyChanged();
@@ -63,11 +68,14 @@ private:
         InterruptHint interruptHint = InterruptHint::Immediate
     );
     QString sidecarExecutablePath() const;
+    void launchSidecarProcess();
+    void scheduleSidecarStart(int delayMs);
     void handleStreamBytes(const QByteArray &bytes);
     void finishCurrentReply();
     void failCurrentReply(const QString &message);
 
     PetRuntime *m_runtime = nullptr;
+    SettingsService *m_settings = nullptr;
     QNetworkAccessManager m_network;
     QProcess m_sidecarProcess;
     QPointer<QNetworkReply> m_currentReply;
@@ -79,6 +87,9 @@ private:
     QString m_holdBuffer;
     bool m_sidecarReady = false;
     bool m_sending = false;
+    bool m_sidecarRestartPending = false;
+    bool m_sidecarStoppingForRestart = false;
+    int m_sidecarRestartAttempts = 0;
     // 用户取消后，剩余 SSE chunks 必须被丢弃，否则会拼到新建的 assistant 消息里产生"幽灵回复"。
     // 每次 sendMessage 复位 false。
     bool m_cancelled = false;

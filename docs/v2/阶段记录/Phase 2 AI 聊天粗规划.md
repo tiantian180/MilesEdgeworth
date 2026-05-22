@@ -121,6 +121,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 - 配置先用环境变量（`MILES_PROVIDER_BASE_URL` / `MILES_PROVIDER_API_KEY` / `MILES_PROVIDER_MODEL` 等）；图形配置在 2.2。
 - 无 API key 时 fallback 到 mock provider，`/health` 标 `provider: "mock-fallback"`。
 - 不在 CI 中调用真实外部 API（`httptest` mock 上游）。
+- Go sidecar provider 层预留可观测性 middleware hook 位置（接口定义，不激活），供 Phase 2.3 接入 Langfuse 时无需改调用结构。
 
 验收：
 
@@ -129,7 +130,9 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 - 网络失败、provider 4xx/5xx 都能转化为 `RUN_ERROR` 事件并在 UI 显示。
 - 模型不按 `[EXPR:x]` 格式输出时不崩，首段默认 `neutral`。
 
-### Phase 2.2：用户配置与安全存储
+### Phase 2.2：用户配置与安全存储 ✓
+
+> 已完成。详见 `阶段记录/Phase 2.2 用户配置与安全存储.md`。
 
 目标：把临时配置升级为用户可维护配置。
 
@@ -138,12 +141,8 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 - 基础设置窗口或设置面板。
 - provider、base URL、API key、model、temperature、max tokens。
 - 字符速率限制器参数 `msPerChar` 也在设置中暴露（默认 80ms，范围 40–200ms）。详见《AI 聊天动画编排设计》§7.2。
-- API key 存储策略：macOS Keychain / Windows Credential Manager / Linux Secret Service。
-  - **TODO（Phase 2.2 详细计划时拍板）**：当 keychain / credential manager / secret service 不可用时的兜底——三选一：
-    - A：拒绝启动并提示用户手动配置
-    - B：fallback 到加密配置文件 + 显式警告
-    - C：fallback 到仅环境变量读取（不在磁盘留任何 key）
-  - 粗规划阶段不预先选定；Phase 2.2 plan 写具体方案时一并决定。
+- API key 存储策略：macOS Keychain 已落地；Windows Credential Manager / Linux Secret Service 留到对应平台支持时实现。
+- 当系统密钥存储不可用时，本阶段选择“不落盘”兜底：当前进程内可用，重启后需要重新输入，或继续使用外部环境变量。
 
 验收：
 
@@ -159,9 +158,10 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 - 完整 Miles persona prompt（包含表达约定、风格、禁忌等），替换 2.1 的最小版本。
 - 会话历史保存（SQLite）。
 - 新建 / 清空会话。
-- 历史摘要或截断策略。
+- 历史摘要或截断策略（可参考 Langfuse 实际 token 用量数据）。
 - ChatController 完整状态机：`IDLE` / `BUFFERING_FOR_START` / `STREAMING` / `GATED` / `WAITING_FOR_ANIMATION_END`。详见《AI 聊天动画编排设计》§5。
 - 字符速率限制器实现：`QTimer` + hold buffer drain + 积压追平。详见《AI 聊天动画编排设计》§7。
+- **Langfuse 可观测性接入**：激活 Phase 2.1 预留的 middleware hook，接入 Langfuse SDK（Go）。覆盖：每轮 LLM 调用的 trace（prompt、completion、latency、token 用量、cost）、session 关联、persona prompt 版本管理。Langfuse 地址/API key 作为可选配置项，未配置时静默跳过，不影响主流程。
 
 验收：
 
@@ -211,7 +211,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 范围：
 
 - ChatWindow 支持粘贴、拖拽图片到输入框。
-- Go sidecar 引入 [models.dev](https://models.dev/) 数据源（后台静默同步 + 本地磁盘缓存，TTL 7 天）自动检测模型 `supports_vision`；未知模型可手动 override。
+- Go sidecar 引入 [models.dev](https://models.dev/) 数据源（后台静默同步 + 本地磁盘缓存，TTL 7 天），作为**通用模型能力数据库**持久使用，不局限于本阶段。可覆盖的字段包括但不限于：`supports_vision`（本阶段主要用途）、`context_window` / `max_output_tokens`（用于 token 预算与截断策略）、`supports_tool_use`（工具调用能力检测）、`supports_streaming`、定价信息等。未知模型或字段可手动 override。后续阶段如需消费新字段，直接读取已缓存数据，无需重复设计同步机制。
 - 附图按钮始终可见，unsupported 时置灰并 tooltip 提示前往设置启用。
 - 图片发送时按 OpenAI 多模态格式构建 `content` 数组（text + image_url）。
 

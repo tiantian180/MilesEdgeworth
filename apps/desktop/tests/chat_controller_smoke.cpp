@@ -1,6 +1,10 @@
 #include "chat/ChatController.h"
 #include "chat/ChatStreamEvent.h"
 #include "pet/PetRuntime.h"
+#include "settings/SecretStore.h"
+#include "settings/SettingsService.h"
+
+#include <QCoreApplication>
 
 #include <stdexcept>
 
@@ -13,10 +17,18 @@ void require(bool condition, const char *message)
 }
 } // namespace
 
-int main()
+int main(int argc, char *argv[])
 {
+    QCoreApplication app(argc, argv);
+    NullSecretStore secretStore;
+    SettingsService settings(&secretStore);
+    settings.setBaseUrl(QStringLiteral("https://api.example.test/v1"));
+    settings.setModel(QStringLiteral("miles-test-model"));
+    settings.setTemperature(0.2);
+    settings.setMaxTokens(128);
+
     PetRuntime runtime;
-    ChatController controller(&runtime);
+    ChatController controller(&runtime, &settings);
 
     ChatStreamEvent started;
     started.type = QStringLiteral("RUN_STARTED");
@@ -106,7 +118,7 @@ int main()
     // Hold buffer round-trip: feed a delta while the controller is in its default
     // "immediate flush" mode (Phase 2.1 plumbing -- full GATED logic lands in 2.3).
     PetRuntime hbRuntime;
-    ChatController hbController(&hbRuntime);
+    ChatController hbController(&hbRuntime, &settings);
 
     ChatStreamEvent hbStarted;
     hbStarted.type = QStringLiteral("RUN_STARTED");
