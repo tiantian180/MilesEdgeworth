@@ -46,7 +46,9 @@ def main() -> int:
     require("MILES_LOG_LEVEL" in mileslog and "MILES_LOG_FILE" in mileslog
             and "MILES_LOG_PAYLOADS" in mileslog,
             "mileslog must read all logging env vars")
-    require("WithGroup" not in mileslog,
+    require("TextHandler" not in mileslog,
+            "mileslog must not use slog.TextHandler")
+    require(".WithGroup(" not in mileslog and "slog.WithGroup" not in mileslog,
             "mileslog must not use slog.WithGroup for category")
     require("category" in mileslog and "MILES." in mileslog_test,
             "mileslog tests must cover category formatting")

@@ -20,7 +20,6 @@ type sink struct {
 }
 
 type handler struct {
-	slog.Handler
 	mu    *sync.Mutex
 	sinks []sink
 	level slog.Level
@@ -77,10 +76,9 @@ func defaultSinks() []sink {
 
 func newHandler(sinks []sink, level slog.Level) *handler {
 	return &handler{
-		Handler: slog.NewTextHandler(io.Discard, nil),
-		mu:      &sync.Mutex{},
-		sinks:   sinks,
-		level:   level,
+		mu:    &sync.Mutex{},
+		sinks: sinks,
+		level: level,
 	}
 }
 
@@ -124,6 +122,10 @@ func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	next := *h
 	next.attrs = append(append([]slog.Attr{}, h.attrs...), attrs...)
 	return &next
+}
+
+func (h *handler) WithGroup(_ string) slog.Handler {
+	return h
 }
 
 func formatLine(t time.Time, level slog.Level, category string, message string, attrs []slog.Attr, source string, includeDate bool) string {
