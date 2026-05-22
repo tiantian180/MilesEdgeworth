@@ -68,8 +68,6 @@ signals:
 private:
     QVariantMap messageObject(const QString &role, const QString &text, bool pending, bool error) const;
     void appendMessage(const QVariantMap &message);
-    void appendAssistantDelta(const QString &delta);
-    void flushHoldBuffer();
     void transitionTo(ChatPhase next);
     void handleCleanFinishReady();
     void handleBoundaryReached();

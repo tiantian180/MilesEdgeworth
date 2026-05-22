@@ -365,15 +365,13 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
             if (m_pacer != nullptr) {
                 m_pacer->append(event.delta);
             } else {
-                m_holdBuffer.append(event.delta);
-                flushHoldBuffer();
+                appendChunkToCurrentMessage(event.delta);
             }
         } else if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
             if (m_pacer != nullptr) {
                 m_pacer->append(event.delta);
             } else {
-                m_holdBuffer.append(event.delta);
-                flushHoldBuffer();
+                appendChunkToCurrentMessage(event.delta);
             }
         } else {
             m_holdBuffer.append(event.delta);
@@ -473,35 +471,6 @@ void ChatController::appendMessage(const QVariantMap &message)
     emit messagesChanged();
 }
 
-void ChatController::appendAssistantDelta(const QString &delta)
-{
-    if (m_cancelled) {
-        return;
-    }
-
-    m_holdBuffer.append(delta);
-    flushHoldBuffer();
-}
-
-void ChatController::flushHoldBuffer()
-{
-    if (m_cancelled || m_holdBuffer.isEmpty()) {
-        return;
-    }
-
-    if (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size()) {
-        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
-        m_assistantMessageIndex = m_messages.size() - 1;
-    }
-
-    QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
-    message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + m_holdBuffer);
-    message.insert(QStringLiteral("pending"), true);
-    m_messages[m_assistantMessageIndex] = message;
-    m_holdBuffer.clear();
-    emit messagesChanged();
-}
-
 void ChatController::transitionTo(ChatPhase next)
 {
     if (m_phase == next) {
@@ -565,11 +534,15 @@ void ChatController::handleGateTimeout()
 
 void ChatController::drainHoldBufferToPacer()
 {
-    if (m_holdBuffer.isEmpty() || m_pacer == nullptr) {
+    if (m_holdBuffer.isEmpty()) {
         return;
     }
 
-    m_pacer->append(m_holdBuffer);
+    if (m_pacer != nullptr) {
+        m_pacer->append(m_holdBuffer);
+    } else {
+        appendChunkToCurrentMessage(m_holdBuffer);
+    }
     m_holdBuffer.clear();
 }
 
