@@ -5,6 +5,7 @@
 #include "settings/SettingsService.h"
 
 #include <QCoreApplication>
+#include <QDebug>
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
@@ -440,6 +441,11 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kExpressionRequestedEvent)) {
         const QString state = event.value.value(QStringLiteral("state")).toString();
         const QString expression = event.value.value(QStringLiteral("expression")).toString();
+        qInfo().noquote() << "chat expression requested"
+                          << "phase=" << static_cast<int>(m_phase)
+                          << "state=" << state
+                          << "expression=" << expression
+                          << "interruptHint=" << event.value.value(QStringLiteral("interruptHint")).toString();
 
         if (m_phase == ChatPhase::BUFFERING_FOR_START || m_phase == ChatPhase::GATED) {
             m_pendingState = state;

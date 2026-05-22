@@ -55,6 +55,7 @@ private:
     void submitIdleLoopFinishedIfStillCurrent(int playbackSerial);
     void applyCurrentFrameMask();
     QRegion regionFromCurrentFrame() const;
+    void showContextMenuQueued(const QPoint &globalPosition);
     void showContextMenuAt(const QPoint &globalPosition);
     void playSoundFromRuntime();
     void showPropFromRuntime();
@@ -72,6 +73,8 @@ private:
     QTimer m_propExpireTimer;
     QPoint m_pressPosition;
     QPoint m_pendingSingleClickPosition;
+    QPoint m_pendingContextMenuPosition;
     bool m_dragMoved = false;
     bool m_doubleClickPending = false;
+    bool m_contextMenuPending = false;
 };

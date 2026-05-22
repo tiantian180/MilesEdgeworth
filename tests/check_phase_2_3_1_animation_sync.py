@@ -69,6 +69,8 @@ def main() -> int:
             "ChatController must call requestBoundaryAndNotify on PetRuntime")
     require("requestCleanFinishAndNotify" in controller_cpp,
             "ChatController must call requestCleanFinishAndNotify on PetRuntime")
+    require("chat expression requested" in controller_cpp and "qInfo" in controller_cpp,
+            "ChatController should log parsed expression events for provider-vs-runtime diagnosis")
 
     # PetRuntime API
     require("requestBoundaryAndNotify" in runtime_h,

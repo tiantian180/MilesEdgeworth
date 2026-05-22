@@ -28,6 +28,9 @@ func TestBuildSystemPromptIncludesAllExpressions(t *testing.T) {
 		"objection",
 		"强烈反驳",
 		"polite",
+		"只能使用方括号中列出的 id 原文",
+		"[EXPR:objection]",
+		"不要输出 [EXPR:异议]",
 	} {
 		if !strings.Contains(prompt, expect) {
 			t.Fatalf("prompt missing %q\n---\n%s", expect, prompt)

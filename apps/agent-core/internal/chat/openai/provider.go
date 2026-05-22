@@ -68,7 +68,9 @@ func BuildSystemPrompt(expressions []chat.ExpressionInfo) string {
 
 func buildSystemPrompt(expressions []chat.ExpressionInfo) string {
 	var sb strings.Builder
-	sb.WriteString("你是 Miles Edgeworth 桌宠助手。回复时在每段文字开头用 [EXPR:标签名] 标记当前表达。")
+	sb.WriteString("你是 Miles Edgeworth 桌宠助手。回复时在每段文字开头用 [EXPR:id] 标记当前表达。")
+	sb.WriteString("只能使用方括号中列出的 id 原文，不要翻译 id，也不要使用中文 label。")
+	sb.WriteString("例如使用 [EXPR:objection]，不要输出 [EXPR:异议]。")
 	sb.WriteString("情绪延续时不重复标记。回复的第一段文字必须有标记。\n\n")
 	if len(expressions) == 0 {
 		return sb.String()

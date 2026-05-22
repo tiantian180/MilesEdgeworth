@@ -32,6 +32,19 @@ def main() -> int:
         ".setStyleSheet(" not in menu_cpp and "QMenu {" not in menu_cpp,
         "右键菜单应使用 Qt 平台默认样式，不应写成自定义绘制菜单",
     )
+    require(
+        "QMenu menu(parent)" not in menu_cpp,
+        "跨 Space 桌宠窗口不应作为 QMenu 的 QWidget parent，否则 macOS 原生 popup 可能绑定到旧 Space 或崩溃",
+    )
+    require(
+        "QMenu menu;" in menu_cpp,
+        "右键菜单应使用无 QWidget parent 的 QMenu，避免依赖桌宠 native window 的 Space 状态",
+    )
+    require(
+        "showContextMenuQueued" in surface_cpp + surface_h
+        and "QTimer::singleShot(0" in surface_cpp,
+        "右键菜单不应在 mousePressEvent 中同步 exec，应排到当前鼠标事件之后显示",
+    )
 
     for forbidden in [
         "语音语言",
