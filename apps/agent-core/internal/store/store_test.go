@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"sort"
 	"testing"
 )
 
@@ -184,6 +185,33 @@ func TestUserAndSummaryCannotBePartial(t *testing.T) {
 	}
 }
 
+func TestAppendMessageRejectsInvalidRole(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AppendMessage(conv.ID, "judge", "非法角色", false); !errors.Is(err, ErrInvalidRole) {
+		t.Fatalf("AppendMessage error = %v, want invalid role error", err)
+	}
+	messages, err := s.GetMessages(conv.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 0 {
+		t.Fatalf("messages = %+v, want none", messages)
+	}
+}
+
+func TestReplaceSummaryMissingConversationReturnsErrNotFound(t *testing.T) {
+	s := openTestStore(t)
+
+	if err := s.ReplaceSummary("missing-conversation", 1, "摘要"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ReplaceSummary error = %v, want ErrNotFound", err)
+	}
+}
+
 func TestListConversationsHonorsLimitAndSortsByUpdatedAt(t *testing.T) {
 	s := openTestStore(t)
 	oldConv, err := s.CreateConversation("old")
@@ -218,5 +246,32 @@ func TestListConversationsHonorsLimitAndSortsByUpdatedAt(t *testing.T) {
 	}
 	if conversations[0].ID != newConv.ID || conversations[1].ID != midConv.ID {
 		t.Fatalf("conversation order = %+v, want new then mid", conversations)
+	}
+}
+
+func TestListConversationsSortsTiesByIDDescending(t *testing.T) {
+	s := openTestStore(t)
+	ids := []string{"cccccccc-0000-4000-8000-000000000000", "aaaaaaaa-0000-4000-8000-000000000000", "bbbbbbbb-0000-4000-8000-000000000000"}
+	for _, id := range ids {
+		if _, err := s.db.Exec(`
+			INSERT INTO conversations (id, skin_id, updated_at)
+			VALUES (?, 'miles-edgeworth', '2024-01-01T00:00:00.000Z')
+		`, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(ids)))
+
+	conversations, err := s.ListConversations(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conversations) != len(ids) {
+		t.Fatalf("len(conversations) = %d, want %d: %+v", len(conversations), len(ids), conversations)
+	}
+	for i, id := range ids {
+		if conversations[i].ID != id {
+			t.Fatalf("conversation order = %+v, want IDs desc %+v", conversations, ids)
+		}
 	}
 }

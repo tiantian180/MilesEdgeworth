@@ -41,7 +41,10 @@ type Message struct {
 	CreatedAt      string `json:"createdAt"`
 }
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound    = errors.New("not found")
+	ErrInvalidRole = errors.New("invalid role")
+)
 
 const schema = `
 CREATE TABLE IF NOT EXISTS conversations (
@@ -128,7 +131,7 @@ func (s *Store) ListConversations(limit int) ([]Conversation, error) {
 	rows, err := s.db.Query(`
 		SELECT id, title, skin_id, created_at, updated_at
 		FROM conversations
-		ORDER BY updated_at DESC
+		ORDER BY updated_at DESC, id DESC
 		LIMIT ?
 	`, limit)
 	if err != nil {
@@ -193,6 +196,9 @@ func (s *Store) UpdateConversationTitle(id, title string) error {
 }
 
 func (s *Store) AppendMessage(conversationID, role, content string, partial bool) (Message, error) {
+	if err := validateRole(role); err != nil {
+		return Message{}, err
+	}
 	if role != RoleAssistant {
 		partial = false
 	}
@@ -297,6 +303,14 @@ func (s *Store) ReplaceSummary(conversationID string, upToMessageID int64, summa
 		}
 	}()
 
+	var exists int
+	if err := tx.QueryRow(`SELECT 1 FROM conversations WHERE id = ?`, conversationID).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("load conversation: %w", err)
+	}
+
 	if _, err := tx.Exec(`
 		DELETE FROM messages
 		WHERE conversation_id = ? AND id <= ?
@@ -346,6 +360,15 @@ func boolToInt(v bool) int {
 		return 1
 	}
 	return 0
+}
+
+func validateRole(role string) error {
+	switch role {
+	case RoleUser, RoleAssistant, RoleSummary:
+		return nil
+	default:
+		return fmt.Errorf("%w: %s", ErrInvalidRole, role)
+	}
 }
 
 func firstRunes(s string, limit int) string {
