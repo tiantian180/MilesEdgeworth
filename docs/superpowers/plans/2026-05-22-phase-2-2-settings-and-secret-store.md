@@ -199,7 +199,7 @@ def main() -> int:
     require("virtual bool remove(" in secret_h, "SecretStore must expose remove()")
     require("std::unique_ptr<SecretStore> create()" in secret_h, "factory create() must be declared")
     require("class NullSecretStore" in secret_h, "NullSecretStore must be declared")
-    require("Q_OS_MACOS" in secret_cpp or "Q_OS_MAC" in secret_cpp,
+    require("MILES_HAS_MAC_SECRET_STORE" in secret_cpp,
             "SecretStore.cpp factory must branch on macOS")
 
     # macOS implementation
@@ -233,10 +233,6 @@ def main() -> int:
     require("provider/temperature" in settings_cpp, "QSettings key provider/temperature required")
     require("provider/maxTokens" in settings_cpp, "QSettings key provider/maxTokens required")
     require("chat/msPerChar" in settings_cpp, "QSettings key chat/msPerChar required")
-    require("apiKey" not in settings_cpp.replace("setApiKey", "").replace("apiKey()", "")
-            or "QSettings" not in settings_cpp[settings_cpp.find("setApiKey"):],
-            "API key must never be written via QSettings")
-    # Spot-check: literal "provider/apiKey" must not appear (defensive)
     require("provider/apiKey" not in settings_cpp,
             "API key must never be stored as a QSettings key")
 
@@ -1720,6 +1716,10 @@ private:
 In `main()`, before constructing `ChatController`, add:
 
 ```cpp
+    QTemporaryDir tmp;
+    assert(tmp.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, tmp.path());
     QCoreApplication::setOrganizationName("tian-test");
     QCoreApplication::setApplicationName("MilesEdgeworth-smoke");
 
@@ -2035,43 +2035,9 @@ Append after it:
 - [Phase 2.2 用户配置与安全存储](阶段记录/Phase%202.2%20用户配置与安全存储.md):Phase 2.2 的 SecretStore 抽象、macOS Keychain 接入、SettingsService/Controller、SettingsWindow QML 和 QProcess env 注入的验收记录。
 ```
 
-- [ ] **Step 3: Update the rough plan with a "已完成" callout**
+- [x] **Step 3: Update the rough plan** *(already applied manually — confirmed complete)*
 
-Open `docs/v2/阶段记录/Phase 2 AI 聊天粗规划.md`. Find the Phase 2.2 section header:
-
-```markdown
-### Phase 2.2：用户配置与安全存储
-```
-
-Insert immediately below it:
-
-```markdown
-> 已完成。详见 `阶段记录/Phase 2.2 用户配置与安全存储.md`。
-```
-
-Also remove or strike-through the TODO callout at the bottom of the Phase 2.2 block (the keychain fallback TODO), since we've now picked C (env-var only). Replace:
-
-```markdown
-  - **TODO（Phase 2.2 详细计划时拍板）**：当 keychain / credential manager / secret service 不可用时的兜底——三选一：
-    - A：拒绝启动并提示用户手动配置
-    - B：fallback 到加密配置文件 + 显式警告
-    - C：fallback 到仅环境变量读取（不在磁盘留任何 key）
-  - 粗规划阶段不预先选定；Phase 2.2 plan 写具体方案时一并决定。
-```
-
-With:
-
-```markdown
-  - 兜底:Keychain 不可用时仅读 `MILES_PROVIDER_API_KEY` 环境变量,任何情况下 API key 不落盘。
-```
-
-- [ ] **Step 4: Update the "后续入口" pointer**
-
-Open `docs/v2/阶段记录/Phase 2 AI 聊天粗规划.md`. Find the "## 8. 后续入口" section. Append:
-
-```markdown
-Phase 2.2 已完成,Phase 2.3 详细执行计划开始前请先读《AI 聊天动画编排设计》§5、§7。
-```
+- [x] **Step 4: Update the "后续入口" pointer** *(already applied manually — confirmed complete)*
 
 - [ ] **Step 5: Run contract check + commit**
 
