@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia Network QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia Network QuickControls2 Test)
 include(CTest)
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -22,6 +22,8 @@ set(DESKTOP_SOURCES
     src/chat/ChatController.h
     src/chat/ChatStreamEvent.cpp
     src/chat/ChatStreamEvent.h
+    src/chat/ChatTextPacer.cpp
+    src/chat/ChatTextPacer.h
     src/main.cpp
     src/settings/SecretStore.cpp
     src/settings/SecretStore.h
@@ -173,6 +175,25 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME chat_stream_event_parser_smoke COMMAND ChatStreamEventParserSmoke)
+
+    add_executable(ChatTextPacerSmoke
+        tests/chat_text_pacer_smoke.cpp
+        src/chat/ChatTextPacer.cpp
+        src/chat/ChatTextPacer.h
+    )
+
+    target_include_directories(ChatTextPacerSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(ChatTextPacerSmoke
+        PRIVATE
+            Qt6::Core
+            Qt6::Test
+    )
+
+    add_test(NAME chat_text_pacer_smoke COMMAND ChatTextPacerSmoke)
 
     add_executable(SkinManifestLoaderSmoke
         tests/skin_manifest_loader_smoke.cpp
