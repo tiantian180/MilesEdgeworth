@@ -12,6 +12,9 @@ cmake-build-*/
 CMakeUserPresets.json
 *.user.*
 
+# Local Qt/QML language-server state
+apps/desktop/.qmlls.ini
+
 # Local brainstorming / visual companion artifacts
 .superpowers/
 
