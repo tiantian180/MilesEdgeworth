@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -13,7 +15,10 @@ import (
 	"milesedgeworth/agent-core/internal/chat"
 	"milesedgeworth/agent-core/internal/chat/config"
 	"milesedgeworth/agent-core/internal/chat/openai"
+	chatservice "milesedgeworth/agent-core/internal/chat/service"
 	"milesedgeworth/agent-core/internal/mileslog"
+	"milesedgeworth/agent-core/internal/models"
+	"milesedgeworth/agent-core/internal/store"
 )
 
 var logger = mileslog.New("MILES.SIDECAR")
@@ -35,9 +40,26 @@ func main() {
 		logger.Info("provider selected", "provider", "mock-fallback")
 	}
 
+	dataDir := os.Getenv("MILES_DATA_DIR")
+	if strings.TrimSpace(dataDir) == "" {
+		dataDir = filepath.Join(os.TempDir(), "MilesEdgeworth")
+	}
+	st, err := store.Open(dataDir)
+	if err != nil {
+		logger.Error("store open failed", "error", err)
+		os.Exit(1)
+	}
+	defer st.Close()
+
+	catalog := models.NewCatalog(dataDir)
+	if err := catalog.Refresh(context.Background()); err != nil {
+		logger.Warn("models catalog refresh failed", "error", err)
+	}
+	chatService := chatservice.New(st, provider, catalog, cfg.Model)
+
 	server := &http.Server{
 		Addr:    *addr,
-		Handler: api.NewServer(provider, label).Routes(),
+		Handler: api.NewServer(st, chatService, label).Routes(),
 	}
 
 	errs := make(chan error, 1)

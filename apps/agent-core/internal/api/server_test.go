@@ -1,23 +1,74 @@
 package api_test
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"milesedgeworth/agent-core/internal/api"
 	"milesedgeworth/agent-core/internal/chat"
+	chatservice "milesedgeworth/agent-core/internal/chat/service"
+	"milesedgeworth/agent-core/internal/store"
 )
 
+type fakeCatalog struct {
+	window int
+}
+
+func (c fakeCatalog) ContextWindow(string) int {
+	return c.window
+}
+
+type fakeProvider struct {
+	mu           sync.Mutex
+	completeText string
+	streamCalls  int
+	streamParams chat.ChatParams
+	streamFunc   func(context.Context, chat.ChatParams) (<-chan chat.StreamEvent, error)
+}
+
+func (p *fakeProvider) StreamChat(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+	p.mu.Lock()
+	p.streamCalls++
+	p.streamParams = params
+	p.mu.Unlock()
+
+	if p.streamFunc != nil {
+		return p.streamFunc(ctx, params)
+	}
+
+	events := make(chan chat.StreamEvent, 4)
+	events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+	events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "异议あり。"}
+	events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
+	close(events)
+	return events, nil
+}
+
+func (p *fakeProvider) Complete(context.Context, chat.ChatParams) (string, error) {
+	if p.completeText != "" {
+		return p.completeText, nil
+	}
+	return "压缩后的记忆", nil
+}
+
+func (p *fakeProvider) calls() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.streamCalls
+}
+
 func TestHealth(t *testing.T) {
-	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0), "mock").Routes())
-	defer server.Close()
+	_, server := newTestServer(t, &fakeProvider{}, 8192)
 
 	resp, err := http.Get(server.URL + "/health")
 	if err != nil {
@@ -36,103 +87,347 @@ func TestHealth(t *testing.T) {
 	if body["ok"] != true {
 		t.Fatalf("health ok = %v, want true", body["ok"])
 	}
-	if body["provider"] != "mock" {
-		t.Fatalf("provider = %v, want mock", body["provider"])
+	if body["provider"] != "test-provider" {
+		t.Fatalf("provider = %v, want test-provider", body["provider"])
 	}
 }
 
-func TestMockChatStream(t *testing.T) {
-	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0), "mock").Routes())
-	defer server.Close()
+func TestConversationCRUD(t *testing.T) {
+	_, server := newTestServer(t, &fakeProvider{}, 8192)
 
-	payload := []byte(`{"conversationId":"default","message":"hello miles"}`)
-	resp, err := http.Post(server.URL+"/v1/chat/messages", "application/json", bytes.NewReader(payload))
+	resp, err := http.Post(server.URL+"/v1/conversations", "application/json", strings.NewReader(`{"skinId":"miles-edgeworth"}`))
 	if err != nil {
-		t.Fatalf("POST /v1/chat/messages failed: %v", err)
+		t.Fatalf("POST /v1/conversations: %v", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create status = %d, want 201", resp.StatusCode)
+	}
 
+	var created store.Conversation
+	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
+		t.Fatalf("decode created conversation: %v", err)
+	}
+	if created.ID == "" || created.SkinID != "miles-edgeworth" {
+		t.Fatalf("created conversation = %+v", created)
+	}
+
+	resp, err = http.Get(server.URL + "/v1/conversations?limit=10")
+	if err != nil {
+		t.Fatalf("GET /v1/conversations: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list status = %d, want 200", resp.StatusCode)
+	}
+	var list []store.Conversation
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		t.Fatalf("decode conversation list: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != created.ID || list[0].SkinID != "miles-edgeworth" {
+		t.Fatalf("list = %+v, want created conversation", list)
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, server.URL+"/v1/conversations/"+created.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE /v1/conversations/{id}: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("delete status = %d, want 204", resp.StatusCode)
+	}
+
+	resp, err = http.Get(server.URL + "/v1/conversations/" + created.ID + "/messages")
+	if err != nil {
+		t.Fatalf("GET deleted messages: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("deleted messages status = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestChatPersistsUserAndAssistant(t *testing.T) {
+	st, server := newTestServer(t, &fakeProvider{}, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"  待った  "}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("chat status = %d, want 200", resp.StatusCode)
+	}
+	events := readSSEEvents(t, resp.Body)
+	if len(events) == 0 {
+		t.Fatal("got no SSE events")
+	}
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[0].Role != store.RoleUser || messages[0].Content != "待った" {
+		t.Fatalf("user message = %+v", messages[0])
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "异议あり。" || messages[1].IsPartial {
+		t.Fatalf("reply message = %+v", messages[1])
+	}
+}
+
+func TestChatRejectsUnknownConversation(t *testing.T) {
+	provider := &fakeProvider{}
+	_, server := newTestServer(t, provider, 8192)
+
+	resp := postChat(t, server.URL, `{"conversationId":"missing","message":"hello"}`)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+	if provider.calls() != 0 {
+		t.Fatalf("provider calls = %d, want 0", provider.calls())
+	}
+}
+
+func TestGetConversationMessagesIncludesPartialFlag(t *testing.T) {
+	st, server := newTestServer(t, &fakeProvider{}, 8192)
+	conv := createConversation(t, st)
+	if _, err := st.AppendMessage(conv.ID, store.RoleUser, "検事", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AppendMessage(conv.ID, store.RoleAssistant, "途中まで", true); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(server.URL + "/v1/conversations/" + conv.ID + "/messages")
+	if err != nil {
+		t.Fatalf("GET messages: %v", err)
+	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
 	}
-	if got := resp.Header.Get("Content-Type"); !strings.Contains(got, "text/event-stream") {
-		t.Fatalf("content-type = %q, want text/event-stream", got)
+
+	var messages []store.Message
+	if err := json.NewDecoder(resp.Body).Decode(&messages); err != nil {
+		t.Fatalf("decode messages: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2", len(messages))
+	}
+	if messages[0].IsPartial {
+		t.Fatalf("user isPartial = true, want false")
+	}
+	if !messages[1].IsPartial {
+		t.Fatalf("reply isPartial = false, want true")
+	}
+}
+
+func TestChatPersistsPartialOnClientCancel(t *testing.T) {
+	partialSent := make(chan struct{})
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			events := make(chan chat.StreamEvent)
+			go func() {
+				defer close(events)
+				events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+				events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "途中"}
+				close(partialSent)
+				<-ctx.Done()
+			}()
+			return events, nil
+		},
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, server.URL+"/v1/chat/messages", strings.NewReader(fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST /v1/chat/messages: %v", err)
 	}
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("read stream: %v", err)
-	}
-	body := string(bodyBytes)
-	for _, token := range []string{
-		`"type":"RUN_STARTED"`,
-		`"name":"miles.pet.expression.requested"`,
-		`"state":"thinking"`,
-		`"expression":"neutral"`,
-		`"type":"TEXT_MESSAGE_START"`,
-		`"expression":"objection"`,
-		`"type":"TEXT_MESSAGE_CONTENT"`,
-		`"type":"TEXT_MESSAGE_END"`,
-		`"state":"idle"`,
-		`"interruptHint":"afterCurrent"`,
-		`"type":"RUN_FINISHED"`,
-	} {
-		if !strings.Contains(body, token) {
-			t.Fatalf("stream missing %s in:\n%s", token, body)
+	reader := bufio.NewReader(resp.Body)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("read stream before cancel: %v", err)
 		}
+		if strings.Contains(line, `"delta":"途中"`) {
+			break
+		}
+	}
+	<-partialSent
+	cancel()
+	_ = resp.Body.Close()
+
+	eventually(t, time.Second, func() bool {
+		messages := getMessages(t, st, conv.ID)
+		return len(messages) == 2 &&
+			messages[1].Role == store.RoleAssistant &&
+			messages[1].Content == "途中" &&
+			messages[1].IsPartial
+	})
+}
+
+func TestSummarizingEventIsFirstSSEEventWhenTriggered(t *testing.T) {
+	provider := &fakeProvider{completeText: "古い会話の要約"}
+	st, server := newTestServer(t, provider, 2000)
+	conv := createConversation(t, st)
+	appendStoreMessage(t, st, conv.ID, store.RoleUser, strings.Repeat("古い証言", 120))
+	appendStoreMessage(t, st, conv.ID, store.RoleAssistant, "記録した。")
+	appendStoreMessage(t, st, conv.ID, store.RoleUser, "最近の質問")
+	appendStoreMessage(t, st, conv.ID, store.RoleAssistant, "最近の回答")
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"今の質問"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	events := readSSEEvents(t, resp.Body)
+	if len(events) == 0 {
+		t.Fatal("got no SSE events")
+	}
+	if events[0].Type != "CUSTOM" || events[0].Name != chatservice.SummarizingEventName {
+		t.Fatalf("first event = %+v, want summarizing event", events[0])
 	}
 }
 
 func TestChatStreamRejectsEmptyMessage(t *testing.T) {
-	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(time.Millisecond), "mock").Routes())
-	defer server.Close()
+	_, server := newTestServer(t, &fakeProvider{}, 8192)
 
-	resp, err := http.Post(server.URL+"/v1/chat/messages", "application/json", strings.NewReader(`{"message":"   "}`))
-	if err != nil {
-		t.Fatalf("POST /v1/chat/messages failed: %v", err)
-	}
+	resp := postChat(t, server.URL, `{"conversationId":"anything","message":"   "}`)
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
 	}
 }
 
 func TestChatStreamForwardsExpressions(t *testing.T) {
-	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0), "mock").Routes())
-	defer server.Close()
+	provider := &fakeProvider{}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
 
-	payload := []byte(`{
-		"conversationId": "default",
+	resp := postChat(t, server.URL, fmt.Sprintf(`{
+		"conversationId": %q,
 		"message": "hi",
 		"expressions": [
 			{"id": "objection", "description": "strong rebuttal"},
 			{"id": "polite"}
 		]
-	}`)
-	resp, err := http.Post(server.URL+"/v1/chat/messages", "application/json", bytes.NewReader(payload))
-	if err != nil {
-		t.Fatalf("POST failed: %v", err)
-	}
+	}`, conv.ID))
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", resp.StatusCode)
 	}
-	// Mock doesn't currently echo expressions; we just verify decoding doesn't blow up.
+	_, _ = io.Copy(io.Discard, resp.Body)
+
+	provider.mu.Lock()
+	defer provider.mu.Unlock()
+	got := strings.Join(provider.streamParams.KnownExpressionIDs, ",")
+	if got != "objection,polite" {
+		t.Fatalf("known expression ids = %q, want objection,polite", got)
+	}
 }
 
 func TestChatStreamRejectsOversizedBody(t *testing.T) {
-	server := httptest.NewServer(api.NewServer(chat.NewMockProvider(0), "mock").Routes())
-	defer server.Close()
+	_, server := newTestServer(t, &fakeProvider{}, 8192)
 
 	huge := strings.Repeat("x", 2*1024*1024)
 	body := fmt.Sprintf(`{"message":"%s"}`, huge)
-	resp, err := http.Post(server.URL+"/v1/chat/messages", "application/json", strings.NewReader(body))
-	if err != nil {
-		t.Fatalf("POST: %v", err)
-	}
+	resp := postChat(t, server.URL, body)
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusRequestEntityTooLarge && resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 413 or 400", resp.StatusCode)
+	}
+}
+
+func newTestServer(t *testing.T, provider chat.Provider, window int) (*store.Store, *httptest.Server) {
+	t.Helper()
+	st, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	svc := chatservice.New(st, provider, fakeCatalog{window: window}, "test-model")
+	server := httptest.NewServer(api.NewServer(st, svc, "test-provider").Routes())
+	t.Cleanup(server.Close)
+	return st, server
+}
+
+func createConversation(t *testing.T, st *store.Store) store.Conversation {
+	t.Helper()
+	conv, err := st.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return conv
+}
+
+func appendStoreMessage(t *testing.T, st *store.Store, conversationID, role, content string) {
+	t.Helper()
+	if _, err := st.AppendMessage(conversationID, role, content, false); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func getMessages(t *testing.T, st *store.Store, conversationID string) []store.Message {
+	t.Helper()
+	messages, err := st.GetMessages(conversationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return messages
+}
+
+func postChat(t *testing.T, baseURL, body string) *http.Response {
+	t.Helper()
+	resp, err := http.Post(baseURL+"/v1/chat/messages", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST /v1/chat/messages: %v", err)
+	}
+	return resp
+}
+
+func readSSEEvents(t *testing.T, body io.Reader) []chat.StreamEvent {
+	t.Helper()
+	bodyBytes, err := io.ReadAll(body)
+	if err != nil {
+		t.Fatalf("read stream: %v", err)
+	}
+	var events []chat.StreamEvent
+	for _, line := range bytes.Split(bodyBytes, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if !bytes.HasPrefix(line, []byte("data: ")) {
+			continue
+		}
+		var event chat.StreamEvent
+		if err := json.Unmarshal(bytes.TrimPrefix(line, []byte("data: ")), &event); err != nil {
+			t.Fatalf("decode SSE event %q: %v", line, err)
+		}
+		events = append(events, event)
+	}
+	return events
+}
+
+func eventually(t *testing.T, timeout time.Duration, check func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if check() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !check() {
+		t.Fatalf("condition not met within %s", timeout)
 	}
 }
