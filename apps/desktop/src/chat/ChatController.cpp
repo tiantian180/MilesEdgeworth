@@ -208,6 +208,7 @@ void ChatController::sendMessage(const QString &message)
         return;
     }
 
+    ++m_currentStreamId;
     m_cancelled = false;
     appendMessage(messageObject(QStringLiteral("user"), trimmed, false, false));
     appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));

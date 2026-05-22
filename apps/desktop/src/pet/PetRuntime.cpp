@@ -758,10 +758,6 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     const bool replacingActiveAnimation = !m_currentActionId.isEmpty()
         && (m_currentActionId != actionId || m_currentPhaseId != phaseId);
 
-    if (replacingActiveAnimation) {
-        drainPendingNotifications();
-    }
-
     const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
     const bool wasSleeping = sleeping();
     const bool wasSleepTransitioning = sleepTransitioning();
@@ -808,6 +804,9 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     }
     emit playbackSerialChanged();
 
+    if (replacingActiveAnimation) {
+        drainPendingNotifications();
+    }
 }
 
 bool PetRuntime::atAnimationBoundary() const

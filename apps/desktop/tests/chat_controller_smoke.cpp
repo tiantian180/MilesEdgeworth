@@ -553,5 +553,41 @@ int main(int argc, char *argv[])
                 "stale pacer chunks must not leak into the next assistant message");
     }
 
+    // --- Phase 2.3.1: sendMessage must invalidate stale pacer chunks before RUN_STARTED ---
+    {
+        PetRuntime sRuntime;
+        for (int i = 0; i < 5 && sRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            sRuntime.handleAnimationFinished();
+        }
+
+        ChatController sController(&sRuntime, &settings);
+
+        ChatStreamEvent firstStarted;
+        firstStarted.type = QStringLiteral("RUN_STARTED");
+        sController.applyStreamEvent(firstStarted);
+
+        ChatStreamEvent firstStart;
+        firstStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        firstStart.role = QStringLiteral("assistant");
+        sController.applyStreamEvent(firstStart);
+
+        ChatStreamEvent firstText;
+        firstText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        firstText.delta = QStringLiteral("旧旧旧旧旧旧旧旧旧旧");
+        sController.applyStreamEvent(firstText);
+
+        ChatStreamEvent firstFinished;
+        firstFinished.type = QStringLiteral("RUN_FINISHED");
+        sController.applyStreamEvent(firstFinished);
+        sRuntime.handleAnimationFinished();
+
+        sController.sendMessage(QStringLiteral("next"));
+        waitFor([]() { return false; }, 200);
+
+        const auto messages = sController.messages();
+        require(!messages.constLast().toMap().value(QStringLiteral("text")).toString().contains(QStringLiteral("旧")),
+                "sendMessage should invalidate stale pacer chunks before sidecar RUN_STARTED arrives");
+    }
+
     return 0;
 }
