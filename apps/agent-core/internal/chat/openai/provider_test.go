@@ -350,3 +350,65 @@ func TestCompleteReturnsAssistantMessageContent(t *testing.T) {
 		t.Fatalf("Complete = %q, want %q", got, "摘要文本")
 	}
 }
+
+func TestCompleteNonOKReturnsProviderError(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Error-Code", "InvalidEndpointOrModel.NotFound")
+		w.Header().Set("X-Request-Id", "req-complete-1")
+		http.Error(w, `{"error":{"message":"model not found"}}`, http.StatusNotFound)
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(strings.Replace(upstream.URL, "://", "://user:pass@", 1), "sk-bad", "test-model", 0.5, 256)
+	_, err := p.Complete(context.Background(), chat.ChatParams{
+		Messages: []chat.Message{{Role: "user", Content: "请总结"}},
+	})
+	if err == nil {
+		t.Fatal("Complete error = nil, want provider error")
+	}
+	got := err.Error()
+	for _, want := range []string{
+		"404",
+		upstream.URL + "/v1/chat/completions",
+		"x-error-code=InvalidEndpointOrModel.NotFound",
+		"x-request-id=req-complete-1",
+		"model not found",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("Complete error should mention %q, got %q", want, got)
+		}
+	}
+	for _, forbidden := range []string{"user:pass", "sk-bad"} {
+		if strings.Contains(got, forbidden) {
+			t.Fatalf("Complete error must not leak %q, got %q", forbidden, got)
+		}
+	}
+}
+
+func TestCompleteReturnsErrorForMissingContent(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+	}{
+		{name: "empty choices", body: `{"choices":[]}`},
+		{name: "blank content", body: `{"choices":[{"message":{"role":"assistant","content":"  \n\t  "}}]}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprint(w, tc.body)
+			}))
+			defer upstream.Close()
+
+			p := openai.NewProvider(upstream.URL, "sk-test", "test-model", 0.5, 256)
+			got, err := p.Complete(context.Background(), chat.ChatParams{
+				Messages: []chat.Message{{Role: "user", Content: "请总结"}},
+			})
+			if err == nil {
+				t.Fatalf("Complete error = nil with result %q, want error", got)
+			}
+			if !strings.Contains(err.Error(), "provider returned no completion content") {
+				t.Fatalf("Complete error = %q, want no completion content", err.Error())
+			}
+		})
+	}
+}

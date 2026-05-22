@@ -151,9 +151,10 @@ func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-ch
 		return events, nil
 	}
 
-	logger.Debug("stream started", "knownTags", strings.Join(params.KnownExpressionIDs, ","))
+	knownTags := append([]string(nil), params.KnownExpressionIDs...)
+	logger.Debug("stream started", "knownTags", strings.Join(knownTags, ","))
 
-	go p.pipe(ctx, resp, events, runID, messageID, params.KnownExpressionIDs)
+	go p.pipe(ctx, resp, events, runID, messageID, knownTags)
 	return events, nil
 }
 
@@ -198,7 +199,7 @@ func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string
 			return content, nil
 		}
 	}
-	return "", nil
+	return "", fmt.Errorf("provider returned no completion content")
 }
 
 func makeChatMessages(messages []chat.Message) []chatMessage {
