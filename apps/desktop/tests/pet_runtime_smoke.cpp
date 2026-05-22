@@ -685,6 +685,18 @@ int main(int argc, char *argv[])
         require(turnBoundaryCallbacks == 1, "边界通知不应吞掉 handleAnimationFinished 的原有流程");
         require(runtime.currentFacing() == "left", "边界通知后仍应应用转身动作的 facingAfter");
         require(runtime.currentActionId() == "idle_stand", "边界通知后 onceThenIdle 动作仍应回到 idle_stand");
+
+        int replacedBoundaryCallbacks = 0;
+        runtime.playAction("bow");
+        runtime.requestBoundaryAndNotify([&replacedBoundaryCallbacks]() {
+            ++replacedBoundaryCallbacks;
+        });
+        runtime.returnToIdle();
+        require(replacedBoundaryCallbacks == 1,
+                "替换当前动画时应释放旧 boundary callback，避免悬挂到下一段动画");
+        runtime.handleAnimationFinished();
+        require(replacedBoundaryCallbacks == 1,
+                "旧 boundary callback 不应在后续无关动画结束时重复触发");
     }
 
     runtime.playRecipe("doubleClick.holdIt");

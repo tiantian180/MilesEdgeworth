@@ -331,6 +331,11 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("RUN_STARTED")) {
+        ++m_currentStreamId;
+        const bool wasSending = m_sending;
+        if (!wasSending) {
+            m_assistantMessageIndex = -1;
+        }
         setSending(true);
         setStatusText(QStringLiteral("正在回复"));
         m_holdBuffer.clear();
@@ -363,15 +368,15 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     if (event.type == QStringLiteral("TEXT_MESSAGE_CONTENT")) {
         if (m_phase == ChatPhase::STREAMING) {
             if (m_pacer != nullptr) {
-                m_pacer->append(event.delta);
+                m_pacer->append(event.delta, m_currentStreamId);
             } else {
-                appendChunkToCurrentMessage(event.delta);
+                appendChunkToCurrentMessage(event.delta, m_currentStreamId);
             }
         } else if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
             if (m_pacer != nullptr) {
-                m_pacer->append(event.delta);
+                m_pacer->append(event.delta, m_currentStreamId);
             } else {
-                appendChunkToCurrentMessage(event.delta);
+                appendChunkToCurrentMessage(event.delta, m_currentStreamId);
             }
         } else {
             m_holdBuffer.append(event.delta);
@@ -512,7 +517,6 @@ void ChatController::handleBoundaryReached()
         if (m_runtime != nullptr) {
             m_runtime->returnToIdle();
         }
-        m_assistantMessageIndex = -1;
         transitionTo(ChatPhase::IDLE);
     }
 }
@@ -539,16 +543,16 @@ void ChatController::drainHoldBufferToPacer()
     }
 
     if (m_pacer != nullptr) {
-        m_pacer->append(m_holdBuffer);
+        m_pacer->append(m_holdBuffer, m_currentStreamId);
     } else {
-        appendChunkToCurrentMessage(m_holdBuffer);
+        appendChunkToCurrentMessage(m_holdBuffer, m_currentStreamId);
     }
     m_holdBuffer.clear();
 }
 
-void ChatController::appendChunkToCurrentMessage(const QString &chunk)
+void ChatController::appendChunkToCurrentMessage(const QString &chunk, quint64 streamId)
 {
-    if (chunk.isEmpty()) {
+    if (chunk.isEmpty() || streamId != m_currentStreamId) {
         return;
     }
 

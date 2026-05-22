@@ -502,5 +502,56 @@ int main(int argc, char *argv[])
                 "RUN_ERROR during GATED should mark the assistant message as error");
     }
 
+    // --- Phase 2.3.1: old pacer chunks must not leak into a later reply ---
+    {
+        PetRuntime lRuntime;
+        for (int i = 0; i < 5 && lRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            lRuntime.handleAnimationFinished();
+        }
+
+        ChatController lController(&lRuntime, &settings);
+
+        ChatStreamEvent firstStarted;
+        firstStarted.type = QStringLiteral("RUN_STARTED");
+        lController.applyStreamEvent(firstStarted);
+
+        ChatStreamEvent firstStart;
+        firstStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        firstStart.role = QStringLiteral("assistant");
+        lController.applyStreamEvent(firstStart);
+
+        ChatStreamEvent firstText;
+        firstText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        firstText.delta = QStringLiteral("旧旧旧旧旧旧旧旧旧旧");
+        lController.applyStreamEvent(firstText);
+
+        ChatStreamEvent firstFinished;
+        firstFinished.type = QStringLiteral("RUN_FINISHED");
+        lController.applyStreamEvent(firstFinished);
+        lRuntime.handleAnimationFinished();
+        const int messagesAfterFirst = lController.messages().size();
+
+        ChatStreamEvent secondStarted;
+        secondStarted.type = QStringLiteral("RUN_STARTED");
+        lController.applyStreamEvent(secondStarted);
+
+        ChatStreamEvent secondStart;
+        secondStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        secondStart.role = QStringLiteral("assistant");
+        lController.applyStreamEvent(secondStart);
+
+        const int messagesAfterSecondStart = lController.messages().size();
+        require(messagesAfterSecondStart == messagesAfterFirst + 1,
+                "second reply setup should append one assistant message");
+
+        waitFor([]() { return false; }, 200);
+
+        const auto messages = lController.messages();
+        require(messages.size() == messagesAfterSecondStart,
+                "stale pacer chunks must not create ghost messages after a new reply starts");
+        require(messages.constLast().toMap().value(QStringLiteral("text")).toString().isEmpty(),
+                "stale pacer chunks must not leak into the next assistant message");
+    }
+
     return 0;
 }

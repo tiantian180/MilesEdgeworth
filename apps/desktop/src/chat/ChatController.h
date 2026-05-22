@@ -73,7 +73,7 @@ private:
     void handleBoundaryReached();
     void handleGateTimeout();
     void drainHoldBufferToPacer();
-    void appendChunkToCurrentMessage(const QString &chunk);
+    void appendChunkToCurrentMessage(const QString &chunk, quint64 streamId);
     void setSidecarReady(bool ready);
     void setSending(bool sending);
     void setStatusText(const QString &statusText);
@@ -116,6 +116,7 @@ private:
     bool m_cancelled = false;
     QString m_statusText = QStringLiteral("未连接");
     int m_assistantMessageIndex = -1;
+    quint64 m_currentStreamId = 1;
 };
 
 struct ChatControllerForeign

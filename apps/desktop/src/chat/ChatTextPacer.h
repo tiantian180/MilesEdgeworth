@@ -13,21 +13,28 @@ class ChatTextPacer : public QObject
 public:
     explicit ChatTextPacer(QObject *parent = nullptr);
 
-    void append(const QString &text);
+    void append(const QString &text, quint64 streamId = 0);
 
     int msPerChar() const { return m_msPerChar; }
     void setMsPerChar(int value);
 
-    int pendingCount() const { return m_queue.size(); }
+    int pendingCount() const { return static_cast<int>(queuedCharCount()); }
 
 signals:
-    void chunkReady(const QString &chunk);
+    void chunkReady(const QString &chunk, quint64 streamId);
 
 private:
+    struct QueuedChunk {
+        QString text;
+        quint64 streamId = 0;
+    };
+
     void tick();
     int effectiveInterval() const;
+    bool isEmpty() const;
+    qsizetype queuedCharCount() const;
 
-    QString m_queue;
+    QList<QueuedChunk> m_queue;
     QTimer m_timer;
     int m_msPerChar = 80;
 

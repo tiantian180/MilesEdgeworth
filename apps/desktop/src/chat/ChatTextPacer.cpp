@@ -9,13 +9,17 @@ ChatTextPacer::ChatTextPacer(QObject *parent)
     connect(&m_timer, &QTimer::timeout, this, &ChatTextPacer::tick);
 }
 
-void ChatTextPacer::append(const QString &text)
+void ChatTextPacer::append(const QString &text, quint64 streamId)
 {
     if (text.isEmpty()) {
         return;
     }
 
-    m_queue.append(text);
+    if (!m_queue.isEmpty() && m_queue.last().streamId == streamId) {
+        m_queue.last().text.append(text);
+    } else {
+        m_queue.append(QueuedChunk{text, streamId});
+    }
     if (!m_timer.isActive()) {
         m_timer.start(effectiveInterval());
     }
@@ -38,7 +42,7 @@ void ChatTextPacer::setMsPerChar(int value)
 
 int ChatTextPacer::effectiveInterval() const
 {
-    if (m_queue.size() > kMaxBacklog) {
+    if (queuedCharCount() > kMaxBacklog) {
         const int sped = static_cast<int>(m_msPerChar * kBacklogSpeedupFactor);
         return sped < 1 ? 1 : sped;
     }
@@ -47,25 +51,30 @@ int ChatTextPacer::effectiveInterval() const
 
 void ChatTextPacer::tick()
 {
-    if (m_queue.isEmpty()) {
+    if (isEmpty()) {
         m_timer.stop();
         return;
     }
 
+    QueuedChunk &front = m_queue.first();
     int popCount = 1;
-    const QChar first = m_queue.at(0);
-    if (first.isHighSurrogate() && m_queue.size() >= 2) {
-        const QChar second = m_queue.at(1);
+    const QChar first = front.text.at(0);
+    if (first.isHighSurrogate() && front.text.size() >= 2) {
+        const QChar second = front.text.at(1);
         if (second.isLowSurrogate()) {
             popCount = 2;
         }
     }
 
-    const QString chunk = m_queue.left(popCount);
-    m_queue.remove(0, popCount);
-    emit chunkReady(chunk);
+    const QString chunk = front.text.left(popCount);
+    const quint64 streamId = front.streamId;
+    front.text.remove(0, popCount);
+    if (front.text.isEmpty()) {
+        m_queue.removeFirst();
+    }
+    emit chunkReady(chunk, streamId);
 
-    if (m_queue.isEmpty()) {
+    if (isEmpty()) {
         m_timer.stop();
         return;
     }
@@ -74,4 +83,18 @@ void ChatTextPacer::tick()
     if (m_timer.interval() != next) {
         m_timer.start(next);
     }
+}
+
+bool ChatTextPacer::isEmpty() const
+{
+    return m_queue.isEmpty() || queuedCharCount() == 0;
+}
+
+qsizetype ChatTextPacer::queuedCharCount() const
+{
+    qsizetype total = 0;
+    for (const QueuedChunk &chunk : m_queue) {
+        total += chunk.text.size();
+    }
+    return total;
 }

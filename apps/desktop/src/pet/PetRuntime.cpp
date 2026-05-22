@@ -755,6 +755,13 @@ void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinitio
 
 void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase)
 {
+    const bool replacingActiveAnimation = !m_currentActionId.isEmpty()
+        && (m_currentActionId != actionId || m_currentPhaseId != phaseId);
+
+    if (replacingActiveAnimation) {
+        drainPendingNotifications();
+    }
+
     const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
     const bool wasSleeping = sleeping();
     const bool wasSleepTransitioning = sleepTransitioning();
