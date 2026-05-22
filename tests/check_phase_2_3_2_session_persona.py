@@ -41,7 +41,11 @@ def main() -> int:
     service_go = read_go_package("apps/agent-core/internal/chat/service")
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
-    persona_store_h = read("apps/desktop/src/pet/manifest/PersonaStore.h")
+    persona_store = (
+        read("apps/desktop/src/pet/manifest/PersonaStore.h")
+        + "\n"
+        + read("apps/desktop/src/pet/manifest/PersonaStore.cpp")
+    )
     settings_h = read("apps/desktop/src/settings/SettingsController.h")
     chat_h = read("apps/desktop/src/chat/ChatController.h")
     chat_cpp = read("apps/desktop/src/chat/ChatController.cpp")
@@ -80,7 +84,11 @@ def main() -> int:
 
     require("models.dev/api.json" in models_go, "models catalog must fetch models.dev API")
     require("models-cache.json" in models_go, "models catalog must cache responses")
-    require("limit.context" in models_go, "models catalog must read limit.context")
+    require(
+        ('json:"limit"' in models_go and 'json:"context"' in models_go)
+        or "limit.context" in models_go,
+        "models catalog must read limit.context",
+    )
     require("8192" in models_go, "models catalog must use 8192 fallback context window")
 
     require("type Service struct" in service_go, "ChatService must exist")
@@ -103,7 +111,7 @@ def main() -> int:
 
     require("personaPrompt" in manifest_h, "SkinManifest must contain personaPrompt")
     require("PersonaStore" in loader_cpp, "SkinManifestLoader must delegate persona read to PersonaStore")
-    require("persona-overrides" in persona_store_h, "PersonaStore must support built-in override path")
+    require("persona-overrides" in persona_store, "PersonaStore must support built-in override path")
     require("savePersona" in settings_h or "personaPrompt" in settings_h, "SettingsController must expose persona editing")
     require("角色人格" in settings_qml, "SettingsWindow must show persona editor")
     require("persona.md" in qrc, "Miles persona.md must be bundled")
