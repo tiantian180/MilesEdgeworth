@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -16,6 +15,7 @@ import (
 
 	"milesedgeworth/agent-core/internal/chat"
 	"milesedgeworth/agent-core/internal/chat/expression"
+	"milesedgeworth/agent-core/internal/mileslog"
 )
 
 type Provider struct {
@@ -27,17 +27,7 @@ type Provider struct {
 	httpClient  *http.Client
 }
 
-var debugLoggingEnabled bool
-
-func SetDebugLogging(enabled bool) {
-	debugLoggingEnabled = enabled
-}
-
-func debugf(format string, args ...any) {
-	if debugLoggingEnabled {
-		log.Printf("debug chat.openai: "+format, args...)
-	}
-}
+var logger = mileslog.New("MILES.CHAT.PROVIDER")
 
 func NewProvider(baseURL, apiKey, model string, temperature float64, maxTokens int) *Provider {
 	return &Provider{
@@ -145,8 +135,11 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 		close(events)
 		return events, err
 	}
-	debugf("request prepared model=%s endpoint=%s expressions=%d message_len=%d",
-		p.model, sanitizeEndpoint(p.baseURL), len(req.Expressions), len([]rune(req.Message)))
+	logger.Debug("request prepared",
+		"model", p.model,
+		"endpoint", sanitizeEndpoint(p.baseURL),
+		"expressions", len(req.Expressions),
+		"messageLen", len([]rune(req.Message)))
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		p.baseURL, bytes.NewReader(encoded))
@@ -182,7 +175,7 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 	for _, e := range req.Expressions {
 		knownTags = append(knownTags, e.ID)
 	}
-	debugf("stream started known_tags=%s", strings.Join(knownTags, ","))
+	logger.Debug("stream started", "knownTags", strings.Join(knownTags, ","))
 
 	go p.pipe(ctx, resp, events, knownTags)
 	return events, nil
@@ -248,7 +241,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		func(text string) {
 			if !sawFirstSpeaking {
 				sawFirstSpeaking = true
-				debugf("no leading expression before text; fallback expression=neutral text_len=%d", len([]rune(text)))
+				logger.Debug("fallback expression inserted",
+					"expression", "neutral",
+					"textLen", len([]rune(text)))
 				send(ctx, events, chat.StreamEvent{
 					Type:  "CUSTOM",
 					Name:  "miles.pet.expression.requested",
@@ -256,7 +251,7 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 					Value: map[string]any{"state": "speaking", "expression": "neutral"},
 				})
 			}
-			debugf("text chunk parsed len=%d", len([]rune(text)))
+			logger.Debug("text chunk parsed", "len", len([]rune(text)))
 			send(ctx, events, chat.StreamEvent{
 				Type:      "TEXT_MESSAGE_CONTENT",
 				RunID:     runID,
@@ -266,7 +261,7 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		},
 		func(tag string) {
 			sawFirstSpeaking = true
-			debugf("expression tag parsed tag=%s", tag)
+			logger.Debug("expression tag parsed", "tag", tag)
 			send(ctx, events, chat.StreamEvent{
 				Type:  "CUSTOM",
 				Name:  "miles.pet.expression.requested",
@@ -289,17 +284,24 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		}
 		var chunk chatCompletionStreamChunk
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			logger.Warn("malformed provider chunk skipped", "error", err)
+			if mileslog.PayloadLoggingEnabled() {
+				logger.Debug("malformed provider payload", "payload", payload)
+			}
 			continue
 		}
 		for _, choice := range chunk.Choices {
 			if choice.Delta.Content != "" {
-				debugf("provider delta received len=%d", len([]rune(choice.Delta.Content)))
+				logger.Debug("provider delta received", "len", len([]rune(choice.Delta.Content)))
+				if mileslog.PayloadLoggingEnabled() {
+					logger.Debug("provider delta payload", "text", choice.Delta.Content)
+				}
 				parser.Feed(choice.Delta.Content)
 			}
 		}
 	}
 	parser.Flush()
-	debugf("stream finished")
+	logger.Debug("stream finished")
 
 	send(ctx, events, chat.StreamEvent{
 		Type:      "TEXT_MESSAGE_END",

@@ -317,3 +317,31 @@ func TestStreamReplySkipsMalformedChunks(t *testing.T) {
 		t.Fatal("expected polite expression after malformed chunk was skipped")
 	}
 }
+
+func TestPayloadLoggingFlagDoesNotAffectStreamEvents(t *testing.T) {
+	t.Setenv("MILES_LOG_PAYLOADS", "1")
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"[EXPR:polite]secret text\"}}]}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "any", 0.7, 128)
+	events, err := p.StreamReply(context.Background(), chat.Request{
+		Message:     "hi",
+		Expressions: []chat.ExpressionInfo{{ID: "polite"}},
+	})
+	if err != nil {
+		t.Fatalf("StreamReply: %v", err)
+	}
+	seenText := false
+	for event := range events {
+		if event.Type == "TEXT_MESSAGE_CONTENT" && event.Delta == "secret text" {
+			seenText = true
+		}
+	}
+	if !seenText {
+		t.Fatal("payload logging flag must not change stream parsing")
+	}
+}
