@@ -50,11 +50,26 @@ int main(int argc, char *argv[])
     PetRuntime runtime;
     ChatController controller(&runtime, &settings);
 
+    const QMetaObject *metaObject = controller.metaObject();
+    require(metaObject->indexOfProperty("conversations") >= 0,
+            "ChatController should expose conversations as a Qt property");
+    require(metaObject->indexOfProperty("currentConversationId") >= 0,
+            "ChatController should expose currentConversationId as a Qt property");
+
     ChatStreamEvent started;
     started.type = QStringLiteral("RUN_STARTED");
     started.runId = QStringLiteral("mock-run");
     controller.applyStreamEvent(started);
     require(controller.sending(), "RUN_STARTED should mark controller as sending");
+    require(controller.statusText() == QStringLiteral("正在回复"),
+            "RUN_STARTED should set replying status");
+
+    ChatStreamEvent memoryEvent;
+    memoryEvent.type = QStringLiteral("CUSTOM");
+    memoryEvent.name = QStringLiteral("miles.chat.memory.summarizing");
+    controller.applyStreamEvent(memoryEvent);
+    require(controller.statusText() == QStringLiteral("整理记忆中..."),
+            "memory summarizing event should update status text");
 
     ChatStreamEvent thinkingEvent;
     thinkingEvent.type = QStringLiteral("CUSTOM");
@@ -130,6 +145,7 @@ int main(int argc, char *argv[])
     require(runtime.currentState() == QStringLiteral("error"), "RUN_ERROR should move pet to error state");
 
     // 取消后到达的残留事件不应该新建 assistant 消息
+    controller.switchConversation(QStringLiteral("smoke-conversation"));
     controller.sendMessage(QStringLiteral("again"));
     const int messagesBeforeCancel = controller.messages().size();
     controller.cancelCurrentReply();
@@ -630,6 +646,7 @@ int main(int argc, char *argv[])
         sController.applyStreamEvent(firstFinished);
         sRuntime.handleAnimationFinished();
 
+        sController.switchConversation(QStringLiteral("smoke-conversation"));
         sController.sendMessage(QStringLiteral("next"));
         waitFor([]() { return false; }, 200);
 
