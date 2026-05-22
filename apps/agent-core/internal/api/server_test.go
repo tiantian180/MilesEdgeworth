@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -277,6 +278,74 @@ func TestChatPersistsPartialOnClientCancel(t *testing.T) {
 	})
 }
 
+func TestChatPersistsPartialOnceOnFlushError(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 4)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "途中"}
+			events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "まで"}
+			events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
+			close(events)
+			return events, nil
+		},
+	}
+	st, handler := newTestHandler(t, provider, 8192)
+	conv := createConversation(t, st)
+	body := strings.NewReader(fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/messages", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := &flushErrorRecorder{
+		header:      make(http.Header),
+		failAtFlush: 2,
+	}
+
+	handler.ServeHTTP(rec, req)
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "途中" || !messages[1].IsPartial {
+		t.Fatalf("partial message = %+v", messages[1])
+	}
+}
+
+func TestChatDoesNotPersistAssistantAfterRunError(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 4)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "途中"}
+			events <- chat.StreamEvent{Type: "RUN_ERROR", RunID: params.RunID, Error: "provider failed"}
+			close(events)
+			return events, nil
+		},
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	events := readSSEEvents(t, resp.Body)
+	if got := events[len(events)-1].Type; got != "RUN_ERROR" {
+		t.Fatalf("last event = %q, want RUN_ERROR", got)
+	}
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 1 {
+		t.Fatalf("message count = %d, want only user row: %+v", len(messages), messages)
+	}
+	if messages[0].Role != store.RoleUser || messages[0].Content != "hello" {
+		t.Fatalf("user message = %+v", messages[0])
+	}
+}
+
 func TestSummarizingEventIsFirstSSEEventWhenTriggered(t *testing.T) {
 	provider := &fakeProvider{completeText: "古い会話の要約"}
 	st, server := newTestServer(t, provider, 2000)
@@ -349,7 +418,46 @@ func TestChatStreamRejectsOversizedBody(t *testing.T) {
 	}
 }
 
+func TestMethodNotAllowedReturnsJSONAndAllowHeader(t *testing.T) {
+	_, server := newTestServer(t, &fakeProvider{}, 8192)
+
+	req, err := http.NewRequest(http.MethodDelete, server.URL+"/v1/chat/messages", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE /v1/chat/messages: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want 405", resp.StatusCode)
+	}
+	if got := resp.Header.Get("Allow"); got != http.MethodPost {
+		t.Fatalf("Allow = %q, want POST", got)
+	}
+	if got := resp.Header.Get("Content-Type"); !strings.Contains(got, "application/json") {
+		t.Fatalf("Content-Type = %q, want JSON", got)
+	}
+	var body map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode error body: %v", err)
+	}
+	if body["error"] != "method not allowed" {
+		t.Fatalf("error body = %+v", body)
+	}
+}
+
 func newTestServer(t *testing.T, provider chat.Provider, window int) (*store.Store, *httptest.Server) {
+	t.Helper()
+	st, handler := newTestHandler(t, provider, window)
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+	return st, server
+}
+
+func newTestHandler(t *testing.T, provider chat.Provider, window int) (*store.Store, http.Handler) {
 	t.Helper()
 	st, err := store.Open(t.TempDir())
 	if err != nil {
@@ -358,9 +466,7 @@ func newTestServer(t *testing.T, provider chat.Provider, window int) (*store.Sto
 	t.Cleanup(func() { _ = st.Close() })
 
 	svc := chatservice.New(st, provider, fakeCatalog{window: window}, "test-model")
-	server := httptest.NewServer(api.NewServer(st, svc, "test-provider").Routes())
-	t.Cleanup(server.Close)
-	return st, server
+	return st, api.NewServer(st, svc, "test-provider").Routes()
 }
 
 func createConversation(t *testing.T, st *store.Store) store.Conversation {
@@ -430,4 +536,32 @@ func eventually(t *testing.T, timeout time.Duration, check func() bool) {
 	if !check() {
 		t.Fatalf("condition not met within %s", timeout)
 	}
+}
+
+type flushErrorRecorder struct {
+	header      http.Header
+	body        bytes.Buffer
+	status      int
+	flushes     int
+	failAtFlush int
+}
+
+func (r *flushErrorRecorder) Header() http.Header {
+	return r.header
+}
+
+func (r *flushErrorRecorder) WriteHeader(status int) {
+	r.status = status
+}
+
+func (r *flushErrorRecorder) Write(p []byte) (int, error) {
+	return r.body.Write(p)
+}
+
+func (r *flushErrorRecorder) FlushError() error {
+	r.flushes++
+	if r.flushes == r.failAtFlush {
+		return errors.New("flush failed")
+	}
+	return nil
 }

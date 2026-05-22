@@ -50,7 +50,7 @@ func (s *Server) Routes() http.Handler {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w, http.MethodGet)
 		return
 	}
 
@@ -102,7 +102,7 @@ func (s *Server) handleConversations(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusCreated, newConversationResponse(conv))
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w, http.MethodGet, http.MethodPost)
 	}
 }
 
@@ -128,7 +128,7 @@ func (s *Server) handleConversationByID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if r.Method != http.MethodDelete {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w, http.MethodDelete)
 		return
 	}
 	if _, err := s.store.GetConversation(path); err != nil {
@@ -144,7 +144,7 @@ func (s *Server) handleConversationByID(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleConversationMessages(w http.ResponseWriter, r *http.Request, conversationID string) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w, http.MethodGet)
 		return
 	}
 	if _, err := s.store.GetConversation(conversationID); err != nil {
@@ -161,7 +161,7 @@ func (s *Server) handleConversationMessages(w http.ResponseWriter, r *http.Reque
 
 func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeMethodNotAllowed(w, http.MethodPost)
 		return
 	}
 
@@ -206,18 +206,28 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(http.StatusOK)
 
-	flusher, _ := w.(http.Flusher)
+	controller := http.NewResponseController(w)
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
 	var reply strings.Builder
+	partialPersisted := false
+	persistPartialOnce := func(providerError bool) {
+		if partialPersisted {
+			return
+		}
+		if s.persistPartialReply(req.ConversationID, reply.String(), providerError) {
+			partialPersisted = true
+		}
+	}
 	writeEvent := func(event chat.StreamEvent) bool {
 		if err := writeSSE(w, event); err != nil {
 			cancel()
 			return false
 		}
-		if flusher != nil {
-			flusher.Flush()
+		if err := controller.Flush(); err != nil {
+			cancel()
+			return false
 		}
 		return true
 	}
@@ -245,7 +255,7 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 			providerError = true
 		}
 		if !writeEvent(event) {
-			s.persistPartialReply(req.ConversationID, reply.String(), providerError)
+			persistPartialOnce(providerError)
 			return
 		}
 		if event.Type == "RUN_FINISHED" {
@@ -261,13 +271,18 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		_, _ = s.store.AppendMessage(req.ConversationID, store.RoleAssistant, content, false)
 		return
 	}
-	s.persistPartialReply(req.ConversationID, content, false)
+	persistPartialOnce(false)
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+func writeMethodNotAllowed(w http.ResponseWriter, methods ...string) {
+	w.Header().Set("Allow", strings.Join(methods, ", "))
+	writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 }
 
 func writeSSE(w http.ResponseWriter, event chat.StreamEvent) error {
@@ -279,11 +294,12 @@ func writeSSE(w http.ResponseWriter, event chat.StreamEvent) error {
 	return err
 }
 
-func (s *Server) persistPartialReply(conversationID, content string, providerError bool) {
+func (s *Server) persistPartialReply(conversationID, content string, providerError bool) bool {
 	if providerError || content == "" {
-		return
+		return false
 	}
-	_, _ = s.store.AppendMessage(conversationID, store.RoleAssistant, content, true)
+	_, err := s.store.AppendMessage(conversationID, store.RoleAssistant, content, true)
+	return err == nil
 }
 
 func writeStoreError(w http.ResponseWriter, err error) {
