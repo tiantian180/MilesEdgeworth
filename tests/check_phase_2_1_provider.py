@@ -71,7 +71,8 @@ def main() -> int:
     require("type ExpressionInfo struct" in provider_go, "ExpressionInfo struct must exist")
 
     require("m_holdBuffer" in controller_h, "ChatController must declare a hold buffer member")
-    require("flushHoldBuffer" in controller_h, "ChatController must declare flushHoldBuffer")
+    require("flushHoldBuffer" in controller_h or "drainHoldBufferToPacer" in controller_h,
+            "ChatController must declare a hold-buffer drain path")
     require("m_holdBuffer" in controller_cpp, "ChatController.cpp must use the hold buffer")
     require('"expressions"' in controller_cpp, "ChatController must include expressions field in request body")
 
