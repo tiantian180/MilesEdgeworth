@@ -17,6 +17,7 @@
 - `main.cpp` 设置 `QCoreApplication` organization / domain / application name，创建 `SettingsService` 与 `SettingsController`，加载 `SettingsWindow`。
 - `ChatController::startSidecar()` 从 `SettingsService` 读取当前配置，将 `MILES_PROVIDER_BASE_URL` / `MILES_PROVIDER_API_KEY` / `MILES_PROVIDER_MODEL` / `MILES_PROVIDER_TEMPERATURE` / `MILES_PROVIDER_MAX_TOKENS` 注入 sidecar 的 `QProcessEnvironment`。
 - 设置保存后触发 `ChatController::restartSidecar()`，让 Go sidecar 用新的 provider 配置启动。
+- sidecar 重启使用短延迟启动和有限重试，降低旧监听 socket 刚释放时新进程绑定 `127.0.0.1:39710` 失败的概率。
 
 ## 安全边界
 

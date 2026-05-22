@@ -115,6 +115,12 @@ def main() -> int:
     require("MILES_PROVIDER_TEMPERATURE" in chat_cpp, "ChatController must inject MILES_PROVIDER_TEMPERATURE")
     require("MILES_PROVIDER_MAX_TOKENS" in chat_cpp, "ChatController must inject MILES_PROVIDER_MAX_TOKENS")
     require("restartSidecar" in chat_h and "restartSidecar" in chat_cpp, "ChatController must expose restartSidecar()")
+    require("scheduleSidecarStart" in chat_h and "scheduleSidecarStart" in chat_cpp,
+            "ChatController restart must schedule sidecar starts")
+    require("kSidecarRestartMaxAttempts" in chat_cpp,
+            "ChatController restart must cap sidecar restart retries")
+    require("kSidecarRestartRetryDelayMs" in chat_cpp,
+            "ChatController restart must delay retry starts after a fast sidecar exit")
     require(
         "handleSettingsSaved" in chat_h and "handleSettingsSaved" in chat_cpp,
         "ChatController must respond to saved settings",
