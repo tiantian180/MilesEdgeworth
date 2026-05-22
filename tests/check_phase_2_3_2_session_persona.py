@@ -15,6 +15,16 @@ def read(path: str) -> str:
     return file_path.read_text(encoding="utf-8")
 
 
+def read_go_package(path: str) -> str:
+    dir_path = ROOT / path
+    if not dir_path.is_dir():
+        raise AssertionError(f"missing directory: {path}")
+    go_files = sorted(dir_path.glob("*.go"))
+    if not go_files:
+        raise AssertionError(f"missing Go files in directory: {path}")
+    return "\n".join(file_path.read_text(encoding="utf-8") for file_path in go_files)
+
+
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
@@ -26,9 +36,9 @@ def main() -> int:
     openai_go = read("apps/agent-core/internal/chat/openai/provider.go")
     server_go = read("apps/agent-core/internal/api/server.go")
     main_go = read("apps/agent-core/cmd/miles-agent/main.go")
-    store_go = read("apps/agent-core/internal/store/store.go")
-    models_go = read("apps/agent-core/internal/models/catalog.go")
-    service_go = read("apps/agent-core/internal/chat/service/service.go")
+    store_go = read_go_package("apps/agent-core/internal/store")
+    models_go = read_go_package("apps/agent-core/internal/models")
+    service_go = read_go_package("apps/agent-core/internal/chat/service")
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
     persona_store_h = read("apps/desktop/src/pet/manifest/PersonaStore.h")
@@ -53,7 +63,8 @@ def main() -> int:
     require("StreamChat(ctx context.Context, params ChatParams)" in provider_go, "Provider must expose StreamChat")
     require("Complete(ctx context.Context, params ChatParams)" in provider_go, "Provider must expose Complete")
     require("StreamReply" not in provider_go, "old StreamReply interface must be removed")
-    require("BuildSystemPrompt" not in openai_go, "OpenAI provider must not own system prompt construction")
+    require("BuildSystemPrompt" not in openai_go, "OpenAI provider must not own exported system prompt construction")
+    require("buildSystemPrompt" not in openai_go, "OpenAI provider must not own unexported system prompt construction")
     require("Messages:" in openai_go and "params.Messages" in openai_go, "OpenAI provider must serialize prepared messages")
     require("Complete(" in openai_go and "chatCompletionResponse" in openai_go, "OpenAI provider must implement non-stream completion")
 
@@ -77,7 +88,10 @@ def main() -> int:
     require("PersonaPrompt" in service_go or "personaPrompt" in service_go, "ChatService must use request persona")
     require("当前可用表达标签" in service_go, "ChatService must generate dynamic EXPR rules")
     require("以下是较早对话的摘要" in service_go, "summary must be injected as system context")
-    require("EstimateTokens" in service_go and "len([]rune" in service_go, "token estimate must use rune count")
+    require(
+        "EstimateTokens" in service_go and ("len([]rune" in service_go or "utf8.RuneCountInString" in service_go),
+        "token estimate must use rune count",
+    )
     require("miles.chat.memory.summarizing" in service_go, "ChatService/API must emit summarizing custom event")
 
     require('"/v1/conversations"' in server_go, "API must register conversations endpoint")
