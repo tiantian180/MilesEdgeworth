@@ -24,6 +24,8 @@ set(DESKTOP_SOURCES
     src/chat/ChatStreamEvent.h
     src/chat/ChatTextPacer.cpp
     src/chat/ChatTextPacer.h
+    src/logging/MilesLogHandler.cpp
+    src/logging/MilesLogHandler.h
     src/main.cpp
     src/settings/SecretStore.cpp
     src/settings/SecretStore.h
@@ -196,6 +198,24 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME chat_text_pacer_smoke COMMAND ChatTextPacerSmoke)
+
+    add_executable(LoggingFormatterSmoke
+        tests/logging_formatter_smoke.cpp
+        src/logging/MilesLogHandler.cpp
+        src/logging/MilesLogHandler.h
+    )
+
+    target_include_directories(LoggingFormatterSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(LoggingFormatterSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    add_test(NAME logging_formatter_smoke COMMAND LoggingFormatterSmoke)
 
     add_executable(SkinManifestLoaderSmoke
         tests/skin_manifest_loader_smoke.cpp

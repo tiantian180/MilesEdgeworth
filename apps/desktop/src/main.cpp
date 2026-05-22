@@ -1,5 +1,6 @@
 #include "DesktopShellController.h"
 #include "chat/ChatController.h"
+#include "logging/MilesLogHandler.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/PetRuntime.h"
@@ -24,6 +25,8 @@
 
 int main(int argc, char *argv[])
 {
+    MilesLogHandler::install();
+
     // Qt.labs.platform 的原生菜单在部分平台需要 Qt Widgets fallback。
     // 因此桌面壳层使用 QApplication，而不是更轻的 QGuiApplication。
     QApplication app(argc, argv);
