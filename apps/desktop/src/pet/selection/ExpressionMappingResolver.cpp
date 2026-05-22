@@ -129,18 +129,18 @@ ActionRequest resolveInternal(
 
     const ExpressionMappingDefinition mapping = manifest.expressionMappings.value(resolvedExpressionId);
     const QList<ExpressionMappingEntry> entries = availableEntries(manifest, context, mapping);
-    qCDebug(petExpressionLog) << "resolve expression"
-                              << "requested=" << expressionId
-                              << "resolved=" << resolvedExpressionId
-                              << "state=" << context.state
-                              << "candidates=" << entries.size()
-                              << "selection=" << mapping.selection;
+    qCDebug(petExpressionLog).noquote() << "resolve expression"
+                                         << QStringLiteral("requested=%1").arg(expressionId)
+                                         << QStringLiteral("resolved=%1").arg(resolvedExpressionId)
+                                         << QStringLiteral("state=%1").arg(context.state)
+                                         << QStringLiteral("candidates=%1").arg(entries.size())
+                                         << QStringLiteral("selection=%1").arg(mapping.selection);
     const ActionRequest selectedRequest = selectEntry(context, mapping, entries);
     if (selectedRequest.kind != ActionRequestKind::None) {
-        qCDebug(petExpressionLog) << "expression selected request"
-                                  << "expression=" << resolvedExpressionId
-                                  << "kind=" << static_cast<int>(selectedRequest.kind)
-                                  << "target=" << selectedRequest.targetId;
+        qCDebug(petExpressionLog).noquote() << "expression selected request"
+                                             << QStringLiteral("expression=%1").arg(resolvedExpressionId)
+                                             << QStringLiteral("kind=%1").arg(static_cast<int>(selectedRequest.kind))
+                                             << QStringLiteral("target=%1").arg(selectedRequest.targetId);
         return selectedRequest;
     }
 
@@ -148,14 +148,14 @@ ActionRequest resolveInternal(
         ? QString::fromUtf8(kNeutralExpressionId)
         : mapping.fallbackExpressionId.trimmed();
     if (fallbackExpressionId == resolvedExpressionId) {
-        qCDebug(petExpressionLog) << "expression fallback exhausted"
-                                  << "expression=" << resolvedExpressionId;
+        qCDebug(petExpressionLog).noquote() << "expression fallback exhausted"
+                                             << QStringLiteral("expression=%1").arg(resolvedExpressionId);
         return ActionRequest::none();
     }
 
-    qCDebug(petExpressionLog) << "expression fallback"
-                              << "from=" << resolvedExpressionId
-                              << "to=" << fallbackExpressionId;
+    qCDebug(petExpressionLog).noquote() << "expression fallback"
+                                         << QStringLiteral("from=%1").arg(resolvedExpressionId)
+                                         << QStringLiteral("to=%1").arg(fallbackExpressionId);
     return resolveInternal(manifest, context, fallbackExpressionId, visitedExpressionIds);
 }
 } // namespace

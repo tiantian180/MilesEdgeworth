@@ -31,6 +31,8 @@ def main() -> int:
     qt_handler_smoke = read("apps/desktop/tests/logging_formatter_smoke.cpp")
     desktop_main = read("apps/desktop/src/main.cpp")
     chat_cpp = read("apps/desktop/src/chat/ChatController.cpp")
+    runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    expression_cpp = read("apps/desktop/src/pet/selection/ExpressionMappingResolver.cpp")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     root_cmake = read("CMakeLists.txt")
 
@@ -55,6 +57,8 @@ def main() -> int:
 
     require("MILES_DEBUG_CHAT" not in main_go + provider_go,
             "MILES_DEBUG_CHAT must be removed")
+    require("PayloadLoggingEnabled" in provider_go,
+            "provider must guard raw payload logs behind MILES_LOG_PAYLOADS")
     require("SetDebugLogging" not in provider_go,
             "openai.SetDebugLogging must be removed")
     require("debugf(" not in provider_go,
@@ -95,6 +99,20 @@ def main() -> int:
             "ChatController logProcessOutput helper must be removed")
     require("MILES_LOG_PAYLOADS" in chat_cpp,
             "ChatController must forward MILES_LOG_PAYLOADS to sidecar")
+    require(".noquote()" in chat_cpp,
+            "ChatController should use noquote key=value debug logs")
+    require(".noquote()" in runtime_cpp,
+            "PetRuntime should use noquote key=value debug logs")
+    require(".noquote()" in expression_cpp,
+            "ExpressionMappingResolver should use noquote key=value debug logs")
+    require("qCDebug(chatLog) <<" not in chat_cpp,
+            "ChatController debug logs should use noquote formatting")
+    require("qCDebug(petRuntimeLog) <<" not in runtime_cpp,
+            "PetRuntime runtime debug logs should use noquote formatting")
+    require("qCDebug(petExpressionLog) <<" not in runtime_cpp + expression_cpp,
+            "Pet expression debug logs should use noquote formatting")
+    require("\"message=\" << trimmed" not in chat_cpp and "\"text=\" << event.delta" not in chat_cpp,
+            "ChatController must not log user or model text payloads")
 
     print("logging standard contract ok")
     return 0

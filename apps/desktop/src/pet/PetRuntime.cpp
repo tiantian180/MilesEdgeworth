@@ -217,8 +217,8 @@ void PetRuntime::playActionFromPool(const QString &poolId)
 void PetRuntime::submitActionRequest(const ActionRequest &request)
 {
     if (request.kind == ActionRequestKind::None) {
-        qCDebug(petRuntimeLog) << "ignore empty action request"
-                               << "hideCurrentProp=" << request.hideCurrentProp;
+        qCDebug(petRuntimeLog).noquote() << "ignore empty action request"
+                                          << QStringLiteral("hideCurrentProp=%1").arg(request.hideCurrentProp);
         if (request.hideCurrentProp) {
             executeActionRequest(request);
         }
@@ -226,10 +226,10 @@ void PetRuntime::submitActionRequest(const ActionRequest &request)
     }
 
     if (request.interruptHint == InterruptHint::AfterCurrent && shouldDeferActionRequest(request)) {
-        qCDebug(petRuntimeLog) << "defer action request"
-                               << "kind=" << static_cast<int>(request.kind)
-                               << "target=" << request.targetId
-                               << "state=" << request.petState;
+        qCDebug(petRuntimeLog).noquote() << "defer action request"
+                                          << QStringLiteral("kind=%1").arg(static_cast<int>(request.kind))
+                                          << QStringLiteral("target=%1").arg(request.targetId)
+                                          << QStringLiteral("state=%1").arg(request.petState);
         m_pendingRequest = request;
         return;
     }
@@ -243,11 +243,11 @@ void PetRuntime::submitActionRequest(const ActionRequest &request)
 
 void PetRuntime::executeActionRequest(const ActionRequest &request)
 {
-    qCDebug(petRuntimeLog) << "execute action request"
-                           << "kind=" << static_cast<int>(request.kind)
-                           << "target=" << request.targetId
-                           << "state=" << request.petState
-                           << "interruptHint=" << static_cast<int>(request.interruptHint);
+    qCDebug(petRuntimeLog).noquote() << "execute action request"
+                                      << QStringLiteral("kind=%1").arg(static_cast<int>(request.kind))
+                                      << QStringLiteral("target=%1").arg(request.targetId)
+                                      << QStringLiteral("state=%1").arg(request.petState)
+                                      << QStringLiteral("interruptHint=%1").arg(static_cast<int>(request.interruptHint));
     if (request.hideCurrentProp) {
         hideCurrentProp();
     }
@@ -374,12 +374,12 @@ void PetRuntime::submitExpressionRequest(
         emit currentStateChanged();
     }
 
-    qCDebug(petExpressionLog) << "submit expression request"
-                              << "requestedState=" << requestedState
-                              << "eventState=" << eventState
-                              << "expression=" << expression
-                              << "interruptHint=" << static_cast<int>(interruptHint)
-                              << "currentAction=" << m_currentActionId;
+    qCDebug(petExpressionLog).noquote() << "submit expression request"
+                                         << QStringLiteral("requestedState=%1").arg(requestedState)
+                                         << QStringLiteral("eventState=%1").arg(eventState)
+                                         << QStringLiteral("expression=%1").arg(expression)
+                                         << QStringLiteral("interruptHint=%1").arg(static_cast<int>(interruptHint))
+                                         << QStringLiteral("currentAction=%1").arg(m_currentActionId);
     submitRuntimeEvent(PetEvent::agentExpressionRequested(eventState, expression, randomValue, interruptHint));
 }
 
@@ -433,10 +433,10 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
         clearActiveRecipe();
     }
 
-    qCDebug(petRuntimeLog) << "play action"
-                           << "requested=" << actionId
-                           << "resolved=" << nextActionId
-                           << "resetRecipe=" << resetRecipe;
+    qCDebug(petRuntimeLog).noquote() << "play action"
+                                      << QStringLiteral("requested=%1").arg(actionId)
+                                      << QStringLiteral("resolved=%1").arg(nextActionId)
+                                      << QStringLiteral("resetRecipe=%1").arg(resetRecipe);
     setCurrentAction(nextActionId, m_manifest.actions.value(nextActionId));
 }
 
@@ -807,13 +807,13 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     m_currentAutoReturnToIdle = nextAutoReturnToIdle;
     m_currentAnimationUrl = nextAnimationUrl;
     ++m_playbackSerial;
-    qCDebug(petRuntimeLog) << "set current phase"
-                           << "action=" << actionId
-                           << "phase=" << nextPhaseId
-                           << "loopMode=" << nextLoopMode
-                           << "url=" << nextAnimationUrl
-                           << "serial=" << m_playbackSerial
-                           << "replacing=" << replacingActiveAnimation;
+    qCDebug(petRuntimeLog).noquote() << "set current phase"
+                                      << QStringLiteral("action=%1").arg(actionId)
+                                      << QStringLiteral("phase=%1").arg(nextPhaseId)
+                                      << QStringLiteral("loopMode=%1").arg(nextLoopMode)
+                                      << QStringLiteral("url=%1").arg(nextAnimationUrl.toString())
+                                      << QStringLiteral("serial=%1").arg(m_playbackSerial)
+                                      << QStringLiteral("replacing=%1").arg(replacingActiveAnimation);
 
     if (actionChanged) {
         emit currentActionChanged();

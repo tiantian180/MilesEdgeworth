@@ -47,15 +47,15 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
 
     connect(&m_sidecarProcess, &QProcess::started, this, [this]() {
         setStatusText(QStringLiteral("连接中"));
-        qCDebug(chatLog) << "sidecar process started"
-                         << "pid=" << m_sidecarProcess.processId()
-                         << "program=" << m_sidecarProcess.program();
+        qCDebug(chatLog).noquote() << "sidecar process started"
+                                    << QStringLiteral("pid=%1").arg(m_sidecarProcess.processId())
+                                    << QStringLiteral("program=%1").arg(m_sidecarProcess.program());
         QTimer::singleShot(250, this, &ChatController::checkHealth);
     });
     connect(&m_sidecarProcess, &QProcess::errorOccurred, this, [this]() {
-        qCDebug(chatLog) << "sidecar process error"
-                         << "error=" << m_sidecarProcess.error()
-                         << "message=" << m_sidecarProcess.errorString();
+        qCDebug(chatLog).noquote() << "sidecar process error"
+                                    << QStringLiteral("error=%1").arg(m_sidecarProcess.error())
+                                    << QStringLiteral("message=%1").arg(m_sidecarProcess.errorString());
         setSidecarReady(false);
         if (!m_sidecarRestartPending) {
             setStatusText(QStringLiteral("未连接"));
@@ -65,9 +65,9 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
             qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             this,
             [this](int, QProcess::ExitStatus) {
-                qCDebug(chatLog) << "sidecar process finished"
-                                 << "exitCode=" << m_sidecarProcess.exitCode()
-                                 << "exitStatus=" << m_sidecarProcess.exitStatus();
+                qCDebug(chatLog).noquote() << "sidecar process finished"
+                                            << QStringLiteral("exitCode=%1").arg(m_sidecarProcess.exitCode())
+                                            << QStringLiteral("exitStatus=%1").arg(m_sidecarProcess.exitStatus());
                 setSidecarReady(false);
                 if (m_sidecarStoppingForRestart) {
                     setStatusText(QStringLiteral("重启中"));
@@ -122,8 +122,8 @@ void ChatController::startSidecar()
 void ChatController::launchSidecarProcess()
 {
     if (m_sidecarProcess.state() != QProcess::NotRunning) {
-        qCDebug(chatLog) << "sidecar already running under this app"
-                         << "pid=" << m_sidecarProcess.processId();
+        qCDebug(chatLog).noquote() << "sidecar already running under this app"
+                                    << QStringLiteral("pid=%1").arg(m_sidecarProcess.processId());
         checkHealth();
         return;
     }
@@ -235,12 +235,12 @@ void ChatController::checkHealth()
         const bool healthy = reply->error() == QNetworkReply::NoError
             && ownedPid > 0
             && healthPid == ownedPid;
-        qCDebug(chatLog) << "sidecar health"
-                         << "healthy=" << healthy
-                         << "pid=" << healthPid
-                         << "ownedPid=" << ownedPid
-                         << "provider=" << health.value(QStringLiteral("provider")).toString()
-                         << "error=" << reply->errorString();
+        qCDebug(chatLog).noquote() << "sidecar health"
+                                    << QStringLiteral("healthy=%1").arg(healthy)
+                                    << QStringLiteral("pid=%1").arg(healthPid)
+                                    << QStringLiteral("ownedPid=%1").arg(ownedPid)
+                                    << QStringLiteral("provider=%1").arg(health.value(QStringLiteral("provider")).toString())
+                                    << QStringLiteral("error=%1").arg(reply->errorString());
         reply->deleteLater();
         setSidecarReady(healthy);
         if (healthy) {
@@ -297,9 +297,9 @@ void ChatController::sendMessage(const QString &message)
             expressionsArray.append(entry);
         }
         body.insert(QStringLiteral("expressions"), expressionsArray);
-        qCDebug(chatLog) << "send chat request"
-                         << "messageLen=" << trimmed.size()
-                         << "expressions=" << expressionsArray.size();
+        qCDebug(chatLog).noquote() << "send chat request"
+                                    << QStringLiteral("messageLen=%1").arg(trimmed.size())
+                                    << QStringLiteral("expressions=%1").arg(expressionsArray.size());
     }
 
     if (QCoreApplication::instance() == nullptr) {
@@ -504,10 +504,10 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         const QString state = event.value.value(QStringLiteral("state")).toString();
         const QString expression = event.value.value(QStringLiteral("expression")).toString();
         qCDebug(chatLog).noquote() << "chat expression requested"
-                                    << "phase=" << static_cast<int>(m_phase)
-                                    << "state=" << state
-                                    << "expression=" << expression
-                                    << "interruptHint=" << event.value.value(QStringLiteral("interruptHint")).toString();
+                                    << QStringLiteral("phase=%1").arg(static_cast<int>(m_phase))
+                                    << QStringLiteral("state=%1").arg(state)
+                                    << QStringLiteral("expression=%1").arg(expression)
+                                    << QStringLiteral("interruptHint=%1").arg(event.value.value(QStringLiteral("interruptHint")).toString());
 
         if (m_phase == ChatPhase::BUFFERING_FOR_START || m_phase == ChatPhase::GATED) {
             m_pendingState = state;
@@ -731,16 +731,16 @@ QString ChatController::sidecarExecutablePath() const
 void ChatController::handleStreamBytes(const QByteArray &bytes)
 {
     const QList<ChatStreamEvent> events = m_parser.ingest(bytes);
-    qCDebug(chatLog) << "stream bytes received"
-                     << "bytes=" << bytes.size()
-                     << "events=" << events.size();
+    qCDebug(chatLog).noquote() << "stream bytes received"
+                                << QStringLiteral("bytes=%1").arg(bytes.size())
+                                << QStringLiteral("events=%1").arg(events.size());
     for (const ChatStreamEvent &event : events) {
-        qCDebug(chatLog) << "stream event"
-                         << "type=" << event.type
-                         << "name=" << event.name
-                         << "state=" << event.value.value(QStringLiteral("state")).toString()
-                         << "expression=" << event.value.value(QStringLiteral("expression")).toString()
-                         << "deltaLen=" << event.delta.size();
+        qCDebug(chatLog).noquote() << "stream event"
+                                    << QStringLiteral("type=%1").arg(event.type)
+                                    << QStringLiteral("name=%1").arg(event.name)
+                                    << QStringLiteral("state=%1").arg(event.value.value(QStringLiteral("state")).toString())
+                                    << QStringLiteral("expression=%1").arg(event.value.value(QStringLiteral("expression")).toString())
+                                    << QStringLiteral("deltaLen=%1").arg(event.delta.size());
         applyStreamEvent(event);
     }
 }
