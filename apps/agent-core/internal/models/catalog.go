@@ -140,14 +140,30 @@ func (c *Catalog) fetchModels(ctx context.Context) (map[string]ModelInfo, error)
 	models := make(map[string]ModelInfo)
 	for _, provider := range providers {
 		for id, raw := range provider.Models {
-			models[id] = ModelInfo{
+			mergeModelInfo(models, id, ModelInfo{
 				ContextWindow:  raw.Limit.Context,
 				OutputLimit:    raw.Limit.Output,
 				SupportsVision: contains(raw.Modalities.Input, "image"),
-			}
+			})
 		}
 	}
 	return models, nil
+}
+
+func mergeModelInfo(models map[string]ModelInfo, id string, candidate ModelInfo) {
+	current, exists := models[id]
+	if !exists {
+		models[id] = candidate
+		return
+	}
+	if candidate.ContextWindow > current.ContextWindow {
+		current.ContextWindow = candidate.ContextWindow
+		current.OutputLimit = candidate.OutputLimit
+	} else if candidate.ContextWindow == current.ContextWindow && candidate.OutputLimit > current.OutputLimit {
+		current.OutputLimit = candidate.OutputLimit
+	}
+	current.SupportsVision = current.SupportsVision || candidate.SupportsVision
+	models[id] = current
 }
 
 func contains(values []string, target string) bool {
