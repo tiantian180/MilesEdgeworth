@@ -1,0 +1,57 @@
+{
+  // VS Code 调试配置文件。这里是 JSONC，允许写注释。
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // 显示在 VS Code「运行和调试」面板里的配置名称。
+      "name": "Debug MilesEdgeworthDesktop",
+
+      // Microsoft C/C++ 扩展使用的调试器类型。
+      "type": "cppdbg",
+
+      // 启动新进程，而不是附加到已经运行的进程。
+      "request": "launch",
+
+      // CMake 构建出的桌面 app 可执行文件。如果这个路径不存在，先重新构建项目。
+      "program": "${workspaceFolder}/build/apps/desktop/MilesEdgeworthDesktop.app/Contents/MacOS/MilesEdgeworthDesktop",
+
+      // 传给桌面 app 的命令行参数。通常留空；sidecar 地址由 ChatController 管理。
+      "args": [],
+
+      // 从仓库根目录启动，方便日志和诊断信息里的相对路径保持稳定。
+      "cwd": "${workspaceFolder}",
+
+      // macOS 调试后端。
+      "MIMode": "lldb",
+
+      // 注入桌面 app 的环境变量；其中部分变量会继续转发给 sidecar。
+      "environment": [
+        // Qt 日志过滤规则。想减少日志时，可改成 "miles.*.debug=false" 或删除这一项。
+        { "name": "QT_LOGGING_RULES", "value": "miles.*.debug=true" },
+
+        // Go sidecar 日志级别，可选 debug、info、warn、error。
+        { "name": "MILES_LOG_LEVEL", "value": "debug" },
+
+        // 可选的共享日志文件。Qt 启动时会清空一次，之后 Qt 和 sidecar 都追加写入。
+        { "name": "MILES_LOG_FILE", "value": "${workspaceFolder}/miles-debug.log" },
+
+        // 原文 payload 日志开关。默认保持 "0"；只有本地排查模型原始 delta 时才临时改成 "1"。
+        { "name": "MILES_LOG_PAYLOADS", "value": "0" },
+
+        // 可选：调试本地 sidecar 时，用这个变量覆盖 sidecar 可执行文件路径。
+        // { "name": "MILESEDGEWORTH_AGENT_PATH", "value": "${workspaceFolder}/build/apps/agent-core/miles-agent" },
+
+        // 可选：覆盖模型 provider 配置。普通测试优先使用 app 内的设置窗口。
+        // 如果将来提交这个文件，绝不要把真实 API key 写进仓库。
+        // { "name": "MILES_PROVIDER_BASE_URL", "value": "https://ark.cn-beijing.volces.com/api/v3" },
+        // { "name": "MILES_PROVIDER_MODEL", "value": "your-model-id" },
+        // { "name": "MILES_PROVIDER_API_KEY", "value": "your-api-key" },
+        // { "name": "MILES_PROVIDER_TEMPERATURE", "value": "0.7" },
+        // { "name": "MILES_PROVIDER_MAX_TOKENS", "value": "2048" }
+      ],
+
+      // false 表示使用 VS Code 调试控制台/集成调试 UI，不额外打开独立终端。
+      "externalConsole": false
+    }
+  ]
+}
