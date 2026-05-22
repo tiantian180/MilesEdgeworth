@@ -18,7 +18,7 @@
 #include <QProcessEnvironment>
 
 namespace {
-Q_LOGGING_CATEGORY(chatLog, "miles.chat")
+Q_LOGGING_CATEGORY(chatLog, "miles.chat", QtInfoMsg)
 
 constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
@@ -355,6 +355,7 @@ void ChatController::cancelCurrentReply()
     m_gateTimeout.stop();
     m_pendingExpression.clear();
     m_pendingState.clear();
+    m_finishPendingAfterStart = false;
     if (!m_holdBuffer.isEmpty()
             && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
         appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
@@ -403,6 +404,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         m_holdBuffer.clear();
         m_pendingExpression.clear();
         m_pendingState.clear();
+        m_finishPendingAfterStart = false;
         transitionTo(ChatPhase::BUFFERING_FOR_START);
         if (m_runtime != nullptr) {
             QPointer<ChatController> self(this);
@@ -465,8 +467,16 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         }
 
         m_currentReply.clear();
+        if (m_phase == ChatPhase::BUFFERING_FOR_START) {
+            m_finishPendingAfterStart = true;
+            setSending(false);
+            setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+            return;
+        }
+
         m_pendingExpression.clear();
         m_pendingState.clear();
+        m_finishPendingAfterStart = false;
         setSending(false);
         setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
         drainHoldBufferToPacer();
@@ -564,6 +574,23 @@ void ChatController::handleCleanFinishReady()
     }
     transitionTo(ChatPhase::STREAMING);
     drainHoldBufferToPacer();
+
+    if (m_finishPendingAfterStart) {
+        m_finishPendingAfterStart = false;
+        if (m_runtime == nullptr) {
+            transitionTo(ChatPhase::IDLE);
+            m_assistantMessageIndex = -1;
+            return;
+        }
+
+        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+        QPointer<ChatController> self(this);
+        m_runtime->requestBoundaryAndNotify([self]() {
+            if (self != nullptr) {
+                self->handleBoundaryReached();
+            }
+        });
+    }
 }
 
 void ChatController::handleBoundaryReached()
@@ -732,6 +759,7 @@ void ChatController::finishCurrentReply()
     m_assistantMessageIndex = -1;
     m_holdBuffer.clear();
     m_currentReply.clear();
+    m_finishPendingAfterStart = false;
     setSending(false);
     setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
 }
@@ -744,6 +772,7 @@ void ChatController::failCurrentReply(const QString &message)
     m_gateTimeout.stop();
     m_pendingExpression.clear();
     m_pendingState.clear();
+    m_finishPendingAfterStart = false;
     if (hasBufferedText
             && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
         appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));

@@ -226,6 +226,55 @@ int main(int argc, char *argv[])
         // Full pacer drain timing is covered by ChatTextPacerSmoke.
     }
 
+    // --- Fast response: RUN_FINISHED must not discard the start expression while buffering ---
+    {
+        PetRuntime fastRuntime;
+        fastRuntime.setState(QStringLiteral("thinking"));
+        ChatController fastController(&fastRuntime, &settings);
+
+        ChatStreamEvent fastStarted;
+        fastStarted.type = QStringLiteral("RUN_STARTED");
+        fastController.applyStreamEvent(fastStarted);
+
+        ChatStreamEvent fastExpr;
+        fastExpr.type = QStringLiteral("CUSTOM");
+        fastExpr.name = QStringLiteral("miles.pet.expression.requested");
+        fastExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        fastExpr.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        fastController.applyStreamEvent(fastExpr);
+
+        ChatStreamEvent fastStart;
+        fastStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        fastStart.role = QStringLiteral("assistant");
+        fastController.applyStreamEvent(fastStart);
+
+        ChatStreamEvent fastText;
+        fastText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        fastText.delta = QStringLiteral("快速异议");
+        fastController.applyStreamEvent(fastText);
+
+        ChatStreamEvent fastEnd;
+        fastEnd.type = QStringLiteral("TEXT_MESSAGE_END");
+        fastController.applyStreamEvent(fastEnd);
+
+        ChatStreamEvent fastFinished;
+        fastFinished.type = QStringLiteral("RUN_FINISHED");
+        fastController.applyStreamEvent(fastFinished);
+
+        require(fastRuntime.currentActionId() != QStringLiteral("objecting"),
+                "fast response should still wait for clean finish before applying start expression");
+
+        fastRuntime.handleAnimationFinished();
+        require(fastRuntime.currentActionId() == QStringLiteral("objecting")
+                    || fastRuntime.currentActionId() == QStringLiteral("crossed"),
+                "RUN_FINISHED during BUFFERING_FOR_START must preserve and apply the pending objection expression");
+        require(waitFor([&fastController]() {
+                    return fastController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("快速异议");
+                }),
+                "fast buffered text should drain after the preserved start expression applies");
+    }
+
     // --- Phase 2.3.1: mid-stream expression switch (STREAMING -> GATED -> STREAMING) ---
     {
         PetRuntime gRuntime;

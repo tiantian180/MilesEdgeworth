@@ -14,8 +14,8 @@
 #include <utility>
 
 namespace {
-Q_LOGGING_CATEGORY(petRuntimeLog, "miles.pet.runtime")
-Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression")
+Q_LOGGING_CATEGORY(petRuntimeLog, "miles.pet.runtime", QtInfoMsg)
+Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression", QtInfoMsg)
 
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
 constexpr int kBoundarySafetyMs = 1500;
@@ -463,6 +463,7 @@ void PetRuntime::returnToIdle()
 
 void PetRuntime::handleAnimationFinished()
 {
+    const int finishingPlaybackSerial = m_playbackSerial;
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
     const PhaseDefinition phase = action.phases.value(m_currentPhaseId);
     if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
@@ -470,7 +471,9 @@ void PetRuntime::handleAnimationFinished()
         return;
     }
 
-    drainPendingNotifications();
+    if (drainPendingNotifications() && m_playbackSerial != finishingPlaybackSerial) {
+        return;
+    }
 
     applyFacingAfterCurrentAction(action);
 

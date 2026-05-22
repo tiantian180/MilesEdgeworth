@@ -62,6 +62,8 @@ def main() -> int:
             "ChatController must handle PetRuntime boundaryReached callback")
     require("handleGateTimeout" in controller_h,
             "ChatController must handle GATED safety timeout")
+    require("m_finishPendingAfterStart" in controller_h and "m_finishPendingAfterStart = true" in controller_cpp,
+            "ChatController must preserve start expression when RUN_FINISHED arrives during BUFFERING_FOR_START")
     require("drainHoldBufferToPacer" in controller_h,
             "ChatController must drain its hold buffer through the pacer")
     require("appendChunkToCurrentMessage" in controller_h,
@@ -92,6 +94,8 @@ def main() -> int:
             "PetRuntime notify API must take std::function callbacks")
     require("drainPendingNotifications" in runtime_cpp,
             "PetRuntime must drain pending notifications at animation boundaries")
+    require("finishingPlaybackSerial" in runtime_cpp,
+            "PetRuntime must stop stale animation-finished flow when a boundary callback replaces the animation")
     require("miles.pet.runtime" in runtime_cpp and "miles.pet.expression" in runtime_cpp,
             "PetRuntime/ExpressionMapping should expose debug categories")
 
