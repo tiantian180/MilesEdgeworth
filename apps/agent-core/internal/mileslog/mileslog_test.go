@@ -83,3 +83,74 @@ func TestEnabledHonorsLevel(t *testing.T) {
 		t.Fatal("error should be enabled at warn level")
 	}
 }
+
+func TestHandlerQualifiesAttrsAddedAfterWithGroup(t *testing.T) {
+	var buf bytes.Buffer
+	h := newHandler([]sink{{writer: &buf, includeDate: false}}, slog.LevelInfo)
+	logger := slog.New(h).With("category", "MILES.TEST").WithGroup("request").With("model", "x").WithGroup("body")
+
+	logger.Info("grouped line", "tokens", 12)
+
+	got := buf.String()
+	for _, want := range []string{
+		"request.model=x",
+		"request.body.tokens=12",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("grouped log missing %q in %q", want, got)
+		}
+	}
+}
+
+func TestHandlerFlattensSlogGroupAttrs(t *testing.T) {
+	var buf bytes.Buffer
+	h := newHandler([]sink{{writer: &buf, includeDate: false}}, slog.LevelInfo)
+	logger := slog.New(h).With("category", "MILES.TEST")
+
+	logger.Info("group attr", slog.Group("request", "model", "x", slog.Group("usage", "tokens", 12)))
+
+	got := buf.String()
+	for _, want := range []string{
+		"request.model=x",
+		"request.usage.tokens=12",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("flattened group log missing %q in %q", want, got)
+		}
+	}
+}
+
+type redactedValue string
+
+func (v redactedValue) LogValue() slog.Value {
+	return slog.StringValue("redacted:" + string(v))
+}
+
+func TestHandlerResolvesLogValuerAttrs(t *testing.T) {
+	var buf bytes.Buffer
+	h := newHandler([]sink{{writer: &buf, includeDate: false}}, slog.LevelInfo)
+	logger := slog.New(h).With("category", "MILES.TEST")
+
+	logger.Info("resolved attr", "payload", redactedValue("token"))
+
+	got := buf.String()
+	if !strings.Contains(got, "payload=redacted:token") {
+		t.Fatalf("log valuer attr should be resolved, got %q", got)
+	}
+}
+
+func TestPerCallCategoryDoesNotOverrideLoggerCategory(t *testing.T) {
+	var buf bytes.Buffer
+	h := newHandler([]sink{{writer: &buf, includeDate: false}}, slog.LevelInfo)
+	logger := slog.New(h).With("category", "MILES.FIXED")
+
+	logger.Info("category attempt", "category", "MILES.CALL")
+
+	got := buf.String()
+	if !strings.Contains(got, "[MILES.FIXED]") {
+		t.Fatalf("logger category should be preserved, got %q", got)
+	}
+	if strings.Contains(got, "[MILES.CALL]") {
+		t.Fatalf("per-call category should not override logger category: %q", got)
+	}
+}

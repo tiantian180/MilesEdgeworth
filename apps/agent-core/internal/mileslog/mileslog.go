@@ -24,6 +24,7 @@ type handler struct {
 	sinks []sink
 	level slog.Level
 	attrs []slog.Attr
+	group []string
 }
 
 var (
@@ -69,6 +70,8 @@ func defaultSinks() []sink {
 	if path := strings.TrimSpace(os.Getenv("MILES_LOG_FILE")); path != "" {
 		if file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
 			sinks = append(sinks, sink{writer: file, includeDate: true})
+		} else {
+			fmt.Fprintf(os.Stderr, "mileslog: open log file %q: %v\n", path, err)
 		}
 	}
 	return sinks
@@ -90,16 +93,20 @@ func (h *handler) Handle(_ context.Context, record slog.Record) error {
 	attrs := make([]slog.Attr, 0, len(h.attrs)+record.NumAttrs())
 	attrs = append(attrs, h.attrs...)
 	record.Attrs(func(attr slog.Attr) bool {
-		attrs = append(attrs, attr)
+		attrs = appendAttr(attrs, h.group, attr)
 		return true
 	})
 
 	category := "MILES.APP"
+	categoryFound := false
 	filtered := attrs[:0]
 	for _, attr := range attrs {
 		if attr.Key == "category" {
-			if value := strings.TrimSpace(attr.Value.String()); value != "" {
-				category = strings.ToUpper(value)
+			if !categoryFound {
+				categoryFound = true
+				if value := strings.TrimSpace(attr.Value.String()); value != "" {
+					category = strings.ToUpper(value)
+				}
 			}
 			continue
 		}
@@ -120,12 +127,60 @@ func (h *handler) Handle(_ context.Context, record slog.Record) error {
 
 func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	next := *h
-	next.attrs = append(append([]slog.Attr{}, h.attrs...), attrs...)
+	next.attrs = append([]slog.Attr{}, h.attrs...)
+	next.attrs = appendAttrs(next.attrs, h.group, attrs)
 	return &next
 }
 
-func (h *handler) WithGroup(_ string) slog.Handler {
-	return h
+func (h *handler) WithGroup(name string) slog.Handler {
+	if name == "" {
+		return h
+	}
+	next := *h
+	next.group = append(append([]string{}, h.group...), name)
+	return &next
+}
+
+func appendAttrs(dst []slog.Attr, groups []string, attrs []slog.Attr) []slog.Attr {
+	for _, attr := range attrs {
+		dst = appendAttr(dst, groups, attr)
+	}
+	return dst
+}
+
+func appendAttr(dst []slog.Attr, groups []string, attr slog.Attr) []slog.Attr {
+	attr.Value = attr.Value.Resolve()
+	if attr.Equal(slog.Attr{}) {
+		return dst
+	}
+
+	if attr.Value.Kind() == slog.KindGroup {
+		groupAttrs := attr.Value.Group()
+		if len(groupAttrs) == 0 {
+			return dst
+		}
+		nextGroups := groups
+		if attr.Key != "" {
+			nextGroups = append(append([]string{}, groups...), attr.Key)
+		}
+		return appendAttrs(dst, nextGroups, groupAttrs)
+	}
+
+	if attr.Key == "" {
+		return dst
+	}
+	attr.Key = qualifyKey(groups, attr.Key)
+	return append(dst, attr)
+}
+
+func qualifyKey(groups []string, key string) string {
+	if len(groups) == 0 {
+		return key
+	}
+	parts := make([]string, 0, len(groups)+1)
+	parts = append(parts, groups...)
+	parts = append(parts, key)
+	return strings.Join(parts, ".")
 }
 
 func formatLine(t time.Time, level slog.Level, category string, message string, attrs []slog.Attr, source string, includeDate bool) string {
