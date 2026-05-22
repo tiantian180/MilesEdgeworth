@@ -358,5 +358,80 @@ int main(int argc, char *argv[])
                 "RUN_FINISHED boundary callback should restore idle action");
     }
 
+    // --- Phase 2.3.1 Task 8: cancel during GATED drains buffered text and idles ---
+    {
+        PetRuntime cRuntime;
+        for (int i = 0; i < 5 && cRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            cRuntime.handleAnimationFinished();
+        }
+        require(cRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "GATED cancel test should start from idle runtime state");
+
+        ChatController cController(&cRuntime, &settings);
+
+        ChatStreamEvent cStarted;
+        cStarted.type = QStringLiteral("RUN_STARTED");
+        cController.applyStreamEvent(cStarted);
+
+        ChatStreamEvent cExpr1;
+        cExpr1.type = QStringLiteral("CUSTOM");
+        cExpr1.name = QStringLiteral("miles.pet.expression.requested");
+        cExpr1.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        cExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        cController.applyStreamEvent(cExpr1);
+        require(cRuntime.currentState() == QStringLiteral("speaking"),
+                "GATED cancel test should enter speaking before cancel");
+
+        ChatStreamEvent cStart;
+        cStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        cStart.role = QStringLiteral("assistant");
+        cController.applyStreamEvent(cStart);
+
+        ChatStreamEvent cText1;
+        cText1.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        cText1.delta = QStringLiteral("前");
+        cController.applyStreamEvent(cText1);
+        require(waitFor([&cController]() {
+                    return cController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前");
+                }),
+                "GATED cancel test should stream the first segment before the gate");
+
+        ChatStreamEvent cExpr2;
+        cExpr2.type = QStringLiteral("CUSTOM");
+        cExpr2.name = QStringLiteral("miles.pet.expression.requested");
+        cExpr2.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        cExpr2.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+        cController.applyStreamEvent(cExpr2);
+
+        ChatStreamEvent cText2;
+        cText2.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        cText2.delta = QStringLiteral("后");
+        cController.applyStreamEvent(cText2);
+        require(cController.messages().constLast().toMap()
+                    .value(QStringLiteral("text")).toString() == QStringLiteral("前"),
+                "GATED cancel test should hold text before cancel");
+
+        const int messagesBeforeGatedCancel = cController.messages().size();
+        cController.cancelCurrentReply();
+        require(!cController.sending(), "cancel during GATED should clear sending");
+        require(cRuntime.currentState() == QStringLiteral("idle"),
+                "cancel during GATED should return runtime to idle");
+        require(cRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "cancel during GATED should restore idle action");
+        require(waitFor([&cController]() {
+                    return cController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前后");
+                }),
+                "cancel during GATED should drain held text through the pacer");
+
+        ChatStreamEvent cStray;
+        cStray.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        cStray.delta = QStringLiteral("残留");
+        cController.applyStreamEvent(cStray);
+        require(cController.messages().size() == messagesBeforeGatedCancel,
+                "stream content after GATED cancel must not append a new assistant message");
+    }
+
     return 0;
 }

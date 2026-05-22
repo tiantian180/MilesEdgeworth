@@ -287,12 +287,22 @@ void ChatController::sendMessage(const QString &message)
 
 void ChatController::cancelCurrentReply()
 {
-    if (!m_sending && m_currentReply.isNull()) {
+    const bool activePhase = m_phase != ChatPhase::IDLE;
+    if (!m_sending && m_currentReply.isNull() && !activePhase) {
         return;
     }
 
     m_cancelled = true;
-    m_holdBuffer.clear();
+    m_gateTimeout.stop();
+    m_pendingExpression.clear();
+    m_pendingState.clear();
+    if (!m_holdBuffer.isEmpty()
+            && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
+        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
+        m_assistantMessageIndex = m_messages.size() - 1;
+    }
+    drainHoldBufferToPacer();
+    transitionTo(ChatPhase::IDLE);
     if (m_currentReply) {
         QNetworkReply *reply = m_currentReply;
         m_currentReply.clear();
@@ -307,10 +317,11 @@ void ChatController::cancelCurrentReply()
         emit messagesChanged();
     }
 
-    m_assistantMessageIndex = -1;
     setSending(false);
     setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
-    requestPetExpression(QStringLiteral("idle"), QStringLiteral("neutral"));
+    if (m_runtime != nullptr) {
+        m_runtime->returnToIdle();
+    }
 }
 
 void ChatController::applyStreamEvent(const ChatStreamEvent &event)
@@ -564,11 +575,14 @@ void ChatController::drainHoldBufferToPacer()
 
 void ChatController::appendChunkToCurrentMessage(const QString &chunk)
 {
-    if (m_cancelled || chunk.isEmpty()) {
+    if (chunk.isEmpty()) {
         return;
     }
 
     if (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size()) {
+        if (m_cancelled) {
+            return;
+        }
         appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
         m_assistantMessageIndex = m_messages.size() - 1;
     }
@@ -672,10 +686,24 @@ void ChatController::finishCurrentReply()
 void ChatController::failCurrentReply(const QString &message)
 {
     const QString text = message.trimmed().isEmpty() ? QStringLiteral("请求失败") : message.trimmed();
+    const bool hasBufferedText = !m_holdBuffer.isEmpty();
+
+    m_gateTimeout.stop();
+    m_pendingExpression.clear();
+    m_pendingState.clear();
+    if (hasBufferedText
+            && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
+        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
+        m_assistantMessageIndex = m_messages.size() - 1;
+    }
+    drainHoldBufferToPacer();
+    transitionTo(ChatPhase::IDLE);
 
     if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
         QVariantMap assistantMessage = m_messages.at(m_assistantMessageIndex).toMap();
-        assistantMessage.insert(QStringLiteral("text"), text);
+        if (assistantMessage.value(QStringLiteral("text")).toString().isEmpty() && !hasBufferedText) {
+            assistantMessage.insert(QStringLiteral("text"), text);
+        }
         assistantMessage.insert(QStringLiteral("pending"), false);
         assistantMessage.insert(QStringLiteral("error"), true);
         m_messages[m_assistantMessageIndex] = assistantMessage;
