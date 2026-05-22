@@ -75,8 +75,8 @@ def main() -> int:
     require("Q_LOGGING_CATEGORY" in controller_cpp and "miles.chat" in controller_cpp
             and "qCDebug" in controller_cpp,
             "ChatController should expose miles.chat debug logs for provider-vs-runtime diagnosis")
-    require("readyReadStandardError" in controller_cpp and "sidecar stderr" in controller_cpp,
-            "ChatController should forward sidecar stderr in debug logs")
+    require("ForwardedErrorChannel" in controller_cpp and "readyReadStandardError" not in controller_cpp,
+            "ChatController should forward sidecar stderr directly without re-logging it")
     require("sidecar health" in controller_cpp and '"pid"' in controller_cpp
             and "ownedPid" in controller_cpp,
             "ChatController should log sidecar health diagnostics and reject stale sidecar pids")
