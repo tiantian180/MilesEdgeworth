@@ -1,5 +1,7 @@
 #include "pet/manifest/SkinManifestLoader.h"
 
+#include "pet/manifest/PersonaStore.h"
+
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
@@ -711,13 +713,13 @@ void completeFilesystemDescriptor(
 
 SkinManifest SkinManifestLoader::loadFromResource(const QString &resourcePath)
 {
-    return loadManifestFile(resourcePath, LoadContext{
-        resourcePath,
-        QUrl(QStringLiteral("qrc:/skins/miles-edgeworth/")),
-        QStringLiteral("miles-edgeworth"),
-        QStringLiteral("御剑怜侍"),
-        true,
-    });
+    SkinDescriptor descriptor;
+    descriptor.id = QStringLiteral("miles-edgeworth");
+    descriptor.name = QStringLiteral("御剑怜侍");
+    descriptor.rootUrl = QUrl(QStringLiteral("qrc:/skins/miles-edgeworth/"));
+    descriptor.manifestPath = resourcePath;
+    descriptor.builtin = true;
+    return loadFromDescriptor(descriptor);
 }
 
 SkinManifest SkinManifestLoader::loadFromDescriptor(const SkinDescriptor &descriptor)
@@ -732,6 +734,7 @@ SkinManifest SkinManifestLoader::loadFromDescriptor(const SkinDescriptor &descri
     if (manifest.skinName.isEmpty()) {
         manifest.skinName = descriptor.id;
     }
+    manifest.personaPrompt = PersonaStore::readForDescriptor(descriptor);
     return manifest;
 }
 

@@ -135,6 +135,32 @@ ApplicationWindow {
             }
         }
 
+        Label {
+            text: qsTr("角色人格")
+            color: "#26201b"
+            font.pixelSize: 16
+            font.weight: Font.DemiBold
+        }
+
+        TextArea {
+            id: personaField
+            Layout.fillWidth: true
+            Layout.preferredHeight: 180
+            text: App.SettingsController.personaPrompt
+            wrapMode: TextArea.Wrap
+            selectByMouse: true
+            placeholderText: qsTr("当前皮肤没有 persona.md，保存后会创建。")
+            onTextEdited: App.SettingsController.personaPrompt = text
+        }
+
+        Label {
+            visible: App.SettingsController.personaError.length > 0
+            text: App.SettingsController.personaError
+            color: "#b65a45"
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
         Item { Layout.fillHeight: true }
 
         RowLayout {
@@ -158,6 +184,7 @@ ApplicationWindow {
                     App.SettingsController.maxTokens = maxTokensField.value
                     App.SettingsController.temperature = temperatureSlider.value
                     App.SettingsController.msPerChar = Math.round(msPerCharSlider.value)
+                    App.SettingsController.personaPrompt = personaField.text
                     App.SettingsController.save()
                 }
             }

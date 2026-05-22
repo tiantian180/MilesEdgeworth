@@ -8,6 +8,8 @@
 #include <QString>
 #include <QtQml/qqmlregistration.h>
 
+class PetRuntime;
+
 class SettingsController : public QObject
 {
     Q_OBJECT
@@ -17,11 +19,13 @@ class SettingsController : public QObject
     Q_PROPERTY(double temperature READ temperature WRITE setTemperature NOTIFY temperatureChanged)
     Q_PROPERTY(int maxTokens READ maxTokens WRITE setMaxTokens NOTIFY maxTokensChanged)
     Q_PROPERTY(int msPerChar READ msPerChar WRITE setMsPerChar NOTIFY msPerCharChanged)
+    Q_PROPERTY(QString personaPrompt READ personaPrompt WRITE setPersonaPrompt NOTIFY personaPromptChanged)
+    Q_PROPERTY(QString personaError READ personaError NOTIFY personaErrorChanged)
     Q_PROPERTY(bool secretStoreAvailable READ secretStoreAvailable CONSTANT)
     Q_PROPERTY(bool windowVisible READ windowVisible NOTIFY windowVisibleChanged)
 
 public:
-    explicit SettingsController(SettingsService *service, QObject *parent = nullptr);
+    explicit SettingsController(SettingsService *service, PetRuntime *runtime = nullptr, QObject *parent = nullptr);
 
     QString baseUrl() const { return m_baseUrl; }
     void setBaseUrl(const QString &value);
@@ -41,6 +45,10 @@ public:
     int msPerChar() const { return m_msPerChar; }
     void setMsPerChar(int value);
 
+    QString personaPrompt() const { return m_personaPrompt; }
+    QString personaError() const { return m_personaError; }
+    void setPersonaPrompt(const QString &value);
+
     bool secretStoreAvailable() const;
     bool windowVisible() const { return m_windowVisible; }
 
@@ -48,6 +56,7 @@ public:
     Q_INVOKABLE void closeWindow();
     Q_INVOKABLE void save();
     Q_INVOKABLE void revert();
+    Q_INVOKABLE void reloadPersona();
 
 signals:
     void baseUrlChanged();
@@ -56,17 +65,23 @@ signals:
     void temperatureChanged();
     void maxTokensChanged();
     void msPerCharChanged();
+    void personaPromptChanged();
+    void personaErrorChanged();
     void windowVisibleChanged();
     void saved();
 
 private:
     void syncFromService(bool includeSecret);
+    void setPersonaError(const QString &value);
     void setWindowVisible(bool visible);
 
     SettingsService *m_service = nullptr;
+    PetRuntime *m_runtime = nullptr;
     QString m_baseUrl;
     QString m_apiKey;
     QString m_model;
+    QString m_personaPrompt;
+    QString m_personaError;
     double m_temperature = 0.7;
     int m_maxTokens = 2048;
     int m_msPerChar = 80;

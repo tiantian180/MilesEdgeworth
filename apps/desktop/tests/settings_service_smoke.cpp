@@ -1,6 +1,7 @@
 #include "settings/SecretStore.h"
 #include "settings/SettingsController.h"
 #include "settings/SettingsService.h"
+#include "pet/PetRuntime.h"
 
 #include <QCoreApplication>
 #include <QSettings>
@@ -126,6 +127,30 @@ int main(int argc, char *argv[])
         reopen.save();
         SettingsService reopen2(&store);
         assert(reopen2.apiKey().isEmpty());
+    }
+
+    {
+        QTemporaryDir personaDir;
+        assert(personaDir.isValid());
+        qputenv("MILES_DATA_DIR", personaDir.path().toUtf8());
+
+        InMemorySecretStore store;
+        SettingsService service(&store);
+        PetRuntime runtime;
+        assert(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"));
+
+        SettingsController controller(&service, &runtime);
+        controller.openWindow();
+        const QString savedPersona = QStringLiteral("Settings saved persona\n御剑怜侍保持正式中文语气。\n");
+        controller.setPersonaPrompt(savedPersona);
+        controller.save();
+
+        assert(controller.personaError().isEmpty());
+        assert(runtime.manifest().personaPrompt == savedPersona);
+        assert(runtime.reloadActiveSkin());
+        assert(runtime.manifest().personaPrompt == savedPersona);
+
+        qunsetenv("MILES_DATA_DIR");
     }
 
     return 0;

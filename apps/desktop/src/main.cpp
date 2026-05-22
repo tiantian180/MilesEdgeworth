@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 
     std::unique_ptr<SecretStore> secretStore = SecretStore::create();
     SettingsService settingsService(secretStore.get());
-    SettingsController settingsController(&settingsService);
+    SettingsController settingsController(&settingsService, &petRuntime);
     SettingsControllerForeign::s_instance = &settingsController;
 
     ChatController chatController(&petRuntime, &settingsService);

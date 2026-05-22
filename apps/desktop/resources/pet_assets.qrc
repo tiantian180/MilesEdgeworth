@@ -94,6 +94,7 @@
   <qresource prefix="/skins/miles-edgeworth">
     <file alias="skin.json">skins/miles-edgeworth/skin.json</file>
     <file alias="manifest.json">skins/miles-edgeworth/manifest.json</file>
+    <file alias="persona.md">skins/miles-edgeworth/persona.md</file>
     <file alias="assets/body/idle/stand-right.gif">skins/miles-edgeworth/assets/body/idle/stand-right.gif</file>
     <file alias="assets/body/idle/stand-left.gif">skins/miles-edgeworth/assets/body/idle/stand-left.gif</file>
     <file alias="assets/body/startup/briefcase-in-right.gif">skins/miles-edgeworth/assets/body/startup/briefcase-in-right.gif</file>

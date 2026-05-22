@@ -1,8 +1,10 @@
+#include "pet/manifest/PersonaStore.h"
 #include "pet/manifest/SkinManifestLoader.h"
 
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextStream>
 
@@ -33,6 +35,7 @@ void require(bool condition, const char *message)
 int main(int argc, char **argv)
 {
     QCoreApplication app(argc, argv);
+    QStandardPaths::setTestModeEnabled(true);
 
     const QUrl rootUrl(QStringLiteral("file:///tmp/example-skin/"));
     require(
@@ -78,6 +81,8 @@ int main(int argc, char **argv)
   }
 }
 )JSON")), "manifest.json should be written");
+    const QString filesystemPersona = QStringLiteral("Filesystem persona content\n第二行\n");
+    require(writeFile(skinDir.filePath(QStringLiteral("persona.md")), filesystemPersona), "persona.md should be written");
 
     SkinManifest manifest = SkinManifestLoader::loadFromDirectory(dir.path());
     require(manifest.skinId == QStringLiteral("test-skin"), "loadFromDirectory should populate skinId");
@@ -91,6 +96,25 @@ int main(int argc, char **argv)
         manifest.actions.value(QStringLiteral("idle_stand")).variants.value(QStringLiteral("right")).toString() == expectedAnimationUrl,
         "skin: action URL should resolve under the selected skin root"
     );
+    require(manifest.personaPrompt == filesystemPersona, "filesystem skin persona.md should load into manifest");
+
+    QTemporaryDir personaDataDir;
+    require(personaDataDir.isValid(), "persona override data dir should be valid");
+    qputenv("MILES_DATA_DIR", personaDataDir.path().toUtf8());
+
+    SkinManifest builtInMiles = SkinManifestLoader::loadFromResource(QStringLiteral(":/skins/miles-edgeworth/manifest.json"));
+    require(
+        builtInMiles.personaPrompt.contains(QStringLiteral("Miles Edgeworth"))
+            || builtInMiles.personaPrompt.contains(QStringLiteral("御剑怜侍")),
+        "built-in Miles persona should load from qrc"
+    );
+
+    QString personaError;
+    const QString overridePersona = QStringLiteral("Override persona for miles-edgeworth\n");
+    require(PersonaStore::writeForManifest(builtInMiles, overridePersona, &personaError), "persona override should save");
+    builtInMiles = SkinManifestLoader::loadFromResource(QStringLiteral(":/skins/miles-edgeworth/manifest.json"));
+    require(builtInMiles.personaPrompt == overridePersona, "persona override should win over built-in qrc persona");
+    qunsetenv("MILES_DATA_DIR");
 
     QList<SkinDescriptor> descriptors = SkinManifestLoader::discoverInDirectories(QStringList{dir.path()}, false);
     require(descriptors.size() == 1, "discoverInDirectories should find one test skin");
