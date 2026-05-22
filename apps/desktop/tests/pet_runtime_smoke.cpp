@@ -674,6 +674,17 @@ int main(int argc, char *argv[])
         require(cleanFinishCallbacks == 0, "requestCleanFinishAndNotify 不应在动作边界前回调");
         runtime.handleAnimationFinished();
         require(cleanFinishCallbacks == 1, "requestCleanFinishAndNotify 应在 handleAnimationFinished 自然边界回调");
+
+        runtime.setFacing("right");
+        runtime.playRecipe("turn.once");
+        int turnBoundaryCallbacks = 0;
+        runtime.requestBoundaryAndNotify([&turnBoundaryCallbacks]() {
+            ++turnBoundaryCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(turnBoundaryCallbacks == 1, "边界通知不应吞掉 handleAnimationFinished 的原有流程");
+        require(runtime.currentFacing() == "left", "边界通知后仍应应用转身动作的 facingAfter");
+        require(runtime.currentActionId() == "idle_stand", "边界通知后 onceThenIdle 动作仍应回到 idle_stand");
     }
 
     runtime.playRecipe("doubleClick.holdIt");

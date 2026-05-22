@@ -14,6 +14,7 @@
 
 namespace {
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
+constexpr int kBoundarySafetyMs = 1500;
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -444,9 +445,7 @@ void PetRuntime::handleAnimationFinished()
         return;
     }
 
-    if (drainPendingNotifications()) {
-        return;
-    }
+    drainPendingNotifications();
 
     applyFacingAfterCurrentAction(action);
 
@@ -802,9 +801,6 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     }
     emit playbackSerialChanged();
 
-    if (atAnimationBoundary()) {
-        drainPendingNotifications();
-    }
 }
 
 bool PetRuntime::atAnimationBoundary() const
@@ -847,7 +843,7 @@ void PetRuntime::enqueueBoundaryNotification(std::function<void()> callback)
         triggerPendingNotification(notificationId);
     });
 
-    notification.timer->start(1500);
+    notification.timer->start(kBoundarySafetyMs);
     m_pendingNotifications.append(std::move(notification));
 }
 
