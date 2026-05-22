@@ -151,24 +151,38 @@ ApplicationWindow {
                         id: bubble
 
                         readonly property bool isUser: modelData.role === "user"
+                        readonly property string bodyText: modelData.text.length > 0 ? modelData.text : "…"
 
-                        width: Math.min(parent.width * 0.82, messageText.implicitWidth + 24)
-                        implicitHeight: messageText.implicitHeight + 16
+                        width: Math.min(parent.width * 0.82, Math.max(44, messageMetrics.width + 24))
+                        implicitHeight: messageText.contentHeight + 16
                         anchors.right: isUser ? parent.right : undefined
                         anchors.left: isUser ? undefined : parent.left
                         radius: 6
                         color: modelData.error ? "#f6d6cc" : (isUser ? "#dce7f7" : "#eee7da")
                         border.color: modelData.error ? "#b65a45" : "transparent"
 
-                        Text {
+                        TextMetrics {
+                            id: messageMetrics
+
+                            text: bubble.bodyText
+                            font: messageText.font
+                        }
+
+                        TextEdit {
                             id: messageText
 
                             anchors.fill: parent
                             anchors.margins: 8
-                            text: modelData.text.length > 0 ? modelData.text : "…"
+                            text: bubble.bodyText
                             color: "#26201b"
                             font.pixelSize: 14
-                            wrapMode: Text.Wrap
+                            readOnly: true
+                            selectByMouse: true
+                            selectByKeyboard: true
+                            selectedTextColor: "#26201b"
+                            selectionColor: "#b9d0f2"
+                            textFormat: TextEdit.PlainText
+                            wrapMode: TextEdit.Wrap
                         }
                     }
                 }
@@ -186,24 +200,27 @@ ApplicationWindow {
             TextArea {
                 id: input
 
+                readonly property bool disconnectedInput: !App.ChatController.sidecarReady && !App.ChatController.sending
+
                 Layout.fillWidth: true
                 Layout.preferredHeight: 72
                 wrapMode: TextArea.Wrap
-                placeholderText: "输入消息"
-                placeholderTextColor: "#82786e"
-                color: "#26201b"
+                placeholderText: disconnectedInput ? "未连接，先点设置填写模型配置" : "输入消息"
+                placeholderTextColor: disconnectedInput ? "#8a4b38" : "#82786e"
+                color: enabled ? "#26201b" : "#6f5545"
                 selectionColor: "#b9d0f2"
                 selectedTextColor: "#26201b"
                 enabled: App.ChatController.sidecarReady && !App.ChatController.sending
+                opacity: 1.0
                 leftPadding: 12
                 rightPadding: 12
                 topPadding: 10
                 bottomPadding: 10
                 background: Rectangle {
                     radius: 6
-                    color: input.enabled ? "#fffdf8" : "#eee9e2"
-                    border.color: input.activeFocus ? "#7b604c" : "#d8d1c8"
-                    border.width: input.activeFocus ? 2 : 1
+                    color: input.disconnectedInput ? "#fff4ec" : (input.enabled ? "#fffdf8" : "#eee9e2")
+                    border.color: input.disconnectedInput ? "#c66a4b" : (input.activeFocus ? "#7b604c" : "#d8d1c8")
+                    border.width: (input.disconnectedInput || input.activeFocus) ? 2 : 1
                 }
 
                 Keys.onPressed: function(event) {

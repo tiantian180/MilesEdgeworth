@@ -94,6 +94,17 @@ def main() -> int:
     require("echoMode" in settings_qml, "API key field must use echoMode for masking")
     require("设置" in chat_qml, "ChatWindow must surface a 设置 button")
     require("SettingsController" in chat_qml, "ChatWindow must reference the SettingsController singleton")
+    require("TextEdit" in chat_qml, "chat message text must be selectable")
+    require("selectByMouse: true" in chat_qml, "chat message text must support mouse selection")
+    require("readOnly: true" in chat_qml, "chat message text selection must not make bubbles editable")
+    require(
+        "未连接，先点设置填写模型配置" in chat_qml,
+        "disabled input placeholder must explain the disconnected state and settings entry",
+    )
+    require(
+        "disconnectedInput" in chat_qml,
+        "ChatWindow must expose a distinct disconnected input style",
+    )
 
     # ChatController wiring
     require("SettingsService" in chat_h, "ChatController must take a SettingsService")

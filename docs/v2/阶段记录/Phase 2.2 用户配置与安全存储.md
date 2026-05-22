@@ -13,6 +13,7 @@
 - 新增 `SettingsController` QML singleton：维护设置窗口的 staged value，支持 Save / Cancel。
 - 新增 `SettingsWindow.qml`：提供 base URL、API key、model、temperature、max tokens、`msPerChar` 设置入口；API key 输入框使用 password echo mode。
 - `ChatWindow.qml` 顶部增加“设置”按钮，打开设置窗口。
+- `ChatWindow.qml` 支持选择聊天气泡文本；未连接时输入框显示明确的设置指引和醒目禁用态。
 - `main.cpp` 设置 `QCoreApplication` organization / domain / application name，创建 `SettingsService` 与 `SettingsController`，加载 `SettingsWindow`。
 - `ChatController::startSidecar()` 从 `SettingsService` 读取当前配置，将 `MILES_PROVIDER_BASE_URL` / `MILES_PROVIDER_API_KEY` / `MILES_PROVIDER_MODEL` / `MILES_PROVIDER_TEMPERATURE` / `MILES_PROVIDER_MAX_TOKENS` 注入 sidecar 的 `QProcessEnvironment`。
 - 设置保存后触发 `ChatController::restartSidecar()`，让 Go sidecar 用新的 provider 配置启动。
