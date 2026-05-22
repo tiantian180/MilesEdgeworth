@@ -145,16 +145,6 @@ void SettingsController::save()
         return;
     }
 
-    m_service->setBaseUrl(m_baseUrl);
-    if (m_apiKeyLoaded) {
-        m_service->setApiKey(m_apiKey);
-    }
-    m_service->setModel(m_model);
-    m_service->setTemperature(m_temperature);
-    m_service->setMaxTokens(m_maxTokens);
-    m_service->setMsPerChar(m_msPerChar);
-    m_service->save();
-
     if (m_runtime != nullptr) {
         QString error;
         if (!PersonaStore::writeForManifest(m_runtime->manifest(), m_personaPrompt, &error)) {
@@ -167,6 +157,16 @@ void SettingsController::save()
         }
         reloadPersona();
     }
+
+    m_service->setBaseUrl(m_baseUrl);
+    if (m_apiKeyLoaded) {
+        m_service->setApiKey(m_apiKey);
+    }
+    m_service->setModel(m_model);
+    m_service->setTemperature(m_temperature);
+    m_service->setMaxTokens(m_maxTokens);
+    m_service->setMsPerChar(m_msPerChar);
+    m_service->save();
 
     emit saved();
     closeWindow();

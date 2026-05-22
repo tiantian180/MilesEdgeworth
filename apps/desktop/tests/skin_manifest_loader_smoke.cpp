@@ -4,6 +4,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextStream>
@@ -114,6 +115,39 @@ int main(int argc, char **argv)
     require(PersonaStore::writeForManifest(builtInMiles, overridePersona, &personaError), "persona override should save");
     builtInMiles = SkinManifestLoader::loadFromResource(QStringLiteral(":/skins/miles-edgeworth/manifest.json"));
     require(builtInMiles.personaPrompt == overridePersona, "persona override should win over built-in qrc persona");
+
+    const QStringList invalidSkinIds = {
+        QString(),
+        QStringLiteral("bad/skin"),
+        QStringLiteral("bad\\skin"),
+        QStringLiteral("../escape"),
+        QStringLiteral("bad..skin"),
+    };
+    for (const QString &invalidSkinId : invalidSkinIds) {
+        SkinDescriptor invalidDescriptor;
+        invalidDescriptor.id = invalidSkinId;
+        invalidDescriptor.rootUrl = QUrl::fromLocalFile(skinDir.absolutePath() + QLatin1Char('/'));
+        require(
+            PersonaStore::readForDescriptor(invalidDescriptor).isEmpty(),
+            "invalid skin id must not read persona from override or skin root"
+        );
+
+        SkinManifest invalidManifest;
+        invalidManifest.skinId = invalidSkinId;
+        invalidManifest.skinRootUrl = QUrl::fromLocalFile(skinDir.absolutePath() + QLatin1Char('/'));
+        invalidManifest.builtin = true;
+        personaError.clear();
+        require(
+            !PersonaStore::writeForManifest(invalidManifest, QStringLiteral("bad"), &personaError),
+            "invalid skin id must not write persona override"
+        );
+        require(!personaError.isEmpty(), "invalid skin id write should report an error");
+    }
+    require(
+        !QFileInfo(personaDataDir.path() + QStringLiteral("/escape.md")).exists(),
+        "invalid skin id must not escape persona override directory"
+    );
+
     qunsetenv("MILES_DATA_DIR");
 
     QList<SkinDescriptor> descriptors = SkinManifestLoader::discoverInDirectories(QStringList{dir.path()}, false);

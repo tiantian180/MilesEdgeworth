@@ -3,11 +3,25 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QStandardPaths>
 #include <QUrl>
 #include <QtGlobal>
 
 namespace {
+bool isValidSkinId(const QString &skinId)
+{
+    if (skinId.isEmpty()
+        || skinId.contains(QLatin1Char('/'))
+        || skinId.contains(QLatin1Char('\\'))
+        || skinId.contains(QStringLiteral(".."))) {
+        return false;
+    }
+
+    static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9._-]*$"));
+    return pattern.match(skinId).hasMatch();
+}
+
 QString readTextFile(const QString &path)
 {
     QFile file(path);
@@ -89,16 +103,21 @@ QString PersonaStore::dataDir()
 
 QString PersonaStore::overridePathForSkin(const QString &skinId)
 {
+    if (!isValidSkinId(skinId)) {
+        return {};
+    }
     return QDir(dataDir()).filePath(QStringLiteral("persona-overrides/%1.md").arg(skinId));
 }
 
 QString PersonaStore::readForDescriptor(const SkinDescriptor &descriptor)
 {
-    if (!descriptor.id.isEmpty()) {
-        const QString overridePath = overridePathForSkin(descriptor.id);
-        if (QFileInfo::exists(overridePath) && QFileInfo(overridePath).isFile()) {
-            return readTextFile(overridePath);
-        }
+    if (!isValidSkinId(descriptor.id)) {
+        return {};
+    }
+
+    const QString overridePath = overridePathForSkin(descriptor.id);
+    if (QFileInfo::exists(overridePath) && QFileInfo(overridePath).isFile()) {
+        return readTextFile(overridePath);
     }
 
     const QString skinPersonaPath = personaPathForRootUrl(descriptor.rootUrl);
@@ -111,6 +130,13 @@ QString PersonaStore::readForDescriptor(const SkinDescriptor &descriptor)
 
 bool PersonaStore::writeForManifest(const SkinManifest &manifest, const QString &content, QString *errorMessage)
 {
+    if (!isValidSkinId(manifest.skinId)) {
+        if (errorMessage != nullptr) {
+            *errorMessage = QStringLiteral("皮肤 id 非法，无法保存 persona：%1").arg(manifest.skinId);
+        }
+        return false;
+    }
+
     QString path;
     if (manifest.builtin) {
         path = overridePathForSkin(manifest.skinId);

@@ -4,8 +4,12 @@
 #include "pet/PetRuntime.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
 #include <QSettings>
+#include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QTextStream>
 
 #include <cassert>
 #include <map>
@@ -54,11 +58,23 @@ void setupQSettingsScope(QTemporaryDir &dir)
     QCoreApplication::setOrganizationName(QStringLiteral("tian-test"));
     QCoreApplication::setApplicationName(QStringLiteral("MilesEdgeworth-test"));
 }
+
+bool writeFile(const QString &path, const QString &content)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+    QTextStream stream(&file);
+    stream << content;
+    return true;
+}
 } // namespace
 
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
+    QStandardPaths::setTestModeEnabled(true);
 
     QTemporaryDir tmp;
     assert(tmp.isValid());
@@ -132,6 +148,8 @@ int main(int argc, char *argv[])
     {
         QTemporaryDir personaDir;
         assert(personaDir.isValid());
+        const bool hadMilesDataDir = qEnvironmentVariableIsSet("MILES_DATA_DIR");
+        const QByteArray previousMilesDataDir = qgetenv("MILES_DATA_DIR");
         qputenv("MILES_DATA_DIR", personaDir.path().toUtf8());
 
         InMemorySecretStore store;
@@ -150,7 +168,66 @@ int main(int argc, char *argv[])
         assert(runtime.reloadActiveSkin());
         assert(runtime.manifest().personaPrompt == savedPersona);
 
-        qunsetenv("MILES_DATA_DIR");
+        if (hadMilesDataDir) {
+            qputenv("MILES_DATA_DIR", previousMilesDataDir);
+        } else {
+            qunsetenv("MILES_DATA_DIR");
+        }
+    }
+
+    {
+        QTemporaryDir personaDir;
+        assert(personaDir.isValid());
+        const bool hadMilesDataDir = qEnvironmentVariableIsSet("MILES_DATA_DIR");
+        const QByteArray previousMilesDataDir = qgetenv("MILES_DATA_DIR");
+        qputenv("MILES_DATA_DIR", personaDir.path().toUtf8());
+
+        const QString invalidSkinRoot = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+            + QStringLiteral("/skins/invalid-id-skin");
+        QDir invalidSkinDir(invalidSkinRoot);
+        assert(invalidSkinDir.mkpath(QStringLiteral("assets/body/idle")));
+        assert(writeFile(invalidSkinDir.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{"id":"bad/skin","name":"非法 id 皮肤","version":"1.0.0","manifestVersion":1}
+)JSON")));
+        assert(writeFile(invalidSkinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "states": { "idle": { "action": "idle_stand" } },
+  "actions": {
+    "idle_stand": {
+      "variants": {
+        "right": { "animation": "skin:assets/body/idle/stand.gif" }
+      }
+    }
+  }
+}
+)JSON")));
+
+        InMemorySecretStore store;
+        SettingsService service(&store);
+        service.setBaseUrl(QStringLiteral("https://before.example.com"));
+        service.save();
+
+        PetRuntime runtime;
+        assert(runtime.setActiveSkin(QStringLiteral("bad/skin")));
+
+        SettingsController controller(&service, &runtime);
+        controller.openWindow();
+        assert(controller.windowVisible());
+        controller.setBaseUrl(QStringLiteral("https://after.example.com"));
+        controller.setPersonaPrompt(QStringLiteral("Should fail"));
+        controller.save();
+
+        assert(controller.windowVisible());
+        assert(!controller.personaError().isEmpty());
+        assert(service.baseUrl() == QStringLiteral("https://before.example.com"));
+        SettingsService reopened(&store);
+        assert(reopened.baseUrl() == QStringLiteral("https://before.example.com"));
+
+        if (hadMilesDataDir) {
+            qputenv("MILES_DATA_DIR", previousMilesDataDir);
+        } else {
+            qunsetenv("MILES_DATA_DIR");
+        }
     }
 
     return 0;
