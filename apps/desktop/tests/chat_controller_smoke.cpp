@@ -433,5 +433,74 @@ int main(int argc, char *argv[])
                 "stream content after GATED cancel must not append a new assistant message");
     }
 
+    // --- Phase 2.3.1 Task 8: RUN_ERROR during GATED drains buffered text without ghost messages ---
+    {
+        PetRuntime eRuntime;
+        for (int i = 0; i < 5 && eRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            eRuntime.handleAnimationFinished();
+        }
+        require(eRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "GATED error test should start from idle runtime state");
+
+        ChatController eController(&eRuntime, &settings);
+
+        ChatStreamEvent eStarted;
+        eStarted.type = QStringLiteral("RUN_STARTED");
+        eController.applyStreamEvent(eStarted);
+
+        ChatStreamEvent eExpr1;
+        eExpr1.type = QStringLiteral("CUSTOM");
+        eExpr1.name = QStringLiteral("miles.pet.expression.requested");
+        eExpr1.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        eExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        eController.applyStreamEvent(eExpr1);
+
+        ChatStreamEvent eStart;
+        eStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        eStart.role = QStringLiteral("assistant");
+        eController.applyStreamEvent(eStart);
+
+        ChatStreamEvent eText1;
+        eText1.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        eText1.delta = QStringLiteral("前");
+        eController.applyStreamEvent(eText1);
+        require(waitFor([&eController]() {
+                    return eController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前");
+                }),
+                "GATED error test should stream the first segment before the gate");
+
+        ChatStreamEvent eExpr2;
+        eExpr2.type = QStringLiteral("CUSTOM");
+        eExpr2.name = QStringLiteral("miles.pet.expression.requested");
+        eExpr2.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        eExpr2.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+        eController.applyStreamEvent(eExpr2);
+
+        ChatStreamEvent eText2;
+        eText2.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        eText2.delta = QStringLiteral("后");
+        eController.applyStreamEvent(eText2);
+        const int messagesBeforeError = eController.messages().size();
+
+        ChatStreamEvent eError;
+        eError.type = QStringLiteral("RUN_ERROR");
+        eError.error = QStringLiteral("mock failure");
+        eController.applyStreamEvent(eError);
+
+        require(!eController.sending(), "RUN_ERROR during GATED should clear sending");
+        require(eRuntime.currentState() == QStringLiteral("error"),
+                "RUN_ERROR during GATED should move pet to error state");
+        require(waitFor([&eController]() {
+                    return eController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前后");
+                }),
+                "RUN_ERROR during GATED should drain held text through the pacer");
+        require(eController.messages().size() == messagesBeforeError,
+                "RUN_ERROR during GATED must not create a ghost assistant message");
+        require(eController.messages().constLast().toMap().value(QStringLiteral("error")).toBool(),
+                "RUN_ERROR during GATED should mark the assistant message as error");
+    }
+
     return 0;
 }

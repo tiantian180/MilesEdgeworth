@@ -712,7 +712,6 @@ void ChatController::failCurrentReply(const QString &message)
         appendMessage(messageObject(QStringLiteral("assistant"), text, false, true));
     }
 
-    m_assistantMessageIndex = -1;
     m_currentReply.clear();
     setSending(false);
     setStatusText(QStringLiteral("错误"));
