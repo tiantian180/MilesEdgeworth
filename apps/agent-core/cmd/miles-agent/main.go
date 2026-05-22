@@ -21,6 +21,12 @@ func main() {
 	flag.Parse()
 
 	cfg := config.FromEnv()
+	debugChat := os.Getenv("MILES_DEBUG_CHAT") != ""
+	openai.SetDebugLogging(debugChat)
+	if debugChat {
+		log.Printf("debug chat diagnostics enabled")
+	}
+
 	var provider chat.Provider
 	label := "mock-fallback"
 	if cfg.Enabled() {

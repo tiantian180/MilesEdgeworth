@@ -70,8 +70,14 @@ def main() -> int:
             "ChatController must call requestBoundaryAndNotify on PetRuntime")
     require("requestCleanFinishAndNotify" in controller_cpp,
             "ChatController must call requestCleanFinishAndNotify on PetRuntime")
-    require("chat expression requested" in controller_cpp and "qInfo" in controller_cpp,
-            "ChatController should log parsed expression events for provider-vs-runtime diagnosis")
+    require("Q_LOGGING_CATEGORY" in controller_cpp and "miles.chat" in controller_cpp
+            and "qCDebug" in controller_cpp,
+            "ChatController should expose miles.chat debug logs for provider-vs-runtime diagnosis")
+    require("readyReadStandardError" in controller_cpp and "sidecar stderr" in controller_cpp,
+            "ChatController should forward sidecar stderr in debug logs")
+    require("sidecar health" in controller_cpp and '"pid"' in controller_cpp
+            and "ownedPid" in controller_cpp,
+            "ChatController should log sidecar health diagnostics and reject stale sidecar pids")
     require('"action": "crossed", "allowedStates": ["speaking"]' in manifest,
             "Miles manifest should map speaking neutral fallback to a visible speaking action")
     require('"action": "idle_stand", "allowedStates": ["idle", "error"]' in manifest,
@@ -86,6 +92,8 @@ def main() -> int:
             "PetRuntime notify API must take std::function callbacks")
     require("drainPendingNotifications" in runtime_cpp,
             "PetRuntime must drain pending notifications at animation boundaries")
+    require("miles.pet.runtime" in runtime_cpp and "miles.pet.expression" in runtime_cpp,
+            "PetRuntime/ExpressionMapping should expose debug categories")
 
     # Tests
     require("ChatTextPacer" in pacer_smoke,

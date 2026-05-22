@@ -11,12 +11,15 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLoggingCategory>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
 #include <QProcessEnvironment>
 
 namespace {
+Q_LOGGING_CATEGORY(chatLog, "miles.chat")
+
 constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
 constexpr auto kExpressionRequestedEvent = "miles.pet.expression.requested";
@@ -32,6 +35,19 @@ InterruptHint interruptHintFromValue(const QVariantMap &value)
 
     return InterruptHint::Immediate;
 }
+
+void logProcessOutput(const char *label, const QByteArray &bytes)
+{
+    const QList<QByteArray> lines = bytes.split('\n');
+    for (QByteArray line : lines) {
+        if (line.endsWith('\r')) {
+            line.chop(1);
+        }
+        if (!line.trimmed().isEmpty()) {
+            qCDebug(chatLog).noquote() << label << QString::fromLocal8Bit(line);
+        }
+    }
+}
 } // namespace
 
 ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent)
@@ -41,9 +57,15 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
 {
     connect(&m_sidecarProcess, &QProcess::started, this, [this]() {
         setStatusText(QStringLiteral("连接中"));
+        qCDebug(chatLog) << "sidecar process started"
+                         << "pid=" << m_sidecarProcess.processId()
+                         << "program=" << m_sidecarProcess.program();
         QTimer::singleShot(250, this, &ChatController::checkHealth);
     });
     connect(&m_sidecarProcess, &QProcess::errorOccurred, this, [this]() {
+        qCDebug(chatLog) << "sidecar process error"
+                         << "error=" << m_sidecarProcess.error()
+                         << "message=" << m_sidecarProcess.errorString();
         setSidecarReady(false);
         if (!m_sidecarRestartPending) {
             setStatusText(QStringLiteral("未连接"));
@@ -53,6 +75,9 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
             qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             this,
             [this](int, QProcess::ExitStatus) {
+                qCDebug(chatLog) << "sidecar process finished"
+                                 << "exitCode=" << m_sidecarProcess.exitCode()
+                                 << "exitStatus=" << m_sidecarProcess.exitStatus();
                 setSidecarReady(false);
                 if (m_sidecarStoppingForRestart) {
                     setStatusText(QStringLiteral("重启中"));
@@ -67,6 +92,12 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
                 m_sidecarRestartAttempts = 0;
                 setStatusText(QStringLiteral("未连接"));
             });
+    connect(&m_sidecarProcess, &QProcess::readyReadStandardError, this, [this]() {
+        logProcessOutput("sidecar stderr", m_sidecarProcess.readAllStandardError());
+    });
+    connect(&m_sidecarProcess, &QProcess::readyReadStandardOutput, this, [this]() {
+        logProcessOutput("sidecar stdout", m_sidecarProcess.readAllStandardOutput());
+    });
 
     m_pacer = new ChatTextPacer(this);
     connect(m_pacer, &ChatTextPacer::chunkReady,
@@ -107,6 +138,8 @@ void ChatController::startSidecar()
 void ChatController::launchSidecarProcess()
 {
     if (m_sidecarProcess.state() != QProcess::NotRunning) {
+        qCDebug(chatLog) << "sidecar already running under this app"
+                         << "pid=" << m_sidecarProcess.processId();
         checkHealth();
         return;
     }
@@ -142,6 +175,12 @@ void ChatController::launchSidecarProcess()
     }
 
     m_sidecarProcess.setProcessEnvironment(env);
+    qCDebug(chatLog) << "launch sidecar"
+                     << "path=" << executablePath
+                     << "baseUrlSet=" << env.contains(QStringLiteral("MILES_PROVIDER_BASE_URL"))
+                     << "apiKeySet=" << env.contains(QStringLiteral("MILES_PROVIDER_API_KEY"))
+                     << "model=" << env.value(QStringLiteral("MILES_PROVIDER_MODEL"))
+                     << "debug=" << env.contains(QStringLiteral("MILES_DEBUG_CHAT"));
     setStatusText(QStringLiteral("启动中"));
     if (m_sidecarRestartPending) {
         ++m_sidecarRestartAttempts;
@@ -191,7 +230,19 @@ void ChatController::checkHealth()
 {
     QNetworkReply *reply = m_network.get(QNetworkRequest(QUrl(QString::fromLatin1(kHealthUrl))));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        const bool healthy = reply->error() == QNetworkReply::NoError;
+        const QByteArray body = reply->readAll();
+        const QJsonObject health = QJsonDocument::fromJson(body).object();
+        const qint64 ownedPid = m_sidecarProcess.processId();
+        const int healthPid = health.value(QStringLiteral("pid")).toInt();
+        const bool healthy = reply->error() == QNetworkReply::NoError
+            && ownedPid > 0
+            && healthPid == ownedPid;
+        qCDebug(chatLog) << "sidecar health"
+                         << "healthy=" << healthy
+                         << "pid=" << healthPid
+                         << "ownedPid=" << ownedPid
+                         << "provider=" << health.value(QStringLiteral("provider")).toString()
+                         << "error=" << reply->errorString();
         reply->deleteLater();
         setSidecarReady(healthy);
         if (healthy) {
@@ -248,6 +299,9 @@ void ChatController::sendMessage(const QString &message)
             expressionsArray.append(entry);
         }
         body.insert(QStringLiteral("expressions"), expressionsArray);
+        qCDebug(chatLog) << "send chat request"
+                         << "messageLen=" << trimmed.size()
+                         << "expressions=" << expressionsArray.size();
     }
 
     if (QCoreApplication::instance() == nullptr) {
@@ -441,11 +495,11 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kExpressionRequestedEvent)) {
         const QString state = event.value.value(QStringLiteral("state")).toString();
         const QString expression = event.value.value(QStringLiteral("expression")).toString();
-        qInfo().noquote() << "chat expression requested"
-                          << "phase=" << static_cast<int>(m_phase)
-                          << "state=" << state
-                          << "expression=" << expression
-                          << "interruptHint=" << event.value.value(QStringLiteral("interruptHint")).toString();
+        qCDebug(chatLog).noquote() << "chat expression requested"
+                                    << "phase=" << static_cast<int>(m_phase)
+                                    << "state=" << state
+                                    << "expression=" << expression
+                                    << "interruptHint=" << event.value.value(QStringLiteral("interruptHint")).toString();
 
         if (m_phase == ChatPhase::BUFFERING_FOR_START || m_phase == ChatPhase::GATED) {
             m_pendingState = state;
@@ -652,7 +706,16 @@ QString ChatController::sidecarExecutablePath() const
 void ChatController::handleStreamBytes(const QByteArray &bytes)
 {
     const QList<ChatStreamEvent> events = m_parser.ingest(bytes);
+    qCDebug(chatLog) << "stream bytes received"
+                     << "bytes=" << bytes.size()
+                     << "events=" << events.size();
     for (const ChatStreamEvent &event : events) {
+        qCDebug(chatLog) << "stream event"
+                         << "type=" << event.type
+                         << "name=" << event.name
+                         << "state=" << event.value.value(QStringLiteral("state")).toString()
+                         << "expression=" << event.value.value(QStringLiteral("expression")).toString()
+                         << "deltaLen=" << event.delta.size();
         applyStreamEvent(event);
     }
 }

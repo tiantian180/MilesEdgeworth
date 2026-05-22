@@ -1,9 +1,12 @@
 #include "pet/selection/ExpressionMappingResolver.h"
 
+#include <QLoggingCategory>
 #include <QSet>
 #include <QtGlobal>
 
 namespace {
+Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression")
+
 constexpr auto kNeutralExpressionId = "neutral";
 constexpr auto kFirstAvailableSelection = "first_available";
 constexpr auto kWeightedRandomSelection = "weighted_random";
@@ -126,8 +129,18 @@ ActionRequest resolveInternal(
 
     const ExpressionMappingDefinition mapping = manifest.expressionMappings.value(resolvedExpressionId);
     const QList<ExpressionMappingEntry> entries = availableEntries(manifest, context, mapping);
+    qCDebug(petExpressionLog) << "resolve expression"
+                              << "requested=" << expressionId
+                              << "resolved=" << resolvedExpressionId
+                              << "state=" << context.state
+                              << "candidates=" << entries.size()
+                              << "selection=" << mapping.selection;
     const ActionRequest selectedRequest = selectEntry(context, mapping, entries);
     if (selectedRequest.kind != ActionRequestKind::None) {
+        qCDebug(petExpressionLog) << "expression selected request"
+                                  << "expression=" << resolvedExpressionId
+                                  << "kind=" << static_cast<int>(selectedRequest.kind)
+                                  << "target=" << selectedRequest.targetId;
         return selectedRequest;
     }
 
@@ -135,9 +148,14 @@ ActionRequest resolveInternal(
         ? QString::fromUtf8(kNeutralExpressionId)
         : mapping.fallbackExpressionId.trimmed();
     if (fallbackExpressionId == resolvedExpressionId) {
+        qCDebug(petExpressionLog) << "expression fallback exhausted"
+                                  << "expression=" << resolvedExpressionId;
         return ActionRequest::none();
     }
 
+    qCDebug(petExpressionLog) << "expression fallback"
+                              << "from=" << resolvedExpressionId
+                              << "to=" << fallbackExpressionId;
     return resolveInternal(manifest, context, fallbackExpressionId, visitedExpressionIds);
 }
 } // namespace

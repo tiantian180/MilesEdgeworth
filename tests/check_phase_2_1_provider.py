@@ -60,6 +60,10 @@ def main() -> int:
 
     require("openai.NewProvider" in main_go, "main must construct openai provider when configured")
     require("mock-fallback" in main_go, "main must label provider as mock-fallback when config missing")
+    require("MILES_DEBUG_CHAT" in main_go and "SetDebugLogging" in main_go,
+            "sidecar main must enable debug chat diagnostics from MILES_DEBUG_CHAT")
+    require("debugf(" in openai_go and "expression tag parsed" in openai_go,
+            "openai provider must log expression parser diagnostics in debug mode")
 
     require("http.MaxBytesReader" in server_go, "server must enforce max request body size")
     require("const DefaultListenAddr" in server_go or "DefaultListenAddr =" in server_go,
