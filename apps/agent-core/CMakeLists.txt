@@ -23,6 +23,7 @@ add_custom_command(
     DEPENDS
         ${MILES_AGENT_GO_SOURCES}
         "${CMAKE_CURRENT_SOURCE_DIR}/go.mod"
+        "${CMAKE_CURRENT_SOURCE_DIR}/go.sum"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     COMMENT "Building miles-agent sidecar"
     VERBATIM
