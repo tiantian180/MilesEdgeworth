@@ -36,18 +36,6 @@ InterruptHint interruptHintFromValue(const QVariantMap &value)
     return InterruptHint::Immediate;
 }
 
-void logProcessOutput(const char *label, const QByteArray &bytes)
-{
-    const QList<QByteArray> lines = bytes.split('\n');
-    for (QByteArray line : lines) {
-        if (line.endsWith('\r')) {
-            line.chop(1);
-        }
-        if (!line.trimmed().isEmpty()) {
-            qCDebug(chatLog).noquote() << label << QString::fromLocal8Bit(line);
-        }
-    }
-}
 } // namespace
 
 ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent)
@@ -55,6 +43,8 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
     , m_runtime(runtime)
     , m_settings(settings)
 {
+    m_sidecarProcess.setProcessChannelMode(QProcess::ForwardedErrorChannel);
+
     connect(&m_sidecarProcess, &QProcess::started, this, [this]() {
         setStatusText(QStringLiteral("连接中"));
         qCDebug(chatLog) << "sidecar process started"
@@ -92,12 +82,6 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
                 m_sidecarRestartAttempts = 0;
                 setStatusText(QStringLiteral("未连接"));
             });
-    connect(&m_sidecarProcess, &QProcess::readyReadStandardError, this, [this]() {
-        logProcessOutput("sidecar stderr", m_sidecarProcess.readAllStandardError());
-    });
-    connect(&m_sidecarProcess, &QProcess::readyReadStandardOutput, this, [this]() {
-        logProcessOutput("sidecar stdout", m_sidecarProcess.readAllStandardOutput());
-    });
 
     m_pacer = new ChatTextPacer(this);
     connect(m_pacer, &ChatTextPacer::chunkReady,
@@ -154,6 +138,18 @@ void ChatController::launchSidecarProcess()
     }
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QProcessEnvironment systemEnv = QProcessEnvironment::systemEnvironment();
+    const QStringList logEnvNames{
+        QStringLiteral("MILES_LOG_FILE"),
+        QStringLiteral("MILES_LOG_LEVEL"),
+        QStringLiteral("MILES_LOG_PAYLOADS"),
+    };
+    for (const QString &name : logEnvNames) {
+        if (systemEnv.contains(name)) {
+            env.insert(name, systemEnv.value(name));
+        }
+    }
+
     if (m_settings != nullptr) {
         const QString baseUrl = m_settings->baseUrl();
         if (!baseUrl.isEmpty()) {
@@ -175,12 +171,14 @@ void ChatController::launchSidecarProcess()
     }
 
     m_sidecarProcess.setProcessEnvironment(env);
-    qCDebug(chatLog) << "launch sidecar"
-                     << "path=" << executablePath
-                     << "baseUrlSet=" << env.contains(QStringLiteral("MILES_PROVIDER_BASE_URL"))
-                     << "apiKeySet=" << env.contains(QStringLiteral("MILES_PROVIDER_API_KEY"))
-                     << "model=" << env.value(QStringLiteral("MILES_PROVIDER_MODEL"))
-                     << "debug=" << env.contains(QStringLiteral("MILES_DEBUG_CHAT"));
+    qCDebug(chatLog).noquote() << "launch sidecar"
+                               << QStringLiteral("path=%1").arg(executablePath)
+                               << QStringLiteral("baseUrlSet=%1").arg(env.contains(QStringLiteral("MILES_PROVIDER_BASE_URL")))
+                               << QStringLiteral("apiKeySet=%1").arg(env.contains(QStringLiteral("MILES_PROVIDER_API_KEY")))
+                               << QStringLiteral("model=%1").arg(env.value(QStringLiteral("MILES_PROVIDER_MODEL")))
+                               << QStringLiteral("logLevel=%1").arg(env.value(QStringLiteral("MILES_LOG_LEVEL"), QStringLiteral("info")))
+                               << QStringLiteral("logFileSet=%1").arg(env.contains(QStringLiteral("MILES_LOG_FILE")))
+                               << QStringLiteral("payloads=%1").arg(env.value(QStringLiteral("MILES_LOG_PAYLOADS")) == QStringLiteral("1"));
     setStatusText(QStringLiteral("启动中"));
     if (m_sidecarRestartPending) {
         ++m_sidecarRestartAttempts;
