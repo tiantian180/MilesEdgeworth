@@ -59,6 +59,8 @@ set(DESKTOP_SOURCES
     src/pet/manifest/SkinManifest.h
     src/pet/manifest/SkinManifestLoader.cpp
     src/pet/manifest/SkinManifestLoader.h
+    src/pet/PetLogging.cpp
+    src/pet/PetLogging.h
     src/pet/PetRuntime.cpp
     src/pet/PetRuntime.h
     src/pet/PetRuntimeSkin.cpp
@@ -260,6 +262,8 @@ if(BUILD_TESTING)
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h
+        src/pet/PetLogging.cpp
+        src/pet/PetLogging.h
         src/pet/PetRuntime.cpp
         src/pet/PetRuntime.h
         src/pet/PetRuntimeSkin.cpp
@@ -330,6 +334,8 @@ if(BUILD_TESTING)
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h
+        src/pet/PetLogging.cpp
+        src/pet/PetLogging.h
         src/pet/PetRuntime.cpp
         src/pet/PetRuntime.h
         src/pet/PetRuntimeSkin.cpp

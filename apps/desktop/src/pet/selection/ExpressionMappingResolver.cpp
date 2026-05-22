@@ -1,12 +1,11 @@
 #include "pet/selection/ExpressionMappingResolver.h"
 
-#include <QLoggingCategory>
+#include "pet/PetLogging.h"
+
 #include <QSet>
 #include <QtGlobal>
 
 namespace {
-Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression", QtInfoMsg)
-
 constexpr auto kNeutralExpressionId = "neutral";
 constexpr auto kFirstAvailableSelection = "first_available";
 constexpr auto kWeightedRandomSelection = "weighted_random";

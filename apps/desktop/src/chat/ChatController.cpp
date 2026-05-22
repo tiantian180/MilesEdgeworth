@@ -143,17 +143,6 @@ void ChatController::launchSidecarProcess()
     }
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    const QProcessEnvironment systemEnv = QProcessEnvironment::systemEnvironment();
-    const QStringList logEnvNames{
-        QStringLiteral("MILES_LOG_FILE"),
-        QStringLiteral("MILES_LOG_LEVEL"),
-        QStringLiteral("MILES_LOG_PAYLOADS"),
-    };
-    for (const QString &name : logEnvNames) {
-        if (systemEnv.contains(name)) {
-            env.insert(name, systemEnv.value(name));
-        }
-    }
 
     if (m_settings != nullptr) {
         const QString baseUrl = m_settings->baseUrl();
