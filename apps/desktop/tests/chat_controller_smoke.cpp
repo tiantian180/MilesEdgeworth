@@ -296,5 +296,67 @@ int main(int argc, char *argv[])
                 "GATED text should drain through the pacer after the boundary callback");
     }
 
+    // --- Phase 2.3.1 Task 7: RUN_FINISHED waits for animation boundary before idle ---
+    {
+        PetRuntime fRuntime;
+        for (int i = 0; i < 5 && fRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            fRuntime.handleAnimationFinished();
+        }
+        require(fRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "RUN_FINISHED boundary test should start from idle runtime state");
+
+        ChatController fController(&fRuntime, &settings);
+
+        ChatStreamEvent fStarted;
+        fStarted.type = QStringLiteral("RUN_STARTED");
+        fController.applyStreamEvent(fStarted);
+
+        ChatStreamEvent fExpr;
+        fExpr.type = QStringLiteral("CUSTOM");
+        fExpr.name = QStringLiteral("miles.pet.expression.requested");
+        fExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        fExpr.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        fController.applyStreamEvent(fExpr);
+        require(fRuntime.currentState() == QStringLiteral("speaking"),
+                "RUN_FINISHED boundary test should enter speaking before finish");
+        const QString fSpeakingAction = fRuntime.currentActionId();
+
+        ChatStreamEvent fStart;
+        fStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        fStart.role = QStringLiteral("assistant");
+        fController.applyStreamEvent(fStart);
+
+        ChatStreamEvent fText;
+        fText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        fText.delta = QStringLiteral("结尾");
+        fController.applyStreamEvent(fText);
+        require(waitFor([&fController]() {
+                    return fController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("结尾");
+                }),
+                "RUN_FINISHED boundary test should stream text before finish");
+
+        ChatStreamEvent fFinished;
+        fFinished.type = QStringLiteral("RUN_FINISHED");
+        fFinished.runId = QStringLiteral("mock-run-finished");
+        fController.applyStreamEvent(fFinished);
+
+        require(!fController.sending(), "RUN_FINISHED should clear sending while waiting for boundary");
+        require(fController.statusText() == QStringLiteral("未连接"),
+                "RUN_FINISHED should restore non-sending status while waiting for boundary");
+        require(!fController.messages().constLast().toMap().value(QStringLiteral("pending")).toBool(),
+                "RUN_FINISHED should clear assistant pending before boundary");
+        require(fRuntime.currentState() == QStringLiteral("speaking"),
+                "RUN_FINISHED must not synchronously return to idle");
+        require(fRuntime.currentActionId() == fSpeakingAction,
+                "RUN_FINISHED must not synchronously replace the current animation");
+
+        fRuntime.handleAnimationFinished();
+        require(fRuntime.currentState() == QStringLiteral("idle"),
+                "RUN_FINISHED should return to idle only after boundary callback");
+        require(fRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "RUN_FINISHED boundary callback should restore idle action");
+    }
+
     return 0;
 }

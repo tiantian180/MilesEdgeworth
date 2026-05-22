@@ -357,6 +357,13 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
                 m_holdBuffer.append(event.delta);
                 flushHoldBuffer();
             }
+        } else if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
+            if (m_pacer != nullptr) {
+                m_pacer->append(event.delta);
+            } else {
+                m_holdBuffer.append(event.delta);
+                flushHoldBuffer();
+            }
         } else {
             m_holdBuffer.append(event.delta);
         }
@@ -374,7 +381,33 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("RUN_FINISHED")) {
-        finishCurrentReply();
+        if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
+            QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
+            message.insert(QStringLiteral("pending"), false);
+            m_messages[m_assistantMessageIndex] = message;
+            emit messagesChanged();
+        }
+
+        m_currentReply.clear();
+        m_pendingExpression.clear();
+        m_pendingState.clear();
+        setSending(false);
+        setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+        drainHoldBufferToPacer();
+
+        if (m_runtime == nullptr) {
+            transitionTo(ChatPhase::IDLE);
+            m_assistantMessageIndex = -1;
+            return;
+        }
+
+        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+        QPointer<ChatController> self(this);
+        m_runtime->requestBoundaryAndNotify([self]() {
+            if (self != nullptr) {
+                self->handleBoundaryReached();
+            }
+        });
         return;
     }
 
@@ -499,6 +532,7 @@ void ChatController::handleBoundaryReached()
         if (m_runtime != nullptr) {
             m_runtime->returnToIdle();
         }
+        m_assistantMessageIndex = -1;
         transitionTo(ChatPhase::IDLE);
     }
 }
@@ -541,7 +575,7 @@ void ChatController::appendChunkToCurrentMessage(const QString &chunk)
 
     QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
     message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + chunk);
-    message.insert(QStringLiteral("pending"), true);
+    message.insert(QStringLiteral("pending"), m_sending);
     m_messages[m_assistantMessageIndex] = message;
     emit messagesChanged();
 }
