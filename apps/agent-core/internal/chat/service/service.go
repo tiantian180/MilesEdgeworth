@@ -156,16 +156,20 @@ func buildMessagesFromRows(persona string, expressions []chat.ExpressionInfo, ro
 }
 
 func splitRows(rows []store.Message) ([]string, []store.Message) {
-	var summaries []string
+	var latestSummary string
 	var normalRows []store.Message
 	for _, row := range rows {
 		if row.Role == store.RoleSummary {
 			if summary := strings.TrimSpace(row.Content); summary != "" {
-				summaries = append(summaries, summary)
+				latestSummary = summary
 			}
 			continue
 		}
 		normalRows = append(normalRows, row)
+	}
+	var summaries []string
+	if latestSummary != "" {
+		summaries = append(summaries, latestSummary)
 	}
 	return summaries, normalRows
 }

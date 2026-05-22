@@ -12,6 +12,7 @@ import (
 
 type fakeProvider struct {
 	completeText  string
+	completeTexts []string
 	completeErr   error
 	completeCalls int
 	onComplete    func()
@@ -27,6 +28,9 @@ func (p *fakeProvider) Complete(ctx context.Context, params chat.ChatParams) (st
 	p.completeCalls++
 	if p.onComplete != nil {
 		p.onComplete()
+	}
+	if len(p.completeTexts) >= p.completeCalls {
+		return p.completeTexts[p.completeCalls-1], p.completeErr
 	}
 	return p.completeText, p.completeErr
 }
@@ -245,6 +249,46 @@ func TestBuildMessagesSummaryReplaceExcludesCurrentAndLatestTurn(t *testing.T) {
 	}
 	if messages[len(messages)-1].Content != "当前问题。" {
 		t.Fatalf("last message = %+v, want current user preserved", messages[len(messages)-1])
+	}
+}
+
+func TestBuildMessagesUsesOnlyLatestSummaryAfterTwoSummaryCycles(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("早期", 350))
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "早期回答。")
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("第一轮最近问题", 80))
+	appendMessage(t, s, conv.ID, store.RoleAssistant, strings.Repeat("第一轮最近回答", 80))
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("第一轮当前问题", 80))
+
+	provider := &fakeProvider{completeTexts: []string{"旧完整摘要", "新完整摘要"}}
+	service := newTestService(s, provider, 2000)
+	if _, _, err := service.BuildMessages(context.Background(), BuildRequest{ConversationID: conv.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	appendMessage(t, s, conv.ID, store.RoleAssistant, strings.Repeat("第一轮当前回答", 80))
+	appendMessage(t, s, conv.ID, store.RoleUser, "第二轮当前问题。")
+	messages, _, err := service.BuildMessages(context.Background(), BuildRequest{ConversationID: conv.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if provider.completeCalls != 2 {
+		t.Fatalf("completeCalls = %d, want 2", provider.completeCalls)
+	}
+	system := messages[0].Content
+	if !strings.Contains(system, "以下是较早对话的摘要：\n新完整摘要") {
+		t.Fatalf("system prompt missing latest summary:\n%s", system)
+	}
+	if strings.Contains(system, "旧完整摘要") {
+		t.Fatalf("system prompt included stale summary:\n%s", system)
+	}
+	if messages[len(messages)-1].Role != store.RoleUser || messages[len(messages)-1].Content != "第二轮当前问题。" {
+		t.Fatalf("current user not preserved: %+v", messages[len(messages)-1])
 	}
 }
 
