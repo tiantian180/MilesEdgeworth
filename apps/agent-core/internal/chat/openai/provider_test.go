@@ -13,40 +13,7 @@ import (
 	"milesedgeworth/agent-core/internal/chat/openai"
 )
 
-func TestBuildSystemPromptIncludesAllExpressions(t *testing.T) {
-	exprs := []chat.ExpressionInfo{
-		{ID: "neutral", Description: "默认状态"},
-		{ID: "objection", Description: "强烈反驳"},
-		{ID: "polite"},
-	}
-	prompt := openai.BuildSystemPrompt(exprs)
-
-	for _, expect := range []string{
-		"[EXPR:",
-		"neutral",
-		"默认状态",
-		"objection",
-		"强烈反驳",
-		"polite",
-		"只能使用方括号中列出的 id 原文",
-		"[EXPR:objection]",
-		"不要输出 [EXPR:异议]",
-	} {
-		if !strings.Contains(prompt, expect) {
-			t.Fatalf("prompt missing %q\n---\n%s", expect, prompt)
-		}
-	}
-}
-
-func TestBuildSystemPromptHandlesEmptyExpressions(t *testing.T) {
-	prompt := openai.BuildSystemPrompt(nil)
-	// Still emits an instruction line, just without a tag list.
-	if !strings.Contains(prompt, "[EXPR:") {
-		t.Fatalf("prompt should explain markers even with no tags\n---\n%s", prompt)
-	}
-}
-
-func TestStreamReplyHappyPath(t *testing.T) {
+func TestStreamChatHappyPath(t *testing.T) {
 	// Upstream OpenAI-style SSE: deltas containing [EXPR:objection]...
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/chat/completions" {
@@ -66,8 +33,12 @@ func TestStreamReplyHappyPath(t *testing.T) {
 		if !body.Stream || body.Model != "test-model" {
 			t.Fatalf("unexpected upstream body: %+v", body)
 		}
-		if len(body.Messages) != 2 || body.Messages[0].Role != "system" {
-			t.Fatalf("expected system+user messages, got %+v", body.Messages)
+		gotMessages, err := json.Marshal(body.Messages)
+		if err != nil {
+			t.Fatalf("marshal messages: %v", err)
+		}
+		if got, want := string(gotMessages), `[{"role":"system","content":"persona\n\nexpr rules"},{"role":"user","content":"你好"}]`; got != want {
+			t.Fatalf("messages = %s, want %s", got, want)
 		}
 
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -89,17 +60,17 @@ func TestStreamReplyHappyPath(t *testing.T) {
 	defer upstream.Close()
 
 	p := openai.NewProvider(upstream.URL, "sk-test", "test-model", 0.5, 256)
-	events, err := p.StreamReply(context.Background(), chat.Request{
-		ConversationID: "c1",
-		Message:        "你怎么看？",
-		Expressions: []chat.ExpressionInfo{
-			{ID: "neutral"},
-			{ID: "objection"},
-			{ID: "polite"},
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		RunID:     "test-run",
+		MessageID: "test-message",
+		Messages: []chat.Message{
+			{Role: "system", Content: "persona\n\nexpr rules"},
+			{Role: "user", Content: "你好"},
 		},
+		KnownExpressionIDs: []string{"neutral", "objection", "polite"},
 	})
 	if err != nil {
-		t.Fatalf("StreamReply: %v", err)
+		t.Fatalf("StreamChat: %v", err)
 	}
 
 	var got []chat.StreamEvent
@@ -142,7 +113,7 @@ func TestStreamReplyHappyPath(t *testing.T) {
 	mustFind(func(e chat.StreamEvent) bool { return e.Type == "RUN_FINISHED" }, "RUN_FINISHED")
 }
 
-func TestStreamReplyAcceptsVersionedBaseURL(t *testing.T) {
+func TestStreamChatAcceptsVersionedBaseURL(t *testing.T) {
 	seenPath := ""
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenPath = r.URL.Path
@@ -156,9 +127,9 @@ func TestStreamReplyAcceptsVersionedBaseURL(t *testing.T) {
 	defer upstream.Close()
 
 	p := openai.NewProvider(upstream.URL+"/v1", "sk-test", "test-model", 0.5, 256)
-	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{Messages: []chat.Message{{Role: "user", Content: "hi"}}})
 	if err != nil {
-		t.Fatalf("StreamReply: %v", err)
+		t.Fatalf("StreamChat: %v", err)
 	}
 	for range events {
 	}
@@ -167,7 +138,7 @@ func TestStreamReplyAcceptsVersionedBaseURL(t *testing.T) {
 	}
 }
 
-func TestStreamReplyAcceptsProviderVersionPrefix(t *testing.T) {
+func TestStreamChatAcceptsProviderVersionPrefix(t *testing.T) {
 	seenPath := ""
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenPath = r.URL.Path
@@ -181,9 +152,9 @@ func TestStreamReplyAcceptsProviderVersionPrefix(t *testing.T) {
 	defer upstream.Close()
 
 	p := openai.NewProvider(upstream.URL+"/api/v3", "sk-test", "test-model", 0.5, 256)
-	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{Messages: []chat.Message{{Role: "user", Content: "hi"}}})
 	if err != nil {
-		t.Fatalf("StreamReply: %v", err)
+		t.Fatalf("StreamChat: %v", err)
 	}
 	for range events {
 	}
@@ -192,7 +163,7 @@ func TestStreamReplyAcceptsProviderVersionPrefix(t *testing.T) {
 	}
 }
 
-func TestStreamReplyAcceptsFullChatCompletionsURL(t *testing.T) {
+func TestStreamChatAcceptsFullChatCompletionsURL(t *testing.T) {
 	seenPath := ""
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenPath = r.URL.Path
@@ -206,9 +177,9 @@ func TestStreamReplyAcceptsFullChatCompletionsURL(t *testing.T) {
 	defer upstream.Close()
 
 	p := openai.NewProvider(upstream.URL+"/custom/v1/chat/completions", "sk-test", "test-model", 0.5, 256)
-	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{Messages: []chat.Message{{Role: "user", Content: "hi"}}})
 	if err != nil {
-		t.Fatalf("StreamReply: %v", err)
+		t.Fatalf("StreamChat: %v", err)
 	}
 	for range events {
 	}
@@ -217,7 +188,7 @@ func TestStreamReplyAcceptsFullChatCompletionsURL(t *testing.T) {
 	}
 }
 
-func TestStreamReply4xxBecomesRunError(t *testing.T) {
+func TestStreamChat4xxBecomesRunError(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/custom/v1/chat/completions" {
 			http.NotFound(w, r)
@@ -230,9 +201,9 @@ func TestStreamReply4xxBecomesRunError(t *testing.T) {
 	defer upstream.Close()
 
 	p := openai.NewProvider(upstream.URL+"/custom/v1", "sk-bad", "any", 0.7, 128)
-	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{Messages: []chat.Message{{Role: "user", Content: "hi"}}})
 	if err != nil {
-		t.Fatalf("StreamReply returned err: %v", err)
+		t.Fatalf("StreamChat returned err: %v", err)
 	}
 	var got []chat.StreamEvent
 	for e := range events {
@@ -257,16 +228,16 @@ func TestStreamReply4xxBecomesRunError(t *testing.T) {
 	}
 }
 
-func TestStreamReply4xxSanitizesEndpointDiagnostics(t *testing.T) {
+func TestStreamChat4xxSanitizesEndpointDiagnostics(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "denied", http.StatusForbidden)
 	}))
 	defer upstream.Close()
 
 	p := openai.NewProvider(strings.Replace(upstream.URL, "://", "://user:pass@", 1), "sk-test", "any", 0.7, 128)
-	events, err := p.StreamReply(context.Background(), chat.Request{Message: "hi"})
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{Messages: []chat.Message{{Role: "user", Content: "hi"}}})
 	if err != nil {
-		t.Fatalf("StreamReply returned err: %v", err)
+		t.Fatalf("StreamChat returned err: %v", err)
 	}
 	var got []chat.StreamEvent
 	for e := range events {
@@ -283,7 +254,7 @@ func TestStreamReply4xxSanitizesEndpointDiagnostics(t *testing.T) {
 	}
 }
 
-func TestStreamReplySkipsMalformedChunks(t *testing.T) {
+func TestStreamChatSkipsMalformedChunks(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -300,12 +271,12 @@ func TestStreamReplySkipsMalformedChunks(t *testing.T) {
 	defer upstream.Close()
 
 	p := openai.NewProvider(upstream.URL, "sk-test", "any", 0.7, 128)
-	events, err := p.StreamReply(context.Background(), chat.Request{
-		Message:     "hi",
-		Expressions: []chat.ExpressionInfo{{ID: "polite"}},
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		Messages:           []chat.Message{{Role: "user", Content: "hi"}},
+		KnownExpressionIDs: []string{"polite"},
 	})
 	if err != nil {
-		t.Fatalf("StreamReply: %v", err)
+		t.Fatalf("StreamChat: %v", err)
 	}
 	gotPolite := false
 	for e := range events {
@@ -328,12 +299,12 @@ func TestPayloadLoggingFlagDoesNotAffectStreamEvents(t *testing.T) {
 	defer upstream.Close()
 
 	p := openai.NewProvider(upstream.URL, "sk-test", "any", 0.7, 128)
-	events, err := p.StreamReply(context.Background(), chat.Request{
-		Message:     "hi",
-		Expressions: []chat.ExpressionInfo{{ID: "polite"}},
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		Messages:           []chat.Message{{Role: "user", Content: "hi"}},
+		KnownExpressionIDs: []string{"polite"},
 	})
 	if err != nil {
-		t.Fatalf("StreamReply: %v", err)
+		t.Fatalf("StreamChat: %v", err)
 	}
 	seenText := false
 	for event := range events {
@@ -343,5 +314,39 @@ func TestPayloadLoggingFlagDoesNotAffectStreamEvents(t *testing.T) {
 	}
 	if !seenText {
 		t.Fatal("payload logging flag must not change stream parsing")
+	}
+}
+
+func TestCompleteReturnsAssistantMessageContent(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+			Stream bool `json:"stream"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("upstream decode: %v", err)
+		}
+		if body.Stream {
+			t.Fatalf("Complete request must not stream")
+		}
+		fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":"摘要文本"}}]}`)
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "test-model", 0.5, 256)
+	got, err := p.Complete(context.Background(), chat.ChatParams{
+		Messages: []chat.Message{
+			{Role: "system", Content: "summary rules"},
+			{Role: "user", Content: "请总结"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	if got != "摘要文本" {
+		t.Fatalf("Complete = %q, want %q", got, "摘要文本")
 	}
 }

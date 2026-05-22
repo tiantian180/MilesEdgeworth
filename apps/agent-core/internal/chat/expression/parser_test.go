@@ -98,6 +98,16 @@ func TestParserUnknownTag(t *testing.T) {
 	}
 }
 
+func TestParserAcceptsAllTagsWhenKnownListEmpty(t *testing.T) {
+	cap := &capture{}
+	p := newParser(cap, nil)
+	p.Feed("[EXPR:objection]hi")
+	p.Flush()
+	if got := cap.string(); got != "E(objection)T(hi)" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestParserHalfMarkerAtEnd(t *testing.T) {
 	cap := &capture{}
 	p := newParser(cap, []string{"objection"})

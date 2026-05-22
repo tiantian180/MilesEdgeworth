@@ -15,15 +15,22 @@ func NewMockProvider(delay time.Duration) *MockProvider {
 	return &MockProvider{delay: delay}
 }
 
-func (p *MockProvider) StreamReply(ctx context.Context, req Request) (<-chan StreamEvent, error) {
+func (p *MockProvider) StreamChat(ctx context.Context, params ChatParams) (<-chan StreamEvent, error) {
 	events := make(chan StreamEvent)
 
 	go func() {
 		defer close(events)
 
-		runID := "mock-run-1"
-		messageID := "mock-message-1"
-		reply := fmt.Sprintf("异议。你刚才说的是：%s。Phase 2.0 mock 链路已经接通。", req.Message)
+		runID := params.RunID
+		if runID == "" {
+			runID = "mock-run-1"
+		}
+		messageID := params.MessageID
+		if messageID == "" {
+			messageID = "mock-message-1"
+		}
+		userText := lastUserMessage(params.Messages)
+		reply := fmt.Sprintf("异议。你刚才说的是：%s。Phase 2.0 mock 链路已经接通。", userText)
 
 		if !send(ctx, events, p.delay, StreamEvent{Type: "RUN_STARTED", RunID: runID}) {
 			return
@@ -93,6 +100,25 @@ func (p *MockProvider) StreamReply(ctx context.Context, req Request) (<-chan Str
 	}()
 
 	return events, nil
+}
+
+func (p *MockProvider) Complete(ctx context.Context, params ChatParams) (string, error) {
+	_ = ctx
+	for i := len(params.Messages) - 1; i >= 0; i-- {
+		if params.Messages[i].Role == "user" {
+			return "摘要：" + params.Messages[i].Content, nil
+		}
+	}
+	return "摘要：空对话", nil
+}
+
+func lastUserMessage(messages []Message) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "user" {
+			return messages[i].Content
+		}
+	}
+	return ""
 }
 
 func splitReply(reply string) []string {

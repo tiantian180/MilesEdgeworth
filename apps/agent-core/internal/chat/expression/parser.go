@@ -92,9 +92,14 @@ func (p *Parser) consume() bool {
 	p.buffer = p.buffer[endIdx+len(markerClose):]
 
 	if p.OnExpression != nil {
-		if p.known[tag] {
+		switch {
+		case tag == "":
+			p.OnExpression(p.FallbackTag)
+		case len(p.known) == 0:
 			p.OnExpression(tag)
-		} else {
+		case p.known[tag]:
+			p.OnExpression(tag)
+		default:
 			p.OnExpression(p.FallbackTag)
 		}
 	}
