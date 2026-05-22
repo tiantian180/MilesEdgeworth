@@ -1,20 +1,25 @@
 #include "chat/ChatController.h"
 
+#include "chat/ChatTextPacer.h"
 #include "pet/PetRuntime.h"
 #include "settings/SettingsService.h"
 
 #include <QCoreApplication>
+#include <QDebug>
 #include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLoggingCategory>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
 #include <QProcessEnvironment>
 
 namespace {
+Q_LOGGING_CATEGORY(chatLog, "miles.chat", QtInfoMsg)
+
 constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
 constexpr auto kExpressionRequestedEvent = "miles.pet.expression.requested";
@@ -30,6 +35,12 @@ InterruptHint interruptHintFromValue(const QVariantMap &value)
 
     return InterruptHint::Immediate;
 }
+
+QString logBool(bool value)
+{
+    return value ? QStringLiteral("true") : QStringLiteral("false");
+}
+
 } // namespace
 
 ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent)
@@ -37,11 +48,19 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
     , m_runtime(runtime)
     , m_settings(settings)
 {
+    m_sidecarProcess.setProcessChannelMode(QProcess::ForwardedErrorChannel);
+
     connect(&m_sidecarProcess, &QProcess::started, this, [this]() {
         setStatusText(QStringLiteral("连接中"));
+        qCDebug(chatLog).noquote() << "sidecar process started"
+                                    << QStringLiteral("pid=%1").arg(m_sidecarProcess.processId())
+                                    << QStringLiteral("program=%1").arg(m_sidecarProcess.program());
         QTimer::singleShot(250, this, &ChatController::checkHealth);
     });
     connect(&m_sidecarProcess, &QProcess::errorOccurred, this, [this]() {
+        qCDebug(chatLog).noquote() << "sidecar process error"
+                                    << QStringLiteral("error=%1").arg(m_sidecarProcess.error())
+                                    << QStringLiteral("message=%1").arg(m_sidecarProcess.errorString());
         setSidecarReady(false);
         if (!m_sidecarRestartPending) {
             setStatusText(QStringLiteral("未连接"));
@@ -51,6 +70,9 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
             qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             this,
             [this](int, QProcess::ExitStatus) {
+                qCDebug(chatLog).noquote() << "sidecar process finished"
+                                            << QStringLiteral("exitCode=%1").arg(m_sidecarProcess.exitCode())
+                                            << QStringLiteral("exitStatus=%1").arg(m_sidecarProcess.exitStatus());
                 setSidecarReady(false);
                 if (m_sidecarStoppingForRestart) {
                     setStatusText(QStringLiteral("重启中"));
@@ -65,6 +87,17 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
                 m_sidecarRestartAttempts = 0;
                 setStatusText(QStringLiteral("未连接"));
             });
+
+    m_pacer = new ChatTextPacer(this);
+    connect(m_pacer, &ChatTextPacer::chunkReady,
+            this, &ChatController::appendChunkToCurrentMessage);
+    if (m_settings != nullptr) {
+        m_pacer->setMsPerChar(m_settings->msPerChar());
+    }
+
+    m_gateTimeout.setSingleShot(true);
+    connect(&m_gateTimeout, &QTimer::timeout,
+            this, &ChatController::handleGateTimeout);
 }
 
 ChatController::~ChatController()
@@ -94,6 +127,8 @@ void ChatController::startSidecar()
 void ChatController::launchSidecarProcess()
 {
     if (m_sidecarProcess.state() != QProcess::NotRunning) {
+        qCDebug(chatLog).noquote() << "sidecar already running under this app"
+                                    << QStringLiteral("pid=%1").arg(m_sidecarProcess.processId());
         checkHealth();
         return;
     }
@@ -108,6 +143,18 @@ void ChatController::launchSidecarProcess()
     }
 
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    const QProcessEnvironment systemEnv = QProcessEnvironment::systemEnvironment();
+    const QStringList logEnvNames{
+        QStringLiteral("MILES_LOG_FILE"),
+        QStringLiteral("MILES_LOG_LEVEL"),
+        QStringLiteral("MILES_LOG_PAYLOADS"),
+    };
+    for (const QString &name : logEnvNames) {
+        if (systemEnv.contains(name)) {
+            env.insert(name, systemEnv.value(name));
+        }
+    }
+
     if (m_settings != nullptr) {
         const QString baseUrl = m_settings->baseUrl();
         if (!baseUrl.isEmpty()) {
@@ -129,6 +176,14 @@ void ChatController::launchSidecarProcess()
     }
 
     m_sidecarProcess.setProcessEnvironment(env);
+    qCDebug(chatLog).noquote() << "launch sidecar"
+                               << QStringLiteral("path=%1").arg(executablePath)
+                               << QStringLiteral("baseUrlSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_PROVIDER_BASE_URL"))))
+                               << QStringLiteral("apiKeySet=%1").arg(logBool(env.contains(QStringLiteral("MILES_PROVIDER_API_KEY"))))
+                               << QStringLiteral("model=%1").arg(env.value(QStringLiteral("MILES_PROVIDER_MODEL")))
+                               << QStringLiteral("logLevel=%1").arg(env.value(QStringLiteral("MILES_LOG_LEVEL"), QStringLiteral("info")))
+                               << QStringLiteral("logFileSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_LOG_FILE"))))
+                               << QStringLiteral("payloads=%1").arg(logBool(env.value(QStringLiteral("MILES_LOG_PAYLOADS")) == QStringLiteral("1")));
     setStatusText(QStringLiteral("启动中"));
     if (m_sidecarRestartPending) {
         ++m_sidecarRestartAttempts;
@@ -169,13 +224,28 @@ void ChatController::restartSidecar()
 void ChatController::handleSettingsSaved()
 {
     restartSidecar();
+    if (m_settings != nullptr && m_pacer != nullptr) {
+        m_pacer->setMsPerChar(m_settings->msPerChar());
+    }
 }
 
 void ChatController::checkHealth()
 {
     QNetworkReply *reply = m_network.get(QNetworkRequest(QUrl(QString::fromLatin1(kHealthUrl))));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        const bool healthy = reply->error() == QNetworkReply::NoError;
+        const QByteArray body = reply->readAll();
+        const QJsonObject health = QJsonDocument::fromJson(body).object();
+        const qint64 ownedPid = m_sidecarProcess.processId();
+        const int healthPid = health.value(QStringLiteral("pid")).toInt();
+        const bool healthy = reply->error() == QNetworkReply::NoError
+            && ownedPid > 0
+            && healthPid == ownedPid;
+        qCDebug(chatLog).noquote() << "sidecar health"
+                                    << QStringLiteral("healthy=%1").arg(logBool(healthy))
+                                    << QStringLiteral("pid=%1").arg(healthPid)
+                                    << QStringLiteral("ownedPid=%1").arg(ownedPid)
+                                    << QStringLiteral("provider=%1").arg(health.value(QStringLiteral("provider")).toString())
+                                    << QStringLiteral("error=%1").arg(reply->errorString());
         reply->deleteLater();
         setSidecarReady(healthy);
         if (healthy) {
@@ -193,6 +263,10 @@ void ChatController::sendMessage(const QString &message)
         return;
     }
 
+    ++m_currentStreamId;
+    if (m_pacer != nullptr) {
+        m_pacer->discardBeforeStream(m_currentStreamId);
+    }
     m_cancelled = false;
     appendMessage(messageObject(QStringLiteral("user"), trimmed, false, false));
     appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
@@ -228,6 +302,9 @@ void ChatController::sendMessage(const QString &message)
             expressionsArray.append(entry);
         }
         body.insert(QStringLiteral("expressions"), expressionsArray);
+        qCDebug(chatLog).noquote() << "send chat request"
+                                    << QStringLiteral("messageLen=%1").arg(trimmed.size())
+                                    << QStringLiteral("expressions=%1").arg(expressionsArray.size());
     }
 
     if (QCoreApplication::instance() == nullptr) {
@@ -272,12 +349,23 @@ void ChatController::sendMessage(const QString &message)
 
 void ChatController::cancelCurrentReply()
 {
-    if (!m_sending && m_currentReply.isNull()) {
+    const bool activePhase = m_phase != ChatPhase::IDLE;
+    if (!m_sending && m_currentReply.isNull() && !activePhase) {
         return;
     }
 
     m_cancelled = true;
-    m_holdBuffer.clear();
+    m_gateTimeout.stop();
+    m_pendingExpression.clear();
+    m_pendingState.clear();
+    m_finishPendingAfterStart = false;
+    if (!m_holdBuffer.isEmpty()
+            && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
+        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
+        m_assistantMessageIndex = m_messages.size() - 1;
+    }
+    drainHoldBufferToPacer();
+    transitionTo(ChatPhase::IDLE);
     if (m_currentReply) {
         QNetworkReply *reply = m_currentReply;
         m_currentReply.clear();
@@ -292,10 +380,11 @@ void ChatController::cancelCurrentReply()
         emit messagesChanged();
     }
 
-    m_assistantMessageIndex = -1;
     setSending(false);
     setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
-    requestPetExpression(QStringLiteral("idle"), QStringLiteral("neutral"));
+    if (m_runtime != nullptr) {
+        m_runtime->returnToIdle();
+    }
 }
 
 void ChatController::applyStreamEvent(const ChatStreamEvent &event)
@@ -305,8 +394,31 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("RUN_STARTED")) {
+        ++m_currentStreamId;
+        if (m_pacer != nullptr) {
+            m_pacer->discardBeforeStream(m_currentStreamId);
+        }
+        const bool wasSending = m_sending;
+        if (!wasSending) {
+            m_assistantMessageIndex = -1;
+        }
         setSending(true);
         setStatusText(QStringLiteral("正在回复"));
+        m_holdBuffer.clear();
+        m_pendingExpression.clear();
+        m_pendingState.clear();
+        m_finishPendingAfterStart = false;
+        transitionTo(ChatPhase::BUFFERING_FOR_START);
+        if (m_runtime != nullptr) {
+            QPointer<ChatController> self(this);
+            m_runtime->requestCleanFinishAndNotify([self]() {
+                if (self != nullptr) {
+                    self->handleCleanFinishReady();
+                }
+            });
+        } else {
+            handleCleanFinishReady();
+        }
         return;
     }
 
@@ -321,7 +433,21 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("TEXT_MESSAGE_CONTENT")) {
-        appendAssistantDelta(event.delta);
+        if (m_phase == ChatPhase::STREAMING) {
+            if (m_pacer != nullptr) {
+                m_pacer->append(event.delta, m_currentStreamId);
+            } else {
+                appendChunkToCurrentMessage(event.delta, m_currentStreamId);
+            }
+        } else if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
+            if (m_pacer != nullptr) {
+                m_pacer->append(event.delta, m_currentStreamId);
+            } else {
+                appendChunkToCurrentMessage(event.delta, m_currentStreamId);
+            }
+        } else {
+            m_holdBuffer.append(event.delta);
+        }
         return;
     }
 
@@ -336,7 +462,41 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("RUN_FINISHED")) {
-        finishCurrentReply();
+        if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
+            QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
+            message.insert(QStringLiteral("pending"), false);
+            m_messages[m_assistantMessageIndex] = message;
+            emit messagesChanged();
+        }
+
+        m_currentReply.clear();
+        if (m_phase == ChatPhase::BUFFERING_FOR_START) {
+            m_finishPendingAfterStart = true;
+            setSending(false);
+            setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+            return;
+        }
+
+        m_pendingExpression.clear();
+        m_pendingState.clear();
+        m_finishPendingAfterStart = false;
+        setSending(false);
+        setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+        drainHoldBufferToPacer();
+
+        if (m_runtime == nullptr) {
+            transitionTo(ChatPhase::IDLE);
+            m_assistantMessageIndex = -1;
+            return;
+        }
+
+        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+        QPointer<ChatController> self(this);
+        m_runtime->requestBoundaryAndNotify([self]() {
+            if (self != nullptr) {
+                self->handleBoundaryReached();
+            }
+        });
         return;
     }
 
@@ -346,9 +506,37 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kExpressionRequestedEvent)) {
-        requestPetExpression(event.value.value(QStringLiteral("state")).toString(),
-                             event.value.value(QStringLiteral("expression")).toString(),
-                             interruptHintFromValue(event.value));
+        const QString state = event.value.value(QStringLiteral("state")).toString();
+        const QString expression = event.value.value(QStringLiteral("expression")).toString();
+        qCDebug(chatLog).noquote() << "chat expression requested"
+                                    << QStringLiteral("phase=%1").arg(static_cast<int>(m_phase))
+                                    << QStringLiteral("state=%1").arg(state)
+                                    << QStringLiteral("expression=%1").arg(expression)
+                                    << QStringLiteral("interruptHint=%1").arg(event.value.value(QStringLiteral("interruptHint")).toString());
+
+        if (m_phase == ChatPhase::BUFFERING_FOR_START || m_phase == ChatPhase::GATED) {
+            m_pendingState = state;
+            m_pendingExpression = expression;
+            return;
+        }
+
+        if (m_phase == ChatPhase::STREAMING) {
+            m_pendingState = state;
+            m_pendingExpression = expression;
+            transitionTo(ChatPhase::GATED);
+            m_gateTimeout.start(kGateTimeoutMs);
+            if (m_runtime != nullptr) {
+                QPointer<ChatController> self(this);
+                m_runtime->requestBoundaryAndNotify([self]() {
+                    if (self != nullptr) {
+                        self->handleBoundaryReached();
+                    }
+                });
+            }
+            return;
+        }
+
+        requestPetExpression(state, expression, interruptHintFromValue(event.value));
     }
 }
 
@@ -368,32 +556,115 @@ void ChatController::appendMessage(const QVariantMap &message)
     emit messagesChanged();
 }
 
-void ChatController::appendAssistantDelta(const QString &delta)
+void ChatController::transitionTo(ChatPhase next)
 {
-    if (m_cancelled) {
+    if (m_phase == next) {
+        return;
+    }
+    m_phase = next;
+}
+
+void ChatController::handleCleanFinishReady()
+{
+    if (m_phase != ChatPhase::BUFFERING_FOR_START) {
         return;
     }
 
-    m_holdBuffer.append(delta);
-    flushHoldBuffer();
+    if (!m_pendingExpression.isEmpty()) {
+        requestPetExpression(m_pendingState, m_pendingExpression);
+        m_pendingExpression.clear();
+        m_pendingState.clear();
+    }
+    transitionTo(ChatPhase::STREAMING);
+    drainHoldBufferToPacer();
+
+    if (m_finishPendingAfterStart) {
+        m_finishPendingAfterStart = false;
+        if (m_runtime == nullptr) {
+            transitionTo(ChatPhase::IDLE);
+            m_assistantMessageIndex = -1;
+            return;
+        }
+
+        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+        QPointer<ChatController> self(this);
+        m_runtime->requestBoundaryAndNotify([self]() {
+            if (self != nullptr) {
+                self->handleBoundaryReached();
+            }
+        });
+    }
 }
 
-void ChatController::flushHoldBuffer()
+void ChatController::handleBoundaryReached()
 {
-    if (m_cancelled || m_holdBuffer.isEmpty()) {
+    m_gateTimeout.stop();
+    if (m_phase == ChatPhase::GATED) {
+        if (!m_pendingExpression.isEmpty()) {
+            requestPetExpression(m_pendingState, m_pendingExpression);
+            m_pendingExpression.clear();
+            m_pendingState.clear();
+        }
+        transitionTo(ChatPhase::STREAMING);
+        drainHoldBufferToPacer();
+        return;
+    }
+
+    if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
+        if (m_runtime != nullptr) {
+            m_runtime->returnToIdle();
+        }
+        transitionTo(ChatPhase::IDLE);
+    }
+}
+
+void ChatController::handleGateTimeout()
+{
+    if (m_phase != ChatPhase::GATED) {
+        return;
+    }
+
+    if (!m_pendingExpression.isEmpty()) {
+        requestPetExpression(m_pendingState, m_pendingExpression);
+        m_pendingExpression.clear();
+        m_pendingState.clear();
+    }
+    transitionTo(ChatPhase::STREAMING);
+    drainHoldBufferToPacer();
+}
+
+void ChatController::drainHoldBufferToPacer()
+{
+    if (m_holdBuffer.isEmpty()) {
+        return;
+    }
+
+    if (m_pacer != nullptr) {
+        m_pacer->append(m_holdBuffer, m_currentStreamId);
+    } else {
+        appendChunkToCurrentMessage(m_holdBuffer, m_currentStreamId);
+    }
+    m_holdBuffer.clear();
+}
+
+void ChatController::appendChunkToCurrentMessage(const QString &chunk, quint64 streamId)
+{
+    if (chunk.isEmpty() || streamId != m_currentStreamId) {
         return;
     }
 
     if (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size()) {
+        if (m_cancelled) {
+            return;
+        }
         appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
         m_assistantMessageIndex = m_messages.size() - 1;
     }
 
     QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
-    message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + m_holdBuffer);
-    message.insert(QStringLiteral("pending"), true);
+    message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + chunk);
+    message.insert(QStringLiteral("pending"), m_sending);
     m_messages[m_assistantMessageIndex] = message;
-    m_holdBuffer.clear();
     emit messagesChanged();
 }
 
@@ -465,7 +736,16 @@ QString ChatController::sidecarExecutablePath() const
 void ChatController::handleStreamBytes(const QByteArray &bytes)
 {
     const QList<ChatStreamEvent> events = m_parser.ingest(bytes);
+    qCDebug(chatLog).noquote() << "stream bytes received"
+                                << QStringLiteral("bytes=%1").arg(bytes.size())
+                                << QStringLiteral("events=%1").arg(events.size());
     for (const ChatStreamEvent &event : events) {
+        qCDebug(chatLog).noquote() << "stream event"
+                                    << QStringLiteral("type=%1").arg(event.type)
+                                    << QStringLiteral("name=%1").arg(event.name)
+                                    << QStringLiteral("state=%1").arg(event.value.value(QStringLiteral("state")).toString())
+                                    << QStringLiteral("expression=%1").arg(event.value.value(QStringLiteral("expression")).toString())
+                                    << QStringLiteral("deltaLen=%1").arg(event.delta.size());
         applyStreamEvent(event);
     }
 }
@@ -482,6 +762,7 @@ void ChatController::finishCurrentReply()
     m_assistantMessageIndex = -1;
     m_holdBuffer.clear();
     m_currentReply.clear();
+    m_finishPendingAfterStart = false;
     setSending(false);
     setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
 }
@@ -489,10 +770,25 @@ void ChatController::finishCurrentReply()
 void ChatController::failCurrentReply(const QString &message)
 {
     const QString text = message.trimmed().isEmpty() ? QStringLiteral("请求失败") : message.trimmed();
+    const bool hasBufferedText = !m_holdBuffer.isEmpty();
+
+    m_gateTimeout.stop();
+    m_pendingExpression.clear();
+    m_pendingState.clear();
+    m_finishPendingAfterStart = false;
+    if (hasBufferedText
+            && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
+        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
+        m_assistantMessageIndex = m_messages.size() - 1;
+    }
+    drainHoldBufferToPacer();
+    transitionTo(ChatPhase::IDLE);
 
     if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
         QVariantMap assistantMessage = m_messages.at(m_assistantMessageIndex).toMap();
-        assistantMessage.insert(QStringLiteral("text"), text);
+        if (assistantMessage.value(QStringLiteral("text")).toString().isEmpty() && !hasBufferedText) {
+            assistantMessage.insert(QStringLiteral("text"), text);
+        }
         assistantMessage.insert(QStringLiteral("pending"), false);
         assistantMessage.insert(QStringLiteral("error"), true);
         m_messages[m_assistantMessageIndex] = assistantMessage;
@@ -501,7 +797,6 @@ void ChatController::failCurrentReply(const QString &message)
         appendMessage(messageObject(QStringLiteral("assistant"), text, false, true));
     }
 
-    m_assistantMessageIndex = -1;
     m_currentReply.clear();
     setSending(false);
     setStatusText(QStringLiteral("错误"));

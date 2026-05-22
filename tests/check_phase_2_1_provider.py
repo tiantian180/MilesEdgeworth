@@ -60,6 +60,10 @@ def main() -> int:
 
     require("openai.NewProvider" in main_go, "main must construct openai provider when configured")
     require("mock-fallback" in main_go, "main must label provider as mock-fallback when config missing")
+    require("mileslog.New(\"MILES.SIDECAR\")" in main_go and "MILES_LOG_LEVEL" not in main_go,
+            "sidecar main must use mileslog instead of direct debug env handling")
+    require("mileslog.New(\"MILES.CHAT.PROVIDER\")" in openai_go and "expression tag parsed" in openai_go,
+            "openai provider must log expression parser diagnostics through mileslog")
 
     require("http.MaxBytesReader" in server_go, "server must enforce max request body size")
     require("const DefaultListenAddr" in server_go or "DefaultListenAddr =" in server_go,
@@ -71,7 +75,8 @@ def main() -> int:
     require("type ExpressionInfo struct" in provider_go, "ExpressionInfo struct must exist")
 
     require("m_holdBuffer" in controller_h, "ChatController must declare a hold buffer member")
-    require("flushHoldBuffer" in controller_h, "ChatController must declare flushHoldBuffer")
+    require("flushHoldBuffer" in controller_h or "drainHoldBufferToPacer" in controller_h,
+            "ChatController must declare a hold-buffer drain path")
     require("m_holdBuffer" in controller_cpp, "ChatController.cpp must use the hold buffer")
     require('"expressions"' in controller_cpp, "ChatController must include expressions field in request body")
 

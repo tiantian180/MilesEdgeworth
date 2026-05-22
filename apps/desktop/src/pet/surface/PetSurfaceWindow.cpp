@@ -7,6 +7,10 @@
 #include "pet/surface/PetContextMenu.h"
 #include "pet/surface/PropSurfaceWindow.h"
 
+#ifdef Q_OS_MACOS
+#include "platform/MacPetWindowBehavior.h"
+#endif
+
 #include <QContextMenuEvent>
 #include <QImage>
 #include <QLabel>
@@ -121,7 +125,8 @@ void PetSurfaceWindow::contextMenuEvent(QContextMenuEvent *event)
         return;
     }
 
-    showContextMenuAt(event->globalPos());
+    event->accept();
+    showContextMenuQueued(event->globalPos());
 }
 
 void PetSurfaceWindow::mousePressEvent(QMouseEvent *event)
@@ -132,7 +137,8 @@ void PetSurfaceWindow::mousePressEvent(QMouseEvent *event)
     }
 
     if (event->button() == Qt::RightButton) {
-        showContextMenuAt(event->globalPosition().toPoint());
+        event->accept();
+        showContextMenuQueued(event->globalPosition().toPoint());
         return;
     }
 
@@ -382,7 +388,27 @@ QRegion PetSurfaceWindow::regionFromCurrentFrame() const
 
 void PetSurfaceWindow::showContextMenuAt(const QPoint &globalPosition)
 {
+#ifdef Q_OS_MACOS
+    prepareMacPetWindowForContextMenu(windowHandle());
+#endif
     PetContextMenu::show(this, m_runtime, m_eventBridge, m_shellController, m_chatController, globalPosition);
+}
+
+void PetSurfaceWindow::showContextMenuQueued(const QPoint &globalPosition)
+{
+    m_pendingContextMenuPosition = globalPosition;
+    if (m_contextMenuPending) {
+        return;
+    }
+
+    m_contextMenuPending = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_contextMenuPending = false;
+        if (!m_runtime->pointerInteractionEnabled()) {
+            return;
+        }
+        showContextMenuAt(m_pendingContextMenuPosition);
+    });
 }
 
 void PetSurfaceWindow::playSoundFromRuntime()

@@ -15,6 +15,7 @@ import (
 
 	"milesedgeworth/agent-core/internal/chat"
 	"milesedgeworth/agent-core/internal/chat/expression"
+	"milesedgeworth/agent-core/internal/mileslog"
 )
 
 type Provider struct {
@@ -25,6 +26,8 @@ type Provider struct {
 	maxTokens   int
 	httpClient  *http.Client
 }
+
+var logger = mileslog.New("MILES.CHAT.PROVIDER")
 
 func NewProvider(baseURL, apiKey, model string, temperature float64, maxTokens int) *Provider {
 	return &Provider{
@@ -68,7 +71,9 @@ func BuildSystemPrompt(expressions []chat.ExpressionInfo) string {
 
 func buildSystemPrompt(expressions []chat.ExpressionInfo) string {
 	var sb strings.Builder
-	sb.WriteString("你是 Miles Edgeworth 桌宠助手。回复时在每段文字开头用 [EXPR:标签名] 标记当前表达。")
+	sb.WriteString("你是 Miles Edgeworth 桌宠助手。回复时在每段文字开头用 [EXPR:id] 标记当前表达。")
+	sb.WriteString("只能使用方括号中列出的 id 原文，不要翻译 id，也不要使用中文 label。")
+	sb.WriteString("例如使用 [EXPR:objection]，不要输出 [EXPR:异议]。")
 	sb.WriteString("情绪延续时不重复标记。回复的第一段文字必须有标记。\n\n")
 	if len(expressions) == 0 {
 		return sb.String()
@@ -130,6 +135,11 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 		close(events)
 		return events, err
 	}
+	logger.Debug("request prepared",
+		"model", p.model,
+		"endpoint", sanitizeEndpoint(p.baseURL),
+		"expressions", len(req.Expressions),
+		"messageLen", len([]rune(req.Message)))
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		p.baseURL, bytes.NewReader(encoded))
@@ -165,6 +175,7 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 	for _, e := range req.Expressions {
 		knownTags = append(knownTags, e.ID)
 	}
+	logger.Debug("stream started", "knownTags", strings.Join(knownTags, ","))
 
 	go p.pipe(ctx, resp, events, knownTags)
 	return events, nil
@@ -230,6 +241,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		func(text string) {
 			if !sawFirstSpeaking {
 				sawFirstSpeaking = true
+				logger.Debug("fallback expression inserted",
+					"expression", "neutral",
+					"textLen", len([]rune(text)))
 				send(ctx, events, chat.StreamEvent{
 					Type:  "CUSTOM",
 					Name:  "miles.pet.expression.requested",
@@ -237,6 +251,7 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 					Value: map[string]any{"state": "speaking", "expression": "neutral"},
 				})
 			}
+			logger.Debug("text chunk parsed", "len", len([]rune(text)))
 			send(ctx, events, chat.StreamEvent{
 				Type:      "TEXT_MESSAGE_CONTENT",
 				RunID:     runID,
@@ -246,6 +261,7 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		},
 		func(tag string) {
 			sawFirstSpeaking = true
+			logger.Debug("expression tag parsed", "tag", tag)
 			send(ctx, events, chat.StreamEvent{
 				Type:  "CUSTOM",
 				Name:  "miles.pet.expression.requested",
@@ -268,15 +284,24 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		}
 		var chunk chatCompletionStreamChunk
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			logger.Warn("malformed provider chunk skipped", "error", err)
+			if mileslog.PayloadLoggingEnabled() {
+				logger.Debug("malformed provider payload", "payload", payload)
+			}
 			continue
 		}
 		for _, choice := range chunk.Choices {
 			if choice.Delta.Content != "" {
+				logger.Debug("provider delta received", "len", len([]rune(choice.Delta.Content)))
+				if mileslog.PayloadLoggingEnabled() {
+					logger.Debug("provider delta payload", "text", choice.Delta.Content)
+				}
 				parser.Feed(choice.Delta.Content)
 			}
 		}
 	}
 	parser.Flush()
+	logger.Debug("stream finished")
 
 	send(ctx, events, chat.StreamEvent{
 		Type:      "TEXT_MESSAGE_END",

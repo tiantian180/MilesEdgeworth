@@ -14,6 +14,9 @@
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 
+#include <functional>
+
+class ChatTextPacer;
 class QNetworkReply;
 class PetRuntime;
 class SettingsService;
@@ -27,6 +30,14 @@ class ChatController : public QObject
     Q_PROPERTY(QVariantList messages READ messages NOTIFY messagesChanged)
 
 public:
+    enum class ChatPhase {
+        IDLE,
+        BUFFERING_FOR_START,
+        STREAMING,
+        GATED,
+        WAITING_FOR_ANIMATION_END,
+    };
+
     explicit ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent = nullptr);
     ~ChatController() override;
 
@@ -57,8 +68,12 @@ signals:
 private:
     QVariantMap messageObject(const QString &role, const QString &text, bool pending, bool error) const;
     void appendMessage(const QVariantMap &message);
-    void appendAssistantDelta(const QString &delta);
-    void flushHoldBuffer();
+    void transitionTo(ChatPhase next);
+    void handleCleanFinishReady();
+    void handleBoundaryReached();
+    void handleGateTimeout();
+    void drainHoldBufferToPacer();
+    void appendChunkToCurrentMessage(const QString &chunk, quint64 streamId);
     void setSidecarReady(bool ready);
     void setSending(bool sending);
     void setStatusText(const QString &statusText);
@@ -81,20 +96,28 @@ private:
     QPointer<QNetworkReply> m_currentReply;
     ChatStreamEventParser m_parser;
     QVariantList m_messages;
-    // Phase 2.1 plumbing: accumulate streamed deltas before pushing to m_messages.
-    // Phase 2.3 will gate this buffer on PetRuntime animation boundaries; for now
-    // every Feed flushes immediately, matching the previous direct-append behavior.
+    // Phase 2.3.1: while m_phase is BUFFERING_FOR_START or GATED, streamed
+    // text accumulates here. On transition to STREAMING, it drains into the
+    // pacer. See docs/v2/设计方案/AI 聊天动画编排设计.md §5.
     QString m_holdBuffer;
+    ChatPhase m_phase = ChatPhase::IDLE;
+    QString m_pendingState;
+    QString m_pendingExpression;
+    ChatTextPacer *m_pacer = nullptr;
+    QTimer m_gateTimeout;
+    static constexpr int kGateTimeoutMs = 800;
     bool m_sidecarReady = false;
     bool m_sending = false;
     bool m_sidecarRestartPending = false;
     bool m_sidecarStoppingForRestart = false;
     int m_sidecarRestartAttempts = 0;
+    bool m_finishPendingAfterStart = false;
     // 用户取消后，剩余 SSE chunks 必须被丢弃，否则会拼到新建的 assistant 消息里产生"幽灵回复"。
     // 每次 sendMessage 复位 false。
     bool m_cancelled = false;
     QString m_statusText = QStringLiteral("未连接");
     int m_assistantMessageIndex = -1;
+    quint64 m_currentStreamId = 1;
 };
 
 struct ChatControllerForeign

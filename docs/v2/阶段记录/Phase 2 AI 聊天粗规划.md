@@ -151,6 +151,10 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 ### Phase 2.3：会话历史与人设
 
+> 进行中。动画-文字同步部分（状态机 + 字符速率限制器 + PetRuntime 边界通知）已在 `阶段记录/Phase 2.3.1 动画-文字同步.md` 完成。剩余子阶段：
+> - **Phase 2.3.2**：完整 Miles persona + SQLite 会话历史 + 新建 / 清空对话 + 历史截断。
+> - **Phase 2.3.3**：Langfuse 可观测性接入（Phase 2.1 预留的 middleware hook 激活）。
+
 目标：让 Miles 有稳定人设和基础上下文，并完整落地动画-文字同步状态机。
 
 范围：

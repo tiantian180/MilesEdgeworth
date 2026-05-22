@@ -4,13 +4,26 @@
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/selection/ActionPoolSelector.h"
 
+#include <QLoggingCategory>
 #include <QRandomGenerator>
 #include <QSettings>
+#include <QTimer>
 #include <QtGlobal>
 #include <QVariantMap>
 
+#include <utility>
+
 namespace {
+Q_LOGGING_CATEGORY(petRuntimeLog, "miles.pet.runtime", QtInfoMsg)
+Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression", QtInfoMsg)
+
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
+constexpr int kBoundarySafetyMs = 1500;
+
+QString logBool(bool value)
+{
+    return value ? QStringLiteral("true") : QStringLiteral("false");
+}
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -209,6 +222,8 @@ void PetRuntime::playActionFromPool(const QString &poolId)
 void PetRuntime::submitActionRequest(const ActionRequest &request)
 {
     if (request.kind == ActionRequestKind::None) {
+        qCDebug(petRuntimeLog).noquote() << "ignore empty action request"
+                                          << QStringLiteral("hideCurrentProp=%1").arg(logBool(request.hideCurrentProp));
         if (request.hideCurrentProp) {
             executeActionRequest(request);
         }
@@ -216,6 +231,10 @@ void PetRuntime::submitActionRequest(const ActionRequest &request)
     }
 
     if (request.interruptHint == InterruptHint::AfterCurrent && shouldDeferActionRequest(request)) {
+        qCDebug(petRuntimeLog).noquote() << "defer action request"
+                                          << QStringLiteral("kind=%1").arg(static_cast<int>(request.kind))
+                                          << QStringLiteral("target=%1").arg(request.targetId)
+                                          << QStringLiteral("state=%1").arg(request.petState);
         m_pendingRequest = request;
         return;
     }
@@ -229,6 +248,11 @@ void PetRuntime::submitActionRequest(const ActionRequest &request)
 
 void PetRuntime::executeActionRequest(const ActionRequest &request)
 {
+    qCDebug(petRuntimeLog).noquote() << "execute action request"
+                                      << QStringLiteral("kind=%1").arg(static_cast<int>(request.kind))
+                                      << QStringLiteral("target=%1").arg(request.targetId)
+                                      << QStringLiteral("state=%1").arg(request.petState)
+                                      << QStringLiteral("interruptHint=%1").arg(static_cast<int>(request.interruptHint));
     if (request.hideCurrentProp) {
         hideCurrentProp();
     }
@@ -355,7 +379,23 @@ void PetRuntime::submitExpressionRequest(
         emit currentStateChanged();
     }
 
+    qCDebug(petExpressionLog).noquote() << "submit expression request"
+                                         << QStringLiteral("requestedState=%1").arg(requestedState)
+                                         << QStringLiteral("eventState=%1").arg(eventState)
+                                         << QStringLiteral("expression=%1").arg(expression)
+                                         << QStringLiteral("interruptHint=%1").arg(static_cast<int>(interruptHint))
+                                         << QStringLiteral("currentAction=%1").arg(m_currentActionId);
     submitRuntimeEvent(PetEvent::agentExpressionRequested(eventState, expression, randomValue, interruptHint));
+}
+
+void PetRuntime::requestBoundaryAndNotify(std::function<void()> callback)
+{
+    enqueueBoundaryNotification(std::move(callback));
+}
+
+void PetRuntime::requestCleanFinishAndNotify(std::function<void()> callback)
+{
+    enqueueBoundaryNotification(std::move(callback));
 }
 
 QVariantMap PetRuntime::consumeFrameMovementDelta() const
@@ -398,6 +438,10 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
         clearActiveRecipe();
     }
 
+    qCDebug(petRuntimeLog).noquote() << "play action"
+                                      << QStringLiteral("requested=%1").arg(actionId)
+                                      << QStringLiteral("resolved=%1").arg(nextActionId)
+                                      << QStringLiteral("resetRecipe=%1").arg(logBool(resetRecipe));
     setCurrentAction(nextActionId, m_manifest.actions.value(nextActionId));
 }
 
@@ -424,10 +468,15 @@ void PetRuntime::returnToIdle()
 
 void PetRuntime::handleAnimationFinished()
 {
+    const int finishingPlaybackSerial = m_playbackSerial;
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
     const PhaseDefinition phase = action.phases.value(m_currentPhaseId);
     if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
         playPhase(m_currentActionId, phase.nextPhase);
+        return;
+    }
+
+    if (drainPendingNotifications() && m_playbackSerial != finishingPlaybackSerial) {
         return;
     }
 
@@ -739,6 +788,9 @@ void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinitio
 
 void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase)
 {
+    const bool replacingActiveAnimation = !m_currentActionId.isEmpty()
+        && (m_currentActionId != actionId || m_currentPhaseId != phaseId);
+
     const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
     const bool wasSleeping = sleeping();
     const bool wasSleepTransitioning = sleepTransitioning();
@@ -760,6 +812,13 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     m_currentAutoReturnToIdle = nextAutoReturnToIdle;
     m_currentAnimationUrl = nextAnimationUrl;
     ++m_playbackSerial;
+    qCDebug(petRuntimeLog).noquote() << "set current phase"
+                                      << QStringLiteral("action=%1").arg(actionId)
+                                      << QStringLiteral("phase=%1").arg(nextPhaseId)
+                                      << QStringLiteral("loopMode=%1").arg(nextLoopMode)
+                                      << QStringLiteral("url=%1").arg(nextAnimationUrl.toString())
+                                      << QStringLiteral("serial=%1").arg(m_playbackSerial)
+                                      << QStringLiteral("replacing=%1").arg(logBool(replacingActiveAnimation));
 
     if (actionChanged) {
         emit currentActionChanged();
@@ -784,4 +843,101 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
         emit sleepStateChanged();
     }
     emit playbackSerialChanged();
+
+    if (replacingActiveAnimation) {
+        drainPendingNotifications();
+    }
+}
+
+bool PetRuntime::atAnimationBoundary() const
+{
+    if (m_currentActionId.isEmpty()) {
+        return true;
+    }
+
+    const QString idleAction = actionForState(QStringLiteral("idle"));
+    if (m_currentRecipeId.isEmpty()
+            && m_currentState == QStringLiteral("idle")
+            && !idleAction.isEmpty()
+            && m_currentActionId == idleAction) {
+        return true;
+    }
+
+    return m_currentLoopMode == QStringLiteral("hold")
+        || m_currentLoopMode == QStringLiteral("onceThenHold");
+}
+
+void PetRuntime::enqueueBoundaryNotification(std::function<void()> callback)
+{
+    if (!callback) {
+        return;
+    }
+
+    if (atAnimationBoundary()) {
+        callback();
+        return;
+    }
+
+    PendingNotification notification;
+    notification.id = ++m_nextPendingNotificationId;
+    notification.callback = std::move(callback);
+    notification.timer = new QTimer(this);
+    notification.timer->setSingleShot(true);
+
+    const quint64 notificationId = notification.id;
+    connect(notification.timer, &QTimer::timeout, this, [this, notificationId]() {
+        triggerPendingNotification(notificationId);
+    });
+
+    notification.timer->start(kBoundarySafetyMs);
+    m_pendingNotifications.append(std::move(notification));
+}
+
+bool PetRuntime::drainPendingNotifications()
+{
+    if (m_pendingNotifications.isEmpty()) {
+        return false;
+    }
+
+    QList<PendingNotification> notifications = std::move(m_pendingNotifications);
+    m_pendingNotifications.clear();
+
+    for (PendingNotification &notification : notifications) {
+        if (notification.timer != nullptr) {
+            notification.timer->stop();
+            notification.timer->deleteLater();
+            notification.timer = nullptr;
+        }
+    }
+
+    for (PendingNotification &notification : notifications) {
+        if (notification.callback) {
+            notification.callback();
+        }
+    }
+
+    return true;
+}
+
+bool PetRuntime::triggerPendingNotification(quint64 notificationId)
+{
+    for (qsizetype index = 0; index < m_pendingNotifications.size(); ++index) {
+        if (m_pendingNotifications.at(index).id != notificationId) {
+            continue;
+        }
+
+        PendingNotification notification = std::move(m_pendingNotifications[index]);
+        m_pendingNotifications.removeAt(index);
+        if (notification.timer != nullptr) {
+            notification.timer->stop();
+            notification.timer->deleteLater();
+            notification.timer = nullptr;
+        }
+        if (notification.callback) {
+            notification.callback();
+        }
+        return true;
+    }
+
+    return false;
 }

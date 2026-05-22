@@ -648,13 +648,58 @@ int main(int argc, char *argv[])
     runtime.setAudioLanguage("jp");
     runtime.submitExpressionRequest("speaking", "objection", 0.0);
     require(runtime.currentActionId() == "objecting", "speaking + objection 应映射到异议动作");
+    runtime.submitExpressionRequest("speaking", "neutral", 0.0);
+    require(runtime.currentActionId() == "crossed", "speaking + neutral 应映射到可见说话动作，而不是站立待机");
     runtime.submitExpressionRequest("idle", "polite", 0.0);
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
     runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
-    require(runtime.currentActionId() == "idle_stand", "未知 expression 应降级到 neutral 映射");
+    require(runtime.currentActionId() == "crossed", "未知 expression 应降级到 speaking neutral 的可见说话动作");
     runtime.playAction("bow");
     runtime.submitExpressionRequest("unknown-state", "neutral", 0.0);
-    require(runtime.currentActionId() == "idle_stand", "未知 expression state 应回退到当前 PetState");
+    require(runtime.currentActionId() == "crossed", "未知 expression state 应回退到当前 PetState 的 neutral 映射");
+
+    {
+        int boundaryCallbacks = 0;
+        runtime.playAction("bow");
+        runtime.requestBoundaryAndNotify([&boundaryCallbacks]() {
+            ++boundaryCallbacks;
+        });
+        require(boundaryCallbacks == 0, "requestBoundaryAndNotify 不应在动作边界前回调");
+        runtime.handleAnimationFinished();
+        require(boundaryCallbacks == 1, "requestBoundaryAndNotify 应在 handleAnimationFinished 自然边界回调");
+
+        int cleanFinishCallbacks = 0;
+        runtime.playAction("idle_thinking_once");
+        runtime.requestCleanFinishAndNotify([&cleanFinishCallbacks]() {
+            ++cleanFinishCallbacks;
+        });
+        require(cleanFinishCallbacks == 0, "requestCleanFinishAndNotify 不应在动作边界前回调");
+        runtime.handleAnimationFinished();
+        require(cleanFinishCallbacks == 1, "requestCleanFinishAndNotify 应在 handleAnimationFinished 自然边界回调");
+
+        runtime.setFacing("right");
+        runtime.playRecipe("turn.once");
+        int turnBoundaryCallbacks = 0;
+        runtime.requestBoundaryAndNotify([&turnBoundaryCallbacks]() {
+            ++turnBoundaryCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(turnBoundaryCallbacks == 1, "边界通知不应吞掉 handleAnimationFinished 的原有流程");
+        require(runtime.currentFacing() == "left", "边界通知后仍应应用转身动作的 facingAfter");
+        require(runtime.currentActionId() == "idle_stand", "边界通知后 onceThenIdle 动作仍应回到 idle_stand");
+
+        int replacedBoundaryCallbacks = 0;
+        runtime.playAction("bow");
+        runtime.requestBoundaryAndNotify([&replacedBoundaryCallbacks]() {
+            ++replacedBoundaryCallbacks;
+        });
+        runtime.returnToIdle();
+        require(replacedBoundaryCallbacks == 1,
+                "替换当前动画时应释放旧 boundary callback，避免悬挂到下一段动画");
+        runtime.handleAnimationFinished();
+        require(replacedBoundaryCallbacks == 1,
+                "旧 boundary callback 不应在后续无关动画结束时重复触发");
+    }
 
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");

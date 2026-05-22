@@ -36,7 +36,7 @@ void PetContextMenu::show(
     const QPoint &globalPosition
 )
 {
-    QMenu menu(parent);
+    QMenu menu;
 
     const QVariantList availablePetSizes = runtime->availablePetSizes();
     if (!availablePetSizes.isEmpty()) {

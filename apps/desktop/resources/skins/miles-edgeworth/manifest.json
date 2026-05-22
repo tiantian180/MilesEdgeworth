@@ -55,7 +55,8 @@
       "selection": "first_available",
       "actions": [
         { "action": "thinking", "allowedStates": ["thinking"] },
-        { "action": "idle_stand", "allowedStates": ["idle", "speaking", "error"] }
+        { "action": "crossed", "allowedStates": ["speaking"] },
+        { "action": "idle_stand", "allowedStates": ["idle", "error"] }
       ]
     },
     "objection": {

@@ -21,6 +21,10 @@
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
+#include <functional>
+
+class QTimer;
+
 // PetRuntime 是 v2 桌宠动画系统的执行入口。
 //
 // 它不再理解“单击”“双击”“红茶”这类事件语义；这些语义先进入
@@ -161,6 +165,8 @@ public:
         double randomValue,
         InterruptHint interruptHint
     );
+    void requestBoundaryAndNotify(std::function<void()> callback);
+    void requestCleanFinishAndNotify(std::function<void()> callback);
 
 signals:
     void currentStateChanged();
@@ -213,11 +219,22 @@ private:
     void playPhase(const QString &actionId, const QString &phaseId);
     void setCurrentAction(const QString &actionId, const ActionDefinition &action);
     void setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase);
+    bool atAnimationBoundary() const;
+    void enqueueBoundaryNotification(std::function<void()> callback);
+    bool drainPendingNotifications();
+    bool triggerPendingNotification(quint64 notificationId);
     void applyManifestState();
     bool activateSkin(const QString &skinId, bool persistSelection);
     bool loadSkinDescriptor(const SkinDescriptor &descriptor);
     SkinDescriptor descriptorForSkinId(const QString &skinId) const;
     void refreshAvailableSkins();
+
+    struct PendingNotification
+    {
+        quint64 id = 0;
+        std::function<void()> callback;
+        QTimer *timer = nullptr;
+    };
 
     SkinManifest m_manifest;
     QList<SkinDescriptor> m_availableSkinDescriptors;
@@ -239,6 +256,8 @@ private:
     PropController m_propController;
     int m_playbackSerial = 0;
     ActionRequest m_pendingRequest;
+    QList<PendingNotification> m_pendingNotifications;
+    quint64 m_nextPendingNotificationId = 0;
 };
 
 // 与 DesktopShellControllerForeign 一样，这个 wrapper 让 QML 看到一个名为

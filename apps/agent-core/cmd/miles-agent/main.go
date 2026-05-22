@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,22 +13,26 @@ import (
 	"milesedgeworth/agent-core/internal/chat"
 	"milesedgeworth/agent-core/internal/chat/config"
 	"milesedgeworth/agent-core/internal/chat/openai"
+	"milesedgeworth/agent-core/internal/mileslog"
 )
+
+var logger = mileslog.New("MILES.SIDECAR")
 
 func main() {
 	addr := flag.String("addr", api.DefaultListenAddr, "listen address")
 	flag.Parse()
 
 	cfg := config.FromEnv()
+
 	var provider chat.Provider
 	label := "mock-fallback"
 	if cfg.Enabled() {
 		provider = openai.NewProvider(cfg.BaseURL, cfg.APIKey, cfg.Model, cfg.Temperature, cfg.MaxTokens)
 		label = "openai-compatible"
-		log.Printf("provider: openai-compatible model=%s", cfg.Model)
+		logger.Info("provider selected", "provider", "openai-compatible", "model", cfg.Model)
 	} else {
 		provider = chat.NewMockProvider(35 * time.Millisecond)
-		log.Printf("provider: mock-fallback (set MILES_PROVIDER_BASE_URL, MILES_PROVIDER_API_KEY, MILES_PROVIDER_MODEL to use a real provider)")
+		logger.Info("provider selected", "provider", "mock-fallback")
 	}
 
 	server := &http.Server{
@@ -39,7 +42,7 @@ func main() {
 
 	errs := make(chan error, 1)
 	go func() {
-		log.Printf("miles-agent listening on %s", *addr)
+		logger.Info("server listening", "addr", *addr)
 		errs <- server.ListenAndServe()
 	}()
 
@@ -48,15 +51,17 @@ func main() {
 
 	select {
 	case sig := <-signals:
-		log.Printf("received %s, shutting down", sig)
+		logger.Info("shutdown requested", "signal", sig.String())
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := server.Shutdown(ctx); err != nil {
-			log.Fatalf("shutdown failed: %v", err)
+			logger.Error("shutdown failed", "error", err)
+			os.Exit(1)
 		}
 	case err := <-errs:
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server failed: %v", err)
+			logger.Error("server failed", "error", err)
+			os.Exit(1)
 		}
 	}
 }

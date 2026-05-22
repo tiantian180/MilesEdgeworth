@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 
 	"milesedgeworth/agent-core/internal/chat"
@@ -45,6 +46,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":       true,
+		"pid":      os.Getpid(),
 		"provider": s.providerLabel,
 		"service":  "miles-agent",
 	})

@@ -22,6 +22,10 @@ set(DESKTOP_SOURCES
     src/chat/ChatController.h
     src/chat/ChatStreamEvent.cpp
     src/chat/ChatStreamEvent.h
+    src/chat/ChatTextPacer.cpp
+    src/chat/ChatTextPacer.h
+    src/logging/MilesLogHandler.cpp
+    src/logging/MilesLogHandler.h
     src/main.cpp
     src/settings/SecretStore.cpp
     src/settings/SecretStore.h
@@ -156,6 +160,8 @@ if(TARGET MilesAgentCore)
 endif()
 
 if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+
     add_executable(ChatStreamEventParserSmoke
         tests/chat_stream_event_parser_smoke.cpp
         src/chat/ChatStreamEvent.cpp
@@ -173,6 +179,43 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME chat_stream_event_parser_smoke COMMAND ChatStreamEventParserSmoke)
+
+    add_executable(ChatTextPacerSmoke
+        tests/chat_text_pacer_smoke.cpp
+        src/chat/ChatTextPacer.cpp
+        src/chat/ChatTextPacer.h
+    )
+
+    target_include_directories(ChatTextPacerSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(ChatTextPacerSmoke
+        PRIVATE
+            Qt6::Core
+            Qt6::Test
+    )
+
+    add_test(NAME chat_text_pacer_smoke COMMAND ChatTextPacerSmoke)
+
+    add_executable(LoggingFormatterSmoke
+        tests/logging_formatter_smoke.cpp
+        src/logging/MilesLogHandler.cpp
+        src/logging/MilesLogHandler.h
+    )
+
+    target_include_directories(LoggingFormatterSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(LoggingFormatterSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    add_test(NAME logging_formatter_smoke COMMAND LoggingFormatterSmoke)
 
     add_executable(SkinManifestLoaderSmoke
         tests/skin_manifest_loader_smoke.cpp
@@ -257,6 +300,8 @@ if(BUILD_TESTING)
         src/chat/ChatController.h
         src/chat/ChatStreamEvent.cpp
         src/chat/ChatStreamEvent.h
+        src/chat/ChatTextPacer.cpp
+        src/chat/ChatTextPacer.h
         src/settings/SecretStore.cpp
         src/settings/SecretStore.h
         src/settings/SettingsService.cpp

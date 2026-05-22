@@ -585,5 +585,21 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_2_settings.py
         )
 
+        # Phase 2.3.1 的动画-文字同步检查：守住 ChatController 状态机、
+        # 字符速率限制器和 PetRuntime 的边界通知 API。
+        add_test(
+            NAME check_phase_2_3_1_animation_sync
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_3_1_animation_sync.py
+        )
+
+        # Logging standard check: keeps Qt + Go logging categories, env vars,
+        # payload safety, and sidecar stderr forwarding aligned with docs/v2/设计方案/日志规范设计.md.
+        add_test(
+            NAME check_logging_standard
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_logging_standard.py
+        )
+
     endif()
 endif()

@@ -18,6 +18,10 @@ void applyMacPetWindowBaseBehavior(QWindow *window);
 // “固定在屏幕最上层”的实验模式，不适合这个需要可随时取消的普通开关。
 void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop);
 
+// 右键菜单显示前调用：确保 accessory app 和跨 Space 桌宠窗口在当前
+// Space 成为可接收菜单的前台上下文。
+void prepareMacPetWindowForContextMenu(QWindow *window);
+
 // 聊天窗口是普通工作窗口，打开时应让应用显示在 Dock；关闭后恢复桌宠
 // 辅助应用模式，避免只剩桌宠本体时占用普通应用位置。
 void setMacApplicationDockVisible(bool visible);

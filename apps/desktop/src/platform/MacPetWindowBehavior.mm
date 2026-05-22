@@ -90,6 +90,17 @@ void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop)
     // 这样用户手滑点错时，桌宠仍停在原地，后续自然可以被其他窗口覆盖。
 }
 
+void prepareMacPetWindowForContextMenu(QWindow *window)
+{
+    NSWindow *nativeWindow = nativeWindowForQWindow(window);
+    if (nativeWindow == nil) {
+        return;
+    }
+
+    [nativeWindow orderFrontRegardless];
+    [NSApp activateIgnoringOtherApps:YES];
+}
+
 void setMacApplicationDockVisible(bool visible)
 {
     [NSApp setActivationPolicy:visible ? NSApplicationActivationPolicyRegular : NSApplicationActivationPolicyAccessory];
