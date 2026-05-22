@@ -313,8 +313,14 @@ func (s *Store) ReplaceSummary(conversationID string, upToMessageID int64, summa
 
 	if _, err := tx.Exec(`
 		DELETE FROM messages
-		WHERE conversation_id = ? AND id <= ?
-	`, conversationID, upToMessageID); err != nil {
+		WHERE conversation_id = ? AND role = ?
+	`, conversationID, RoleSummary); err != nil {
+		return fmt.Errorf("delete existing summaries: %w", err)
+	}
+	if _, err := tx.Exec(`
+		DELETE FROM messages
+		WHERE conversation_id = ? AND role != ? AND id <= ?
+	`, conversationID, RoleSummary, upToMessageID); err != nil {
 		return fmt.Errorf("delete old messages: %w", err)
 	}
 	if _, err := tx.Exec(`

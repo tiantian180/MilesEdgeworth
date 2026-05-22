@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -76,17 +77,28 @@ func (s *Service) BuildMessages(ctx context.Context, req BuildRequest) ([]chat.M
 	}
 
 	summary, err := s.summarize(ctx, req, summaries, eligible)
-	if err == nil {
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, nil, ctxErr
+		}
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, nil, err
+		}
+	} else if trimmedSummary := strings.TrimSpace(summary); trimmedSummary != "" {
 		upToMessageID := eligible[len(eligible)-1].ID
-		if err := s.store.ReplaceSummary(req.ConversationID, upToMessageID, summary); err != nil {
-			return nil, nil, err
+		remainingRows := rowsAfter(normalRows, upToMessageID)
+		candidate, _ := buildMessagesFromParts(req.PersonaPrompt, req.Expressions, []string{trimmedSummary}, remainingRows)
+		if withinBudget(candidate, s.contextLimit()) {
+			if err := s.store.ReplaceSummary(req.ConversationID, upToMessageID, trimmedSummary); err != nil {
+				return nil, nil, err
+			}
+			reloaded, err := s.store.GetMessages(req.ConversationID)
+			if err != nil {
+				return nil, nil, err
+			}
+			messages, knownExpressionIDs = buildMessagesFromRows(req.PersonaPrompt, req.Expressions, reloaded)
+			return messages, knownExpressionIDs, nil
 		}
-		reloaded, err := s.store.GetMessages(req.ConversationID)
-		if err != nil {
-			return nil, nil, err
-		}
-		messages, knownExpressionIDs = buildMessagesFromRows(req.PersonaPrompt, req.Expressions, reloaded)
-		return messages, knownExpressionIDs, nil
 	}
 
 	messages = fallbackTruncate(req.PersonaPrompt, req.Expressions, summaries, normalRows, s.contextLimit())
@@ -307,6 +319,16 @@ func removeMessageByID(rows []store.Message, id int64) []store.Message {
 	out := rows[:0]
 	for _, row := range rows {
 		if row.ID != id {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
+func rowsAfter(rows []store.Message, messageID int64) []store.Message {
+	out := make([]store.Message, 0, len(rows))
+	for _, row := range rows {
+		if row.ID > messageID {
 			out = append(out, row)
 		}
 	}

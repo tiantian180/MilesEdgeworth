@@ -152,6 +152,49 @@ func TestReplaceSummaryIsTransactional(t *testing.T) {
 	}
 }
 
+func TestReplaceSummaryDeletesExistingSummaryRows(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := s.AppendMessage(conv.ID, RoleUser, "第一段证言。", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReplaceSummary(conv.ID, first.ID, "旧摘要"); err != nil {
+		t.Fatal(err)
+	}
+	protected, err := s.AppendMessage(conv.ID, RoleUser, "保留的新消息。", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReplaceSummary(conv.ID, first.ID, "新摘要"); err != nil {
+		t.Fatal(err)
+	}
+
+	messages, err := s.GetMessages(conv.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var summaries []Message
+	var keptProtected bool
+	for _, msg := range messages {
+		if msg.Role == RoleSummary {
+			summaries = append(summaries, msg)
+		}
+		if msg.ID == protected.ID {
+			keptProtected = true
+		}
+	}
+	if len(summaries) != 1 || summaries[0].Content != "新摘要" {
+		t.Fatalf("summaries = %+v, want only new summary; messages=%+v", summaries, messages)
+	}
+	if !keptProtected {
+		t.Fatalf("protected message was deleted: %+v", messages)
+	}
+}
+
 func TestUserAndSummaryCannotBePartial(t *testing.T) {
 	s := openTestStore(t)
 	conv, err := s.CreateConversation("miles-edgeworth")

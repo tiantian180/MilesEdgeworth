@@ -16,10 +16,22 @@ type fakeProvider struct {
 	completeErr   error
 	completeCalls int
 	onComplete    func()
+	streamCalls   int
+	streamParams  chat.ChatParams
+	streamEvents  chan chat.StreamEvent
+	streamErr     error
 }
 
-func (p *fakeProvider) StreamChat(context.Context, chat.ChatParams) (<-chan chat.StreamEvent, error) {
-	panic("not used")
+func (p *fakeProvider) StreamChat(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+	_ = ctx
+	p.streamCalls++
+	p.streamParams = params
+	if p.streamEvents != nil || p.streamErr != nil {
+		return p.streamEvents, p.streamErr
+	}
+	events := make(chan chat.StreamEvent)
+	close(events)
+	return events, nil
 }
 
 func (p *fakeProvider) Complete(ctx context.Context, params chat.ChatParams) (string, error) {
@@ -265,7 +277,7 @@ func TestBuildMessagesUsesOnlyLatestSummaryAfterTwoSummaryCycles(t *testing.T) {
 	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("第一轮当前问题", 80))
 
 	provider := &fakeProvider{completeTexts: []string{"旧完整摘要", "新完整摘要"}}
-	service := newTestService(s, provider, 2000)
+	service := newTestService(s, provider, 6000)
 	if _, _, err := service.BuildMessages(context.Background(), BuildRequest{ConversationID: conv.ID}); err != nil {
 		t.Fatal(err)
 	}
@@ -287,8 +299,241 @@ func TestBuildMessagesUsesOnlyLatestSummaryAfterTwoSummaryCycles(t *testing.T) {
 	if strings.Contains(system, "旧完整摘要") {
 		t.Fatalf("system prompt included stale summary:\n%s", system)
 	}
+	stored, err := s.GetMessages(conv.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var summaries []store.Message
+	for _, msg := range stored {
+		if msg.Role == store.RoleSummary {
+			summaries = append(summaries, msg)
+		}
+	}
+	if len(summaries) != 1 || summaries[0].Content != "新完整摘要" {
+		t.Fatalf("stored summaries = %+v, want only latest summary", summaries)
+	}
 	if messages[len(messages)-1].Role != store.RoleUser || messages[len(messages)-1].Content != "第二轮当前问题。" {
 		t.Fatalf("current user not preserved: %+v", messages[len(messages)-1])
+	}
+}
+
+func TestBuildMessagesTreatsBlankSummaryAsFailure(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("旧", 700))
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "旧记录。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "最近问题。")
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "最近回答。")
+	currentUser := appendMessage(t, s, conv.ID, store.RoleUser, "当前问题。")
+
+	messages, _, err := newTestService(s, &fakeProvider{completeText: " \n\t "}, 2000).BuildMessages(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, msg := range messages {
+		if strings.Contains(msg.Content, strings.Repeat("旧", 20)) {
+			t.Fatalf("blank summary should fall back to truncation: %+v", messages)
+		}
+	}
+	if messages[len(messages)-1].Role != store.RoleUser || messages[len(messages)-1].Content != currentUser.Content {
+		t.Fatalf("current user not preserved: %+v", messages)
+	}
+	stored, err := s.GetMessages(conv.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, msg := range stored {
+		if msg.Role == store.RoleSummary {
+			t.Fatalf("blank summary was written to store: %+v", stored)
+		}
+	}
+}
+
+func TestBuildMessagesReturnsCancellationErrorWithoutFallback(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("旧", 700))
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "旧记录。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "最近问题。")
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "最近回答。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "当前问题。")
+
+	_, _, err = newTestService(s, &fakeProvider{completeErr: context.Canceled}, 2000).BuildMessages(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("BuildMessages error = %v, want context.Canceled", err)
+	}
+}
+
+func TestBuildMessagesReturnsContextErrorWhenCompleteFailsAfterContextDone(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("旧", 700))
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "旧记录。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "最近问题。")
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "最近回答。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "当前问题。")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	provider := &fakeProvider{
+		completeErr: errors.New("provider stopped"),
+		onComplete:  cancel,
+	}
+	_, _, err = newTestService(s, provider, 2000).BuildMessages(ctx, BuildRequest{
+		ConversationID: conv.ID,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("BuildMessages error = %v, want context.Canceled", err)
+	}
+}
+
+func TestBuildMessagesFallsBackWhenSummaryStillOverBudget(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("旧", 700))
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "旧记录。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "最近问题。")
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "最近回答。")
+	currentUser := appendMessage(t, s, conv.ID, store.RoleUser, "当前问题。")
+
+	messages, _, err := newTestService(s, &fakeProvider{completeText: strings.Repeat("超长摘要", 300)}, 2000).BuildMessages(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if messages[len(messages)-1].Role != store.RoleUser || messages[len(messages)-1].Content != currentUser.Content {
+		t.Fatalf("current user not preserved: %+v", messages)
+	}
+	stored, err := s.GetMessages(conv.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, msg := range stored {
+		if msg.Role == store.RoleSummary {
+			t.Fatalf("over-budget summary was written to store: %+v", stored)
+		}
+	}
+}
+
+func TestBuildMessagesStopsWhenSummarizingEmitReturnsFalse(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("旧", 700))
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "旧记录。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "最近问题。")
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "最近回答。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "当前问题。")
+
+	provider := &fakeProvider{completeText: "压缩后的记忆"}
+	_, _, err = newTestService(s, provider, 2000).BuildMessages(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		Emit: func(event chat.StreamEvent) bool {
+			if event.Name != SummarizingEventName {
+				t.Fatalf("event = %+v, want summarizing", event)
+			}
+			return false
+		},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("BuildMessages error = %v, want context.Canceled", err)
+	}
+	if provider.completeCalls != 0 {
+		t.Fatalf("completeCalls = %d, want 0", provider.completeCalls)
+	}
+}
+
+func TestStreamChatStopsWhenSummarizingEmitReturnsFalse(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, strings.Repeat("旧", 700))
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "旧记录。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "最近问题。")
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "最近回答。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "当前问题。")
+
+	provider := &fakeProvider{completeText: "压缩后的记忆"}
+	events, err := newTestService(s, provider, 2000).StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		Emit:           func(chat.StreamEvent) bool { return false },
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("StreamChat error = %v, want context.Canceled", err)
+	}
+	if events != nil {
+		t.Fatalf("events = %v, want nil", events)
+	}
+	if provider.completeCalls != 0 || provider.streamCalls != 0 {
+		t.Fatalf("provider calls = complete %d stream %d, want none", provider.completeCalls, provider.streamCalls)
+	}
+}
+
+func TestStreamChatForwardsBuiltParams(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "指出矛盾。")
+
+	provider := &fakeProvider{}
+	events, err := newTestService(s, provider, 8192).StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		PersonaPrompt:  "保持冷静。",
+		Expressions: []chat.ExpressionInfo{
+			{ID: "objection", Label: "强烈反驳"},
+			{ID: "thinking", Label: "思考"},
+		},
+		RunID:     "run-1",
+		MessageID: "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if events == nil {
+		t.Fatal("events = nil, want stream channel")
+	}
+	if provider.streamCalls != 1 {
+		t.Fatalf("streamCalls = %d, want 1", provider.streamCalls)
+	}
+	params := provider.streamParams
+	if params.RunID != "run-1" || params.MessageID != "msg-1" {
+		t.Fatalf("ids = (%q, %q), want forwarded ids", params.RunID, params.MessageID)
+	}
+	if len(params.KnownExpressionIDs) != 2 || params.KnownExpressionIDs[0] != "objection" || params.KnownExpressionIDs[1] != "thinking" {
+		t.Fatalf("KnownExpressionIDs = %+v", params.KnownExpressionIDs)
+	}
+	if len(params.Messages) != 2 {
+		t.Fatalf("messages = %+v, want system and user", params.Messages)
+	}
+	if params.Messages[0].Role != "system" || !strings.Contains(params.Messages[0].Content, "保持冷静。") {
+		t.Fatalf("system message = %+v", params.Messages[0])
+	}
+	if params.Messages[1].Role != store.RoleUser || params.Messages[1].Content != "指出矛盾。" {
+		t.Fatalf("user message = %+v", params.Messages[1])
 	}
 }
 
