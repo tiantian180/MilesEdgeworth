@@ -648,13 +648,15 @@ int main(int argc, char *argv[])
     runtime.setAudioLanguage("jp");
     runtime.submitExpressionRequest("speaking", "objection", 0.0);
     require(runtime.currentActionId() == "objecting", "speaking + objection 应映射到异议动作");
+    runtime.submitExpressionRequest("speaking", "neutral", 0.0);
+    require(runtime.currentActionId() == "crossed", "speaking + neutral 应映射到可见说话动作，而不是站立待机");
     runtime.submitExpressionRequest("idle", "polite", 0.0);
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
     runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
-    require(runtime.currentActionId() == "idle_stand", "未知 expression 应降级到 neutral 映射");
+    require(runtime.currentActionId() == "crossed", "未知 expression 应降级到 speaking neutral 的可见说话动作");
     runtime.playAction("bow");
     runtime.submitExpressionRequest("unknown-state", "neutral", 0.0);
-    require(runtime.currentActionId() == "idle_stand", "未知 expression state 应回退到当前 PetState");
+    require(runtime.currentActionId() == "crossed", "未知 expression state 应回退到当前 PetState 的 neutral 映射");
 
     {
         int boundaryCallbacks = 0;

@@ -31,6 +31,7 @@ def main() -> int:
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     runtime_smoke = read("apps/desktop/tests/pet_runtime_smoke.cpp")
+    manifest = read("apps/desktop/resources/skins/miles-edgeworth/manifest.json")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     root_cmake = read("CMakeLists.txt")
     stage_doc = read("docs/v2/阶段记录/Phase 2.3.1 动画-文字同步.md")
@@ -71,6 +72,10 @@ def main() -> int:
             "ChatController must call requestCleanFinishAndNotify on PetRuntime")
     require("chat expression requested" in controller_cpp and "qInfo" in controller_cpp,
             "ChatController should log parsed expression events for provider-vs-runtime diagnosis")
+    require('"action": "crossed", "allowedStates": ["speaking"]' in manifest,
+            "Miles manifest should map speaking neutral fallback to a visible speaking action")
+    require('"action": "idle_stand", "allowedStates": ["idle", "error"]' in manifest,
+            "Miles manifest should not map speaking neutral fallback to idle_stand")
 
     # PetRuntime API
     require("requestBoundaryAndNotify" in runtime_h,
