@@ -14,3 +14,6 @@ CMakeUserPresets.json
 
 # Local brainstorming / visual companion artifacts
 .superpowers/
+
+# Local debug log files
+miles-debug*.log
