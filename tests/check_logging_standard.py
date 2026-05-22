@@ -113,6 +113,12 @@ def main() -> int:
             "Pet expression debug logs should use noquote formatting")
     require("\"message=\" << trimmed" not in chat_cpp and "\"text=\" << event.delta" not in chat_cpp,
             "ChatController must not log user or model text payloads")
+    require(".arg(env.contains(" not in chat_cpp and ".arg(healthy)" not in chat_cpp,
+            "ChatController boolean log fields should render true/false text")
+    require(".arg(request.hideCurrentProp)" not in runtime_cpp
+            and ".arg(resetRecipe)" not in runtime_cpp
+            and ".arg(replacingActiveAnimation)" not in runtime_cpp,
+            "PetRuntime boolean log fields should render true/false text")
 
     print("logging standard contract ok")
     return 0

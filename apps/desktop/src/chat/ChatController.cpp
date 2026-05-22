@@ -36,6 +36,11 @@ InterruptHint interruptHintFromValue(const QVariantMap &value)
     return InterruptHint::Immediate;
 }
 
+QString logBool(bool value)
+{
+    return value ? QStringLiteral("true") : QStringLiteral("false");
+}
+
 } // namespace
 
 ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, QObject *parent)
@@ -173,12 +178,12 @@ void ChatController::launchSidecarProcess()
     m_sidecarProcess.setProcessEnvironment(env);
     qCDebug(chatLog).noquote() << "launch sidecar"
                                << QStringLiteral("path=%1").arg(executablePath)
-                               << QStringLiteral("baseUrlSet=%1").arg(env.contains(QStringLiteral("MILES_PROVIDER_BASE_URL")))
-                               << QStringLiteral("apiKeySet=%1").arg(env.contains(QStringLiteral("MILES_PROVIDER_API_KEY")))
+                               << QStringLiteral("baseUrlSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_PROVIDER_BASE_URL"))))
+                               << QStringLiteral("apiKeySet=%1").arg(logBool(env.contains(QStringLiteral("MILES_PROVIDER_API_KEY"))))
                                << QStringLiteral("model=%1").arg(env.value(QStringLiteral("MILES_PROVIDER_MODEL")))
                                << QStringLiteral("logLevel=%1").arg(env.value(QStringLiteral("MILES_LOG_LEVEL"), QStringLiteral("info")))
-                               << QStringLiteral("logFileSet=%1").arg(env.contains(QStringLiteral("MILES_LOG_FILE")))
-                               << QStringLiteral("payloads=%1").arg(env.value(QStringLiteral("MILES_LOG_PAYLOADS")) == QStringLiteral("1"));
+                               << QStringLiteral("logFileSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_LOG_FILE"))))
+                               << QStringLiteral("payloads=%1").arg(logBool(env.value(QStringLiteral("MILES_LOG_PAYLOADS")) == QStringLiteral("1")));
     setStatusText(QStringLiteral("启动中"));
     if (m_sidecarRestartPending) {
         ++m_sidecarRestartAttempts;
@@ -236,7 +241,7 @@ void ChatController::checkHealth()
             && ownedPid > 0
             && healthPid == ownedPid;
         qCDebug(chatLog).noquote() << "sidecar health"
-                                    << QStringLiteral("healthy=%1").arg(healthy)
+                                    << QStringLiteral("healthy=%1").arg(logBool(healthy))
                                     << QStringLiteral("pid=%1").arg(healthPid)
                                     << QStringLiteral("ownedPid=%1").arg(ownedPid)
                                     << QStringLiteral("provider=%1").arg(health.value(QStringLiteral("provider")).toString())

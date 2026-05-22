@@ -19,6 +19,11 @@ Q_LOGGING_CATEGORY(petExpressionLog, "miles.pet.expression", QtInfoMsg)
 
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
 constexpr int kBoundarySafetyMs = 1500;
+
+QString logBool(bool value)
+{
+    return value ? QStringLiteral("true") : QStringLiteral("false");
+}
 } // namespace
 
 PetRuntime::PetRuntime(QObject *parent)
@@ -218,7 +223,7 @@ void PetRuntime::submitActionRequest(const ActionRequest &request)
 {
     if (request.kind == ActionRequestKind::None) {
         qCDebug(petRuntimeLog).noquote() << "ignore empty action request"
-                                          << QStringLiteral("hideCurrentProp=%1").arg(request.hideCurrentProp);
+                                          << QStringLiteral("hideCurrentProp=%1").arg(logBool(request.hideCurrentProp));
         if (request.hideCurrentProp) {
             executeActionRequest(request);
         }
@@ -436,7 +441,7 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
     qCDebug(petRuntimeLog).noquote() << "play action"
                                       << QStringLiteral("requested=%1").arg(actionId)
                                       << QStringLiteral("resolved=%1").arg(nextActionId)
-                                      << QStringLiteral("resetRecipe=%1").arg(resetRecipe);
+                                      << QStringLiteral("resetRecipe=%1").arg(logBool(resetRecipe));
     setCurrentAction(nextActionId, m_manifest.actions.value(nextActionId));
 }
 
@@ -813,7 +818,7 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
                                       << QStringLiteral("loopMode=%1").arg(nextLoopMode)
                                       << QStringLiteral("url=%1").arg(nextAnimationUrl.toString())
                                       << QStringLiteral("serial=%1").arg(m_playbackSerial)
-                                      << QStringLiteral("replacing=%1").arg(replacingActiveAnimation);
+                                      << QStringLiteral("replacing=%1").arg(logBool(replacingActiveAnimation));
 
     if (actionChanged) {
         emit currentActionChanged();
