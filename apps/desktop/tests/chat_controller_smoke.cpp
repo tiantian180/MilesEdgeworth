@@ -226,5 +226,75 @@ int main(int argc, char *argv[])
         // Full pacer drain timing is covered by ChatTextPacerSmoke.
     }
 
+    // --- Phase 2.3.1: mid-stream expression switch (STREAMING -> GATED -> STREAMING) ---
+    {
+        PetRuntime gRuntime;
+        for (int i = 0; i < 5 && gRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            gRuntime.handleAnimationFinished();
+        }
+        require(gRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "mid-stream gate test should start from idle runtime state");
+
+        ChatController gController(&gRuntime, &settings);
+
+        ChatStreamEvent gStarted;
+        gStarted.type = QStringLiteral("RUN_STARTED");
+        gController.applyStreamEvent(gStarted);
+
+        ChatStreamEvent gExpr1;
+        gExpr1.type = QStringLiteral("CUSTOM");
+        gExpr1.name = QStringLiteral("miles.pet.expression.requested");
+        gExpr1.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        gExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        gController.applyStreamEvent(gExpr1);
+        require(gRuntime.currentState() == QStringLiteral("speaking"),
+                "initial expression should apply after the synchronous clean finish boundary");
+
+        ChatStreamEvent gStart;
+        gStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        gStart.role = QStringLiteral("assistant");
+        gController.applyStreamEvent(gStart);
+
+        ChatStreamEvent gText1;
+        gText1.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        gText1.delta = QStringLiteral("片段1");
+        gController.applyStreamEvent(gText1);
+        require(waitFor([&gController]() {
+                    return gController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("片段1");
+                }),
+                "STREAMING text should drain through the pacer before the mid-run gate");
+
+        ChatStreamEvent gExpr2;
+        gExpr2.type = QStringLiteral("CUSTOM");
+        gExpr2.name = QStringLiteral("miles.pet.expression.requested");
+        gExpr2.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        gExpr2.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+        gController.applyStreamEvent(gExpr2);
+
+        ChatStreamEvent gText2;
+        gText2.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        gText2.delta = QStringLiteral("片段2");
+        gController.applyStreamEvent(gText2);
+
+        const QString preBoundaryText = gController.messages().constLast()
+                .toMap().value(QStringLiteral("text")).toString();
+        require(preBoundaryText == QStringLiteral("片段1"),
+                "GATED text should stay buffered before the animation boundary");
+        require(gRuntime.currentState() == QStringLiteral("speaking"),
+                "mid-run expression should not apply before the animation boundary");
+
+        gRuntime.handleAnimationFinished();
+        require(gRuntime.currentState() == QStringLiteral("thinking"),
+                "boundary callback should request the queued thinking expression");
+        require(gRuntime.currentActionId() == QStringLiteral("thinking"),
+                "queued thinking expression should switch to the thinking action at the boundary");
+        require(waitFor([&gController]() {
+                    return gController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("片段1片段2");
+                }),
+                "GATED text should drain through the pacer after the boundary callback");
+    }
+
     return 0;
 }
