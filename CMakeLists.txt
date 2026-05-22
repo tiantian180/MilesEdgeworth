@@ -593,5 +593,13 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_3_1_animation_sync.py
         )
 
+        # Logging standard check: keeps Qt + Go logging categories, env vars,
+        # payload safety, and sidecar stderr forwarding aligned with docs/v2/设计方案/日志规范设计.md.
+        add_test(
+            NAME check_logging_standard
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_logging_standard.py
+        )
+
     endif()
 endif()
