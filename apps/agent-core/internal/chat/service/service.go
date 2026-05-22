@@ -212,11 +212,14 @@ func buildExpressionRules(expressions []chat.ExpressionInfo) string {
 		if id == "" {
 			continue
 		}
-		label := strings.TrimSpace(expression.Label)
-		if label == "" {
+		description := strings.TrimSpace(expression.Description)
+		if description == "" {
+			description = strings.TrimSpace(expression.Label)
+		}
+		if description == "" {
 			items = append(items, "- "+id)
 		} else {
-			items = append(items, fmt.Sprintf("- %s：%s", id, label))
+			items = append(items, fmt.Sprintf("- %s：%s", id, description))
 		}
 	}
 	if len(items) > 0 {

@@ -329,6 +329,15 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 			}
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		logger.Warn("provider stream read failed", "error", err)
+		send(ctx, events, chat.StreamEvent{
+			Type:  "RUN_ERROR",
+			RunID: runID,
+			Error: "provider stream read failed: " + err.Error(),
+		})
+		return
+	}
 	parser.Flush()
 	logger.Debug("stream finished")
 

@@ -601,15 +601,27 @@ void ChatController::sendMessageInConversation(const QString &trimmed)
         }
     });
     connect(reply, &QNetworkReply::finished, this, [this, reply, requestId]() {
-        if (reply != m_currentReply || requestId != m_chatRequestId) {
+        const bool activeReply = reply == m_currentReply && requestId == m_chatRequestId;
+        const bool completedReply = m_completedChatRequestIds.contains(requestId);
+        if (!activeReply && !completedReply) {
             reply->deleteLater();
             return;
         }
 
         const QNetworkReply::NetworkError error = reply->error();
         const QString errorString = reply->errorString();
-        m_currentReply.clear();
+        if (activeReply) {
+            m_currentReply.clear();
+        }
+        if (completedReply) {
+            m_completedChatRequestIds.remove(requestId);
+        }
         reply->deleteLater();
+
+        if (completedReply && !activeReply) {
+            loadConversations();
+            return;
+        }
 
         if (m_cancelled) {
             return;
@@ -633,6 +645,7 @@ void ChatController::cancelCurrentReply()
     }
 
     m_cancelled = true;
+    ++m_asyncGeneration;
     abortPendingConversationCreate();
     m_gateTimeout.stop();
     m_pendingExpression.clear();
@@ -664,6 +677,9 @@ void ChatController::cancelCurrentReply()
     if (m_runtime != nullptr) {
         m_runtime->returnToIdle();
     }
+    if (!m_currentConversationId.isEmpty()) {
+        loadConversations();
+    }
 }
 
 void ChatController::applyStreamEvent(const ChatStreamEvent &event)
@@ -674,6 +690,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
 
     if (event.type == QStringLiteral("RUN_STARTED")) {
         ++m_currentStreamId;
+        ++m_asyncGeneration;
         if (m_pacer != nullptr) {
             m_pacer->discardBeforeStream(m_currentStreamId);
         }
@@ -688,16 +705,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         m_pendingState.clear();
         m_finishPendingAfterStart = false;
         transitionTo(ChatPhase::BUFFERING_FOR_START);
-        if (m_runtime != nullptr) {
-            QPointer<ChatController> self(this);
-            m_runtime->requestCleanFinishAndNotify([self]() {
-                if (self != nullptr) {
-                    self->handleCleanFinishReady();
-                }
-            });
-        } else {
-            handleCleanFinishReady();
-        }
+        requestCleanFinishForCurrentStream();
         return;
     }
 
@@ -741,6 +749,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("RUN_FINISHED")) {
+        m_completedChatRequestIds.insert(m_chatRequestId);
         if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
             QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
             message.insert(QStringLiteral("pending"), false);
@@ -770,12 +779,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         }
 
         transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
-        QPointer<ChatController> self(this);
-        m_runtime->requestBoundaryAndNotify([self]() {
-            if (self != nullptr) {
-                self->handleBoundaryReached();
-            }
-        });
+        requestBoundaryForCurrentStream();
         return;
     }
 
@@ -810,12 +814,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
             transitionTo(ChatPhase::GATED);
             m_gateTimeout.start(kGateTimeoutMs);
             if (m_runtime != nullptr) {
-                QPointer<ChatController> self(this);
-                m_runtime->requestBoundaryAndNotify([self]() {
-                    if (self != nullptr) {
-                        self->handleBoundaryReached();
-                    }
-                });
+                requestBoundaryForCurrentStream();
             }
             return;
         }
@@ -871,17 +870,61 @@ void ChatController::handleCleanFinishReady()
         }
 
         transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
-        QPointer<ChatController> self(this);
-        m_runtime->requestBoundaryAndNotify([self]() {
-            if (self != nullptr) {
-                self->handleBoundaryReached();
-            }
-        });
+        requestBoundaryForCurrentStream();
     }
+}
+
+void ChatController::requestCleanFinishForCurrentStream()
+{
+    if (m_runtime == nullptr) {
+        handleCleanFinishReady();
+        return;
+    }
+
+    const quint64 streamId = m_currentStreamId;
+    const quint64 generation = m_asyncGeneration;
+    QPointer<ChatController> self(this);
+    m_runtime->requestCleanFinishAndNotify([self, streamId, generation]() {
+        if (self != nullptr && self->runtimeCallbackStillCurrent(streamId, generation)) {
+            self->handleCleanFinishReady();
+        }
+    });
+}
+
+void ChatController::requestBoundaryForCurrentStream()
+{
+    if (m_runtime == nullptr) {
+        handleBoundaryReached();
+        return;
+    }
+
+    const quint64 streamId = m_currentStreamId;
+    const quint64 generation = m_asyncGeneration;
+    const quint64 boundaryId = ++m_boundaryRequestId;
+    QPointer<ChatController> self(this);
+    m_runtime->requestBoundaryAndNotify([self, streamId, generation, boundaryId]() {
+        if (self != nullptr && self->boundaryCallbackStillCurrent(streamId, generation, boundaryId)) {
+            self->handleBoundaryReached();
+        }
+    });
+}
+
+bool ChatController::runtimeCallbackStillCurrent(quint64 streamId, quint64 generation) const
+{
+    return streamId == m_currentStreamId
+        && generation == m_asyncGeneration
+        && !m_cancelled;
+}
+
+bool ChatController::boundaryCallbackStillCurrent(quint64 streamId, quint64 generation, quint64 boundaryId) const
+{
+    return runtimeCallbackStillCurrent(streamId, generation)
+        && boundaryId == m_boundaryRequestId;
 }
 
 void ChatController::handleBoundaryReached()
 {
+    ++m_boundaryRequestId;
     m_gateTimeout.stop();
     if (m_phase == ChatPhase::GATED) {
         if (!m_pendingExpression.isEmpty()) {
@@ -908,6 +951,7 @@ void ChatController::handleGateTimeout()
         return;
     }
 
+    ++m_boundaryRequestId;
     if (!m_pendingExpression.isEmpty()) {
         requestPetExpression(m_pendingState, m_pendingExpression);
         m_pendingExpression.clear();
@@ -1116,6 +1160,9 @@ void ChatController::finishCurrentReply()
     m_finishPendingAfterStart = false;
     setSending(false);
     setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+    if (!m_currentConversationId.isEmpty()) {
+        loadConversations();
+    }
 }
 
 void ChatController::failCurrentReply(const QString &message)
@@ -1123,6 +1170,7 @@ void ChatController::failCurrentReply(const QString &message)
     const QString text = message.trimmed().isEmpty() ? QStringLiteral("请求失败") : message.trimmed();
     const bool hasBufferedText = !m_holdBuffer.isEmpty();
 
+    ++m_asyncGeneration;
     m_gateTimeout.stop();
     m_pendingExpression.clear();
     m_pendingState.clear();
@@ -1152,6 +1200,9 @@ void ChatController::failCurrentReply(const QString &message)
     setSending(false);
     setStatusText(QStringLiteral("错误"));
     requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"));
+    if (!m_currentConversationId.isEmpty()) {
+        loadConversations();
+    }
 }
 
 void ChatController::abortPendingConversationCreate()
@@ -1168,6 +1219,7 @@ void ChatController::abortPendingConversationCreate()
 void ChatController::isolateConversationAsyncState()
 {
     m_cancelled = true;
+    ++m_asyncGeneration;
     ++m_chatRequestId;
     ++m_listRequestId;
     ++m_messageLoadRequestId;
@@ -1183,6 +1235,9 @@ void ChatController::isolateConversationAsyncState()
     ++m_currentStreamId;
     if (m_pacer != nullptr) {
         m_pacer->discardBeforeStream(m_currentStreamId);
+    }
+    if (m_runtime != nullptr) {
+        m_runtime->returnToIdle();
     }
 
     if (m_currentReply) {

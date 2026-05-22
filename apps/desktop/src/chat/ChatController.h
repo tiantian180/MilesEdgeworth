@@ -10,6 +10,7 @@
 #include <QPointer>
 #include <QProcess>
 #include <QQmlEngine>
+#include <QSet>
 #include <QTimer>
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
@@ -86,6 +87,10 @@ private:
     void transitionTo(ChatPhase next);
     void handleCleanFinishReady();
     void handleBoundaryReached();
+    void requestCleanFinishForCurrentStream();
+    void requestBoundaryForCurrentStream();
+    bool runtimeCallbackStillCurrent(quint64 streamId, quint64 generation) const;
+    bool boundaryCallbackStillCurrent(quint64 streamId, quint64 generation, quint64 boundaryId) const;
     void handleGateTimeout();
     void drainHoldBufferToPacer();
     void appendChunkToCurrentMessage(const QString &chunk, quint64 streamId);
@@ -146,10 +151,13 @@ private:
     QString m_conversationSkinHint;
     int m_assistantMessageIndex = -1;
     quint64 m_currentStreamId = 1;
+    quint64 m_asyncGeneration = 1;
+    quint64 m_boundaryRequestId = 1;
     quint64 m_chatRequestId = 0;
     quint64 m_pendingCreateRequestId = 0;
     quint64 m_listRequestId = 0;
     quint64 m_messageLoadRequestId = 0;
+    QSet<quint64> m_completedChatRequestIds;
     bool m_conversationSkinMismatch = false;
 };
 

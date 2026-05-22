@@ -133,6 +133,63 @@ func TestBuildMessagesPutsPersonaBeforeExpressionRules(t *testing.T) {
 	}
 }
 
+func TestBuildMessagesExpressionRulesPreferDescription(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "指出矛盾。")
+
+	messages, _, err := newTestService(s, &fakeProvider{}, 8192).BuildMessages(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		Expressions: []chat.ExpressionInfo{
+			{ID: "objection", Label: "强烈反驳", Description: "发现证词矛盾时使用"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	system := messages[0].Content
+	if !strings.Contains(system, "- objection：发现证词矛盾时使用") {
+		t.Fatalf("system prompt should use description for expression rule:\n%s", system)
+	}
+	if strings.Contains(system, "- objection：强烈反驳") {
+		t.Fatalf("system prompt should prefer description over label:\n%s", system)
+	}
+}
+
+func TestBuildMessagesExpressionRulesFallBackToLabel(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "指出矛盾。")
+
+	messages, _, err := newTestService(s, &fakeProvider{}, 8192).BuildMessages(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		Expressions: []chat.ExpressionInfo{
+			{ID: "thinking", Label: "思考"},
+			{ID: "neutral"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	system := messages[0].Content
+	for _, want := range []string{
+		"- thinking：思考",
+		"- neutral",
+	} {
+		if !strings.Contains(system, want) {
+			t.Fatalf("system prompt missing %q:\n%s", want, system)
+		}
+	}
+}
+
 func TestBuildMessagesInjectsSummaryIntoSystemPrompt(t *testing.T) {
 	s := openTestStore(t)
 	conv, err := s.CreateConversation("miles-edgeworth")

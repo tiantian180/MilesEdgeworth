@@ -289,6 +289,47 @@ func TestStreamChatSkipsMalformedChunks(t *testing.T) {
 	}
 }
 
+func TestStreamChatReadErrorBecomesRunError(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Content-Length", "4096")
+		w.WriteHeader(http.StatusOK)
+		flusher := w.(http.Flusher)
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")
+		flusher.Flush()
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "any", 0.7, 128)
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		Messages: []chat.Message{{Role: "user", Content: "hi"}},
+	})
+	if err != nil {
+		t.Fatalf("StreamChat: %v", err)
+	}
+
+	var got []chat.StreamEvent
+	for e := range events {
+		got = append(got, e)
+	}
+
+	hasRunError := false
+	for _, e := range got {
+		switch e.Type {
+		case "RUN_ERROR":
+			hasRunError = true
+			if e.Error == "" {
+				t.Fatalf("RUN_ERROR missing diagnostic: %+v", got)
+			}
+		case "TEXT_MESSAGE_END", "RUN_FINISHED":
+			t.Fatalf("read error must not emit %s: %+v", e.Type, got)
+		}
+	}
+	if !hasRunError {
+		t.Fatalf("missing RUN_ERROR after stream read error: %+v", got)
+	}
+}
+
 func TestPayloadLoggingFlagDoesNotAffectStreamEvents(t *testing.T) {
 	t.Setenv("MILES_LOG_PAYLOADS", "1")
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

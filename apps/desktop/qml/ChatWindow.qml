@@ -16,6 +16,8 @@ ApplicationWindow {
     color: "#f7f4ef"
 
     property bool conversationPanelOpen: false
+    property string pendingDeleteConversationId: ""
+    property string pendingDeleteConversationTitle: ""
 
     onVisibleChanged: App.DesktopShell.setChatWindowDockVisible(visible)
 
@@ -276,7 +278,11 @@ ApplicationWindow {
                                     color: deleteConversationButton.down ? "#d8d1c8" : "#f7f4ef"
                                     border.color: "#d8d1c8"
                                 }
-                                onClicked: App.ChatController.deleteConversation(modelData.id)
+                                onClicked: {
+                                    chatWindow.pendingDeleteConversationId = modelData.id
+                                    chatWindow.pendingDeleteConversationTitle = titleText
+                                    deleteConversationDialog.open()
+                                }
                             }
                         }
                     }
@@ -473,6 +479,37 @@ ApplicationWindow {
 
                 onClicked: chatLayout.submitInput()
             }
+        }
+    }
+
+    Dialog {
+        id: deleteConversationDialog
+
+        modal: true
+        anchors.centerIn: parent
+        title: "删除会话"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+
+        contentItem: Label {
+            width: 260
+            text: chatWindow.pendingDeleteConversationTitle.length > 0
+                    ? "确定删除「" + chatWindow.pendingDeleteConversationTitle + "」？"
+                    : "确定删除这个会话？"
+            color: "#26201b"
+            wrapMode: Text.WordWrap
+        }
+
+        onAccepted: {
+            if (chatWindow.pendingDeleteConversationId.length > 0) {
+                App.ChatController.deleteConversation(chatWindow.pendingDeleteConversationId)
+            }
+            chatWindow.pendingDeleteConversationId = ""
+            chatWindow.pendingDeleteConversationTitle = ""
+        }
+
+        onRejected: {
+            chatWindow.pendingDeleteConversationId = ""
+            chatWindow.pendingDeleteConversationTitle = ""
         }
     }
 }
