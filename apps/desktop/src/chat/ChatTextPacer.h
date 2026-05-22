@@ -14,6 +14,7 @@ public:
     explicit ChatTextPacer(QObject *parent = nullptr);
 
     void append(const QString &text, quint64 streamId = 0);
+    void discardBeforeStream(quint64 streamId);
 
     int msPerChar() const { return m_msPerChar; }
     void setMsPerChar(int value);
@@ -31,6 +32,7 @@ private:
 
     void tick();
     int effectiveInterval() const;
+    void stopIfEmpty();
     bool isEmpty() const;
     qsizetype queuedCharCount() const;
 

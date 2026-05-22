@@ -40,6 +40,16 @@ void ChatTextPacer::setMsPerChar(int value)
     }
 }
 
+void ChatTextPacer::discardBeforeStream(quint64 streamId)
+{
+    for (qsizetype i = m_queue.size() - 1; i >= 0; --i) {
+        if (m_queue.at(i).streamId < streamId) {
+            m_queue.removeAt(i);
+        }
+    }
+    stopIfEmpty();
+}
+
 int ChatTextPacer::effectiveInterval() const
 {
     if (queuedCharCount() > kMaxBacklog) {
@@ -82,6 +92,13 @@ void ChatTextPacer::tick()
     const int next = effectiveInterval();
     if (m_timer.interval() != next) {
         m_timer.start(next);
+    }
+}
+
+void ChatTextPacer::stopIfEmpty()
+{
+    if (isEmpty()) {
+        m_timer.stop();
     }
 }
 

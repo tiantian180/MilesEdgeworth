@@ -587,6 +587,20 @@ int main(int argc, char *argv[])
         const auto messages = sController.messages();
         require(!messages.constLast().toMap().value(QStringLiteral("text")).toString().contains(QStringLiteral("旧")),
                 "sendMessage should invalidate stale pacer chunks before sidecar RUN_STARTED arrives");
+
+        ChatStreamEvent nextStarted;
+        nextStarted.type = QStringLiteral("RUN_STARTED");
+        sController.applyStreamEvent(nextStarted);
+        sRuntime.handleAnimationFinished();
+        ChatStreamEvent nextText;
+        nextText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        nextText.delta = QStringLiteral("新");
+        sController.applyStreamEvent(nextText);
+        require(waitFor([&sController]() {
+                    return sController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString().contains(QStringLiteral("新"));
+                }, 500),
+                "new reply text should not wait for stale pacer chunks to drain");
     }
 
     return 0;

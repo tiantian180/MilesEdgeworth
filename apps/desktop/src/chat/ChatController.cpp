@@ -209,6 +209,9 @@ void ChatController::sendMessage(const QString &message)
     }
 
     ++m_currentStreamId;
+    if (m_pacer != nullptr) {
+        m_pacer->discardBeforeStream(m_currentStreamId);
+    }
     m_cancelled = false;
     appendMessage(messageObject(QStringLiteral("user"), trimmed, false, false));
     appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
@@ -333,6 +336,9 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
 
     if (event.type == QStringLiteral("RUN_STARTED")) {
         ++m_currentStreamId;
+        if (m_pacer != nullptr) {
+            m_pacer->discardBeforeStream(m_currentStreamId);
+        }
         const bool wasSending = m_sending;
         if (!wasSending) {
             m_assistantMessageIndex = -1;
