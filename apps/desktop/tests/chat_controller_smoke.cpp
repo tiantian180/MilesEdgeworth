@@ -5,7 +5,11 @@
 #include "settings/SettingsService.h"
 
 #include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QThread>
 
+#include <functional>
 #include <stdexcept>
 
 namespace {
@@ -14,6 +18,21 @@ void require(bool condition, const char *message)
     if (!condition) {
         throw std::runtime_error(message);
     }
+}
+
+bool waitFor(const std::function<bool()> &predicate, int timeoutMs = 1500)
+{
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < timeoutMs) {
+        if (predicate()) {
+            return true;
+        }
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        QThread::msleep(5);
+    }
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    return predicate();
 }
 } // namespace
 
@@ -26,6 +45,7 @@ int main(int argc, char *argv[])
     settings.setModel(QStringLiteral("miles-test-model"));
     settings.setTemperature(0.2);
     settings.setMaxTokens(128);
+    settings.setMsPerChar(40);
 
     PetRuntime runtime;
     ChatController controller(&runtime, &settings);
@@ -42,6 +62,7 @@ int main(int argc, char *argv[])
     thinkingEvent.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
     thinkingEvent.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
     controller.applyStreamEvent(thinkingEvent);
+    runtime.handleAnimationFinished();
     require(runtime.currentState() == QStringLiteral("thinking"), "custom thinking event should update runtime state");
     require(runtime.currentActionId() == QStringLiteral("thinking"), "thinking neutral should play thinking action");
 
@@ -57,8 +78,11 @@ int main(int argc, char *argv[])
     messageContent.messageId = QStringLiteral("assistant-1");
     messageContent.delta = QStringLiteral("异议");
     controller.applyStreamEvent(messageContent);
-    require(controller.messages().constFirst().toMap().value("text").toString() == QStringLiteral("异议"),
-            "content delta should append to assistant message");
+    require(waitFor([&controller]() {
+                return controller.messages().constFirst().toMap().value("text").toString()
+                    == QStringLiteral("异议");
+            }),
+            "content delta should append to assistant message through the pacer");
 
     ChatStreamEvent expressionEvent;
     expressionEvent.type = QStringLiteral("CUSTOM");
@@ -66,6 +90,10 @@ int main(int argc, char *argv[])
     expressionEvent.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
     expressionEvent.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
     controller.applyStreamEvent(expressionEvent);
+    require(waitFor([&runtime]() {
+                return runtime.currentState() == QStringLiteral("speaking");
+            }),
+            "custom expression event should update runtime state after the gate opens");
     require(runtime.currentState() == QStringLiteral("speaking"), "custom expression event should update runtime state");
     require(runtime.currentActionId() == QStringLiteral("objecting")
                 || runtime.currentActionId() == QStringLiteral("crossed"),
@@ -115,9 +143,10 @@ int main(int argc, char *argv[])
     require(controller.messages().size() == messagesBeforeCancel,
             "stream content after cancel must not append a new assistant message");
 
-    // Hold buffer round-trip: feed a delta while the controller is in its default
-    // "immediate flush" mode (Phase 2.1 plumbing -- full GATED logic lands in 2.3).
+    // Hold buffer round-trip: feed deltas while the controller is waiting for
+    // cleanFinishReady, then let the pacer drain after the animation boundary.
     PetRuntime hbRuntime;
+    hbRuntime.setState(QStringLiteral("speaking"));
     ChatController hbController(&hbRuntime, &settings);
 
     ChatStreamEvent hbStarted;
@@ -135,14 +164,67 @@ int main(int argc, char *argv[])
     hbController.applyStreamEvent(hbContent);
 
     require(hbController.messages().constFirst().toMap().value("text").toString()
-                == QStringLiteral("片段一"),
-            "hold buffer should flush content immediately in phase 2.1");
+                .isEmpty(),
+            "hold buffer should not flush content before cleanFinishReady");
+    hbRuntime.handleAnimationFinished();
+    require(waitFor([&hbController]() {
+                return hbController.messages().constFirst().toMap().value("text").toString()
+                    == QStringLiteral("片段一");
+            }),
+            "hold buffer should drain through the pacer after cleanFinishReady");
 
     hbContent.delta = QStringLiteral("片段二");
     hbController.applyStreamEvent(hbContent);
-    require(hbController.messages().constFirst().toMap().value("text").toString()
-                == QStringLiteral("片段一片段二"),
-            "subsequent deltas should append through the hold buffer");
+    require(waitFor([&hbController]() {
+                return hbController.messages().constFirst().toMap().value("text").toString()
+                    == QStringLiteral("片段一片段二");
+            }),
+            "subsequent deltas should append through the pacer");
+
+    // --- Phase 2.3.1: BUFFERING_FOR_START holds text until cleanFinishReady ---
+    {
+        PetRuntime smRuntime;
+        smRuntime.setState(QStringLiteral("speaking")); // simulate non-idle baseline
+        ChatController smController(&smRuntime, &settings);
+
+        ChatStreamEvent smStarted;
+        smStarted.type = QStringLiteral("RUN_STARTED");
+        smController.applyStreamEvent(smStarted);
+        // BUFFERING_FOR_START: text must be queued, not emitted to UI yet.
+
+        ChatStreamEvent smExpr;
+        smExpr.type = QStringLiteral("CUSTOM");
+        smExpr.name = QStringLiteral("miles.pet.expression.requested");
+        smExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        smExpr.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        smController.applyStreamEvent(smExpr);
+
+        ChatStreamEvent smStart;
+        smStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        smStart.role = QStringLiteral("assistant");
+        smController.applyStreamEvent(smStart);
+
+        ChatStreamEvent smText;
+        smText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        smText.delta = QStringLiteral("异议!");
+        smController.applyStreamEvent(smText);
+
+        const auto messagesWhileBuffering = smController.messages();
+        const QString textWhileBuffering = messagesWhileBuffering.constLast()
+                .toMap().value(QStringLiteral("text")).toString();
+        require(textWhileBuffering.isEmpty(),
+                "BUFFERING_FOR_START must NOT push streamed text to the UI yet");
+
+        // Simulate PetRuntime reaching a clean finish on the previous animation.
+        smRuntime.handleAnimationFinished();
+        require(waitFor([&smController]() {
+                    const auto messages = smController.messages();
+                    return !messages.isEmpty()
+                        && messages.constLast().toMap().value(QStringLiteral("text")).toString().startsWith(QStringLiteral("异"));
+                }),
+                "cleanFinishReady should let buffered text start draining through the pacer");
+        // Full pacer drain timing is covered by ChatTextPacerSmoke.
+    }
 
     return 0;
 }

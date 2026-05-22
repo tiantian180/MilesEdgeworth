@@ -1,5 +1,6 @@
 #include "chat/ChatController.h"
 
+#include "chat/ChatTextPacer.h"
 #include "pet/PetRuntime.h"
 #include "settings/SettingsService.h"
 
@@ -65,6 +66,17 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
                 m_sidecarRestartAttempts = 0;
                 setStatusText(QStringLiteral("未连接"));
             });
+
+    m_pacer = new ChatTextPacer(this);
+    connect(m_pacer, &ChatTextPacer::chunkReady,
+            this, &ChatController::appendChunkToCurrentMessage);
+    if (m_settings != nullptr) {
+        m_pacer->setMsPerChar(m_settings->msPerChar());
+    }
+
+    m_gateTimeout.setSingleShot(true);
+    connect(&m_gateTimeout, &QTimer::timeout,
+            this, &ChatController::handleGateTimeout);
 }
 
 ChatController::~ChatController()
@@ -169,6 +181,9 @@ void ChatController::restartSidecar()
 void ChatController::handleSettingsSaved()
 {
     restartSidecar();
+    if (m_settings != nullptr && m_pacer != nullptr) {
+        m_pacer->setMsPerChar(m_settings->msPerChar());
+    }
 }
 
 void ChatController::checkHealth()
@@ -307,6 +322,20 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     if (event.type == QStringLiteral("RUN_STARTED")) {
         setSending(true);
         setStatusText(QStringLiteral("正在回复"));
+        m_holdBuffer.clear();
+        m_pendingExpression.clear();
+        m_pendingState.clear();
+        transitionTo(ChatPhase::BUFFERING_FOR_START);
+        if (m_runtime != nullptr) {
+            QPointer<ChatController> self(this);
+            m_runtime->requestCleanFinishAndNotify([self]() {
+                if (self != nullptr) {
+                    self->handleCleanFinishReady();
+                }
+            });
+        } else {
+            handleCleanFinishReady();
+        }
         return;
     }
 
@@ -321,7 +350,16 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("TEXT_MESSAGE_CONTENT")) {
-        appendAssistantDelta(event.delta);
+        if (m_phase == ChatPhase::STREAMING) {
+            if (m_pacer != nullptr) {
+                m_pacer->append(event.delta);
+            } else {
+                m_holdBuffer.append(event.delta);
+                flushHoldBuffer();
+            }
+        } else {
+            m_holdBuffer.append(event.delta);
+        }
         return;
     }
 
@@ -346,9 +384,32 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kExpressionRequestedEvent)) {
-        requestPetExpression(event.value.value(QStringLiteral("state")).toString(),
-                             event.value.value(QStringLiteral("expression")).toString(),
-                             interruptHintFromValue(event.value));
+        const QString state = event.value.value(QStringLiteral("state")).toString();
+        const QString expression = event.value.value(QStringLiteral("expression")).toString();
+
+        if (m_phase == ChatPhase::BUFFERING_FOR_START || m_phase == ChatPhase::GATED) {
+            m_pendingState = state;
+            m_pendingExpression = expression;
+            return;
+        }
+
+        if (m_phase == ChatPhase::STREAMING) {
+            m_pendingState = state;
+            m_pendingExpression = expression;
+            transitionTo(ChatPhase::GATED);
+            m_gateTimeout.start(kGateTimeoutMs);
+            if (m_runtime != nullptr) {
+                QPointer<ChatController> self(this);
+                m_runtime->requestBoundaryAndNotify([self]() {
+                    if (self != nullptr) {
+                        self->handleBoundaryReached();
+                    }
+                });
+            }
+            return;
+        }
+
+        requestPetExpression(state, expression, interruptHintFromValue(event.value));
     }
 }
 
@@ -394,6 +455,94 @@ void ChatController::flushHoldBuffer()
     message.insert(QStringLiteral("pending"), true);
     m_messages[m_assistantMessageIndex] = message;
     m_holdBuffer.clear();
+    emit messagesChanged();
+}
+
+void ChatController::transitionTo(ChatPhase next)
+{
+    if (m_phase == next) {
+        return;
+    }
+    m_phase = next;
+}
+
+void ChatController::handleCleanFinishReady()
+{
+    if (m_phase != ChatPhase::BUFFERING_FOR_START) {
+        return;
+    }
+
+    if (!m_pendingExpression.isEmpty()) {
+        requestPetExpression(m_pendingState, m_pendingExpression);
+        m_pendingExpression.clear();
+        m_pendingState.clear();
+    }
+    transitionTo(ChatPhase::STREAMING);
+    drainHoldBufferToPacer();
+}
+
+void ChatController::handleBoundaryReached()
+{
+    m_gateTimeout.stop();
+    if (m_phase == ChatPhase::GATED) {
+        if (!m_pendingExpression.isEmpty()) {
+            requestPetExpression(m_pendingState, m_pendingExpression);
+            m_pendingExpression.clear();
+            m_pendingState.clear();
+        }
+        transitionTo(ChatPhase::STREAMING);
+        drainHoldBufferToPacer();
+        return;
+    }
+
+    if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
+        if (m_runtime != nullptr) {
+            m_runtime->returnToIdle();
+        }
+        transitionTo(ChatPhase::IDLE);
+    }
+}
+
+void ChatController::handleGateTimeout()
+{
+    if (m_phase != ChatPhase::GATED) {
+        return;
+    }
+
+    if (!m_pendingExpression.isEmpty()) {
+        requestPetExpression(m_pendingState, m_pendingExpression);
+        m_pendingExpression.clear();
+        m_pendingState.clear();
+    }
+    transitionTo(ChatPhase::STREAMING);
+    drainHoldBufferToPacer();
+}
+
+void ChatController::drainHoldBufferToPacer()
+{
+    if (m_holdBuffer.isEmpty() || m_pacer == nullptr) {
+        return;
+    }
+
+    m_pacer->append(m_holdBuffer);
+    m_holdBuffer.clear();
+}
+
+void ChatController::appendChunkToCurrentMessage(const QString &chunk)
+{
+    if (m_cancelled || chunk.isEmpty()) {
+        return;
+    }
+
+    if (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size()) {
+        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
+        m_assistantMessageIndex = m_messages.size() - 1;
+    }
+
+    QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
+    message.insert(QStringLiteral("text"), message.value(QStringLiteral("text")).toString() + chunk);
+    message.insert(QStringLiteral("pending"), true);
+    m_messages[m_assistantMessageIndex] = message;
     emit messagesChanged();
 }
 

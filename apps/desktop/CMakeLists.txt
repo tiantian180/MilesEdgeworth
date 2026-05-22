@@ -280,6 +280,8 @@ if(BUILD_TESTING)
         src/chat/ChatController.h
         src/chat/ChatStreamEvent.cpp
         src/chat/ChatStreamEvent.h
+        src/chat/ChatTextPacer.cpp
+        src/chat/ChatTextPacer.h
         src/settings/SecretStore.cpp
         src/settings/SecretStore.h
         src/settings/SettingsService.cpp
