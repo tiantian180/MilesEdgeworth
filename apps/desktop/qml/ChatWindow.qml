@@ -93,13 +93,17 @@ ApplicationWindow {
                 color: "#26201b"
                 font.pixelSize: 18
                 font.weight: Font.DemiBold
+                elide: Text.ElideRight
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
             }
 
             Label {
                 text: App.ChatController.statusText
                 color: App.ChatController.sidecarReady ? "#386641" : "#8a4b38"
                 font.pixelSize: 12
+                elide: Text.ElideRight
+                Layout.maximumWidth: 112
             }
 
             Button {
@@ -336,7 +340,9 @@ ApplicationWindow {
                                 readonly property bool isUser: modelData.role === "user"
                                 readonly property string bodyText: modelData.text.length > 0 ? modelData.text : "…"
 
-                                width: Math.min(parent.width * 0.82, Math.max(44, messageMetrics.width + 24))
+                                width: Math.min(parent.width * 0.82,
+                                                Math.max(44, messageMetrics.width + 24,
+                                                         partial ? partialMetrics.width + 16 : 0))
                                 implicitHeight: messageText.contentHeight + (partialLabel.visible ? partialLabel.implicitHeight + 4 : 0) + 16
                                 height: implicitHeight
                                 anchors.right: isUser ? parent.right : undefined
@@ -350,6 +356,13 @@ ApplicationWindow {
 
                                     text: bubble.bodyText
                                     font: messageText.font
+                                }
+
+                                TextMetrics {
+                                    id: partialMetrics
+
+                                    text: "已截断"
+                                    font: partialLabel.font
                                 }
 
                                 TextEdit {
