@@ -27,6 +27,8 @@ set(DESKTOP_SOURCES
     src/logging/MilesLogHandler.cpp
     src/logging/MilesLogHandler.h
     src/main.cpp
+    src/settings/ProviderConfigFile.cpp
+    src/settings/ProviderConfigFile.h
     src/settings/SecretStore.cpp
     src/settings/SecretStore.h
     src/settings/SettingsController.cpp
@@ -439,6 +441,8 @@ if(BUILD_TESTING)
         src/settings/SettingsLogging.h
         src/settings/SettingsService.cpp
         src/settings/SettingsService.h
+        src/settings/ProviderConfigFile.cpp
+        src/settings/ProviderConfigFile.h
         src/settings/SecretStore.cpp
         src/settings/SecretStore.h
         resources/pet_assets.qrc

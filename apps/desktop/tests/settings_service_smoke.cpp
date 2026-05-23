@@ -1,3 +1,4 @@
+#include "settings/ProviderConfigFile.h"
 #include "settings/SecretStore.h"
 #include "settings/SettingsController.h"
 #include "settings/SettingsService.h"
@@ -6,6 +7,9 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -94,6 +98,109 @@ int main(int argc, char *argv[])
     QTemporaryDir tmp;
     assert(tmp.isValid());
     setupQSettingsScope(tmp);
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("providers.json"));
+        ProviderConfigFile file(path);
+        assert(file.load() == ProviderConfigFile::LoadStatus::FileNotFound);
+        assert(file.configNames().isEmpty());
+
+        ProviderConfigFile::ModelConfig cfg;
+        cfg.name = QStringLiteral("deepseek");
+        cfg.baseUrl = QStringLiteral("https://api.deepseek.com");
+        cfg.apiKey = QStringLiteral("sk-test");
+        cfg.model = QStringLiteral("deepseek-chat");
+        cfg.temperature = 0.7;
+        cfg.maxTokens = std::nullopt;
+        assert(file.setConfig(cfg.name, cfg));
+        file.setActiveModelConfig(cfg.name);
+        file.setMsPerChar(60);
+        assert(file.save());
+
+        ProviderConfigFile reopened(path);
+        assert(reopened.load() == ProviderConfigFile::LoadStatus::Ok);
+        assert(reopened.activeModelConfig() == QStringLiteral("deepseek"));
+        assert(reopened.config(QStringLiteral("deepseek")).apiKey == QStringLiteral("sk-test"));
+        assert(reopened.config(QStringLiteral("deepseek")).temperature.has_value());
+        assert(!reopened.config(QStringLiteral("deepseek")).maxTokens.has_value());
+        assert(reopened.msPerChar() == 60);
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("providers-invalid.json"));
+        assert(writeFile(path, QStringLiteral("{not-json")));
+        ProviderConfigFile file(path);
+        assert(file.load() == ProviderConfigFile::LoadStatus::ParseError);
+        assert(QFile::exists(path + QStringLiteral(".bak")));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("providers-extra.json"));
+        assert(writeFile(path, QStringLiteral(R"JSON(
+{
+  "rootUnknown": "keep-root",
+  "activeModelConfig": "deepseek",
+  "msPerChar": 90,
+  "modelConfigs": [
+    {
+      "name": "deepseek",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKey": "sk-test",
+      "model": "deepseek-chat",
+      "temperature": 0.7,
+      "providerUnknown": "keep-provider"
+    }
+  ]
+}
+)JSON")));
+
+        ProviderConfigFile file(path);
+        assert(file.load() == ProviderConfigFile::LoadStatus::Ok);
+        auto cfg = file.config(QStringLiteral("deepseek"));
+        assert(cfg.extraFields.value(QStringLiteral("providerUnknown")).toString() == QStringLiteral("keep-provider"));
+        cfg.model = QStringLiteral("deepseek-reasoner");
+        assert(file.setConfig(cfg.name, cfg));
+        assert(file.save());
+
+        QFile saved(path);
+        assert(saved.open(QIODevice::ReadOnly));
+        const auto doc = QJsonDocument::fromJson(saved.readAll());
+        const auto root = doc.object();
+        assert(root.value(QStringLiteral("rootUnknown")).toString() == QStringLiteral("keep-root"));
+        const auto configs = root.value(QStringLiteral("modelConfigs")).toArray();
+        assert(configs.size() == 1);
+        const auto savedCfg = configs.at(0).toObject();
+        assert(savedCfg.value(QStringLiteral("providerUnknown")).toString() == QStringLiteral("keep-provider"));
+        assert(savedCfg.value(QStringLiteral("model")).toString() == QStringLiteral("deepseek-reasoner"));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("providers-delete.json"));
+        ProviderConfigFile file(path);
+        ProviderConfigFile::ModelConfig first;
+        first.name = QStringLiteral("first");
+        first.baseUrl = QStringLiteral("https://first.example.com");
+        first.apiKey = QStringLiteral("sk-first");
+        first.model = QStringLiteral("first-model");
+        ProviderConfigFile::ModelConfig second = first;
+        second.name = QStringLiteral("second");
+        second.baseUrl = QStringLiteral("https://second.example.com");
+        second.apiKey = QStringLiteral("sk-second");
+        second.model = QStringLiteral("second-model");
+        assert(file.setConfig(first.name, first));
+        assert(file.setConfig(second.name, second));
+        file.setActiveModelConfig(second.name);
+        file.removeConfig(second.name);
+        assert(file.activeModelConfig() == first.name);
+
+        ProviderConfigFile::ModelConfig emptyName = first;
+        emptyName.name.clear();
+        assert(!file.setConfig(QString(), emptyName));
+
+        ProviderConfigFile::ModelConfig duplicate = first;
+        duplicate.name = first.name;
+        assert(!file.setConfig(QStringLiteral("other"), duplicate));
+    }
 
     {
         InMemorySecretStore store;
