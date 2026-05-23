@@ -44,6 +44,28 @@ func TestParserMarkerAtStart(t *testing.T) {
 	}
 }
 
+func TestParserDropsWhitespaceAfterMarker(t *testing.T) {
+	cap := &capture{}
+	p := newParser(cap, []string{"objection", "polite", "neutral"})
+	p.Feed("[EXPR:objection]\n\n异议！")
+	p.Flush()
+	if got := cap.string(); got != "E(objection)T(异议！)" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestParserDropsWhitespaceAfterMarkerAcrossChunks(t *testing.T) {
+	cap := &capture{}
+	p := newParser(cap, []string{"objection", "polite", "neutral"})
+	p.Feed("[EXPR:objection]")
+	p.Feed("\n")
+	p.Feed("\n异议！")
+	p.Flush()
+	if got := cap.string(); got != "E(objection)T(异议！)" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestParserMarkerInMiddle(t *testing.T) {
 	cap := &capture{}
 	p := newParser(cap, []string{"objection", "polite", "neutral"})

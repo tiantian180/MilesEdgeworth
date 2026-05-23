@@ -2,7 +2,10 @@
 // Markers have the form [EXPR:tag_name]. Unknown tags are downgraded to FallbackTag.
 package expression
 
-import "strings"
+import (
+	"strings"
+	"unicode"
+)
 
 const (
 	markerOpen  = "[EXPR:"
@@ -17,8 +20,9 @@ type Parser struct {
 	OnText       func(string)
 	OnExpression func(string)
 
-	known  map[string]bool
-	buffer string
+	known                     map[string]bool
+	buffer                    string
+	dropWhitespaceAfterMarker bool
 }
 
 // NewParser creates a streaming marker parser with the standard callback shape.
@@ -63,6 +67,20 @@ func (p *Parser) Flush() {
 
 // consume tries to emit one event. Returns true if it made progress.
 func (p *Parser) consume() bool {
+	if p.dropWhitespaceAfterMarker {
+		if p.buffer == "" {
+			return false
+		}
+		trimmed := strings.TrimLeftFunc(p.buffer, unicode.IsSpace)
+		if len(trimmed) != len(p.buffer) {
+			p.buffer = trimmed
+			if p.buffer == "" {
+				return false
+			}
+		}
+		p.dropWhitespaceAfterMarker = false
+	}
+
 	idx := strings.Index(p.buffer, markerOpen)
 	if idx == -1 {
 		// No marker possible; emit safe prefix, hold ambiguous tail.
@@ -103,6 +121,7 @@ func (p *Parser) consume() bool {
 			p.OnExpression(p.FallbackTag)
 		}
 	}
+	p.dropWhitespaceAfterMarker = true
 	return true
 }
 
