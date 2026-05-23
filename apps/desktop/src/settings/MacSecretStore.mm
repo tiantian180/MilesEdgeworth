@@ -1,5 +1,7 @@
 #include "MacSecretStore.h"
 
+#include "settings/SettingsLogging.h"
+
 #import <Foundation/Foundation.h>
 #import <Security/Security.h>
 
@@ -32,6 +34,11 @@ NSMutableDictionary *baseQuery(const QString &service, const QString &account)
     query[(__bridge id)kSecUseDataProtectionKeychain] = (__bridge id)kCFBooleanTrue;
     return query;
 }
+
+QString statusValue(OSStatus status)
+{
+    return QStringLiteral("status=%1").arg(status);
+}
 } // namespace
 
 QString MacSecretStore::read(const QString &service, const QString &account)
@@ -43,6 +50,12 @@ QString MacSecretStore::read(const QString &service, const QString &account)
     CFTypeRef result = nullptr;
     const OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, &result);
     if (status != errSecSuccess || result == nullptr) {
+        if (status != errSecItemNotFound) {
+            qCWarning(settingsLog).noquote() << "keychain read failed"
+                                             << statusValue(status)
+                                             << QStringLiteral("service=%1").arg(service)
+                                             << QStringLiteral("account=%1").arg(account);
+        }
         return {};
     }
 
@@ -65,9 +78,16 @@ bool MacSecretStore::write(const QString &service, const QString &account, const
 
     OSStatus status = SecItemUpdate((__bridge CFDictionaryRef)query, (__bridge CFDictionaryRef)attrs);
     if (status == errSecSuccess) {
+        qCDebug(settingsLog).noquote() << "keychain secret updated"
+                                       << QStringLiteral("service=%1").arg(service)
+                                       << QStringLiteral("account=%1").arg(account);
         return true;
     }
     if (status != errSecItemNotFound) {
+        qCWarning(settingsLog).noquote() << "keychain update failed"
+                                         << statusValue(status)
+                                         << QStringLiteral("service=%1").arg(service)
+                                         << QStringLiteral("account=%1").arg(account);
         return false;
     }
 
@@ -75,6 +95,16 @@ bool MacSecretStore::write(const QString &service, const QString &account, const
     addQuery[(__bridge id)kSecValueData] = toNSData(secret);
     addQuery[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
     status = SecItemAdd((__bridge CFDictionaryRef)addQuery, nullptr);
+    if (status != errSecSuccess) {
+        qCWarning(settingsLog).noquote() << "keychain add failed"
+                                         << statusValue(status)
+                                         << QStringLiteral("service=%1").arg(service)
+                                         << QStringLiteral("account=%1").arg(account);
+    } else {
+        qCDebug(settingsLog).noquote() << "keychain secret added"
+                                       << QStringLiteral("service=%1").arg(service)
+                                       << QStringLiteral("account=%1").arg(account);
+    }
     return status == errSecSuccess;
 }
 
@@ -82,5 +112,11 @@ bool MacSecretStore::remove(const QString &service, const QString &account)
 {
     NSMutableDictionary *query = baseQuery(service, account);
     const OSStatus status = SecItemDelete((__bridge CFDictionaryRef)query);
+    if (status != errSecSuccess && status != errSecItemNotFound) {
+        qCWarning(settingsLog).noquote() << "keychain remove failed"
+                                         << statusValue(status)
+                                         << QStringLiteral("service=%1").arg(service)
+                                         << QStringLiteral("account=%1").arg(account);
+    }
     return status == errSecSuccess || status == errSecItemNotFound;
 }

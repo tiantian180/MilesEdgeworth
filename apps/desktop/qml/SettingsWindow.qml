@@ -181,14 +181,15 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
-                Label {
-                    visible: App.SettingsController.saveError.length > 0
-                    text: App.SettingsController.saveError
-                    color: "#b65a45"
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                }
             }
+        }
+
+        Label {
+            visible: App.SettingsController.saveError.length > 0
+            text: App.SettingsController.saveError
+            color: "#b65a45"
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
         }
 
         RowLayout {
@@ -207,6 +208,9 @@ ApplicationWindow {
                 highlighted: true
                 onClicked: {
                     App.SettingsController.baseUrl = baseUrlField.text
+                    if (apiKeyField.text.length > 0) {
+                        App.SettingsController.apiKey = apiKeyField.text
+                    }
                     App.SettingsController.model = modelField.text
                     App.SettingsController.maxTokens = maxTokensField.value
                     App.SettingsController.temperature = temperatureSlider.value

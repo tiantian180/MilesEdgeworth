@@ -2,6 +2,7 @@
 
 #include "pet/PetRuntime.h"
 #include "pet/manifest/PersonaStore.h"
+#include "settings/SettingsLogging.h"
 
 #include <QtGlobal>
 
@@ -149,6 +150,10 @@ void SettingsController::save()
         return;
     }
     setSaveError(QString());
+    qCDebug(settingsLog).noquote() << "settings controller save requested"
+                                   << QStringLiteral("apiKeyLoaded=%1").arg(m_apiKeyLoaded ? "true" : "false")
+                                   << QStringLiteral("baseUrlSet=%1").arg(!m_baseUrl.isEmpty() ? "true" : "false")
+                                   << QStringLiteral("modelSet=%1").arg(!m_model.isEmpty() ? "true" : "false");
 
     if (m_runtime != nullptr) {
         QString error;
@@ -173,9 +178,11 @@ void SettingsController::save()
     m_service->setMsPerChar(m_msPerChar);
     if (!m_service->save()) {
         setSaveError(QStringLiteral("保存 API Key 失败：系统钥匙串写入失败。请重新保存，或查看 miles-debug.log。"));
+        qCWarning(settingsLog).noquote() << "settings controller save failed";
         return;
     }
 
+    qCDebug(settingsLog).noquote() << "settings controller save completed";
     emit saved();
     closeWindow();
 }

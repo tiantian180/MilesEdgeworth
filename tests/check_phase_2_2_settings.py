@@ -104,6 +104,10 @@ def main() -> int:
     require("openWindow" in controller_h, "SettingsController.openWindow() required")
     require("saveError" in controller_h and "saveError" in settings_qml,
             "Settings window must surface provider setting save failures")
+    require(
+        "App.SettingsController.apiKey = apiKeyField.text" in settings_qml,
+        "Settings save button must explicitly read the API key field instead of relying on TextField edit signals",
+    )
     require("SettingsControllerForeign" in controller_h, "SettingsControllerForeign QML singleton boilerplate required")
     require("QJSEngine::setObjectOwnership" in controller_h, "SettingsController singleton must keep C++ ownership")
     require("ApplicationWindow" in settings_qml, "SettingsWindow.qml must be ApplicationWindow")
@@ -180,6 +184,7 @@ def main() -> int:
         "desktop CMake must ad-hoc sign the app bundle so Data Protection Keychain has a stable app identity",
     )
     require("SettingsWindow.qml" in desktop_cmake, "desktop CMake must add SettingsWindow.qml to the QML module")
+    require("SettingsLogging.cpp" in desktop_cmake, "desktop CMake must compile settings logging category")
     require("check_phase_2_2_settings" in root_cmake, "root CMake must register Phase 2.2 contract check")
 
     # Docs

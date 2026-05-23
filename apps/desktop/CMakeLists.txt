@@ -31,6 +31,8 @@ set(DESKTOP_SOURCES
     src/settings/SecretStore.h
     src/settings/SettingsController.cpp
     src/settings/SettingsController.h
+    src/settings/SettingsLogging.cpp
+    src/settings/SettingsLogging.h
     src/settings/SettingsService.cpp
     src/settings/SettingsService.h
     src/window/WindowInputMaskController.cpp
@@ -324,6 +326,8 @@ if(BUILD_TESTING)
         src/chat/ChatTextPacer.h
         src/settings/SecretStore.cpp
         src/settings/SecretStore.h
+        src/settings/SettingsLogging.cpp
+        src/settings/SettingsLogging.h
         src/settings/SettingsService.cpp
         src/settings/SettingsService.h
         src/pet/behavior/BehaviorTriggerEngine.cpp
@@ -431,6 +435,8 @@ if(BUILD_TESTING)
         src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.h
         src/settings/SettingsController.cpp
         src/settings/SettingsController.h
+        src/settings/SettingsLogging.cpp
+        src/settings/SettingsLogging.h
         src/settings/SettingsService.cpp
         src/settings/SettingsService.h
         src/settings/SecretStore.cpp

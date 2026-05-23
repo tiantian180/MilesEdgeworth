@@ -1,6 +1,7 @@
 #include "SettingsService.h"
 
 #include "SecretStore.h"
+#include "settings/SettingsLogging.h"
 
 #include <QSettings>
 
@@ -113,6 +114,12 @@ bool SettingsService::secretStoreAvailable() const
 
 bool SettingsService::save()
 {
+    qCDebug(settingsLog).noquote() << "settings save requested"
+                                   << QStringLiteral("baseUrlSet=%1").arg(!m_baseUrl.isEmpty() ? "true" : "false")
+                                   << QStringLiteral("modelSet=%1").arg(!m_model.isEmpty() ? "true" : "false")
+                                   << QStringLiteral("apiKeyLoaded=%1").arg(m_apiKeyLoaded ? "true" : "false")
+                                   << QStringLiteral("apiKeyChanged=%1").arg(m_apiKey != m_savedApiKey ? "true" : "false")
+                                   << QStringLiteral("secretStoreAvailable=%1").arg(secretStoreAvailable() ? "true" : "false");
     {
         QSettings settings;
         settings.setValue(QString::fromLatin1(kBaseUrlKey), m_baseUrl);
@@ -133,11 +140,13 @@ bool SettingsService::save()
                                                m_apiKey);
         }
         if (!secretSaved) {
+            qCWarning(settingsLog).noquote() << "settings secret save failed";
             return false;
         }
         m_savedApiKey = m_apiKey;
     }
 
     emit saved();
+    qCDebug(settingsLog).noquote() << "settings save completed";
     return true;
 }
