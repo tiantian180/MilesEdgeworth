@@ -129,7 +129,10 @@ bool SettingsController::secretStoreAvailable() const
 
 void SettingsController::openWindow()
 {
-    syncFromService(true);
+    syncFromService(false);
+    m_apiKey.clear();
+    m_apiKeyLoaded = false;
+    emit apiKeyChanged();
     reloadPersona();
     setWindowVisible(true);
 }
@@ -174,7 +177,10 @@ void SettingsController::save()
 
 void SettingsController::revert()
 {
-    syncFromService(true);
+    syncFromService(false);
+    m_apiKey.clear();
+    m_apiKeyLoaded = false;
+    emit apiKeyChanged();
     reloadPersona();
     closeWindow();
 }

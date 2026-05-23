@@ -44,6 +44,12 @@ public:
         return true;
     }
 
+    QString peek(const QString &service, const QString &account) const
+    {
+        const auto it = m_store.find({service, account});
+        return it == m_store.end() ? QString() : it->second;
+    }
+
     int readCount() const { return m_readCount; }
 
 private:
@@ -120,11 +126,23 @@ int main(int argc, char *argv[])
         assert(store.readCount() == 0);
 
         controller.openWindow();
-        assert(store.readCount() == 1);
-        assert(controller.apiKey() == QStringLiteral("sk-secret"));
+        assert(store.readCount() == 0);
+        assert(controller.apiKey().isEmpty());
 
         controller.openWindow();
-        assert(store.readCount() == 1);
+        assert(store.readCount() == 0);
+        controller.save();
+        assert(store.peek(QString::fromUtf8(SettingsService::kKeychainService),
+                          QString::fromUtf8(SettingsService::kKeychainAccount))
+            == QStringLiteral("sk-secret"));
+
+        controller.openWindow();
+        controller.setApiKey(QStringLiteral("sk-replaced"));
+        controller.save();
+        assert(store.peek(QString::fromUtf8(SettingsService::kKeychainService),
+                          QString::fromUtf8(SettingsService::kKeychainAccount))
+            == QStringLiteral("sk-replaced"));
+        assert(store.readCount() == 0);
     }
 
     {

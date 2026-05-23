@@ -81,7 +81,7 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         text: App.SettingsController.apiKey
                         echoMode: TextInput.Password
-                        placeholderText: "sk-..."
+                        placeholderText: "留空保留已保存 API Key，输入新 key 会覆盖"
                         onTextEdited: App.SettingsController.apiKey = text
                     }
 
@@ -199,7 +199,6 @@ ApplicationWindow {
                 highlighted: true
                 onClicked: {
                     App.SettingsController.baseUrl = baseUrlField.text
-                    App.SettingsController.apiKey = apiKeyField.text
                     App.SettingsController.model = modelField.text
                     App.SettingsController.maxTokens = maxTokensField.value
                     App.SettingsController.temperature = temperatureSlider.value
