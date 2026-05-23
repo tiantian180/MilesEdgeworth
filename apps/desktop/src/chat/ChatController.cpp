@@ -146,15 +146,6 @@ void ChatController::launchSidecarProcess()
         return;
     }
 
-    const QString executablePath = sidecarExecutablePath();
-    if (executablePath.isEmpty()) {
-        m_sidecarRestartPending = false;
-        m_sidecarRestartAttempts = 0;
-        setSidecarReady(false);
-        setStatusText(QStringLiteral("找不到 miles-agent"));
-        return;
-    }
-
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
     const QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (!dataDir.isEmpty()) {
@@ -162,6 +153,7 @@ void ChatController::launchSidecarProcess()
         env.insert(QStringLiteral("MILES_DATA_DIR"), dataDir);
     }
 
+    bool providerConfigured = false;
     if (m_settings != nullptr) {
         const QString baseUrl = m_settings->baseUrl();
         if (!baseUrl.isEmpty()) {
@@ -178,8 +170,19 @@ void ChatController::launchSidecarProcess()
             env.insert(QStringLiteral("MILES_PROVIDER_MODEL"), model);
         }
 
+        providerConfigured = !baseUrl.isEmpty() && !apiKey.isEmpty() && !model.isEmpty();
         env.insert(QStringLiteral("MILES_PROVIDER_TEMPERATURE"), QString::number(m_settings->temperature()));
         env.insert(QStringLiteral("MILES_PROVIDER_MAX_TOKENS"), QString::number(m_settings->maxTokens()));
+    }
+    setProviderConfigured(providerConfigured);
+
+    const QString executablePath = sidecarExecutablePath();
+    if (executablePath.isEmpty()) {
+        m_sidecarRestartPending = false;
+        m_sidecarRestartAttempts = 0;
+        setSidecarReady(false);
+        setStatusText(QStringLiteral("找不到 miles-agent"));
+        return;
     }
 
     m_sidecarProcess.setProcessEnvironment(env);
@@ -231,6 +234,7 @@ void ChatController::restartSidecar()
 
 void ChatController::handleSettingsSaved()
 {
+    updateProviderConfiguredFromSettings();
     restartSidecar();
     if (m_settings != nullptr && m_pacer != nullptr) {
         m_pacer->setMsPerChar(m_settings->msPerChar());
@@ -1004,6 +1008,30 @@ void ChatController::setSidecarReady(bool ready)
 
     m_sidecarReady = ready;
     emit sidecarReadyChanged();
+}
+
+void ChatController::setProviderConfigured(bool configured)
+{
+    if (m_providerConfigured == configured) {
+        return;
+    }
+
+    m_providerConfigured = configured;
+    emit providerConfiguredChanged();
+}
+
+bool ChatController::updateProviderConfiguredFromSettings()
+{
+    if (m_settings == nullptr) {
+        setProviderConfigured(false);
+        return false;
+    }
+
+    const bool configured = !m_settings->baseUrl().isEmpty()
+        && !m_settings->apiKey().isEmpty()
+        && !m_settings->model().isEmpty();
+    setProviderConfigured(configured);
+    return configured;
 }
 
 void ChatController::setSending(bool sending)

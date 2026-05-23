@@ -62,10 +62,26 @@ int main(int argc, char *argv[])
             "ChatController should expose conversationSkinMismatch as a Qt property");
     require(metaObject->indexOfProperty("conversationSkinHint") >= 0,
             "ChatController should expose conversationSkinHint as a Qt property");
+    require(metaObject->indexOfProperty("providerConfigured") >= 0,
+            "ChatController should expose providerConfigured as a Qt property");
     require(!controller.conversationSkinMismatch(),
             "conversation skin mismatch should be false by default");
     require(controller.conversationSkinHint().isEmpty(),
             "conversation skin hint should be empty by default");
+
+    {
+        SettingsService providerSettings(&secretStore);
+        providerSettings.setBaseUrl(QStringLiteral("https://api.example.test/v1"));
+        providerSettings.setModel(QStringLiteral("miles-test-model"));
+        ChatController providerController(&runtime, &providerSettings);
+        require(!providerController.providerConfigured(),
+                "providerConfigured should stay false until base URL, API key, and model are all present");
+
+        providerSettings.setApiKey(QStringLiteral("sk-test"));
+        providerController.handleSettingsSaved();
+        require(providerController.providerConfigured(),
+                "providerConfigured should become true after complete provider settings are saved");
+    }
 
     ChatStreamEvent started;
     started.type = QStringLiteral("RUN_STARTED");

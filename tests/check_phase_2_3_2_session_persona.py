@@ -114,6 +114,10 @@ def main() -> int:
     require("persona-overrides" in persona_store, "PersonaStore must support built-in override path")
     require("savePersona" in settings_h or "personaPrompt" in settings_h, "SettingsController must expose persona editing")
     require("角色人格" in settings_qml, "SettingsWindow must show persona editor")
+    require(
+        'id: personaField' in settings_qml and 'color: "#26201b"\n                    wrapMode: TextArea.Wrap' in settings_qml,
+        "SettingsWindow persona editor must use readable dark text",
+    )
     require("persona.md" in qrc, "Miles persona.md must be bundled")
     require("[EXPR:" not in persona, "persona.md must not contain EXPR marker instructions")
 

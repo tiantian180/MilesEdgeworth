@@ -424,11 +424,14 @@ ApplicationWindow {
                 id: input
 
                 readonly property bool disconnectedInput: !App.ChatController.sidecarReady && !App.ChatController.sending
+                readonly property bool missingProviderConfig: disconnectedInput && !App.ChatController.providerConfigured
 
                 Layout.fillWidth: true
                 Layout.preferredHeight: 72
                 wrapMode: TextArea.Wrap
-                placeholderText: disconnectedInput ? "未连接，先点设置填写模型配置" : "输入消息"
+                placeholderText: disconnectedInput
+                        ? (missingProviderConfig ? "未连接，先点设置填写模型配置" : "未连接，点重连或稍后重试")
+                        : "输入消息"
                 placeholderTextColor: disconnectedInput ? "#8a4b38" : "#82786e"
                 color: enabled ? "#26201b" : "#6f5545"
                 selectionColor: "#b9d0f2"

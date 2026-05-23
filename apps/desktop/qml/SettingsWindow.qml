@@ -157,9 +157,19 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 180
                     text: App.SettingsController.personaPrompt
+                    color: "#26201b"
                     wrapMode: TextArea.Wrap
                     selectByMouse: true
                     placeholderText: qsTr("当前皮肤没有 persona.md，保存后会创建。")
+                    placeholderTextColor: "#82786e"
+                    selectedTextColor: "#26201b"
+                    selectionColor: "#b9d0f2"
+                    background: Rectangle {
+                        radius: 6
+                        color: "#fffdf8"
+                        border.color: personaField.activeFocus ? "#7b604c" : "#d8d1c8"
+                        border.width: personaField.activeFocus ? 2 : 1
+                    }
                     onTextEdited: App.SettingsController.personaPrompt = text
                 }
 

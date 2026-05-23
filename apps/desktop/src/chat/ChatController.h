@@ -26,6 +26,7 @@ class ChatController : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool sidecarReady READ sidecarReady NOTIFY sidecarReadyChanged)
+    Q_PROPERTY(bool providerConfigured READ providerConfigured NOTIFY providerConfiguredChanged)
     Q_PROPERTY(bool sending READ sending NOTIFY sendingChanged)
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusTextChanged)
     Q_PROPERTY(QVariantList messages READ messages NOTIFY messagesChanged)
@@ -47,6 +48,7 @@ public:
     ~ChatController() override;
 
     bool sidecarReady() const { return m_sidecarReady; }
+    bool providerConfigured() const { return m_providerConfigured; }
     bool sending() const { return m_sending; }
     QString statusText() const { return m_statusText; }
     QVariantList messages() const { return m_messages; }
@@ -73,6 +75,7 @@ public slots:
 
 signals:
     void sidecarReadyChanged();
+    void providerConfiguredChanged();
     void sendingChanged();
     void statusTextChanged();
     void messagesChanged();
@@ -95,6 +98,8 @@ private:
     void drainHoldBufferToPacer();
     void appendChunkToCurrentMessage(const QString &chunk, quint64 streamId);
     void setSidecarReady(bool ready);
+    void setProviderConfigured(bool configured);
+    bool updateProviderConfiguredFromSettings();
     void setSending(bool sending);
     void setStatusText(const QString &statusText);
     void requestPetExpression(
@@ -137,6 +142,7 @@ private:
     QTimer m_gateTimeout;
     static constexpr int kGateTimeoutMs = 800;
     bool m_sidecarReady = false;
+    bool m_providerConfigured = false;
     bool m_sending = false;
     bool m_sidecarRestartPending = false;
     bool m_sidecarStoppingForRestart = false;

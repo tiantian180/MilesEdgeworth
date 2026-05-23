@@ -98,8 +98,13 @@ def main() -> int:
     require("selectByMouse: true" in chat_qml, "chat message text must support mouse selection")
     require("readOnly: true" in chat_qml, "chat message text selection must not make bubbles editable")
     require(
-        "未连接，先点设置填写模型配置" in chat_qml,
-        "disabled input placeholder must explain the disconnected state and settings entry",
+        "providerConfigured" in chat_h and "providerConfigured" in chat_qml,
+        "ChatWindow disconnected placeholder must know whether provider settings are complete",
+    )
+    require(
+        "未连接，先点设置填写模型配置" in chat_qml
+        and "未连接，点重连或稍后重试" in chat_qml,
+        "disabled input placeholder must distinguish missing config from disconnected configured state",
     )
     require(
         "disconnectedInput" in chat_qml,
@@ -108,6 +113,7 @@ def main() -> int:
 
     # ChatController wiring
     require("SettingsService" in chat_h, "ChatController must take a SettingsService")
+    require("providerConfiguredChanged" in chat_h, "ChatController must notify provider config completeness")
     require("QProcessEnvironment" in chat_cpp, "ChatController must build a QProcessEnvironment")
     require("MILES_PROVIDER_BASE_URL" in chat_cpp, "ChatController must inject MILES_PROVIDER_BASE_URL")
     require("MILES_PROVIDER_API_KEY" in chat_cpp, "ChatController must inject MILES_PROVIDER_API_KEY")
