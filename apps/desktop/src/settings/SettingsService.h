@@ -44,6 +44,7 @@ public:
     void setMsPerChar(int value);
 
     bool providerConfigured() const;
+    QString configPath() const;
     QString lastError() const;
     bool save();
 

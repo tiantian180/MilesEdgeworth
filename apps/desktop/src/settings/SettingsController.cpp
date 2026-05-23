@@ -4,6 +4,10 @@
 #include "pet/manifest/PersonaStore.h"
 #include "settings/SettingsLogging.h"
 
+#include <QDesktopServices>
+#include <QDir>
+#include <QFileInfo>
+#include <QUrl>
 #include <QtGlobal>
 
 #include <optional>
@@ -355,6 +359,7 @@ void SettingsController::deleteConfig(const QString &name)
         return;
     }
 
+    const bool deletedActiveConfig = target == m_service->activeModelConfig();
     m_service->removeModelConfig(target);
     if (!m_service->save()) {
         const QString detail = m_service->lastError().trimmed();
@@ -364,7 +369,23 @@ void SettingsController::deleteConfig(const QString &name)
         return;
     }
     syncFromService();
-    emit saved();
+    if (deletedActiveConfig) {
+        emit saved();
+    }
+}
+
+void SettingsController::openConfigDirectory()
+{
+    if (m_service == nullptr) {
+        return;
+    }
+
+    const QFileInfo info(m_service->configPath());
+    QDir dir = info.dir();
+    if (!dir.exists()) {
+        dir.mkpath(QStringLiteral("."));
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(dir.absolutePath()));
 }
 
 void SettingsController::updateProviderConfigured()

@@ -90,6 +90,10 @@ def main() -> int:
                 f"SettingsController/QML missing {token}")
     require("SettingsControllerForeign" in controller_h, "SettingsControllerForeign QML singleton boilerplate required")
     require("QJSEngine::setObjectOwnership" in controller_h, "SettingsController singleton must keep C++ ownership")
+    require("openConfigDirectory" in controller_h + controller_cpp + settings_qml,
+            "SettingsWindow must expose an open config directory action")
+    require("QDesktopServices::openUrl" in controller_cpp,
+            "SettingsController.openConfigDirectory() must open the settings directory")
     require("ApplicationWindow" in settings_qml, "SettingsWindow.qml must be ApplicationWindow")
     require("TabBar" in settings_qml, "SettingsWindow must split settings into tabs")
     require("模型配置" in settings_qml and "角色人格" in settings_qml,
@@ -103,6 +107,7 @@ def main() -> int:
             "Settings save button must explicitly read the API key field")
     require("新增" in settings_qml, "SettingsWindow must allow adding model configs")
     require("删除" in settings_qml, "SettingsWindow must allow deleting model configs")
+    require("打开配置目录" in settings_qml, "SettingsWindow must show an open config directory button")
 
     # Chat UI and controller wiring
     require("设置" in chat_qml, "ChatWindow must surface a 设置 button")
@@ -137,6 +142,8 @@ def main() -> int:
     require("SecretStore" not in desktop_cmake, "desktop CMake must not compile SecretStore")
     require("MacSecretStore" not in desktop_cmake, "desktop CMake must not compile MacSecretStore")
     require("Security" not in desktop_cmake, "desktop CMake must not link the Apple Security framework")
+    require("codesign" in desktop_cmake and "Ad-hoc signing" in desktop_cmake,
+            "desktop CMake must ad-hoc sign local macOS app bundles")
     require("SettingsServiceSmoke" in desktop_cmake, "desktop CMake must register SettingsServiceSmoke target")
     require("settings_service_smoke" in desktop_cmake, "desktop CMake must register settings_service_smoke test")
     require("SettingsWindow.qml" in desktop_cmake, "desktop CMake must add SettingsWindow.qml to the QML module")
@@ -153,6 +160,7 @@ def main() -> int:
     require("Phase 2.2" in index_doc, "doc index must link Phase 2.2 record")
     require("settings.json" in design_doc and "ProviderConfigFile" in design_doc,
             "design doc must describe settings.json and ProviderConfigFile")
+    require("bool setConfig" in design_doc, "design doc must match ProviderConfigFile::setConfig return type")
 
     print("phase 2.2 model config JSON contract ok")
     return 0

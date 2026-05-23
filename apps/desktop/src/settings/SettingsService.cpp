@@ -142,6 +142,11 @@ bool SettingsService::providerConfigured() const
     return !baseUrl().isEmpty() && !apiKey().isEmpty() && !model().isEmpty();
 }
 
+QString SettingsService::configPath() const
+{
+    return m_configFile.path();
+}
+
 QString SettingsService::lastError() const
 {
     return m_configFile.lastError();

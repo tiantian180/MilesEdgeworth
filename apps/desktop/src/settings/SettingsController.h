@@ -75,6 +75,7 @@ public:
     Q_INVOKABLE void selectConfig(const QString &name);
     Q_INVOKABLE void addConfig();
     Q_INVOKABLE void deleteConfig(const QString &name = {});
+    Q_INVOKABLE void openConfigDirectory();
 
 signals:
     void configNamesChanged();

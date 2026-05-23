@@ -397,6 +397,13 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: 8
 
+            LightButton {
+                id: openConfigDirectoryButton
+                text: qsTr("打开配置目录")
+                Layout.preferredWidth: 128
+                onClicked: App.SettingsController.openConfigDirectory()
+            }
+
             Item { Layout.fillWidth: true }
 
             LightButton {

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia Network QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick Widgets Multimedia Network QuickControls2)
 include(CTest)
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -143,6 +143,15 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 )
 
 qt_finalize_executable(MilesEdgeworthDesktop)
+
+if(APPLE)
+    add_custom_command(TARGET MilesEdgeworthDesktop POST_BUILD
+        COMMAND /usr/bin/codesign --force --deep --sign -
+                "$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>"
+        COMMENT "Ad-hoc signing MilesEdgeworthDesktop.app for local macOS runs"
+        VERBATIM
+    )
+endif()
 
 if(TARGET MilesAgentCore)
     add_custom_target(CopyMilesAgentSidecar
@@ -438,6 +447,7 @@ if(BUILD_TESTING)
     target_link_libraries(SettingsServiceSmoke
         PRIVATE
             Qt6::Core
+            Qt6::Gui
             Qt6::Qml
     )
 

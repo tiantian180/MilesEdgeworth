@@ -218,6 +218,65 @@ int main(int argc, char *argv[])
     }
 
     {
+        const QString path = tmp.filePath(QStringLiteral("settings-controller-extra.json"));
+        assert(writeFile(path, QStringLiteral(R"JSON(
+{
+  "activeModelConfig": "deepseek",
+  "modelConfigs": [
+    {
+      "name": "deepseek",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKey": "sk-test",
+      "model": "deepseek-chat",
+      "providerUnknown": "keep-provider"
+    }
+  ]
+}
+)JSON")));
+
+        SettingsService service(path);
+        SettingsController controller(&service);
+        controller.openWindow();
+        controller.setModel(QStringLiteral("deepseek-reasoner"));
+        controller.save();
+
+        SettingsService reopened(path);
+        const auto cfg = reopened.modelConfig(QStringLiteral("deepseek"));
+        assert(cfg.model == QStringLiteral("deepseek-reasoner"));
+        assert(cfg.extraFields.value(QStringLiteral("providerUnknown")).toString()
+               == QStringLiteral("keep-provider"));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("settings-controller-delete.json"));
+        SettingsService service(path);
+        auto first = modelConfig(QStringLiteral("first"),
+                                 QStringLiteral("https://first.example.com"),
+                                 QStringLiteral("sk-first"),
+                                 QStringLiteral("first-model"));
+        auto second = modelConfig(QStringLiteral("second"),
+                                  QStringLiteral("https://second.example.com"),
+                                  QStringLiteral("sk-second"),
+                                  QStringLiteral("second-model"));
+        assert(service.setModelConfig(first.name, first));
+        assert(service.setModelConfig(second.name, second));
+        service.setActiveModelConfig(first.name);
+        assert(service.save());
+
+        SettingsController controller(&service);
+        int savedCount = 0;
+        QObject::connect(&controller, &SettingsController::saved, [&savedCount]() {
+            ++savedCount;
+        });
+        controller.openWindow();
+        controller.deleteConfig(second.name);
+
+        assert(savedCount == 0);
+        assert(service.activeModelConfig() == first.name);
+        assert(!service.configNames().contains(second.name));
+    }
+
+    {
         const QString path = tmp.filePath(QStringLiteral("settings-service.json"));
         SettingsService service(path);
 

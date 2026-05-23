@@ -311,6 +311,11 @@ bool ProviderConfigFile::setConfig(const QString &name, const ModelConfig &cfg)
     if (oldIndex == -1) {
         m_configs.append(normalized);
     } else {
+        QJsonObject mergedExtraFields = m_configs.at(oldIndex).extraFields;
+        for (auto it = normalized.extraFields.begin(); it != normalized.extraFields.end(); ++it) {
+            mergedExtraFields.insert(it.key(), it.value());
+        }
+        normalized.extraFields = mergedExtraFields;
         m_configs[oldIndex] = normalized;
         if (m_activeModelConfig == oldName) {
             m_activeModelConfig = newName;
