@@ -63,6 +63,14 @@ def main() -> int:
         "kSecClassGenericPassword" in mac_secret_mm,
         "MacSecretStore must use generic-password keychain class",
     )
+    require(
+        "kSecUseDataProtectionKeychain" in mac_secret_mm,
+        "MacSecretStore must use the macOS Data Protection Keychain to avoid legacy login-keychain ACL prompts",
+    )
+    require(
+        "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly" in mac_secret_mm,
+        "MacSecretStore must keep provider API keys device-local in the data-protection keychain",
+    )
     require("class MacSecretStore" in mac_secret_h, "MacSecretStore.h must declare class MacSecretStore")
 
     # SettingsService

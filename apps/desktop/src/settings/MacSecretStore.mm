@@ -26,6 +26,10 @@ NSMutableDictionary *baseQuery(const QString &service, const QString &account)
     query[(__bridge id)kSecClass] = (__bridge id)kSecClassGenericPassword;
     query[(__bridge id)kSecAttrService] = toNSString(service);
     query[(__bridge id)kSecAttrAccount] = toNSString(account);
+    // macOS 传统 login keychain 会把访问权限绑到当前构建的 code hash。
+    // 开发期 adhoc 签名每次构建都变，容易反复弹“允许访问钥匙串”。
+    // Data Protection Keychain 是 Apple 推荐给 SecItem 的现代实现，行为更接近 iOS。
+    query[(__bridge id)kSecUseDataProtectionKeychain] = (__bridge id)kCFBooleanTrue;
     return query;
 }
 } // namespace
@@ -69,6 +73,7 @@ bool MacSecretStore::write(const QString &service, const QString &account, const
 
     NSMutableDictionary *addQuery = baseQuery(service, account);
     addQuery[(__bridge id)kSecValueData] = toNSData(secret);
+    addQuery[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
     status = SecItemAdd((__bridge CFDictionaryRef)addQuery, nullptr);
     return status == errSecSuccess;
 }

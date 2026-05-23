@@ -7,7 +7,7 @@
 ## 完成范围
 
 - 新增 `SecretStore` 抽象：提供 `available()`、`read()`、`write()`、`remove()` 和 `create()` 工厂。
-- 新增 `MacSecretStore`：macOS 下使用 Security framework generic-password keychain，覆盖 `SecItemAdd`、`SecItemCopyMatching`、`SecItemDelete`。
+- 新增 `MacSecretStore`：macOS 下使用 Security framework generic-password，并通过 `kSecUseDataProtectionKeychain` 走 Data Protection Keychain；覆盖 `SecItemAdd`、`SecItemCopyMatching`、`SecItemDelete`。
 - 新增 `NullSecretStore`：非 macOS 或密钥存储不可用时不把 API key 写入磁盘；环境变量仍可作为兜底来源。
 - 新增 `SettingsService`：非 secret 字段通过 `QSettings` 持久化，字段包括 `provider/baseUrl`、`provider/model`、`provider/temperature`、`provider/maxTokens`、`chat/msPerChar`；API key 只走 `SecretStore`。
 - 新增 `SettingsController` QML singleton：维护设置窗口的 staged value，支持 Save / Cancel。
@@ -23,7 +23,12 @@
 
 - API key 不写入 `QSettings`，也不进入仓库、日志或 QML 明文持久化文件。
 - Qt 到 Go sidecar 的聊天 HTTP 请求不携带 API key；key 只通过子进程环境变量传给 sidecar。
+- macOS API key 条目使用 Data Protection Keychain，并标记为 `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，避免传统 login keychain 把访问权限绑到开发构建的 adhoc `cdhash` 后反复弹授权框。
 - 如果系统密钥存储不可用，本阶段选择“不落盘”兜底：用户仍可临时填写并在当前进程内使用，但重启后需要重新输入，或继续使用外部环境变量。
+
+## 迁移备注
+
+2026-05-23 之前的开发版曾把 API key 写入传统 login keychain。该条目仍可能留在“钥匙串访问”中，服务名为 `dev.tian.MilesEdgeworth.v2`、账户为 `MILES_PROVIDER_API_KEY`，但新版 `MacSecretStore` 不再读取它。开发者升级后需要在设置窗口重新保存一次 API key；之后会写入 Data Protection Keychain，启动时不应再因旧 login keychain ACL 反复要求输入登录钥匙串密码。
 
 ## 验收命令
 
