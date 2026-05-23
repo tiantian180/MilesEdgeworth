@@ -62,35 +62,6 @@ func normalizeChatCompletionsURL(raw string) string {
 	}
 }
 
-// BuildSystemPrompt assembles the persona + expression instruction shown to the model.
-// Phase 2.3 will replace this with the full Miles persona; Phase 2.1 only ships the
-// minimal instruction needed for the [EXPR:tag] protocol to function.
-func BuildSystemPrompt(expressions []chat.ExpressionInfo) string {
-	return buildSystemPrompt(expressions)
-}
-
-func buildSystemPrompt(expressions []chat.ExpressionInfo) string {
-	var sb strings.Builder
-	sb.WriteString("你是 Miles Edgeworth 桌宠助手。回复时在每段文字开头用 [EXPR:id] 标记当前表达。")
-	sb.WriteString("只能使用方括号中列出的 id 原文，不要翻译 id，也不要使用中文 label。")
-	sb.WriteString("例如使用 [EXPR:objection]，不要输出 [EXPR:异议]。")
-	sb.WriteString("情绪延续时不重复标记。回复的第一段文字必须有标记。\n\n")
-	if len(expressions) == 0 {
-		return sb.String()
-	}
-	sb.WriteString("当前可用表达标签：\n")
-	for _, e := range expressions {
-		sb.WriteString("- ")
-		sb.WriteString(e.ID)
-		if e.Description != "" {
-			sb.WriteString("：")
-			sb.WriteString(e.Description)
-		}
-		sb.WriteString("\n")
-	}
-	return sb.String()
-}
-
 type chatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -112,20 +83,19 @@ type chatCompletionStreamChunk struct {
 	} `json:"choices"`
 }
 
-const (
-	runID     = "openai-run-1"
-	messageID = "openai-msg-1"
-)
+type chatCompletionResponse struct {
+	Choices []struct {
+		Message chatMessage `json:"message"`
+	} `json:"choices"`
+}
 
-func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan chat.StreamEvent, error) {
+func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
 	events := make(chan chat.StreamEvent, 32)
 
+	messages := makeChatMessages(params.Messages)
 	body := chatCompletionRequest{
-		Model: p.model,
-		Messages: []chatMessage{
-			{Role: "system", Content: BuildSystemPrompt(req.Expressions)},
-			{Role: "user", Content: req.Message},
-		},
+		Model:       p.model,
+		Messages:    messages,
 		Stream:      true,
 		Temperature: p.temperature,
 		MaxTokens:   p.maxTokens,
@@ -138,8 +108,8 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 	logger.Debug("request prepared",
 		"model", p.model,
 		"endpoint", sanitizeEndpoint(p.baseURL),
-		"expressions", len(req.Expressions),
-		"messageLen", len([]rune(req.Message)))
+		"knownTags", len(params.KnownExpressionIDs),
+		"messages", len(messages))
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		p.baseURL, bytes.NewReader(encoded))
@@ -157,6 +127,15 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 		return events, err
 	}
 
+	runID := params.RunID
+	if runID == "" {
+		runID = "openai-run-1"
+	}
+	messageID := params.MessageID
+	if messageID == "" {
+		messageID = "openai-msg-1"
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		// Drain a small sample for diagnostics, then close.
 		sample, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
@@ -165,20 +144,70 @@ func (p *Provider) StreamReply(ctx context.Context, req chat.Request) (<-chan ch
 			defer close(events)
 			send(ctx, events, chat.StreamEvent{
 				Type:  "RUN_ERROR",
+				RunID: runID,
 				Error: providerErrorMessage(resp, p.baseURL, sample),
 			})
 		}()
 		return events, nil
 	}
 
-	knownTags := make([]string, 0, len(req.Expressions))
-	for _, e := range req.Expressions {
-		knownTags = append(knownTags, e.ID)
-	}
+	knownTags := append([]string(nil), params.KnownExpressionIDs...)
 	logger.Debug("stream started", "knownTags", strings.Join(knownTags, ","))
 
-	go p.pipe(ctx, resp, events, knownTags)
+	go p.pipe(ctx, resp, events, runID, messageID, knownTags)
 	return events, nil
+}
+
+func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string, error) {
+	body := chatCompletionRequest{
+		Model:       p.model,
+		Messages:    makeChatMessages(params.Messages),
+		Stream:      false,
+		Temperature: p.temperature,
+		MaxTokens:   p.maxTokens,
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return "", err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		p.baseURL, bytes.NewReader(encoded))
+	if err != nil {
+		return "", err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+
+	resp, err := p.httpClient.Do(httpReq)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		sample, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return "", fmt.Errorf("%s", providerErrorMessage(resp, p.baseURL, sample))
+	}
+
+	var completion chatCompletionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&completion); err != nil {
+		return "", err
+	}
+	for _, choice := range completion.Choices {
+		if content := strings.TrimSpace(choice.Message.Content); content != "" {
+			return content, nil
+		}
+	}
+	return "", fmt.Errorf("provider returned no completion content")
+}
+
+func makeChatMessages(messages []chat.Message) []chatMessage {
+	out := make([]chatMessage, 0, len(messages))
+	for _, message := range messages {
+		out = append(out, chatMessage{Role: message.Role, Content: message.Content})
+	}
+	return out
 }
 
 func providerErrorMessage(resp *http.Response, endpoint string, sample []byte) string {
@@ -210,7 +239,7 @@ func sanitizeEndpoint(endpoint string) string {
 	return parsed.String()
 }
 
-func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- chat.StreamEvent, knownTags []string) {
+func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- chat.StreamEvent, runID, messageID string, knownTags []string) {
 	defer resp.Body.Close()
 	defer close(events)
 
@@ -299,6 +328,15 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 				parser.Feed(choice.Delta.Content)
 			}
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		logger.Warn("provider stream read failed", "error", err)
+		send(ctx, events, chat.StreamEvent{
+			Type:  "RUN_ERROR",
+			RunID: runID,
+			Error: "provider stream read failed: " + err.Error(),
+		})
+		return
 	}
 	parser.Flush()
 	logger.Debug("stream finished")

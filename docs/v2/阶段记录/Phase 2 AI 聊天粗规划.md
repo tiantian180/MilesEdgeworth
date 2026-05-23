@@ -159,7 +159,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 范围：
 
-- 完整 Miles persona prompt（包含表达约定、风格、禁忌等），替换 2.1 的最小版本。
+- 完整 Miles persona prompt（角色风格、禁忌等），替换 2.1 的最小版本。persona 只定义角色，不包含 EXPR 标记指令（EXPR 由 sidecar 动态生成，参见《会话历史与人设设计》§2.2）。
 - 会话历史保存（SQLite）。
 - 新建 / 清空会话。
 - 历史摘要或截断策略（可参考 Langfuse 实际 token 用量数据）。

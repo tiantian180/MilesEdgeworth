@@ -7,6 +7,9 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
+#include <QHostAddress>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QThread>
 
 #include <functional>
@@ -50,11 +53,68 @@ int main(int argc, char *argv[])
     PetRuntime runtime;
     ChatController controller(&runtime, &settings);
 
+    const QMetaObject *metaObject = controller.metaObject();
+    require(metaObject->indexOfProperty("conversations") >= 0,
+            "ChatController should expose conversations as a Qt property");
+    require(metaObject->indexOfProperty("currentConversationId") >= 0,
+            "ChatController should expose currentConversationId as a Qt property");
+    require(metaObject->indexOfProperty("conversationSkinMismatch") >= 0,
+            "ChatController should expose conversationSkinMismatch as a Qt property");
+    require(metaObject->indexOfProperty("conversationSkinHint") >= 0,
+            "ChatController should expose conversationSkinHint as a Qt property");
+    require(metaObject->indexOfProperty("providerConfigured") >= 0,
+            "ChatController should expose providerConfigured as a Qt property");
+    require(!controller.conversationSkinMismatch(),
+            "conversation skin mismatch should be false by default");
+    require(controller.conversationSkinHint().isEmpty(),
+            "conversation skin hint should be empty by default");
+
+    // 启动后恢复历史会话只是 UI 状态同步，不应该打断桌宠入场 recipe。
+    {
+        PetRuntime startupRuntime;
+        require(startupRuntime.currentActionId() == QStringLiteral("briefcase_in"),
+                "startup conversation restore test should begin during briefcase_in");
+        ChatController startupController(&startupRuntime, &settings);
+
+        startupController.switchConversation(QStringLiteral("restored-conversation"));
+        require(startupRuntime.currentActionId() == QStringLiteral("briefcase_in"),
+                "switchConversation without an active chat stream must not interrupt startup animation");
+        require(startupRuntime.currentRecipeId() == QStringLiteral("startup.briefcase"),
+                "switchConversation without an active chat stream must keep the startup recipe active");
+    }
+
+    {
+        SettingsService providerSettings(&secretStore);
+        providerSettings.setBaseUrl(QStringLiteral("https://api.example.test/v1"));
+        providerSettings.setModel(QStringLiteral("miles-test-model"));
+        ChatController providerController(&runtime, &providerSettings);
+        require(!providerController.providerConfigured(),
+                "providerConfigured should stay false until base URL, API key, and model are all present");
+
+        providerSettings.setApiKey(QStringLiteral("sk-test"));
+        providerController.handleSettingsSaved();
+        require(providerController.providerConfigured(),
+                "providerConfigured should become true after complete provider settings are saved");
+    }
+
     ChatStreamEvent started;
     started.type = QStringLiteral("RUN_STARTED");
     started.runId = QStringLiteral("mock-run");
     controller.applyStreamEvent(started);
     require(controller.sending(), "RUN_STARTED should mark controller as sending");
+    require(controller.statusText() == QStringLiteral("正在回复"),
+            "RUN_STARTED should set replying status");
+
+    ChatStreamEvent memoryEvent;
+    memoryEvent.type = QStringLiteral("CUSTOM");
+    memoryEvent.name = QStringLiteral("miles.chat.memory.summarizing");
+    controller.applyStreamEvent(memoryEvent);
+    require(controller.statusText() == QStringLiteral("整理记忆中..."),
+            "memory summarizing event should update status text");
+
+    controller.applyStreamEvent(started);
+    require(controller.statusText() == QStringLiteral("正在回复"),
+            "RUN_STARTED should override memory summarizing status");
 
     ChatStreamEvent thinkingEvent;
     thinkingEvent.type = QStringLiteral("CUSTOM");
@@ -129,7 +189,105 @@ int main(int argc, char *argv[])
     controller.applyStreamEvent(errorEvent);
     require(runtime.currentState() == QStringLiteral("error"), "RUN_ERROR should move pet to error state");
 
+    // 切换会话后，旧 SSE stream 的残留事件不应该写入新会话消息模型。
+    {
+        PetRuntime staleRuntime;
+        ChatController staleController(&staleRuntime, &settings);
+
+        ChatStreamEvent staleStarted;
+        staleStarted.type = QStringLiteral("RUN_STARTED");
+        staleController.applyStreamEvent(staleStarted);
+        staleRuntime.handleAnimationFinished();
+
+        ChatStreamEvent staleStart;
+        staleStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        staleStart.role = QStringLiteral("assistant");
+        staleController.applyStreamEvent(staleStart);
+        require(staleController.messages().size() == 1,
+                "stale stream test should start with one assistant message");
+
+        staleController.switchConversation(QStringLiteral("new-conversation"));
+        require(staleController.messages().isEmpty(),
+                "switchConversation should clear the visible message model");
+
+        ChatStreamEvent staleContent;
+        staleContent.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        staleContent.delta = QStringLiteral("旧回复");
+        staleController.applyStreamEvent(staleContent);
+        waitFor([]() { return false; }, 120);
+        require(staleController.messages().isEmpty(),
+                "stream content after switching conversation must not append to the new message model");
+    }
+
+    // 切换会话必须隔离旧 runtime 回调，并让桌宠离开旧回复动画状态。
+    {
+        QTcpServer holdServer;
+        QList<QTcpSocket *> heldSockets;
+        const bool holdServerListening = holdServer.listen(QHostAddress::LocalHost, 39710);
+        if (holdServerListening) {
+            QObject::connect(&holdServer, &QTcpServer::newConnection, &holdServer, [&holdServer, &heldSockets]() {
+                while (holdServer.hasPendingConnections()) {
+                    QTcpSocket *socket = holdServer.nextPendingConnection();
+                    socket->setParent(&holdServer);
+                    heldSockets.append(socket);
+                }
+            });
+        }
+
+        PetRuntime staleCallbackRuntime;
+        for (int i = 0; i < 5 && staleCallbackRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            staleCallbackRuntime.handleAnimationFinished();
+        }
+        staleCallbackRuntime.requestExpression(QStringLiteral("speaking"), QStringLiteral("objection"));
+        require(staleCallbackRuntime.currentState() == QStringLiteral("speaking"),
+                "stale callback setup should enter speaking before switching conversations");
+        ChatController staleCallbackController(&staleCallbackRuntime, &settings);
+
+        ChatStreamEvent oldStarted;
+        oldStarted.type = QStringLiteral("RUN_STARTED");
+        staleCallbackController.applyStreamEvent(oldStarted);
+        waitFor([]() { return false; }, 1000);
+
+        ChatStreamEvent secondStarted;
+        secondStarted.type = QStringLiteral("RUN_STARTED");
+        staleCallbackController.applyStreamEvent(secondStarted);
+        staleCallbackController.switchConversation(QStringLiteral("new-conversation"));
+        require(staleCallbackRuntime.currentState() == QStringLiteral("idle"),
+                "switchConversation should return runtime to idle instead of leaving old speaking state active");
+
+        if (holdServerListening) {
+            staleCallbackController.sendMessage(QStringLiteral("next"));
+
+            ChatStreamEvent newStarted;
+            newStarted.type = QStringLiteral("RUN_STARTED");
+            staleCallbackController.applyStreamEvent(newStarted);
+
+            ChatStreamEvent newStart;
+            newStart.type = QStringLiteral("TEXT_MESSAGE_START");
+            newStart.role = QStringLiteral("assistant");
+            staleCallbackController.applyStreamEvent(newStart);
+
+            ChatStreamEvent newText;
+            newText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+            newText.delta = QStringLiteral("新回复");
+            staleCallbackController.applyStreamEvent(newText);
+
+            waitFor([]() { return false; }, 700);
+            require(staleCallbackController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString().isEmpty(),
+                    "stale clean-finish callback must not release a later stream's held text");
+
+            staleCallbackRuntime.handleAnimationFinished();
+            require(waitFor([&staleCallbackController]() {
+                        return staleCallbackController.messages().constLast().toMap()
+                            .value(QStringLiteral("text")).toString() == QStringLiteral("新回复");
+                    }),
+                    "current stream clean-finish callback should still release held text");
+        }
+    }
+
     // 取消后到达的残留事件不应该新建 assistant 消息
+    controller.switchConversation(QStringLiteral("smoke-conversation"));
     controller.sendMessage(QStringLiteral("again"));
     const int messagesBeforeCancel = controller.messages().size();
     controller.cancelCurrentReply();
@@ -343,6 +501,81 @@ int main(int argc, char *argv[])
                         .value(QStringLiteral("text")).toString() == QStringLiteral("片段1片段2");
                 }),
                 "GATED text should drain through the pacer after the boundary callback");
+    }
+
+    // 旧 boundary 回调被 gate timeout 释放后，不能再释放同一回复里的下一次 GATED 文本。
+    {
+        PetRuntime timeoutRuntime;
+        for (int i = 0; i < 5 && timeoutRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            timeoutRuntime.handleAnimationFinished();
+        }
+
+        ChatController timeoutController(&timeoutRuntime, &settings);
+
+        ChatStreamEvent timeoutStarted;
+        timeoutStarted.type = QStringLiteral("RUN_STARTED");
+        timeoutController.applyStreamEvent(timeoutStarted);
+
+        ChatStreamEvent timeoutExpr1;
+        timeoutExpr1.type = QStringLiteral("CUSTOM");
+        timeoutExpr1.name = QStringLiteral("miles.pet.expression.requested");
+        timeoutExpr1.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        timeoutExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        timeoutController.applyStreamEvent(timeoutExpr1);
+
+        ChatStreamEvent timeoutStart;
+        timeoutStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        timeoutStart.role = QStringLiteral("assistant");
+        timeoutController.applyStreamEvent(timeoutStart);
+
+        ChatStreamEvent timeoutText1;
+        timeoutText1.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        timeoutText1.delta = QStringLiteral("一");
+        timeoutController.applyStreamEvent(timeoutText1);
+        require(waitFor([&timeoutController]() {
+                    return timeoutController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("一");
+                }),
+                "timeout gate setup should enter streaming and drain first text");
+
+        ChatStreamEvent timeoutExpr2;
+        timeoutExpr2.type = QStringLiteral("CUSTOM");
+        timeoutExpr2.name = QStringLiteral("miles.pet.expression.requested");
+        timeoutExpr2.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        timeoutExpr2.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+        timeoutController.applyStreamEvent(timeoutExpr2);
+
+        ChatStreamEvent timeoutText2;
+        timeoutText2.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        timeoutText2.delta = QStringLiteral("二");
+        timeoutController.applyStreamEvent(timeoutText2);
+        require(waitFor([&timeoutController]() {
+                    return timeoutController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("一二");
+                }, 1200),
+                "gate timeout should release the first gated text");
+
+        ChatStreamEvent timeoutExpr3;
+        timeoutExpr3.type = QStringLiteral("CUSTOM");
+        timeoutExpr3.name = QStringLiteral("miles.pet.expression.requested");
+        timeoutExpr3.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        timeoutExpr3.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        timeoutController.applyStreamEvent(timeoutExpr3);
+
+        ChatStreamEvent timeoutText3;
+        timeoutText3.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        timeoutText3.delta = QStringLiteral("三");
+        timeoutController.applyStreamEvent(timeoutText3);
+
+        waitFor([]() { return false; }, 650);
+        require(timeoutController.messages().constLast().toMap()
+                    .value(QStringLiteral("text")).toString() == QStringLiteral("一二"),
+                "stale boundary safety timeout must not release the next gated text early");
+        require(waitFor([&timeoutController]() {
+                    return timeoutController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("一二三");
+                }, 1000),
+                "the current gate timeout should still release its own buffered text");
     }
 
     // --- Phase 2.3.1 Task 7: RUN_FINISHED waits for animation boundary before idle ---
@@ -630,6 +863,7 @@ int main(int argc, char *argv[])
         sController.applyStreamEvent(firstFinished);
         sRuntime.handleAnimationFinished();
 
+        sController.switchConversation(QStringLiteral("smoke-conversation"));
         sController.sendMessage(QStringLiteral("next"));
         waitFor([]() { return false; }, 200);
 

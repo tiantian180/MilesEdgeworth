@@ -10,6 +10,7 @@
 #include <QPointer>
 #include <QProcess>
 #include <QQmlEngine>
+#include <QSet>
 #include <QTimer>
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
@@ -25,9 +26,14 @@ class ChatController : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool sidecarReady READ sidecarReady NOTIFY sidecarReadyChanged)
+    Q_PROPERTY(bool providerConfigured READ providerConfigured NOTIFY providerConfiguredChanged)
     Q_PROPERTY(bool sending READ sending NOTIFY sendingChanged)
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusTextChanged)
     Q_PROPERTY(QVariantList messages READ messages NOTIFY messagesChanged)
+    Q_PROPERTY(QVariantList conversations READ conversations NOTIFY conversationsChanged)
+    Q_PROPERTY(QString currentConversationId READ currentConversationId NOTIFY currentConversationIdChanged)
+    Q_PROPERTY(bool conversationSkinMismatch READ conversationSkinMismatch NOTIFY conversationSkinMismatchChanged)
+    Q_PROPERTY(QString conversationSkinHint READ conversationSkinHint NOTIFY conversationSkinMismatchChanged)
 
 public:
     enum class ChatPhase {
@@ -42,9 +48,14 @@ public:
     ~ChatController() override;
 
     bool sidecarReady() const { return m_sidecarReady; }
+    bool providerConfigured() const { return m_providerConfigured; }
     bool sending() const { return m_sending; }
     QString statusText() const { return m_statusText; }
     QVariantList messages() const { return m_messages; }
+    QVariantList conversations() const { return m_conversations; }
+    QString currentConversationId() const { return m_currentConversationId; }
+    bool conversationSkinMismatch() const { return m_conversationSkinMismatch; }
+    QString conversationSkinHint() const { return m_conversationSkinHint; }
 
     Q_INVOKABLE void openWindow();
     Q_INVOKABLE void startSidecar();
@@ -52,6 +63,10 @@ public:
     Q_INVOKABLE void checkHealth();
     Q_INVOKABLE void sendMessage(const QString &message);
     Q_INVOKABLE void cancelCurrentReply();
+    Q_INVOKABLE void loadConversations();
+    Q_INVOKABLE void switchConversation(const QString &id);
+    Q_INVOKABLE void newConversation();
+    Q_INVOKABLE void deleteConversation(const QString &id);
 
     void applyStreamEvent(const ChatStreamEvent &event);
 
@@ -60,9 +75,13 @@ public slots:
 
 signals:
     void sidecarReadyChanged();
+    void providerConfiguredChanged();
     void sendingChanged();
     void statusTextChanged();
     void messagesChanged();
+    void conversationsChanged();
+    void currentConversationIdChanged();
+    void conversationSkinMismatchChanged();
     void openWindowRequested();
 
 private:
@@ -71,10 +90,16 @@ private:
     void transitionTo(ChatPhase next);
     void handleCleanFinishReady();
     void handleBoundaryReached();
+    void requestCleanFinishForCurrentStream();
+    void requestBoundaryForCurrentStream();
+    bool runtimeCallbackStillCurrent(quint64 streamId, quint64 generation) const;
+    bool boundaryCallbackStillCurrent(quint64 streamId, quint64 generation, quint64 boundaryId) const;
     void handleGateTimeout();
     void drainHoldBufferToPacer();
     void appendChunkToCurrentMessage(const QString &chunk, quint64 streamId);
     void setSidecarReady(bool ready);
+    void setProviderConfigured(bool configured);
+    bool updateProviderConfiguredFromSettings();
     void setSending(bool sending);
     void setStatusText(const QString &statusText);
     void requestPetExpression(
@@ -88,14 +113,24 @@ private:
     void handleStreamBytes(const QByteArray &bytes);
     void finishCurrentReply();
     void failCurrentReply(const QString &message);
+    void sendMessageInConversation(const QString &trimmed);
+    void abortPendingConversationCreate();
+    void isolateConversationAsyncState();
+    void setCurrentConversationId(const QString &id);
+    void setConversationSkinState(const QString &skinId);
+    void setConversationSkinMismatch(bool mismatch, const QString &hint);
+    void updateConversationCurrentFlags();
+    QString currentSkinId() const;
 
     PetRuntime *m_runtime = nullptr;
     SettingsService *m_settings = nullptr;
     QNetworkAccessManager m_network;
     QProcess m_sidecarProcess;
     QPointer<QNetworkReply> m_currentReply;
+    QPointer<QNetworkReply> m_pendingConversationCreateReply;
     ChatStreamEventParser m_parser;
     QVariantList m_messages;
+    QVariantList m_conversations;
     // Phase 2.3.1: while m_phase is BUFFERING_FOR_START or GATED, streamed
     // text accumulates here. On transition to STREAMING, it drains into the
     // pacer. See docs/v2/设计方案/AI 聊天动画编排设计.md §5.
@@ -107,17 +142,30 @@ private:
     QTimer m_gateTimeout;
     static constexpr int kGateTimeoutMs = 800;
     bool m_sidecarReady = false;
+    bool m_providerConfigured = false;
     bool m_sending = false;
     bool m_sidecarRestartPending = false;
     bool m_sidecarStoppingForRestart = false;
+    bool m_foreignSidecarCleanupAttempted = false;
     int m_sidecarRestartAttempts = 0;
     bool m_finishPendingAfterStart = false;
     // 用户取消后，剩余 SSE chunks 必须被丢弃，否则会拼到新建的 assistant 消息里产生"幽灵回复"。
     // 每次 sendMessage 复位 false。
     bool m_cancelled = false;
     QString m_statusText = QStringLiteral("未连接");
+    QString m_currentConversationId;
+    QString m_currentConversationSkinId;
+    QString m_conversationSkinHint;
     int m_assistantMessageIndex = -1;
     quint64 m_currentStreamId = 1;
+    quint64 m_asyncGeneration = 1;
+    quint64 m_boundaryRequestId = 1;
+    quint64 m_chatRequestId = 0;
+    quint64 m_pendingCreateRequestId = 0;
+    quint64 m_listRequestId = 0;
+    quint64 m_messageLoadRequestId = 0;
+    QSet<quint64> m_completedChatRequestIds;
+    bool m_conversationSkinMismatch = false;
 };
 
 struct ChatControllerForeign

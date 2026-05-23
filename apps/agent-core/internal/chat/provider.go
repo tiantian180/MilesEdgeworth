@@ -2,8 +2,6 @@ package chat
 
 import "context"
 
-// ExpressionInfo describes one expression tag the current skin makes available
-// to the model. Sent from Qt to the sidecar with each chat request.
 type ExpressionInfo struct {
 	ID            string   `json:"id"`
 	Label         string   `json:"label,omitempty"`
@@ -15,6 +13,19 @@ type Request struct {
 	ConversationID string           `json:"conversationId"`
 	Message        string           `json:"message"`
 	Expressions    []ExpressionInfo `json:"expressions,omitempty"`
+	PersonaPrompt  string           `json:"personaPrompt,omitempty"`
+}
+
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type ChatParams struct {
+	RunID              string
+	MessageID          string
+	Messages           []Message
+	KnownExpressionIDs []string
 }
 
 type StreamEvent struct {
@@ -29,5 +40,6 @@ type StreamEvent struct {
 }
 
 type Provider interface {
-	StreamReply(ctx context.Context, req Request) (<-chan StreamEvent, error)
+	StreamChat(ctx context.Context, params ChatParams) (<-chan StreamEvent, error)
+	Complete(ctx context.Context, params ChatParams) (string, error)
 }

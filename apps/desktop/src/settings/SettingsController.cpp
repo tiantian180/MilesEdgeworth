@@ -1,12 +1,18 @@
 #include "SettingsController.h"
 
+#include "pet/PetRuntime.h"
+#include "pet/manifest/PersonaStore.h"
+#include "settings/SettingsLogging.h"
+
 #include <QtGlobal>
 
-SettingsController::SettingsController(SettingsService *service, QObject *parent)
+SettingsController::SettingsController(SettingsService *service, PetRuntime *runtime, QObject *parent)
     : QObject(parent)
     , m_service(service)
+    , m_runtime(runtime)
 {
     syncFromService(false);
+    reloadPersona();
 }
 
 void SettingsController::syncFromService(bool includeSecret)
@@ -108,6 +114,15 @@ void SettingsController::setMsPerChar(int value)
     emit msPerCharChanged();
 }
 
+void SettingsController::setPersonaPrompt(const QString &value)
+{
+    if (m_personaPrompt == value) {
+        return;
+    }
+    m_personaPrompt = value;
+    emit personaPromptChanged();
+}
+
 bool SettingsController::secretStoreAvailable() const
 {
     return m_service != nullptr && m_service->secretStoreAvailable();
@@ -115,7 +130,12 @@ bool SettingsController::secretStoreAvailable() const
 
 void SettingsController::openWindow()
 {
-    syncFromService(true);
+    syncFromService(false);
+    m_apiKey.clear();
+    m_apiKeyLoaded = false;
+    emit apiKeyChanged();
+    reloadPersona();
+    setSaveError(QString());
     setWindowVisible(true);
 }
 
@@ -129,6 +149,24 @@ void SettingsController::save()
     if (m_service == nullptr) {
         return;
     }
+    setSaveError(QString());
+    qCDebug(settingsLog).noquote() << "settings controller save requested"
+                                   << QStringLiteral("apiKeyLoaded=%1").arg(m_apiKeyLoaded ? "true" : "false")
+                                   << QStringLiteral("baseUrlSet=%1").arg(!m_baseUrl.isEmpty() ? "true" : "false")
+                                   << QStringLiteral("modelSet=%1").arg(!m_model.isEmpty() ? "true" : "false");
+
+    if (m_runtime != nullptr) {
+        QString error;
+        if (!PersonaStore::writeForManifest(m_runtime->manifest(), m_personaPrompt, &error)) {
+            setPersonaError(error);
+            return;
+        }
+        if (!m_runtime->reloadActiveSkin()) {
+            setPersonaError(QStringLiteral("保存成功，但重新加载当前皮肤失败。"));
+            return;
+        }
+        reloadPersona();
+    }
 
     m_service->setBaseUrl(m_baseUrl);
     if (m_apiKeyLoaded) {
@@ -138,15 +176,56 @@ void SettingsController::save()
     m_service->setTemperature(m_temperature);
     m_service->setMaxTokens(m_maxTokens);
     m_service->setMsPerChar(m_msPerChar);
-    m_service->save();
+    if (!m_service->save()) {
+        setSaveError(QStringLiteral("保存 API Key 失败：系统钥匙串写入失败。请重新保存，或查看 miles-debug.log。"));
+        qCWarning(settingsLog).noquote() << "settings controller save failed";
+        return;
+    }
+
+    qCDebug(settingsLog).noquote() << "settings controller save completed";
     emit saved();
     closeWindow();
 }
 
 void SettingsController::revert()
 {
-    syncFromService(true);
+    syncFromService(false);
+    m_apiKey.clear();
+    m_apiKeyLoaded = false;
+    emit apiKeyChanged();
+    reloadPersona();
+    setSaveError(QString());
     closeWindow();
+}
+
+void SettingsController::reloadPersona()
+{
+    if (m_runtime == nullptr) {
+        setPersonaPrompt(QString());
+        setPersonaError(QString());
+        return;
+    }
+
+    setPersonaPrompt(m_runtime->manifest().personaPrompt);
+    setPersonaError(QString());
+}
+
+void SettingsController::setPersonaError(const QString &value)
+{
+    if (m_personaError == value) {
+        return;
+    }
+    m_personaError = value;
+    emit personaErrorChanged();
+}
+
+void SettingsController::setSaveError(const QString &value)
+{
+    if (m_saveError == value) {
+        return;
+    }
+    m_saveError = value;
+    emit saveErrorChanged();
 }
 
 void SettingsController::setWindowVisible(bool visible)

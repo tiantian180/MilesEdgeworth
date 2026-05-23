@@ -1,6 +1,7 @@
 #include "SettingsService.h"
 
 #include "SecretStore.h"
+#include "settings/SettingsLogging.h"
 
 #include <QSettings>
 
@@ -111,8 +112,14 @@ bool SettingsService::secretStoreAvailable() const
     return m_secretStore != nullptr && m_secretStore->available();
 }
 
-void SettingsService::save()
+bool SettingsService::save()
 {
+    qCDebug(settingsLog).noquote() << "settings save requested"
+                                   << QStringLiteral("baseUrlSet=%1").arg(!m_baseUrl.isEmpty() ? "true" : "false")
+                                   << QStringLiteral("modelSet=%1").arg(!m_model.isEmpty() ? "true" : "false")
+                                   << QStringLiteral("apiKeyLoaded=%1").arg(m_apiKeyLoaded ? "true" : "false")
+                                   << QStringLiteral("apiKeyChanged=%1").arg(m_apiKey != m_savedApiKey ? "true" : "false")
+                                   << QStringLiteral("secretStoreAvailable=%1").arg(secretStoreAvailable() ? "true" : "false");
     {
         QSettings settings;
         settings.setValue(QString::fromLatin1(kBaseUrlKey), m_baseUrl);
@@ -123,16 +130,23 @@ void SettingsService::save()
     }
 
     if (m_apiKeyLoaded && m_apiKey != m_savedApiKey && m_secretStore != nullptr && m_secretStore->available()) {
+        bool secretSaved = false;
         if (m_apiKey.isEmpty()) {
-            m_secretStore->remove(QString::fromUtf8(kKeychainService),
-                                  QString::fromUtf8(kKeychainAccount));
+            secretSaved = m_secretStore->remove(QString::fromUtf8(kKeychainService),
+                                                QString::fromUtf8(kKeychainAccount));
         } else {
-            m_secretStore->write(QString::fromUtf8(kKeychainService),
-                                 QString::fromUtf8(kKeychainAccount),
-                                 m_apiKey);
+            secretSaved = m_secretStore->write(QString::fromUtf8(kKeychainService),
+                                               QString::fromUtf8(kKeychainAccount),
+                                               m_apiKey);
+        }
+        if (!secretSaved) {
+            qCWarning(settingsLog).noquote() << "settings secret save failed";
+            return false;
         }
         m_savedApiKey = m_apiKey;
     }
 
     emit saved();
+    qCDebug(settingsLog).noquote() << "settings save completed";
+    return true;
 }

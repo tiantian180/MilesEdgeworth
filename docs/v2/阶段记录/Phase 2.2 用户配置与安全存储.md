@@ -7,7 +7,7 @@
 ## 完成范围
 
 - 新增 `SecretStore` 抽象：提供 `available()`、`read()`、`write()`、`remove()` 和 `create()` 工厂。
-- 新增 `MacSecretStore`：macOS 下使用 Security framework generic-password keychain，覆盖 `SecItemAdd`、`SecItemCopyMatching`、`SecItemDelete`。
+- 新增 `MacSecretStore`：macOS 下使用 Security framework generic-password，并通过 `kSecUseDataProtectionKeychain` 走 Data Protection Keychain；覆盖 `SecItemAdd`、`SecItemCopyMatching`、`SecItemDelete`。
 - 新增 `NullSecretStore`：非 macOS 或密钥存储不可用时不把 API key 写入磁盘；环境变量仍可作为兜底来源。
 - 新增 `SettingsService`：非 secret 字段通过 `QSettings` 持久化，字段包括 `provider/baseUrl`、`provider/model`、`provider/temperature`、`provider/maxTokens`、`chat/msPerChar`；API key 只走 `SecretStore`。
 - 新增 `SettingsController` QML singleton：维护设置窗口的 staged value，支持 Save / Cancel。
@@ -23,7 +23,17 @@
 
 - API key 不写入 `QSettings`，也不进入仓库、日志或 QML 明文持久化文件。
 - Qt 到 Go sidecar 的聊天 HTTP 请求不携带 API key；key 只通过子进程环境变量传给 sidecar。
-- 如果系统密钥存储不可用，本阶段选择“不落盘”兜底：用户仍可临时填写并在当前进程内使用，但重启后需要重新输入，或继续使用外部环境变量。
+- macOS API key 条目正式路径使用 Data Protection Keychain，并标记为 `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，避免传统 login keychain 把访问权限绑到开发构建的 adhoc `cdhash` 后反复弹授权框。
+- macOS 本地调试构建仍可能因为没有完整 Apple signing entitlements 而在 Data Protection Keychain 上返回 `errSecMissingEntitlement(-34018)`。这种情况下 `MacSecretStore` 会退到单独的开发期 login-keychain service：`dev.tian.MilesEdgeworth.v2.debug-fallback`。该兜底只解决本地调试可用性，不是发布版策略。
+- macOS 开发构建在 `MilesEdgeworthDesktop.app` 产物生成后执行 adhoc bundle 签名，使签名 identifier 与 `CFBundleIdentifier=dev.tian.MilesEdgeworth.v2` 一致；但 adhoc 签名不能提供 Data Protection Keychain 所需 entitlements，发布构建仍需要后续接入正式 Apple 签名配置。
+- `SettingsService::save()` 会返回密钥写入结果；如果系统钥匙串写入失败，设置窗口保持打开并显示错误，不再假装保存成功。
+- 如果系统密钥存储完全不可用，本阶段选择“不落盘”兜底：用户仍可临时填写并在当前进程内使用，但重启后需要重新输入，或继续使用外部环境变量。macOS 本地调试构建的 `errSecMissingEntitlement(-34018)` 属于已知开发期签名限制，按上一条使用独立 login-keychain fallback。
+
+## 开发期旧钥匙串条目
+
+2026-05-23 之前的开发版曾把 API key 写入传统 login keychain。该条目仍可能留在“钥匙串访问”中，服务名为 `dev.tian.MilesEdgeworth.v2`、账户为 `MILES_PROVIDER_API_KEY`，钥匙串列显示为“登录”。
+
+MilesEdgeworth v2 尚未发布，不需要为开发期旧条目提供自动迁移。新版 `MacSecretStore` 不读取、不删除、不迁移旧 login keychain 条目。Data Protection Keychain 缺少 entitlement 时会使用单独的 `dev.tian.MilesEdgeworth.v2.debug-fallback` service，因此不会把旧条目当作当前配置读出。开发者如果已经产生旧条目，可以手动删除旧 login keychain 记录；当前调试兜底条目需要在设置窗口重新保存 API key 后生成。
 
 ## 验收命令
 

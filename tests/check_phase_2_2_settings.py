@@ -63,6 +63,26 @@ def main() -> int:
         "kSecClassGenericPassword" in mac_secret_mm,
         "MacSecretStore must use generic-password keychain class",
     )
+    require(
+        "kSecUseDataProtectionKeychain" in mac_secret_mm,
+        "MacSecretStore must use the macOS Data Protection Keychain to avoid legacy login-keychain ACL prompts",
+    )
+    require(
+        "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly" in mac_secret_mm,
+        "MacSecretStore must keep provider API keys device-local in the data-protection keychain",
+    )
+    require(
+        "errSecMissingEntitlement" in mac_secret_mm and "fallback" in mac_secret_mm.lower(),
+        "MacSecretStore must fall back for local debug builds when Data Protection Keychain lacks entitlements",
+    )
+    require(
+        '".debug-fallback"' in mac_secret_mm,
+        "MacSecretStore debug fallback must use a separate service name instead of reading old login-keychain items",
+    )
+    require(
+        "readLegacySecret" not in mac_secret_mm and "legacySecret" not in mac_secret_mm,
+        "MacSecretStore must not read or migrate legacy login-keychain API keys before the app has shipped",
+    )
     require("class MacSecretStore" in mac_secret_h, "MacSecretStore.h must declare class MacSecretStore")
 
     # SettingsService
@@ -74,7 +94,7 @@ def main() -> int:
     require("msPerChar" in settings_h and "setMsPerChar" in settings_h, "msPerChar getter/setter required")
     require("apiKey" in settings_h and "setApiKey" in settings_h, "apiKey accessor/setter required")
     require("secretStoreAvailable" in settings_h, "secretStoreAvailable query required")
-    require("void save()" in settings_h or "Q_INVOKABLE void save" in settings_h, "save() method required")
+    require("bool save()" in settings_h, "SettingsService.save() must report secret-store write failures")
     require("void saved()" in settings_h, "saved() signal required")
     require("QSettings" in settings_cpp, "SettingsService must persist through QSettings")
     require("provider/baseUrl" in settings_cpp, "QSettings key provider/baseUrl required")
@@ -88,6 +108,12 @@ def main() -> int:
     require("class SettingsController" in controller_h, "SettingsController class missing")
     require("Q_INVOKABLE" in controller_h, "SettingsController must expose Q_INVOKABLE methods")
     require("openWindow" in controller_h, "SettingsController.openWindow() required")
+    require("saveError" in controller_h and "saveError" in settings_qml,
+            "Settings window must surface provider setting save failures")
+    require(
+        "App.SettingsController.apiKey = apiKeyField.text" in settings_qml,
+        "Settings save button must explicitly read the API key field instead of relying on TextField edit signals",
+    )
     require("SettingsControllerForeign" in controller_h, "SettingsControllerForeign QML singleton boilerplate required")
     require("QJSEngine::setObjectOwnership" in controller_h, "SettingsController singleton must keep C++ ownership")
     require("ApplicationWindow" in settings_qml, "SettingsWindow.qml must be ApplicationWindow")
@@ -98,8 +124,13 @@ def main() -> int:
     require("selectByMouse: true" in chat_qml, "chat message text must support mouse selection")
     require("readOnly: true" in chat_qml, "chat message text selection must not make bubbles editable")
     require(
-        "未连接，先点设置填写模型配置" in chat_qml,
-        "disabled input placeholder must explain the disconnected state and settings entry",
+        "providerConfigured" in chat_h and "providerConfigured" in chat_qml,
+        "ChatWindow disconnected placeholder must know whether provider settings are complete",
+    )
+    require(
+        "未连接，先点设置填写模型配置" in chat_qml
+        and "未连接，点重连或稍后重试" in chat_qml,
+        "disabled input placeholder must distinguish missing config from disconnected configured state",
     )
     require(
         "disconnectedInput" in chat_qml,
@@ -108,12 +139,17 @@ def main() -> int:
 
     # ChatController wiring
     require("SettingsService" in chat_h, "ChatController must take a SettingsService")
+    require("providerConfiguredChanged" in chat_h, "ChatController must notify provider config completeness")
     require("QProcessEnvironment" in chat_cpp, "ChatController must build a QProcessEnvironment")
     require("MILES_PROVIDER_BASE_URL" in chat_cpp, "ChatController must inject MILES_PROVIDER_BASE_URL")
     require("MILES_PROVIDER_API_KEY" in chat_cpp, "ChatController must inject MILES_PROVIDER_API_KEY")
     require("MILES_PROVIDER_MODEL" in chat_cpp, "ChatController must inject MILES_PROVIDER_MODEL")
     require("MILES_PROVIDER_TEMPERATURE" in chat_cpp, "ChatController must inject MILES_PROVIDER_TEMPERATURE")
     require("MILES_PROVIDER_MAX_TOKENS" in chat_cpp, "ChatController must inject MILES_PROVIDER_MAX_TOKENS")
+    require(
+        '"-parent-pid"' in chat_cpp and "applicationPid" in chat_cpp,
+        "ChatController must pass parent pid to sidecar for orphan cleanup",
+    )
     require("restartSidecar" in chat_h and "restartSidecar" in chat_cpp, "ChatController must expose restartSidecar()")
     require("scheduleSidecarStart" in chat_h and "scheduleSidecarStart" in chat_cpp,
             "ChatController restart must schedule sidecar starts")
@@ -121,6 +157,10 @@ def main() -> int:
             "ChatController restart must cap sidecar restart retries")
     require("kSidecarRestartRetryDelayMs" in chat_cpp,
             "ChatController restart must delay retry starts after a fast sidecar exit")
+    require(
+        "terminateForeignSidecar" in chat_cpp and "service" in chat_cpp and "SIGTERM" in chat_cpp,
+        "ChatController must recover when an orphan miles-agent already occupies the sidecar port",
+    )
     require(
         "handleSettingsSaved" in chat_h and "handleSettingsSaved" in chat_cpp,
         "ChatController must respond to saved settings",
@@ -135,6 +175,7 @@ def main() -> int:
 
     # Tests
     require("InMemorySecretStore" in smoke, "smoke test must define InMemorySecretStore")
+    require("FailingSecretStore" in smoke, "smoke test must cover SecretStore write failures")
     require("msPerChar" in smoke, "smoke test must cover msPerChar persistence")
     require("apiKey" in smoke, "smoke test must cover apiKey routing through SecretStore")
     require("SettingsServiceSmoke" in desktop_cmake, "desktop CMake must register SettingsServiceSmoke target")
@@ -144,7 +185,12 @@ def main() -> int:
         "desktop CMake must link Apple Security framework on macOS",
     )
     require("MacSecretStore.mm" in desktop_cmake, "desktop CMake must list MacSecretStore.mm under the APPLE block")
+    require(
+        "/usr/bin/codesign" in desktop_cmake and "$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>" in desktop_cmake,
+        "desktop CMake must ad-hoc sign the app bundle so Data Protection Keychain has a stable app identity",
+    )
     require("SettingsWindow.qml" in desktop_cmake, "desktop CMake must add SettingsWindow.qml to the QML module")
+    require("SettingsLogging.cpp" in desktop_cmake, "desktop CMake must compile settings logging category")
     require("check_phase_2_2_settings" in root_cmake, "root CMake must register Phase 2.2 contract check")
 
     # Docs

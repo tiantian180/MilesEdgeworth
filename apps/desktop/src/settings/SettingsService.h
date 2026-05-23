@@ -36,7 +36,7 @@ public:
     void setApiKey(const QString &value);
 
     bool secretStoreAvailable() const;
-    void save();
+    bool save();
 
 signals:
     void saved();

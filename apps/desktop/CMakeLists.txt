@@ -31,6 +31,8 @@ set(DESKTOP_SOURCES
     src/settings/SecretStore.h
     src/settings/SettingsController.cpp
     src/settings/SettingsController.h
+    src/settings/SettingsLogging.cpp
+    src/settings/SettingsLogging.h
     src/settings/SettingsService.cpp
     src/settings/SettingsService.h
     src/window/WindowInputMaskController.cpp
@@ -56,6 +58,8 @@ set(DESKTOP_SOURCES
     src/pet/interaction/HitZoneMatcher.h
     src/pet/interaction/InteractionPipeline.cpp
     src/pet/interaction/InteractionPipeline.h
+    src/pet/manifest/PersonaStore.cpp
+    src/pet/manifest/PersonaStore.h
     src/pet/manifest/SkinManifest.h
     src/pet/manifest/SkinManifestLoader.cpp
     src/pet/manifest/SkinManifestLoader.h
@@ -147,6 +151,15 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 
 qt_finalize_executable(MilesEdgeworthDesktop)
 
+if(APPLE)
+    add_custom_command(TARGET MilesEdgeworthDesktop POST_BUILD
+        COMMAND /usr/bin/codesign --force --deep --sign -
+                "$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>"
+        COMMENT "Ad-hoc signing MilesEdgeworthDesktop.app for stable macOS keychain identity"
+        VERBATIM
+    )
+endif()
+
 if(TARGET MilesAgentCore)
     add_custom_target(CopyMilesAgentSidecar
         ALL
@@ -221,7 +234,10 @@ if(BUILD_TESTING)
 
     add_executable(SkinManifestLoaderSmoke
         tests/skin_manifest_loader_smoke.cpp
+        src/pet/manifest/PersonaStore.cpp
+        src/pet/manifest/PersonaStore.h
         src/pet/manifest/SkinManifestLoader.cpp
+        resources/pet_assets.qrc
     )
 
     target_link_libraries(SkinManifestLoaderSmoke
@@ -259,6 +275,8 @@ if(BUILD_TESTING)
         src/pet/interaction/HitZoneMatcher.h
         src/pet/interaction/InteractionPipeline.cpp
         src/pet/interaction/InteractionPipeline.h
+        src/pet/manifest/PersonaStore.cpp
+        src/pet/manifest/PersonaStore.h
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h
@@ -308,6 +326,8 @@ if(BUILD_TESTING)
         src/chat/ChatTextPacer.h
         src/settings/SecretStore.cpp
         src/settings/SecretStore.h
+        src/settings/SettingsLogging.cpp
+        src/settings/SettingsLogging.h
         src/settings/SettingsService.cpp
         src/settings/SettingsService.h
         src/pet/behavior/BehaviorTriggerEngine.cpp
@@ -331,6 +351,8 @@ if(BUILD_TESTING)
         src/pet/interaction/HitZoneMatcher.h
         src/pet/interaction/InteractionPipeline.cpp
         src/pet/interaction/InteractionPipeline.h
+        src/pet/manifest/PersonaStore.cpp
+        src/pet/manifest/PersonaStore.h
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h
@@ -370,17 +392,63 @@ if(BUILD_TESTING)
 
     qt_add_executable(SettingsServiceSmoke
         tests/settings_service_smoke.cpp
+        src/pet/behavior/BehaviorTriggerEngine.cpp
+        src/pet/behavior/BehaviorTriggerEngine.h
+        src/pet/commands/SkinCommand.h
+        src/pet/commands/SkinCommandResolver.cpp
+        src/pet/commands/SkinCommandResolver.h
+        src/pet/effects/AudioController.cpp
+        src/pet/effects/AudioController.h
+        src/pet/effects/PropController.cpp
+        src/pet/effects/PropController.h
+        src/pet/effects/PropState.h
+        src/pet/events/PetEvent.h
+        src/pet/events/PetEventBridge.cpp
+        src/pet/events/PetEventBridge.h
+        src/pet/interaction/CustomInteractionRegistry.cpp
+        src/pet/interaction/CustomInteractionRegistry.h
+        src/pet/interaction/GestureTracker.cpp
+        src/pet/interaction/GestureTracker.h
+        src/pet/interaction/HitZoneMatcher.cpp
+        src/pet/interaction/HitZoneMatcher.h
+        src/pet/interaction/InteractionPipeline.cpp
+        src/pet/interaction/InteractionPipeline.h
+        src/pet/manifest/PersonaStore.cpp
+        src/pet/manifest/PersonaStore.h
+        src/pet/manifest/SkinManifest.h
+        src/pet/manifest/SkinManifestLoader.cpp
+        src/pet/manifest/SkinManifestLoader.h
+        src/pet/PetLogging.cpp
+        src/pet/PetLogging.h
+        src/pet/PetRuntime.cpp
+        src/pet/PetRuntime.h
+        src/pet/PetRuntimeSkin.cpp
+        src/pet/requests/ActionRequest.h
+        src/pet/runtime/RuntimeSnapshot.h
+        src/pet/selection/ActionPoolSelector.cpp
+        src/pet/selection/ActionPoolSelector.h
+        src/pet/selection/ExpressionMappingResolver.cpp
+        src/pet/selection/ExpressionMappingResolver.h
+        src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
+        src/skins/miles-edgeworth/MilesEdgeworthInteractions.h
+        src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.cpp
+        src/skins/miles-edgeworth/interactions/ProsecutorBadgeInteraction.h
         src/settings/SettingsController.cpp
         src/settings/SettingsController.h
+        src/settings/SettingsLogging.cpp
+        src/settings/SettingsLogging.h
         src/settings/SettingsService.cpp
         src/settings/SettingsService.h
         src/settings/SecretStore.cpp
         src/settings/SecretStore.h
+        resources/pet_assets.qrc
     )
 
     target_include_directories(SettingsServiceSmoke
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/pet
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/pet/events
     )
 
     target_link_libraries(SettingsServiceSmoke

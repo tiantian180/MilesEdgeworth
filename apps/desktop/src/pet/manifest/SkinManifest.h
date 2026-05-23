@@ -296,6 +296,7 @@ struct SkinManifest
     QString skinName;
     QUrl skinRootUrl;
     bool builtin = false;
+    QString personaPrompt;
 
     CanvasDefinition canvas;
     AudioDefinition audio;

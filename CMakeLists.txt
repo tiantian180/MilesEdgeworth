@@ -593,6 +593,14 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_3_1_animation_sync.py
         )
 
+        # Phase 2.3.2 的会话历史与人设检查：守住 persona.md、
+        # SQLite 会话持久化、ChatService 上下文组装和会话列表 UI。
+        add_test(
+            NAME check_phase_2_3_2_session_persona
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_3_2_session_persona.py
+        )
+
         # Logging standard check: keeps Qt + Go logging categories, env vars,
         # payload safety, and sidecar stderr forwarding aligned with docs/v2/设计方案/日志规范设计.md.
         add_test(
