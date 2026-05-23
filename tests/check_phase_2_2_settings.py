@@ -72,9 +72,15 @@ def main() -> int:
         "MacSecretStore must keep provider API keys device-local in the data-protection keychain",
     )
     require(
-        "readLegacySecret" not in mac_secret_mm
-        and "legacySecret" not in mac_secret_mm
-        and "dataProtectionKeychain" not in mac_secret_mm,
+        "errSecMissingEntitlement" in mac_secret_mm and "fallback" in mac_secret_mm.lower(),
+        "MacSecretStore must fall back for local debug builds when Data Protection Keychain lacks entitlements",
+    )
+    require(
+        '".debug-fallback"' in mac_secret_mm,
+        "MacSecretStore debug fallback must use a separate service name instead of reading old login-keychain items",
+    )
+    require(
+        "readLegacySecret" not in mac_secret_mm and "legacySecret" not in mac_secret_mm,
         "MacSecretStore must not read or migrate legacy login-keychain API keys before the app has shipped",
     )
     require("class MacSecretStore" in mac_secret_h, "MacSecretStore.h must declare class MacSecretStore")
