@@ -50,6 +50,15 @@ QJsonObject withoutKnownFields(const QJsonObject &object, const QSet<QString> &k
     return extra;
 }
 
+QString backupPathFor(const QString &path)
+{
+    QFileInfo info(path);
+    if (info.fileName() == QStringLiteral("providers.json")) {
+        return info.dir().filePath(QStringLiteral("providers.json.bak"));
+    }
+    return path + QStringLiteral(".bak");
+}
+
 std::optional<double> optionalTemperature(const QJsonObject &object)
 {
     const auto value = object.value(QStringLiteral("temperature"));
@@ -145,8 +154,9 @@ ProviderConfigFile::LoadStatus ProviderConfigFile::load()
     const auto doc = QJsonDocument::fromJson(file.readAll(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
         m_lastError = parseError.errorString();
-        QFile::remove(m_path + QStringLiteral(".bak"));
-        QFile::copy(m_path, m_path + QStringLiteral(".bak"));
+        const QString backupPath = backupPathFor(m_path);
+        QFile::remove(backupPath);
+        QFile::copy(m_path, backupPath);
         return LoadStatus::ParseError;
     }
 

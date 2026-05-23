@@ -1,5 +1,4 @@
 #include "settings/ProviderConfigFile.h"
-#include "settings/SecretStore.h"
 #include "settings/SettingsController.h"
 #include "settings/SettingsService.h"
 #include "pet/PetRuntime.h"
@@ -16,60 +15,8 @@
 #include <QTextStream>
 
 #include <cassert>
-#include <map>
-#include <utility>
 
 namespace {
-class InMemorySecretStore : public SecretStore
-{
-public:
-    bool available() const override { return true; }
-
-    QString read(const QString &service, const QString &account) override
-    {
-        ++m_readCount;
-        const auto it = m_store.find({service, account});
-        return it == m_store.end() ? QString() : it->second;
-    }
-
-    bool write(const QString &service, const QString &account, const QString &secret) override
-    {
-        if (secret.isEmpty()) {
-            m_store.erase({service, account});
-        } else {
-            m_store[{service, account}] = secret;
-        }
-        return true;
-    }
-
-    bool remove(const QString &service, const QString &account) override
-    {
-        m_store.erase({service, account});
-        return true;
-    }
-
-    QString peek(const QString &service, const QString &account) const
-    {
-        const auto it = m_store.find({service, account});
-        return it == m_store.end() ? QString() : it->second;
-    }
-
-    int readCount() const { return m_readCount; }
-
-private:
-    std::map<std::pair<QString, QString>, QString> m_store;
-    int m_readCount = 0;
-};
-
-class FailingSecretStore : public SecretStore
-{
-public:
-    bool available() const override { return true; }
-    QString read(const QString &, const QString &) override { return {}; }
-    bool write(const QString &, const QString &, const QString &) override { return false; }
-    bool remove(const QString &, const QString &) override { return false; }
-};
-
 void setupQSettingsScope(QTemporaryDir &dir)
 {
     QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -87,6 +34,19 @@ bool writeFile(const QString &path, const QString &content)
     QTextStream stream(&file);
     stream << content;
     return true;
+}
+
+ProviderConfigFile::ModelConfig modelConfig(const QString &name,
+                                            const QString &baseUrl,
+                                            const QString &apiKey,
+                                            const QString &model)
+{
+    ProviderConfigFile::ModelConfig cfg;
+    cfg.name = name;
+    cfg.baseUrl = baseUrl;
+    cfg.apiKey = apiKey;
+    cfg.model = model;
+    return cfg;
 }
 } // namespace
 
@@ -127,11 +87,13 @@ int main(int argc, char *argv[])
     }
 
     {
-        const QString path = tmp.filePath(QStringLiteral("providers-invalid.json"));
+        QTemporaryDir invalidDir;
+        assert(invalidDir.isValid());
+        const QString path = invalidDir.filePath(QStringLiteral("providers.json"));
         assert(writeFile(path, QStringLiteral("{not-json")));
         ProviderConfigFile file(path);
         assert(file.load() == ProviderConfigFile::LoadStatus::ParseError);
-        assert(QFile::exists(path + QStringLiteral(".bak")));
+        assert(QFile::exists(invalidDir.filePath(QStringLiteral("providers.json.bak"))));
     }
 
     {
@@ -203,88 +165,47 @@ int main(int argc, char *argv[])
     }
 
     {
-        InMemorySecretStore store;
-        SettingsService service(&store);
+        const QString path = tmp.filePath(QStringLiteral("settings-service.json"));
+        SettingsService service(path);
 
         assert(service.baseUrl().isEmpty());
         assert(service.model().isEmpty());
-        assert(qFuzzyCompare(service.temperature() + 1.0, 0.7 + 1.0));
-        assert(service.maxTokens() == 2048);
+        assert(!service.temperature().has_value());
+        assert(!service.maxTokens().has_value());
         assert(service.msPerChar() == 80);
+        assert(!service.providerConfigured());
 
-        service.setBaseUrl(QStringLiteral("https://api.example.com"));
-        service.setModel(QStringLiteral("gpt-test"));
-        service.setTemperature(0.3);
-        service.setMaxTokens(1024);
+        auto cfg = modelConfig(QStringLiteral("deepseek"),
+                               QStringLiteral("https://api.example.com"),
+                               QStringLiteral("sk-secret"),
+                               QStringLiteral("gpt-test"));
+        cfg.temperature = 0.3;
+        cfg.maxTokens = std::nullopt;
+        assert(service.setModelConfig(cfg.name, cfg));
+        service.setActiveModelConfig(cfg.name);
         service.setMsPerChar(120);
-        service.save();
-    }
+        assert(service.save());
 
-    {
-        InMemorySecretStore store;
-        SettingsService service(&store);
-        assert(service.baseUrl() == QStringLiteral("https://api.example.com"));
-        assert(service.model() == QStringLiteral("gpt-test"));
-        assert(qFuzzyCompare(service.temperature() + 1.0, 0.3 + 1.0));
-        assert(service.maxTokens() == 1024);
-        assert(service.msPerChar() == 120);
-    }
+        SettingsService reopened(path);
+        assert(reopened.configNames() == QStringList({QStringLiteral("deepseek")}));
+        assert(reopened.activeModelConfig() == QStringLiteral("deepseek"));
+        assert(reopened.baseUrl() == QStringLiteral("https://api.example.com"));
+        assert(reopened.apiKey() == QStringLiteral("sk-secret"));
+        assert(reopened.model() == QStringLiteral("gpt-test"));
+        assert(reopened.temperature().has_value());
+        assert(qFuzzyCompare(*reopened.temperature() + 1.0, 0.3 + 1.0));
+        assert(!reopened.maxTokens().has_value());
+        assert(reopened.msPerChar() == 120);
+        assert(reopened.providerConfigured());
 
-    {
-        InMemorySecretStore store;
-        store.write(QString::fromUtf8(SettingsService::kKeychainService),
-                    QString::fromUtf8(SettingsService::kKeychainAccount),
-                    QStringLiteral("sk-secret"));
-        SettingsService service(&store);
-        assert(store.readCount() == 0);
-
-        SettingsController controller(&service);
-        assert(store.readCount() == 0);
-
+        SettingsController controller(&reopened);
         controller.openWindow();
-        assert(store.readCount() == 0);
-        assert(controller.apiKey().isEmpty());
-
-        controller.openWindow();
-        assert(store.readCount() == 0);
-        controller.save();
-        assert(store.peek(QString::fromUtf8(SettingsService::kKeychainService),
-                          QString::fromUtf8(SettingsService::kKeychainAccount))
-            == QStringLiteral("sk-secret"));
-
-        controller.openWindow();
+        assert(controller.configName() == QStringLiteral("deepseek"));
+        assert(controller.apiKey() == QStringLiteral("sk-secret"));
         controller.setApiKey(QStringLiteral("sk-replaced"));
         controller.save();
-        assert(store.peek(QString::fromUtf8(SettingsService::kKeychainService),
-                          QString::fromUtf8(SettingsService::kKeychainAccount))
-            == QStringLiteral("sk-replaced"));
-        assert(store.readCount() == 0);
-    }
-
-    {
-        InMemorySecretStore store;
-        SettingsService service(&store);
-        assert(service.apiKey().isEmpty());
-
-        service.setApiKey(QStringLiteral("sk-secret"));
-        service.save();
-        assert(service.apiKey() == QStringLiteral("sk-secret"));
-
-        SettingsService reopen(&store);
-        assert(reopen.apiKey() == QStringLiteral("sk-secret"));
-
-        reopen.setApiKey(QString());
-        reopen.save();
-        SettingsService reopen2(&store);
-        assert(reopen2.apiKey().isEmpty());
-    }
-
-    {
-        FailingSecretStore store;
-        SettingsService service(&store);
-        service.setApiKey(QStringLiteral("sk-write-fails"));
-        assert(!service.save());
-        assert(service.apiKey() == QStringLiteral("sk-write-fails"));
+        SettingsService replaced(path);
+        assert(replaced.apiKey() == QStringLiteral("sk-replaced"));
     }
 
     {
@@ -294,8 +215,7 @@ int main(int argc, char *argv[])
         const QByteArray previousMilesDataDir = qgetenv("MILES_DATA_DIR");
         qputenv("MILES_DATA_DIR", personaDir.path().toUtf8());
 
-        InMemorySecretStore store;
-        SettingsService service(&store);
+        SettingsService service(personaDir.filePath(QStringLiteral("providers.json")));
         PetRuntime runtime;
         assert(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"));
 
@@ -344,9 +264,13 @@ int main(int argc, char *argv[])
 }
 )JSON")));
 
-        InMemorySecretStore store;
-        SettingsService service(&store);
-        service.setBaseUrl(QStringLiteral("https://before.example.com"));
+        SettingsService service(personaDir.filePath(QStringLiteral("providers.json")));
+        auto cfg = modelConfig(QStringLiteral("deepseek"),
+                               QStringLiteral("https://before.example.com"),
+                               QStringLiteral("sk-before"),
+                               QStringLiteral("deepseek-chat"));
+        assert(service.setModelConfig(cfg.name, cfg));
+        service.setActiveModelConfig(cfg.name);
         service.save();
 
         PetRuntime runtime;
@@ -362,7 +286,7 @@ int main(int argc, char *argv[])
         assert(controller.windowVisible());
         assert(!controller.personaError().isEmpty());
         assert(service.baseUrl() == QStringLiteral("https://before.example.com"));
-        SettingsService reopened(&store);
+        SettingsService reopened(personaDir.filePath(QStringLiteral("providers.json")));
         assert(reopened.baseUrl() == QStringLiteral("https://before.example.com"));
 
         if (hadMilesDataDir) {

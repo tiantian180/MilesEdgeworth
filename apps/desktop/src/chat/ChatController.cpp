@@ -119,6 +119,7 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
             this, &ChatController::appendChunkToCurrentMessage);
     if (m_settings != nullptr) {
         m_pacer->setMsPerChar(m_settings->msPerChar());
+        updateProviderConfiguredFromSettings();
     }
 
     m_gateTimeout.setSingleShot(true);
@@ -193,9 +194,15 @@ void ChatController::launchSidecarProcess()
             env.insert(QStringLiteral("MILES_PROVIDER_MODEL"), model);
         }
 
-        providerConfigured = !baseUrl.isEmpty() && !apiKey.isEmpty() && !model.isEmpty();
-        env.insert(QStringLiteral("MILES_PROVIDER_TEMPERATURE"), QString::number(m_settings->temperature()));
-        env.insert(QStringLiteral("MILES_PROVIDER_MAX_TOKENS"), QString::number(m_settings->maxTokens()));
+        providerConfigured = m_settings->providerConfigured();
+        const auto temperature = m_settings->temperature();
+        if (temperature.has_value()) {
+            env.insert(QStringLiteral("MILES_PROVIDER_TEMPERATURE"), QString::number(*temperature));
+        }
+        const auto maxTokens = m_settings->maxTokens();
+        if (maxTokens.has_value()) {
+            env.insert(QStringLiteral("MILES_PROVIDER_MAX_TOKENS"), QString::number(*maxTokens));
+        }
     }
     setProviderConfigured(providerConfigured);
 
@@ -319,7 +326,7 @@ void ChatController::checkHealth()
             m_sidecarRestartAttempts = 0;
             loadConversations();
         }
-        setStatusText(healthy ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+        setStatusText(healthy ? idleStatusText() : QStringLiteral("未连接"));
     });
 }
 
@@ -518,6 +525,10 @@ void ChatController::sendMessage(const QString &message)
 {
     const QString trimmed = message.trimmed();
     if (trimmed.isEmpty() || m_sending) {
+        return;
+    }
+    if (!m_providerConfigured) {
+        setStatusText(QStringLiteral("未配置模型"));
         return;
     }
 
@@ -731,7 +742,7 @@ void ChatController::cancelCurrentReply()
     }
 
     setSending(false);
-    setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+    setStatusText(idleStatusText());
     if (m_runtime != nullptr) {
         m_runtime->returnToIdle();
     }
@@ -819,7 +830,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         if (m_phase == ChatPhase::BUFFERING_FOR_START) {
             m_finishPendingAfterStart = true;
             setSending(false);
-            setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+            setStatusText(idleStatusText());
             return;
         }
 
@@ -827,7 +838,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         m_pendingState.clear();
         m_finishPendingAfterStart = false;
         setSending(false);
-        setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+        setStatusText(idleStatusText());
         drainHoldBufferToPacer();
 
         if (m_runtime == nullptr) {
@@ -1081,11 +1092,17 @@ bool ChatController::updateProviderConfiguredFromSettings()
         return false;
     }
 
-    const bool configured = !m_settings->baseUrl().isEmpty()
-        && !m_settings->apiKey().isEmpty()
-        && !m_settings->model().isEmpty();
+    const bool configured = m_settings->providerConfigured();
     setProviderConfigured(configured);
     return configured;
+}
+
+QString ChatController::idleStatusText() const
+{
+    if (!m_sidecarReady) {
+        return QStringLiteral("未连接");
+    }
+    return m_providerConfigured ? QStringLiteral("已连接") : QStringLiteral("未配置模型");
 }
 
 void ChatController::setSending(bool sending)
@@ -1241,7 +1258,7 @@ void ChatController::finishCurrentReply()
     m_currentReply.clear();
     m_finishPendingAfterStart = false;
     setSending(false);
-    setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+    setStatusText(idleStatusText());
     if (!m_currentConversationId.isEmpty()) {
         loadConversations();
     }
@@ -1345,5 +1362,5 @@ void ChatController::isolateConversationAsyncState()
 
     m_assistantMessageIndex = -1;
     setSending(false);
-    setStatusText(m_sidecarReady ? QStringLiteral("已连接") : QStringLiteral("未连接"));
+    setStatusText(idleStatusText());
 }

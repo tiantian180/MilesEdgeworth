@@ -499,19 +499,22 @@ ApplicationWindow {
                 id: input
 
                 readonly property bool disconnectedInput: !App.ChatController.sidecarReady && !App.ChatController.sending
-                readonly property bool missingProviderConfig: disconnectedInput && !App.ChatController.providerConfigured
+                readonly property bool providerConfigured: App.ChatController.providerConfigured
+                readonly property bool canSendInput: App.ChatController.sidecarReady && providerConfigured && !App.ChatController.sending
+                readonly property bool missingProviderConfig: !providerConfigured && !App.ChatController.sending
+                readonly property bool disabledInput: disconnectedInput || missingProviderConfig
 
                 Layout.fillWidth: true
                 Layout.preferredHeight: 72
                 wrapMode: TextArea.Wrap
-                placeholderText: disconnectedInput
-                        ? (missingProviderConfig ? "未连接，先点设置填写模型配置" : "未连接，点重连或稍后重试")
-                        : "输入消息"
-                placeholderTextColor: disconnectedInput ? "#8a4b38" : "#82786e"
+                placeholderText: missingProviderConfig
+                        ? "先点设置填写模型配置"
+                        : (disconnectedInput ? "未连接，点重连或稍后重试" : "输入消息")
+                placeholderTextColor: input.disabledInput ? "#8a4b38" : "#82786e"
                 color: enabled ? "#26201b" : "#6f5545"
                 selectionColor: "#b9d0f2"
                 selectedTextColor: "#26201b"
-                enabled: App.ChatController.sidecarReady && !App.ChatController.sending
+                enabled: input.canSendInput
                 opacity: 1.0
                 leftPadding: 12
                 rightPadding: 12
@@ -519,9 +522,9 @@ ApplicationWindow {
                 bottomPadding: 10
                 background: Rectangle {
                     radius: 6
-                    color: input.disconnectedInput ? "#fff4ec" : (input.enabled ? "#fffdf8" : "#eee9e2")
-                    border.color: input.disconnectedInput ? "#c66a4b" : (input.activeFocus ? "#7b604c" : "#d8d1c8")
-                    border.width: (input.disconnectedInput || input.activeFocus) ? 2 : 1
+                    color: input.disabledInput ? "#fff4ec" : (input.enabled ? "#fffdf8" : "#eee9e2")
+                    border.color: input.disabledInput ? "#c66a4b" : (input.activeFocus ? "#7b604c" : "#d8d1c8")
+                    border.width: (input.disabledInput || input.activeFocus) ? 2 : 1
                 }
 
                 Keys.onPressed: function(event) {
@@ -537,7 +540,10 @@ ApplicationWindow {
                 id: sendButton
 
                 text: App.ChatController.sending ? "停止" : "发送"
-                enabled: App.ChatController.sending || (App.ChatController.sidecarReady && input.text.trim().length > 0)
+                enabled: App.ChatController.sending
+                        || (App.ChatController.sidecarReady
+                            && App.ChatController.providerConfigured
+                            && input.text.trim().length > 0)
                 font.pixelSize: 14
                 font.weight: Font.DemiBold
                 Layout.preferredWidth: 76

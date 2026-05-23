@@ -100,6 +100,7 @@ private:
     void setSidecarReady(bool ready);
     void setProviderConfigured(bool configured);
     bool updateProviderConfiguredFromSettings();
+    QString idleStatusText() const;
     void setSending(bool sending);
     void setStatusText(const QString &statusText);
     void requestPetExpression(

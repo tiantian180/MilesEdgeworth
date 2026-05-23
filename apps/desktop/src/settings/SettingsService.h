@@ -1,57 +1,58 @@
 #pragma once
 
+#include "ProviderConfigFile.h"
+
 #include <QObject>
 #include <QString>
+#include <QStringList>
 
-class SecretStore;
+#include <optional>
 
-// SettingsService owns persisted user-facing provider settings. Non-secret
-// fields use QSettings; the API key is routed through the injected SecretStore.
+// SettingsService owns user-facing provider settings stored in providers.json.
 class SettingsService : public QObject
 {
     Q_OBJECT
 
 public:
-    static constexpr const char *kKeychainService = "dev.tian.MilesEdgeworth.v2";
-    static constexpr const char *kKeychainAccount = "MILES_PROVIDER_API_KEY";
+    explicit SettingsService(QString configPath = {}, QObject *parent = nullptr);
 
-    explicit SettingsService(SecretStore *secretStore, QObject *parent = nullptr);
+    QStringList configNames() const;
 
-    QString baseUrl() const { return m_baseUrl; }
+    QString activeModelConfig() const;
+    void setActiveModelConfig(const QString &name);
+
+    ProviderConfigFile::ModelConfig modelConfig(const QString &name) const;
+    bool setModelConfig(const QString &name, const ProviderConfigFile::ModelConfig &cfg);
+    void removeModelConfig(const QString &name);
+
+    QString baseUrl() const;
     void setBaseUrl(const QString &value);
 
-    QString model() const { return m_model; }
-    void setModel(const QString &value);
-
-    double temperature() const { return m_temperature; }
-    void setTemperature(double value);
-
-    int maxTokens() const { return m_maxTokens; }
-    void setMaxTokens(int value);
-
-    int msPerChar() const { return m_msPerChar; }
-    void setMsPerChar(int value);
-
-    QString apiKey();
+    QString apiKey() const;
     void setApiKey(const QString &value);
 
-    bool secretStoreAvailable() const;
+    QString model() const;
+    void setModel(const QString &value);
+
+    std::optional<double> temperature() const;
+    void setTemperature(std::optional<double> value);
+
+    std::optional<int> maxTokens() const;
+    void setMaxTokens(std::optional<int> value);
+
+    int msPerChar() const;
+    void setMsPerChar(int value);
+
+    bool providerConfigured() const;
+    QString lastError() const;
     bool save();
 
 signals:
     void saved();
 
 private:
-    void load();
-    void ensureApiKeyLoaded();
+    ProviderConfigFile::ModelConfig activeConfig() const;
+    void updateActiveConfig(const ProviderConfigFile::ModelConfig &cfg);
 
-    SecretStore *m_secretStore = nullptr;
-    QString m_baseUrl;
-    QString m_model;
-    double m_temperature = 0.7;
-    int m_maxTokens = 2048;
-    int m_msPerChar = 80;
-    QString m_apiKey;
-    QString m_savedApiKey;
-    bool m_apiKeyLoaded = false;
+    ProviderConfigFile m_configFile;
 };

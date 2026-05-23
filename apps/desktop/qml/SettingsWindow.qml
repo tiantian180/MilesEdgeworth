@@ -42,29 +42,48 @@ ApplicationWindow {
                     font.weight: Font.DemiBold
                 }
 
-                Rectangle {
-                    visible: !App.SettingsController.secretStoreAvailable
-                    Layout.fillWidth: true
-                    implicitHeight: warningLabel.implicitHeight + 18
-                    radius: 6
-                    color: "#fff3df"
-                    border.color: "#d89543"
-
-                    Label {
-                        id: warningLabel
-                        anchors.fill: parent
-                        anchors.margins: 9
-                        text: qsTr("Keychain 不可用：API Key 仅从环境变量读取，不会写入磁盘。")
-                        color: "#7b4a12"
-                        wrapMode: Text.WordWrap
-                    }
-                }
-
                 GridLayout {
                     columns: 2
                     columnSpacing: 12
                     rowSpacing: 10
                     Layout.fillWidth: true
+
+                    Label { text: qsTr("当前配置"); color: "#26201b" }
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        ComboBox {
+                            id: configSelector
+                            Layout.fillWidth: true
+                            model: App.SettingsController.configNames
+                            currentIndex: App.SettingsController.configNames.indexOf(App.SettingsController.activeModelConfig)
+                            onActivated: {
+                                if (currentText.length > 0) {
+                                    App.SettingsController.selectConfig(currentText)
+                                }
+                            }
+                        }
+
+                        Button {
+                            text: qsTr("新增")
+                            onClicked: App.SettingsController.addConfig()
+                        }
+
+                        Button {
+                            text: qsTr("删除")
+                            enabled: App.SettingsController.activeModelConfig.length > 0
+                            onClicked: App.SettingsController.deleteConfig(App.SettingsController.activeModelConfig)
+                        }
+                    }
+
+                    Label { text: qsTr("名称"); color: "#26201b" }
+                    TextField {
+                        id: configNameField
+                        Layout.fillWidth: true
+                        text: App.SettingsController.configName
+                        placeholderText: "deepseek"
+                        onTextEdited: App.SettingsController.configName = text
+                    }
 
                     Label { text: qsTr("Base URL"); color: "#26201b" }
                     TextField {
@@ -81,7 +100,7 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         text: App.SettingsController.apiKey
                         echoMode: TextInput.Password
-                        placeholderText: "留空保留已保存 API Key，输入新 key 会覆盖"
+                        placeholderText: "sk-..."
                         onTextEdited: App.SettingsController.apiKey = text
                     }
 
@@ -95,34 +114,23 @@ ApplicationWindow {
                     }
 
                     Label { text: qsTr("Temperature"); color: "#26201b" }
-                    RowLayout {
+                    TextField {
+                        id: temperatureField
                         Layout.fillWidth: true
-                        Slider {
-                            id: temperatureSlider
-                            Layout.fillWidth: true
-                            from: 0.0
-                            to: 2.0
-                            stepSize: 0.05
-                            value: App.SettingsController.temperature
-                            onMoved: App.SettingsController.temperature = value
-                        }
-                        Label {
-                            text: temperatureSlider.value.toFixed(2)
-                            color: "#26201b"
-                            Layout.preferredWidth: 44
-                        }
+                        text: App.SettingsController.temperatureText
+                        placeholderText: "留空"
+                        inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        onTextEdited: App.SettingsController.temperatureText = text
                     }
 
                     Label { text: qsTr("Max Tokens"); color: "#26201b" }
-                    SpinBox {
+                    TextField {
                         id: maxTokensField
                         Layout.fillWidth: true
-                        from: 1
-                        to: 32768
-                        stepSize: 64
-                        editable: true
-                        value: App.SettingsController.maxTokens
-                        onValueModified: App.SettingsController.maxTokens = value
+                        text: App.SettingsController.maxTokensText
+                        placeholderText: "留空"
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        onTextEdited: App.SettingsController.maxTokensText = text
                     }
 
                     Label { text: qsTr("文字节奏"); color: "#26201b" }
@@ -143,6 +151,14 @@ ApplicationWindow {
                             Layout.preferredWidth: 72
                         }
                     }
+                }
+
+                Label {
+                    visible: App.SettingsController.validationError.length > 0
+                    text: App.SettingsController.validationError
+                    color: "#b65a45"
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
                 }
 
                 Label {
@@ -207,13 +223,12 @@ ApplicationWindow {
                 text: qsTr("保存")
                 highlighted: true
                 onClicked: {
+                    App.SettingsController.configName = configNameField.text
                     App.SettingsController.baseUrl = baseUrlField.text
-                    if (apiKeyField.text.length > 0) {
-                        App.SettingsController.apiKey = apiKeyField.text
-                    }
+                    App.SettingsController.apiKey = apiKeyField.text
                     App.SettingsController.model = modelField.text
-                    App.SettingsController.maxTokens = maxTokensField.value
-                    App.SettingsController.temperature = temperatureSlider.value
+                    App.SettingsController.temperatureText = temperatureField.text
+                    App.SettingsController.maxTokensText = maxTokensField.text
                     App.SettingsController.msPerChar = Math.round(msPerCharSlider.value)
                     App.SettingsController.personaPrompt = personaField.text
                     App.SettingsController.save()

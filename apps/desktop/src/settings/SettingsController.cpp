@@ -6,39 +6,117 @@
 
 #include <QtGlobal>
 
+#include <optional>
+
+namespace {
+QString temperatureToText(std::optional<double> value)
+{
+    return value.has_value() ? QString::number(*value, 'f', 2) : QString();
+}
+
+QString maxTokensToText(std::optional<int> value)
+{
+    return value.has_value() ? QString::number(*value) : QString();
+}
+
+std::optional<double> parseTemperature(const QString &text, QString *error)
+{
+    const QString trimmed = text.trimmed();
+    if (trimmed.isEmpty()) {
+        return std::nullopt;
+    }
+
+    bool ok = false;
+    const double value = trimmed.toDouble(&ok);
+    if (!ok || value < 0.0 || value > 2.0) {
+        *error = QStringLiteral("Temperature 必须留空，或填写 0 到 2 之间的数字。");
+        return std::nullopt;
+    }
+    return value;
+}
+
+std::optional<int> parseMaxTokens(const QString &text, QString *error)
+{
+    const QString trimmed = text.trimmed();
+    if (trimmed.isEmpty()) {
+        return std::nullopt;
+    }
+
+    bool ok = false;
+    const int value = trimmed.toInt(&ok);
+    if (!ok || value < 1) {
+        *error = QStringLiteral("Max Tokens 必须留空，或填写正整数。");
+        return std::nullopt;
+    }
+    return value;
+}
+
+QString nextConfigName(const QStringList &names)
+{
+    const QString base = QStringLiteral("新配置");
+    if (!names.contains(base)) {
+        return base;
+    }
+    for (int i = 2; i < 1000; ++i) {
+        const QString candidate = QStringLiteral("新配置 %1").arg(i);
+        if (!names.contains(candidate)) {
+            return candidate;
+        }
+    }
+    return QStringLiteral("新配置 1000");
+}
+} // namespace
+
 SettingsController::SettingsController(SettingsService *service, PetRuntime *runtime, QObject *parent)
     : QObject(parent)
     , m_service(service)
     , m_runtime(runtime)
 {
-    syncFromService(false);
+    syncFromService();
     reloadPersona();
 }
 
-void SettingsController::syncFromService(bool includeSecret)
+void SettingsController::syncFromService()
 {
     if (m_service == nullptr) {
         return;
     }
 
-    m_baseUrl = m_service->baseUrl();
-    m_model = m_service->model();
-    m_temperature = m_service->temperature();
-    m_maxTokens = m_service->maxTokens();
+    m_configNames = m_service->configNames();
+    m_activeModelConfig = m_service->activeModelConfig();
+    syncFromConfig(m_service->modelConfig(m_activeModelConfig));
     m_msPerChar = m_service->msPerChar();
-    if (includeSecret) {
-        m_apiKey = m_service->apiKey();
-        m_apiKeyLoaded = true;
-    }
 
-    emit baseUrlChanged();
-    if (includeSecret) {
-        emit apiKeyChanged();
-    }
-    emit modelChanged();
-    emit temperatureChanged();
-    emit maxTokensChanged();
+    emit configNamesChanged();
+    emit activeModelConfigChanged();
     emit msPerCharChanged();
+}
+
+void SettingsController::syncFromConfig(const ProviderConfigFile::ModelConfig &cfg)
+{
+    m_configName = cfg.name;
+    m_baseUrl = cfg.baseUrl;
+    m_apiKey = cfg.apiKey;
+    m_model = cfg.model;
+    m_temperatureText = temperatureToText(cfg.temperature);
+    m_maxTokensText = maxTokensToText(cfg.maxTokens);
+
+    emit configNameChanged();
+    emit baseUrlChanged();
+    emit apiKeyChanged();
+    emit modelChanged();
+    emit temperatureTextChanged();
+    emit maxTokensTextChanged();
+    updateProviderConfigured();
+}
+
+void SettingsController::setConfigName(const QString &value)
+{
+    if (m_configName == value) {
+        return;
+    }
+    m_configName = value;
+    emit configNameChanged();
 }
 
 void SettingsController::setBaseUrl(const QString &value)
@@ -48,6 +126,7 @@ void SettingsController::setBaseUrl(const QString &value)
     }
     m_baseUrl = value;
     emit baseUrlChanged();
+    updateProviderConfigured();
 }
 
 void SettingsController::setApiKey(const QString &value)
@@ -56,8 +135,8 @@ void SettingsController::setApiKey(const QString &value)
         return;
     }
     m_apiKey = value;
-    m_apiKeyLoaded = true;
     emit apiKeyChanged();
+    updateProviderConfigured();
 }
 
 void SettingsController::setModel(const QString &value)
@@ -67,36 +146,25 @@ void SettingsController::setModel(const QString &value)
     }
     m_model = value;
     emit modelChanged();
+    updateProviderConfigured();
 }
 
-void SettingsController::setTemperature(double value)
+void SettingsController::setTemperatureText(const QString &value)
 {
-    if (value < 0.0) {
-        value = 0.0;
-    }
-    if (value > 2.0) {
-        value = 2.0;
-    }
-    if (qFuzzyCompare(m_temperature + 1.0, value + 1.0)) {
+    if (m_temperatureText == value) {
         return;
     }
-    m_temperature = value;
-    emit temperatureChanged();
+    m_temperatureText = value;
+    emit temperatureTextChanged();
 }
 
-void SettingsController::setMaxTokens(int value)
+void SettingsController::setMaxTokensText(const QString &value)
 {
-    if (value < 1) {
-        value = 1;
-    }
-    if (value > 32768) {
-        value = 32768;
-    }
-    if (m_maxTokens == value) {
+    if (m_maxTokensText == value) {
         return;
     }
-    m_maxTokens = value;
-    emit maxTokensChanged();
+    m_maxTokensText = value;
+    emit maxTokensTextChanged();
 }
 
 void SettingsController::setMsPerChar(int value)
@@ -123,18 +191,11 @@ void SettingsController::setPersonaPrompt(const QString &value)
     emit personaPromptChanged();
 }
 
-bool SettingsController::secretStoreAvailable() const
-{
-    return m_service != nullptr && m_service->secretStoreAvailable();
-}
-
 void SettingsController::openWindow()
 {
-    syncFromService(false);
-    m_apiKey.clear();
-    m_apiKeyLoaded = false;
-    emit apiKeyChanged();
+    syncFromService();
     reloadPersona();
+    setValidationError(QString());
     setSaveError(QString());
     setWindowVisible(true);
 }
@@ -149,11 +210,51 @@ void SettingsController::save()
     if (m_service == nullptr) {
         return;
     }
+    setValidationError(QString());
     setSaveError(QString());
+
     qCDebug(settingsLog).noquote() << "settings controller save requested"
-                                   << QStringLiteral("apiKeyLoaded=%1").arg(m_apiKeyLoaded ? "true" : "false")
-                                   << QStringLiteral("baseUrlSet=%1").arg(!m_baseUrl.isEmpty() ? "true" : "false")
-                                   << QStringLiteral("modelSet=%1").arg(!m_model.isEmpty() ? "true" : "false");
+                                   << QStringLiteral("configName=%1").arg(m_configName)
+                                   << QStringLiteral("baseUrlSet=%1").arg(!m_baseUrl.trimmed().isEmpty() ? "true" : "false")
+                                   << QStringLiteral("modelSet=%1").arg(!m_model.trimmed().isEmpty() ? "true" : "false");
+
+    QString validation;
+    const auto temperature = parseTemperature(m_temperatureText, &validation);
+    if (!validation.isEmpty()) {
+        setValidationError(validation);
+        return;
+    }
+    const auto maxTokens = parseMaxTokens(m_maxTokensText, &validation);
+    if (!validation.isEmpty()) {
+        setValidationError(validation);
+        return;
+    }
+
+    const bool hasProviderInput = !m_configName.trimmed().isEmpty()
+        || !m_baseUrl.trimmed().isEmpty()
+        || !m_apiKey.trimmed().isEmpty()
+        || !m_model.trimmed().isEmpty()
+        || !m_temperatureText.trimmed().isEmpty()
+        || !m_maxTokensText.trimmed().isEmpty();
+
+    ProviderConfigFile::ModelConfig cfg;
+    if (hasProviderInput) {
+        cfg.name = m_configName.trimmed();
+        cfg.baseUrl = m_baseUrl.trimmed();
+        cfg.apiKey = m_apiKey.trimmed();
+        cfg.model = m_model.trimmed();
+        cfg.temperature = temperature;
+        cfg.maxTokens = maxTokens;
+
+        if (cfg.name.isEmpty()) {
+            setValidationError(QStringLiteral("请填写配置名称。"));
+            return;
+        }
+        if (cfg.baseUrl.isEmpty() || cfg.apiKey.isEmpty() || cfg.model.isEmpty()) {
+            setValidationError(QStringLiteral("Base URL、API Key 和 Model 都必须填写。"));
+            return;
+        }
+    }
 
     if (m_runtime != nullptr) {
         QString error;
@@ -168,20 +269,24 @@ void SettingsController::save()
         reloadPersona();
     }
 
-    m_service->setBaseUrl(m_baseUrl);
-    if (m_apiKeyLoaded) {
-        m_service->setApiKey(m_apiKey);
+    if (hasProviderInput) {
+        const QString oldName = m_activeModelConfig.trimmed().isEmpty() ? cfg.name : m_activeModelConfig;
+        if (!m_service->setModelConfig(oldName, cfg)) {
+            setValidationError(QStringLiteral("配置名称重复或无效。"));
+            return;
+        }
     }
-    m_service->setModel(m_model);
-    m_service->setTemperature(m_temperature);
-    m_service->setMaxTokens(m_maxTokens);
     m_service->setMsPerChar(m_msPerChar);
     if (!m_service->save()) {
-        setSaveError(QStringLiteral("保存 API Key 失败：系统钥匙串写入失败。请重新保存，或查看 miles-debug.log。"));
+        const QString detail = m_service->lastError().trimmed();
+        setSaveError(detail.isEmpty()
+                ? QStringLiteral("保存模型配置失败。")
+                : QStringLiteral("保存模型配置失败：%1").arg(detail));
         qCWarning(settingsLog).noquote() << "settings controller save failed";
         return;
     }
 
+    syncFromService();
     qCDebug(settingsLog).noquote() << "settings controller save completed";
     emit saved();
     closeWindow();
@@ -189,11 +294,9 @@ void SettingsController::save()
 
 void SettingsController::revert()
 {
-    syncFromService(false);
-    m_apiKey.clear();
-    m_apiKeyLoaded = false;
-    emit apiKeyChanged();
+    syncFromService();
     reloadPersona();
+    setValidationError(QString());
     setSaveError(QString());
     closeWindow();
 }
@@ -208,6 +311,70 @@ void SettingsController::reloadPersona()
 
     setPersonaPrompt(m_runtime->manifest().personaPrompt);
     setPersonaError(QString());
+}
+
+void SettingsController::selectConfig(const QString &name)
+{
+    if (m_service == nullptr) {
+        return;
+    }
+    m_service->setActiveModelConfig(name);
+    syncFromService();
+    setValidationError(QString());
+}
+
+void SettingsController::addConfig()
+{
+    m_activeModelConfig.clear();
+    emit activeModelConfigChanged();
+    ProviderConfigFile::ModelConfig cfg;
+    cfg.name = nextConfigName(m_configNames);
+    syncFromConfig(cfg);
+    setValidationError(QString());
+    setSaveError(QString());
+}
+
+void SettingsController::deleteConfig(const QString &name)
+{
+    if (m_service == nullptr) {
+        return;
+    }
+    const QString target = name.trimmed().isEmpty() ? m_activeModelConfig : name.trimmed();
+    if (target.isEmpty()) {
+        return;
+    }
+
+    m_service->removeModelConfig(target);
+    if (!m_service->save()) {
+        const QString detail = m_service->lastError().trimmed();
+        setSaveError(detail.isEmpty()
+                ? QStringLiteral("删除模型配置失败。")
+                : QStringLiteral("删除模型配置失败：%1").arg(detail));
+        return;
+    }
+    syncFromService();
+    emit saved();
+}
+
+void SettingsController::updateProviderConfigured()
+{
+    const bool configured = !m_baseUrl.trimmed().isEmpty()
+        && !m_apiKey.trimmed().isEmpty()
+        && !m_model.trimmed().isEmpty();
+    if (m_providerConfigured == configured) {
+        return;
+    }
+    m_providerConfigured = configured;
+    emit providerConfiguredChanged();
+}
+
+void SettingsController::setValidationError(const QString &value)
+{
+    if (m_validationError == value) {
+        return;
+    }
+    m_validationError = value;
+    emit validationErrorChanged();
 }
 
 void SettingsController::setPersonaError(const QString &value)

@@ -5,7 +5,6 @@
 #include "pet/interaction/CustomInteractionRegistry.h"
 #include "pet/PetRuntime.h"
 #include "pet/surface/PetSurfaceWindow.h"
-#include "settings/SecretStore.h"
 #include "settings/SettingsController.h"
 #include "settings/SettingsService.h"
 #include "skins/miles-edgeworth/MilesEdgeworthInteractions.h"
@@ -54,8 +53,7 @@ int main(int argc, char *argv[])
     PetEventBridge petEventBridge(&petRuntime);
     PetEventBridgeForeign::s_instance = &petEventBridge;
 
-    std::unique_ptr<SecretStore> secretStore = SecretStore::create();
-    SettingsService settingsService(secretStore.get());
+    SettingsService settingsService;
     SettingsController settingsController(&settingsService, &petRuntime);
     SettingsControllerForeign::s_instance = &settingsController;
 
