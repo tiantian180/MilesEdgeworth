@@ -57,6 +57,15 @@ private:
     int m_readCount = 0;
 };
 
+class FailingSecretStore : public SecretStore
+{
+public:
+    bool available() const override { return true; }
+    QString read(const QString &, const QString &) override { return {}; }
+    bool write(const QString &, const QString &, const QString &) override { return false; }
+    bool remove(const QString &, const QString &) override { return false; }
+};
+
 void setupQSettingsScope(QTemporaryDir &dir)
 {
     QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -161,6 +170,14 @@ int main(int argc, char *argv[])
         reopen.save();
         SettingsService reopen2(&store);
         assert(reopen2.apiKey().isEmpty());
+    }
+
+    {
+        FailingSecretStore store;
+        SettingsService service(&store);
+        service.setApiKey(QStringLiteral("sk-write-fails"));
+        assert(!service.save());
+        assert(service.apiKey() == QStringLiteral("sk-write-fails"));
     }
 
     {

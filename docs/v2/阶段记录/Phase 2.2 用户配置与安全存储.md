@@ -24,6 +24,8 @@
 - API key 不写入 `QSettings`，也不进入仓库、日志或 QML 明文持久化文件。
 - Qt 到 Go sidecar 的聊天 HTTP 请求不携带 API key；key 只通过子进程环境变量传给 sidecar。
 - macOS API key 条目使用 Data Protection Keychain，并标记为 `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，避免传统 login keychain 把访问权限绑到开发构建的 adhoc `cdhash` 后反复弹授权框。
+- macOS 开发构建在 `MilesEdgeworthDesktop.app` 产物生成后执行稳定 adhoc bundle 签名，使签名 identifier 与 `CFBundleIdentifier=dev.tian.MilesEdgeworth.v2` 一致；否则 linker-signed Mach-O 会使用临时可执行名身份，Data Protection Keychain 可能出现写入后重启读不到的问题。
+- `SettingsService::save()` 会返回密钥写入结果；如果系统钥匙串写入失败，设置窗口保持打开并显示错误，不再假装保存成功。
 - 如果系统密钥存储不可用，本阶段选择“不落盘”兜底：用户仍可临时填写并在当前进程内使用，但重启后需要重新输入，或继续使用外部环境变量。
 
 ## 开发期旧钥匙串条目

@@ -21,6 +21,7 @@ class SettingsController : public QObject
     Q_PROPERTY(int msPerChar READ msPerChar WRITE setMsPerChar NOTIFY msPerCharChanged)
     Q_PROPERTY(QString personaPrompt READ personaPrompt WRITE setPersonaPrompt NOTIFY personaPromptChanged)
     Q_PROPERTY(QString personaError READ personaError NOTIFY personaErrorChanged)
+    Q_PROPERTY(QString saveError READ saveError NOTIFY saveErrorChanged)
     Q_PROPERTY(bool secretStoreAvailable READ secretStoreAvailable CONSTANT)
     Q_PROPERTY(bool windowVisible READ windowVisible NOTIFY windowVisibleChanged)
 
@@ -47,6 +48,7 @@ public:
 
     QString personaPrompt() const { return m_personaPrompt; }
     QString personaError() const { return m_personaError; }
+    QString saveError() const { return m_saveError; }
     void setPersonaPrompt(const QString &value);
 
     bool secretStoreAvailable() const;
@@ -67,12 +69,14 @@ signals:
     void msPerCharChanged();
     void personaPromptChanged();
     void personaErrorChanged();
+    void saveErrorChanged();
     void windowVisibleChanged();
     void saved();
 
 private:
     void syncFromService(bool includeSecret);
     void setPersonaError(const QString &value);
+    void setSaveError(const QString &value);
     void setWindowVisible(bool visible);
 
     SettingsService *m_service = nullptr;
@@ -82,6 +86,7 @@ private:
     QString m_model;
     QString m_personaPrompt;
     QString m_personaError;
+    QString m_saveError;
     double m_temperature = 0.7;
     int m_maxTokens = 2048;
     int m_msPerChar = 80;

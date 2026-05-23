@@ -411,12 +411,17 @@ ApplicationWindow {
 
                                 readonly property bool isUser: role === "user"
                                 readonly property string bodyText: text.length > 0 ? text : "…"
+                                readonly property real horizontalPadding: 16
+                                readonly property real verticalPadding: 16
                                 readonly property real maxBubbleWidth: parent.width * 0.82
+                                readonly property real maxContentWidth: Math.max(1, maxBubbleWidth - horizontalPadding)
 
                                 width: Math.min(maxBubbleWidth,
-                                                Math.max(messageMetrics.width + 16,
-                                                         partial ? partialMetrics.width + 16 : 0))
-                                implicitHeight: messageText.contentHeight + (partialLabel.visible ? partialLabel.implicitHeight + 4 : 0) + 16
+                                                Math.max(messageMeasure.contentWidth + horizontalPadding,
+                                                         partial ? partialMetrics.width + horizontalPadding : 0))
+                                implicitHeight: messageMeasure.contentHeight
+                                                + (partialLabel.visible ? partialLabel.implicitHeight + 4 : 0)
+                                                + verticalPadding
                                 height: implicitHeight
                                 anchors.right: isUser ? parent.right : undefined
                                 anchors.left: isUser ? undefined : parent.left
@@ -424,11 +429,15 @@ ApplicationWindow {
                                 color: error ? "#f6d6cc" : (isUser ? "#dce7f7" : "#eee7da")
                                 border.color: error ? "#b65a45" : "transparent"
 
-                                TextMetrics {
-                                    id: messageMetrics
+                                Text {
+                                    id: messageMeasure
 
+                                    visible: false
+                                    width: bubble.maxContentWidth
                                     text: bubble.bodyText
-                                    font: messageText.font
+                                    font.pixelSize: 14
+                                    textFormat: Text.PlainText
+                                    wrapMode: Text.Wrap
                                 }
 
                                 TextMetrics {
@@ -450,6 +459,7 @@ ApplicationWindow {
                                     color: "#26201b"
                                     font.pixelSize: 14
                                     readOnly: true
+                                    textMargin: 0
                                     selectByMouse: true
                                     selectByKeyboard: true
                                     selectedTextColor: "#26201b"

@@ -111,7 +111,7 @@ bool SettingsService::secretStoreAvailable() const
     return m_secretStore != nullptr && m_secretStore->available();
 }
 
-void SettingsService::save()
+bool SettingsService::save()
 {
     {
         QSettings settings;
@@ -123,16 +123,21 @@ void SettingsService::save()
     }
 
     if (m_apiKeyLoaded && m_apiKey != m_savedApiKey && m_secretStore != nullptr && m_secretStore->available()) {
+        bool secretSaved = false;
         if (m_apiKey.isEmpty()) {
-            m_secretStore->remove(QString::fromUtf8(kKeychainService),
-                                  QString::fromUtf8(kKeychainAccount));
+            secretSaved = m_secretStore->remove(QString::fromUtf8(kKeychainService),
+                                                QString::fromUtf8(kKeychainAccount));
         } else {
-            m_secretStore->write(QString::fromUtf8(kKeychainService),
-                                 QString::fromUtf8(kKeychainAccount),
-                                 m_apiKey);
+            secretSaved = m_secretStore->write(QString::fromUtf8(kKeychainService),
+                                               QString::fromUtf8(kKeychainAccount),
+                                               m_apiKey);
+        }
+        if (!secretSaved) {
+            return false;
         }
         m_savedApiKey = m_apiKey;
     }
 
     emit saved();
+    return true;
 }

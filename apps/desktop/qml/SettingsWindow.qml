@@ -180,6 +180,14 @@ ApplicationWindow {
                     wrapMode: Text.WordWrap
                     Layout.fillWidth: true
                 }
+
+                Label {
+                    visible: App.SettingsController.saveError.length > 0
+                    text: App.SettingsController.saveError
+                    color: "#b65a45"
+                    wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
             }
         }
 

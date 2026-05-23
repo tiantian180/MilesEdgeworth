@@ -88,7 +88,7 @@ def main() -> int:
     require("msPerChar" in settings_h and "setMsPerChar" in settings_h, "msPerChar getter/setter required")
     require("apiKey" in settings_h and "setApiKey" in settings_h, "apiKey accessor/setter required")
     require("secretStoreAvailable" in settings_h, "secretStoreAvailable query required")
-    require("void save()" in settings_h or "Q_INVOKABLE void save" in settings_h, "save() method required")
+    require("bool save()" in settings_h, "SettingsService.save() must report secret-store write failures")
     require("void saved()" in settings_h, "saved() signal required")
     require("QSettings" in settings_cpp, "SettingsService must persist through QSettings")
     require("provider/baseUrl" in settings_cpp, "QSettings key provider/baseUrl required")
@@ -102,6 +102,8 @@ def main() -> int:
     require("class SettingsController" in controller_h, "SettingsController class missing")
     require("Q_INVOKABLE" in controller_h, "SettingsController must expose Q_INVOKABLE methods")
     require("openWindow" in controller_h, "SettingsController.openWindow() required")
+    require("saveError" in controller_h and "saveError" in settings_qml,
+            "Settings window must surface provider setting save failures")
     require("SettingsControllerForeign" in controller_h, "SettingsControllerForeign QML singleton boilerplate required")
     require("QJSEngine::setObjectOwnership" in controller_h, "SettingsController singleton must keep C++ ownership")
     require("ApplicationWindow" in settings_qml, "SettingsWindow.qml must be ApplicationWindow")
@@ -163,6 +165,7 @@ def main() -> int:
 
     # Tests
     require("InMemorySecretStore" in smoke, "smoke test must define InMemorySecretStore")
+    require("FailingSecretStore" in smoke, "smoke test must cover SecretStore write failures")
     require("msPerChar" in smoke, "smoke test must cover msPerChar persistence")
     require("apiKey" in smoke, "smoke test must cover apiKey routing through SecretStore")
     require("SettingsServiceSmoke" in desktop_cmake, "desktop CMake must register SettingsServiceSmoke target")
@@ -172,6 +175,10 @@ def main() -> int:
         "desktop CMake must link Apple Security framework on macOS",
     )
     require("MacSecretStore.mm" in desktop_cmake, "desktop CMake must list MacSecretStore.mm under the APPLE block")
+    require(
+        "/usr/bin/codesign" in desktop_cmake and "$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>" in desktop_cmake,
+        "desktop CMake must ad-hoc sign the app bundle so Data Protection Keychain has a stable app identity",
+    )
     require("SettingsWindow.qml" in desktop_cmake, "desktop CMake must add SettingsWindow.qml to the QML module")
     require("check_phase_2_2_settings" in root_cmake, "root CMake must register Phase 2.2 contract check")
 

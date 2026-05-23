@@ -149,6 +149,15 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 
 qt_finalize_executable(MilesEdgeworthDesktop)
 
+if(APPLE)
+    add_custom_command(TARGET MilesEdgeworthDesktop POST_BUILD
+        COMMAND /usr/bin/codesign --force --deep --sign -
+                "$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>"
+        COMMENT "Ad-hoc signing MilesEdgeworthDesktop.app for stable macOS keychain identity"
+        VERBATIM
+    )
+endif()
+
 if(TARGET MilesAgentCore)
     add_custom_target(CopyMilesAgentSidecar
         ALL

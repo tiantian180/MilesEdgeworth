@@ -134,6 +134,7 @@ void SettingsController::openWindow()
     m_apiKeyLoaded = false;
     emit apiKeyChanged();
     reloadPersona();
+    setSaveError(QString());
     setWindowVisible(true);
 }
 
@@ -147,6 +148,7 @@ void SettingsController::save()
     if (m_service == nullptr) {
         return;
     }
+    setSaveError(QString());
 
     if (m_runtime != nullptr) {
         QString error;
@@ -169,7 +171,10 @@ void SettingsController::save()
     m_service->setTemperature(m_temperature);
     m_service->setMaxTokens(m_maxTokens);
     m_service->setMsPerChar(m_msPerChar);
-    m_service->save();
+    if (!m_service->save()) {
+        setSaveError(QStringLiteral("保存 API Key 失败：系统钥匙串写入失败。请重新保存，或查看 miles-debug.log。"));
+        return;
+    }
 
     emit saved();
     closeWindow();
@@ -182,6 +187,7 @@ void SettingsController::revert()
     m_apiKeyLoaded = false;
     emit apiKeyChanged();
     reloadPersona();
+    setSaveError(QString());
     closeWindow();
 }
 
@@ -204,6 +210,15 @@ void SettingsController::setPersonaError(const QString &value)
     }
     m_personaError = value;
     emit personaErrorChanged();
+}
+
+void SettingsController::setSaveError(const QString &value)
+{
+    if (m_saveError == value) {
+        return;
+    }
+    m_saveError = value;
+    emit saveErrorChanged();
 }
 
 void SettingsController::setWindowVisible(bool visible)

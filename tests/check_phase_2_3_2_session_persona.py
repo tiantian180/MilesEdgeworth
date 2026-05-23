@@ -140,8 +140,10 @@ def main() -> int:
         "ChatWindow bubbles must not force a minimum or streaming width; padding and max width are enough",
     )
     require(
-        "messageMetrics.width + 16" in chat_qml and "Math.min(maxBubbleWidth" in chat_qml,
-        "ChatWindow bubbles must size to message content plus padding and wrap at max width",
+        "id: messageMeasure" in chat_qml
+        and "messageMeasure.contentWidth" in chat_qml
+        and "maxContentWidth" in chat_qml,
+        "ChatWindow bubbles must measure wrapped text content width at the maximum line width",
     )
     require(
         "id: transcriptModel" in chat_qml
