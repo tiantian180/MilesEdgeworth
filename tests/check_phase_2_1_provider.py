@@ -28,6 +28,7 @@ def main() -> int:
     parser_test = read("apps/agent-core/internal/chat/expression/parser_test.go")
     openai_go = read("apps/agent-core/internal/chat/openai/provider.go")
     openai_test = read("apps/agent-core/internal/chat/openai/provider_test.go")
+    service_go = read("apps/agent-core/internal/chat/service/service.go")
     main_go = read("apps/agent-core/cmd/miles-agent/main.go")
     server_go = read("apps/agent-core/internal/api/server.go")
     provider_go = read("apps/agent-core/internal/chat/provider.go")
@@ -54,12 +55,16 @@ def main() -> int:
 
     require("/v1/chat/completions" in openai_go, "openai provider must POST to /v1/chat/completions")
     require("Bearer " in openai_go, "openai provider must send Bearer token")
-    require("buildSystemPrompt" in openai_go, "openai provider must assemble a system prompt")
+    require("buildSystemPrompt" in service_go, "chat service must assemble a system prompt")
     require("expression.NewParser" in openai_go, "openai provider must use the expression parser")
     require("httptest.NewServer" in openai_test, "openai provider tests must use httptest")
 
     require("openai.NewProvider" in main_go, "main must construct openai provider when configured")
-    require("mock-fallback" in main_go, "main must label provider as mock-fallback when config missing")
+    require("chat.NewMockProvider" not in main_go, "main must not fall back to a mock provider when config is missing")
+    require("mock-fallback" not in main_go, "main must not label missing config as mock-fallback")
+    require('"unconfigured"' in main_go, "main must label missing provider config as unconfigured")
+    require("s.provider == nil" in service_go, "chat service must allow nil provider when config is missing")
+    require("RUN_ERROR" in service_go, "chat service must report missing provider config as RUN_ERROR")
     require("mileslog.New(\"MILES.SIDECAR\")" in main_go and "MILES_LOG_LEVEL" not in main_go,
             "sidecar main must use mileslog instead of direct debug env handling")
     require("mileslog.New(\"MILES.CHAT.PROVIDER\")" in openai_go and "expression tag parsed" in openai_go,
