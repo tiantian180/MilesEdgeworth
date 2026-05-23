@@ -26,9 +26,11 @@
 - macOS API key 条目使用 Data Protection Keychain，并标记为 `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，避免传统 login keychain 把访问权限绑到开发构建的 adhoc `cdhash` 后反复弹授权框。
 - 如果系统密钥存储不可用，本阶段选择“不落盘”兜底：用户仍可临时填写并在当前进程内使用，但重启后需要重新输入，或继续使用外部环境变量。
 
-## 迁移备注
+## 开发期旧钥匙串条目
 
-2026-05-23 之前的开发版曾把 API key 写入传统 login keychain。该条目仍可能留在“钥匙串访问”中，服务名为 `dev.tian.MilesEdgeworth.v2`、账户为 `MILES_PROVIDER_API_KEY`。新版 `MacSecretStore` 会优先读取 Data Protection Keychain；如果没有找到，会尝试读取一次旧 login keychain 条目并写回 Data Protection Keychain。这个自动迁移可能在升级后的第一次启动触发一次旧钥匙串授权，但迁移成功后后续启动应读取新版条目，不再因为开发构建的 adhoc `cdhash` 变化反复要求输入登录钥匙串密码。
+2026-05-23 之前的开发版曾把 API key 写入传统 login keychain。该条目仍可能留在“钥匙串访问”中，服务名为 `dev.tian.MilesEdgeworth.v2`、账户为 `MILES_PROVIDER_API_KEY`，钥匙串列显示为“登录”。
+
+MilesEdgeworth v2 尚未发布，不需要为开发期旧条目提供自动迁移。新版 `MacSecretStore` 不读取、不删除、不迁移旧 login keychain 条目，只读写 Data Protection Keychain。开发者如果已经产生旧条目，需要手动删除旧 login keychain 记录，并在设置窗口重新保存 API key。
 
 ## 验收命令
 

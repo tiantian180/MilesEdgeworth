@@ -72,10 +72,10 @@ def main() -> int:
         "MacSecretStore must keep provider API keys device-local in the data-protection keychain",
     )
     require(
-        "readDataProtectionSecret" in mac_secret_mm
-        and "readLegacySecret" in mac_secret_mm
-        and "write(service, account, legacySecret)" in mac_secret_mm,
-        "MacSecretStore must migrate an existing legacy login-keychain API key into the data-protection keychain",
+        "readLegacySecret" not in mac_secret_mm
+        and "legacySecret" not in mac_secret_mm
+        and "dataProtectionKeychain" not in mac_secret_mm,
+        "MacSecretStore must not read or migrate legacy login-keychain API keys before the app has shipped",
     )
     require("class MacSecretStore" in mac_secret_h, "MacSecretStore.h must declare class MacSecretStore")
 
