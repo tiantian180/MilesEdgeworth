@@ -20,23 +20,24 @@ NSString *toNSString(const QString &value)
                                   encoding:NSUTF8StringEncoding];
 }
 
-NSMutableDictionary *baseQuery(const QString &service, const QString &account)
+NSMutableDictionary *baseQuery(const QString &service, const QString &account, bool dataProtectionKeychain)
 {
     NSMutableDictionary *query = [NSMutableDictionary dictionary];
     query[(__bridge id)kSecClass] = (__bridge id)kSecClassGenericPassword;
     query[(__bridge id)kSecAttrService] = toNSString(service);
     query[(__bridge id)kSecAttrAccount] = toNSString(account);
-    // macOS 传统 login keychain 会把访问权限绑到当前构建的 code hash。
-    // 开发期 adhoc 签名每次构建都变，容易反复弹“允许访问钥匙串”。
-    // Data Protection Keychain 是 Apple 推荐给 SecItem 的现代实现，行为更接近 iOS。
-    query[(__bridge id)kSecUseDataProtectionKeychain] = (__bridge id)kCFBooleanTrue;
+    if (dataProtectionKeychain) {
+        // macOS 传统 login keychain 会把访问权限绑到当前构建的 code hash。
+        // 开发期 adhoc 签名每次构建都变，容易反复弹“允许访问钥匙串”。
+        // Data Protection Keychain 是 Apple 推荐给 SecItem 的现代实现，行为更接近 iOS。
+        query[(__bridge id)kSecUseDataProtectionKeychain] = (__bridge id)kCFBooleanTrue;
+    }
     return query;
 }
-} // namespace
 
-QString MacSecretStore::read(const QString &service, const QString &account)
+QString readSecret(const QString &service, const QString &account, bool dataProtectionKeychain)
 {
-    NSMutableDictionary *query = baseQuery(service, account);
+    NSMutableDictionary *query = baseQuery(service, account, dataProtectionKeychain);
     query[(__bridge id)kSecReturnData] = (__bridge id)kCFBooleanTrue;
     query[(__bridge id)kSecMatchLimit] = (__bridge id)kSecMatchLimitOne;
 
@@ -53,13 +54,45 @@ QString MacSecretStore::read(const QString &service, const QString &account)
     return secret;
 }
 
+QString readDataProtectionSecret(const QString &service, const QString &account)
+{
+    return readSecret(service, account, true);
+}
+
+QString readLegacySecret(const QString &service, const QString &account)
+{
+    return readSecret(service, account, false);
+}
+
+bool removeSecret(const QString &service, const QString &account, bool dataProtectionKeychain)
+{
+    NSMutableDictionary *query = baseQuery(service, account, dataProtectionKeychain);
+    const OSStatus status = SecItemDelete((__bridge CFDictionaryRef)query);
+    return status == errSecSuccess || status == errSecItemNotFound;
+}
+} // namespace
+
+QString MacSecretStore::read(const QString &service, const QString &account)
+{
+    const QString secret = readDataProtectionSecret(service, account);
+    if (!secret.isEmpty()) {
+        return secret;
+    }
+
+    const QString legacySecret = readLegacySecret(service, account);
+    if (!legacySecret.isEmpty()) {
+        write(service, account, legacySecret);
+    }
+    return legacySecret;
+}
+
 bool MacSecretStore::write(const QString &service, const QString &account, const QString &secret)
 {
     if (secret.isEmpty()) {
         return remove(service, account);
     }
 
-    NSMutableDictionary *query = baseQuery(service, account);
+    NSMutableDictionary *query = baseQuery(service, account, true);
     NSMutableDictionary *attrs = [NSMutableDictionary dictionary];
     attrs[(__bridge id)kSecValueData] = toNSData(secret);
 
@@ -71,7 +104,7 @@ bool MacSecretStore::write(const QString &service, const QString &account, const
         return false;
     }
 
-    NSMutableDictionary *addQuery = baseQuery(service, account);
+    NSMutableDictionary *addQuery = baseQuery(service, account, true);
     addQuery[(__bridge id)kSecValueData] = toNSData(secret);
     addQuery[(__bridge id)kSecAttrAccessible] = (__bridge id)kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly;
     status = SecItemAdd((__bridge CFDictionaryRef)addQuery, nullptr);
@@ -80,7 +113,7 @@ bool MacSecretStore::write(const QString &service, const QString &account, const
 
 bool MacSecretStore::remove(const QString &service, const QString &account)
 {
-    NSMutableDictionary *query = baseQuery(service, account);
-    const OSStatus status = SecItemDelete((__bridge CFDictionaryRef)query);
-    return status == errSecSuccess || status == errSecItemNotFound;
+    const bool removedDataProtection = removeSecret(service, account, true);
+    const bool removedLegacy = removeSecret(service, account, false);
+    return removedDataProtection && removedLegacy;
 }

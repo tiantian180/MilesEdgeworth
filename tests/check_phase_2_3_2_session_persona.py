@@ -130,12 +130,21 @@ def main() -> int:
     require("miles.chat.memory.summarizing" in chat_cpp, "ChatController must handle summarizing event")
     require("会话" in chat_qml and "新建" in chat_qml, "ChatWindow must expose conversation list controls")
     require(
-        "id: transcriptScrollTimer" in chat_qml and "transcriptScrollTimer.restart()" in chat_qml,
+        "id: transcriptScrollTimer" in chat_qml
+        and "transcriptScrollTimer.start()" in chat_qml
+        and "transcriptScrollTimer.restart()" not in chat_qml,
         "ChatWindow must throttle transcript autoscroll during streamed message updates",
     )
     require(
         "minimumReadableBubbleWidth" in chat_qml and "stableStreamingWidth" in chat_qml,
         "ChatWindow bubbles must keep readable short-message width and stable streaming width",
+    )
+    require(
+        "id: transcriptModel" in chat_qml
+        and "syncTranscriptMessages" in chat_qml
+        and "model: transcriptModel" in chat_qml
+        and "model: App.ChatController.messages" not in chat_qml,
+        "ChatWindow must mirror messages into a local ListModel instead of resetting the ListView on every streamed chunk",
     )
 
     require("PersonaStore" in desktop_cmake, "desktop CMake must compile PersonaStore")

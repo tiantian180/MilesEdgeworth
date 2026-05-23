@@ -71,6 +71,12 @@ def main() -> int:
         "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly" in mac_secret_mm,
         "MacSecretStore must keep provider API keys device-local in the data-protection keychain",
     )
+    require(
+        "readDataProtectionSecret" in mac_secret_mm
+        and "readLegacySecret" in mac_secret_mm
+        and "write(service, account, legacySecret)" in mac_secret_mm,
+        "MacSecretStore must migrate an existing legacy login-keychain API key into the data-protection keychain",
+    )
     require("class MacSecretStore" in mac_secret_h, "MacSecretStore.h must declare class MacSecretStore")
 
     # SettingsService

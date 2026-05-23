@@ -22,7 +22,48 @@ ApplicationWindow {
     onVisibleChanged: App.DesktopShell.setChatWindowDockVisible(visible)
 
     function scheduleTranscriptScroll() {
-        transcriptScrollTimer.restart()
+        if (!transcriptScrollTimer.running) {
+            transcriptScrollTimer.start()
+        }
+    }
+
+    function setTranscriptProperty(index, name, value) {
+        if (transcriptModel.get(index)[name] !== value) {
+            transcriptModel.setProperty(index, name, value)
+        }
+    }
+
+    function syncTranscriptMessages() {
+        const messages = App.ChatController.messages
+        const count = messages.length
+
+        while (transcriptModel.count > count) {
+            transcriptModel.remove(transcriptModel.count - 1)
+        }
+
+        for (let i = 0; i < count; ++i) {
+            const message = messages[i]
+            const next = {
+                role: message.role || "",
+                text: message.text || "",
+                pending: message.pending === true,
+                error: message.error === true,
+                isPartial: message.isPartial === true
+            }
+
+            if (i >= transcriptModel.count) {
+                transcriptModel.append(next)
+                continue
+            }
+
+            setTranscriptProperty(i, "role", next.role)
+            setTranscriptProperty(i, "text", next.text)
+            setTranscriptProperty(i, "pending", next.pending)
+            setTranscriptProperty(i, "error", next.error)
+            setTranscriptProperty(i, "isPartial", next.isPartial)
+        }
+
+        scheduleTranscriptScroll()
     }
 
     function open() {
@@ -40,8 +81,14 @@ ApplicationWindow {
         }
 
         function onMessagesChanged() {
-            chatWindow.scheduleTranscriptScroll()
+            chatWindow.syncTranscriptMessages()
         }
+    }
+
+    Component.onCompleted: syncTranscriptMessages()
+
+    ListModel {
+        id: transcriptModel
     }
 
     Timer {
@@ -49,7 +96,12 @@ ApplicationWindow {
 
         interval: 33
         repeat: false
-        onTriggered: transcript.positionViewAtEnd()
+        onTriggered: {
+            transcript.positionViewAtEnd()
+            if (App.ChatController.sending) {
+                scheduleTranscriptScroll()
+            }
+        }
     }
 
     ColumnLayout {
@@ -340,12 +392,16 @@ ApplicationWindow {
                         anchors.margins: 10
                         clip: true
                         spacing: 8
-                        model: App.ChatController.messages
+                        model: transcriptModel
 
                         delegate: Item {
-                            required property var modelData
+                            required property string role
+                            required property string text
+                            required property bool pending
+                            required property bool error
+                            required property bool isPartial
 
-                            readonly property bool partial: modelData.isPartial === true
+                            readonly property bool partial: isPartial === true
 
                             width: transcript.width
                             height: bubble.implicitHeight + 4
@@ -353,11 +409,11 @@ ApplicationWindow {
                             Rectangle {
                                 id: bubble
 
-                                readonly property bool isUser: modelData.role === "user"
-                                readonly property string bodyText: modelData.text.length > 0 ? modelData.text : "…"
+                                readonly property bool isUser: role === "user"
+                                readonly property string bodyText: text.length > 0 ? text : "…"
                                 readonly property real maxBubbleWidth: parent.width * 0.82
                                 readonly property real minimumReadableBubbleWidth: Math.min(maxBubbleWidth, 132)
-                                readonly property bool stableStreamingWidth: !isUser && modelData.pending === true
+                                readonly property bool stableStreamingWidth: !isUser && pending === true
 
                                 width: stableStreamingWidth
                                        ? maxBubbleWidth
@@ -370,8 +426,8 @@ ApplicationWindow {
                                 anchors.right: isUser ? parent.right : undefined
                                 anchors.left: isUser ? undefined : parent.left
                                 radius: 6
-                                color: modelData.error ? "#f6d6cc" : (isUser ? "#dce7f7" : "#eee7da")
-                                border.color: modelData.error ? "#b65a45" : "transparent"
+                                color: error ? "#f6d6cc" : (isUser ? "#dce7f7" : "#eee7da")
+                                border.color: error ? "#b65a45" : "transparent"
 
                                 TextMetrics {
                                     id: messageMetrics

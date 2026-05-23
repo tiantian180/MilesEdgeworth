@@ -28,7 +28,7 @@
 
 ## 迁移备注
 
-2026-05-23 之前的开发版曾把 API key 写入传统 login keychain。该条目仍可能留在“钥匙串访问”中，服务名为 `dev.tian.MilesEdgeworth.v2`、账户为 `MILES_PROVIDER_API_KEY`，但新版 `MacSecretStore` 不再读取它。开发者升级后需要在设置窗口重新保存一次 API key；之后会写入 Data Protection Keychain，启动时不应再因旧 login keychain ACL 反复要求输入登录钥匙串密码。
+2026-05-23 之前的开发版曾把 API key 写入传统 login keychain。该条目仍可能留在“钥匙串访问”中，服务名为 `dev.tian.MilesEdgeworth.v2`、账户为 `MILES_PROVIDER_API_KEY`。新版 `MacSecretStore` 会优先读取 Data Protection Keychain；如果没有找到，会尝试读取一次旧 login keychain 条目并写回 Data Protection Keychain。这个自动迁移可能在升级后的第一次启动触发一次旧钥匙串授权，但迁移成功后后续启动应读取新版条目，不再因为开发构建的 adhoc `cdhash` 变化反复要求输入登录钥匙串密码。
 
 ## 验收命令
 
