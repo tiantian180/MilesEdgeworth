@@ -50,7 +50,7 @@ bool PetRuntime::activateSkin(const QString &skinId, bool persistSelection)
         descriptor = descriptorForSkinId(skinId);
     }
 
-    if (!loadSkinDescriptor(descriptor)) {
+    if (!loadSkinDescriptor(descriptor, SkinReloadMode::PlayStartup)) {
         return false;
     }
 
@@ -62,8 +62,18 @@ bool PetRuntime::activateSkin(const QString &skinId, bool persistSelection)
 
 bool PetRuntime::reloadActiveSkin()
 {
+    return reloadActiveSkin(SkinReloadMode::PlayStartup);
+}
+
+bool PetRuntime::reloadActiveSkinPreservingPlayback()
+{
+    return reloadActiveSkin(SkinReloadMode::PreservePlayback);
+}
+
+bool PetRuntime::reloadActiveSkin(SkinReloadMode mode)
+{
     refreshAvailableSkins();
-    return loadSkinDescriptor(descriptorForSkinId(m_activeSkinId));
+    return loadSkinDescriptor(descriptorForSkinId(m_activeSkinId), mode);
 }
 
 void PetRuntime::applyManifestState()
@@ -122,7 +132,7 @@ void PetRuntime::applyManifestState()
     }
 }
 
-bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor)
+bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReloadMode mode)
 {
     if (descriptor.id.isEmpty()) {
         return false;
@@ -133,6 +143,18 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor)
         return false;
     }
 
+    const bool preservePlayback = mode == SkinReloadMode::PreservePlayback;
+    const QString preservedState = m_currentState;
+    const QString preservedActionId = m_currentActionId;
+    const QString preservedRecipeId = m_currentRecipeId;
+    const int preservedRecipeStepIndex = m_currentRecipeStepIndex;
+    const QString preservedPhaseId = m_currentPhaseId;
+    const QString preservedFacing = m_currentFacing;
+    const QString preservedMovementDirection = m_currentMovementDirection;
+    const QString preservedLoopMode = m_currentLoopMode;
+    const bool preservedAutoReturnToIdle = m_currentAutoReturnToIdle;
+    const QUrl preservedAnimationUrl = m_currentAnimationUrl;
+    const int preservedPlaybackSerial = m_playbackSerial;
     const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
     const bool wasSleeping = sleeping();
     const bool wasSleepTransitioning = sleepTransitioning();
@@ -144,52 +166,80 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor)
     const bool hadAnimation = !m_currentAnimationUrl.isEmpty();
     const bool hadSound = !m_audioController.currentSoundUrl().isEmpty();
 
-    hideCurrentProp();
-    clearActiveRecipe();
-    const bool soundCleared = m_audioController.clearCurrentSound();
-    m_currentActionId.clear();
-    m_currentPhaseId.clear();
-    m_currentMovementDirection.clear();
-    m_currentLoopMode = QStringLiteral("loop");
-    m_currentAutoReturnToIdle = false;
-    m_currentAnimationUrl.clear();
-    ++m_playbackSerial;
+    if (!preservePlayback) {
+        hideCurrentProp();
+        clearActiveRecipe();
+        const bool soundCleared = m_audioController.clearCurrentSound();
+        m_currentActionId.clear();
+        m_currentPhaseId.clear();
+        m_currentMovementDirection.clear();
+        m_currentLoopMode = QStringLiteral("loop");
+        m_currentAutoReturnToIdle = false;
+        m_currentAnimationUrl.clear();
+        ++m_playbackSerial;
 
-    if (hadAction) {
-        emit currentActionChanged();
+        if (hadAction) {
+            emit currentActionChanged();
+        }
+        if (hadPhase) {
+            emit currentPhaseChanged();
+        }
+        if (hadMovementDirection) {
+            emit currentMovementDirectionChanged();
+        }
+        if (loopModeChanged) {
+            emit currentLoopModeChanged();
+        }
+        if (autoReturnChanged) {
+            emit currentAutoReturnToIdleChanged();
+        }
+        if (wasPointerInteractionEnabled != pointerInteractionEnabled()) {
+            emit pointerInteractionEnabledChanged();
+        }
+        if (hadAnimation) {
+            emit currentAnimationUrlChanged();
+        }
+        if (hadSound && soundCleared) {
+            emit currentSoundUrlChanged();
+            emit soundPlaybackSerialChanged();
+        }
+        if (wasSleeping != sleeping()
+                || wasSleepTransitioning != sleepTransitioning()) {
+            emit sleepStateChanged();
+        }
+        emit playbackSerialChanged();
     }
-    if (hadPhase) {
-        emit currentPhaseChanged();
-    }
-    if (hadMovementDirection) {
-        emit currentMovementDirectionChanged();
-    }
-    if (loopModeChanged) {
-        emit currentLoopModeChanged();
-    }
-    if (autoReturnChanged) {
-        emit currentAutoReturnToIdleChanged();
-    }
-    if (wasPointerInteractionEnabled != pointerInteractionEnabled()) {
-        emit pointerInteractionEnabledChanged();
-    }
-    if (hadAnimation) {
-        emit currentAnimationUrlChanged();
-    }
-    if (hadSound && soundCleared) {
-        emit currentSoundUrlChanged();
-        emit soundPlaybackSerialChanged();
-    }
-    if (wasSleeping != sleeping()
-            || wasSleepTransitioning != sleepTransitioning()) {
-        emit sleepStateChanged();
-    }
-    emit playbackSerialChanged();
 
     m_manifest = nextManifest;
     m_activeSkinId = descriptor.id;
 
     applyManifestState();
+    if (preservePlayback) {
+        m_currentState = preservedState;
+        m_currentActionId = preservedActionId;
+        m_currentRecipeId = preservedRecipeId;
+        m_currentRecipeStepIndex = preservedRecipeStepIndex;
+        m_currentPhaseId = preservedPhaseId;
+        if (m_manifest.facings.contains(preservedFacing)) {
+            m_currentFacing = preservedFacing;
+        }
+        if (m_manifest.movementDirections.contains(preservedMovementDirection)) {
+            m_currentMovementDirection = preservedMovementDirection;
+        }
+        m_currentLoopMode = preservedLoopMode;
+        m_currentAutoReturnToIdle = preservedAutoReturnToIdle;
+        m_currentAnimationUrl = preservedAnimationUrl;
+        m_playbackSerial = preservedPlaybackSerial;
+
+        if (!m_currentActionId.isEmpty() && !m_manifest.actions.contains(m_currentActionId)) {
+            setState(QStringLiteral("idle"));
+        }
+
+        emit activeSkinChanged();
+        emit skinManifestReloaded();
+        return true;
+    }
+
     setState(QStringLiteral("idle"));
     emit activeSkinChanged();
     emit skinManifestReloaded();

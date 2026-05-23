@@ -284,6 +284,18 @@ int main(int argc, char *argv[])
     require(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"), "built-in Miles should be active by default");
     require(!runtime.availableSkins().isEmpty(), "runtime should expose available skins");
     require(runtime.reloadActiveSkin(), "runtime should reload active skin");
+    runtime.playAction("objecting");
+    const int preserveReloadSerial = runtime.playbackSerial();
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should reload the active skin manifest");
+    require(runtime.currentActionId() == "objecting",
+            "preserve reload must keep the current action instead of replaying startup");
+    require(runtime.currentRecipeId().isEmpty(),
+            "preserve reload must not start startup.briefcase");
+    require(runtime.playbackSerial() == preserveReloadSerial,
+            "preserve reload must not restart the current animation");
+    runtime.returnToIdle();
+    require(runtime.reloadActiveSkin(), "runtime should reload active skin before startup assertions");
     PetEventBridge bridge(&runtime);
 
     // 启动时应进入旧版公文包入场序列，而不是直接静止站立。

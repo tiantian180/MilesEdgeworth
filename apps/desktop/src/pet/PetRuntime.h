@@ -130,6 +130,11 @@ public:
     RuntimeSnapshot snapshot() const;
 
     // ---- 设置类接口：菜单或 QML 直接调用，不走事件管线 ----
+    enum class SkinReloadMode {
+        PlayStartup,
+        PreservePlayback,
+    };
+
     Q_INVOKABLE void setState(const QString &state);
     Q_INVOKABLE void setFacing(const QString &facing);
     Q_INVOKABLE void toggleFacing();
@@ -139,6 +144,7 @@ public:
     Q_INVOKABLE void setPetSize(const QString &sizeId);
     Q_INVOKABLE bool setActiveSkin(const QString &skinId);
     Q_INVOKABLE bool reloadActiveSkin();
+    Q_INVOKABLE bool reloadActiveSkinPreservingPlayback();
 
     // ---- 底层播放入口：高层应优先用 submitActionRequest，这些方法供 RecipeRunner / 测试使用 ----
     Q_INVOKABLE void playAction(const QString &actionId);
@@ -225,7 +231,8 @@ private:
     bool triggerPendingNotification(quint64 notificationId);
     void applyManifestState();
     bool activateSkin(const QString &skinId, bool persistSelection);
-    bool loadSkinDescriptor(const SkinDescriptor &descriptor);
+    bool reloadActiveSkin(SkinReloadMode mode);
+    bool loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReloadMode mode);
     SkinDescriptor descriptorForSkinId(const QString &skinId) const;
     void refreshAvailableSkins();
 
