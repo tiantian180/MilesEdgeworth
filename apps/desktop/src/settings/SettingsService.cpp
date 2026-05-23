@@ -137,6 +137,16 @@ void SettingsService::setMsPerChar(int value)
     m_configFile.setMsPerChar(value);
 }
 
+ProviderConfigFile::LangfuseConfig SettingsService::langfuseConfig() const
+{
+    return m_configFile.langfuseConfig();
+}
+
+void SettingsService::setLangfuseConfig(const ProviderConfigFile::LangfuseConfig &cfg)
+{
+    m_configFile.setLangfuseConfig(cfg);
+}
+
 bool SettingsService::providerConfigured() const
 {
     return !baseUrl().isEmpty() && !apiKey().isEmpty() && !model().isEmpty();

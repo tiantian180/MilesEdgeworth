@@ -23,6 +23,11 @@ class SettingsController : public QObject
     Q_PROPERTY(QString temperatureText READ temperatureText WRITE setTemperatureText NOTIFY temperatureTextChanged)
     Q_PROPERTY(QString maxTokensText READ maxTokensText WRITE setMaxTokensText NOTIFY maxTokensTextChanged)
     Q_PROPERTY(int msPerChar READ msPerChar WRITE setMsPerChar NOTIFY msPerCharChanged)
+    Q_PROPERTY(bool langfuseEnabled READ langfuseEnabled WRITE setLangfuseEnabled NOTIFY langfuseEnabledChanged)
+    Q_PROPERTY(QString langfuseHost READ langfuseHost WRITE setLangfuseHost NOTIFY langfuseHostChanged)
+    Q_PROPERTY(QString langfusePublicKey READ langfusePublicKey WRITE setLangfusePublicKey NOTIFY langfusePublicKeyChanged)
+    Q_PROPERTY(QString langfuseSecretKey READ langfuseSecretKey WRITE setLangfuseSecretKey NOTIFY langfuseSecretKeyChanged)
+    Q_PROPERTY(bool langfuseCaptureContent READ langfuseCaptureContent WRITE setLangfuseCaptureContent NOTIFY langfuseCaptureContentChanged)
     Q_PROPERTY(bool providerConfigured READ providerConfigured NOTIFY providerConfiguredChanged)
     Q_PROPERTY(QString validationError READ validationError NOTIFY validationErrorChanged)
     Q_PROPERTY(QString personaPrompt READ personaPrompt WRITE setPersonaPrompt NOTIFY personaPromptChanged)
@@ -57,6 +62,21 @@ public:
     int msPerChar() const { return m_msPerChar; }
     void setMsPerChar(int value);
 
+    bool langfuseEnabled() const { return m_langfuseEnabled; }
+    void setLangfuseEnabled(bool value);
+
+    QString langfuseHost() const { return m_langfuseHost; }
+    void setLangfuseHost(const QString &value);
+
+    QString langfusePublicKey() const { return m_langfusePublicKey; }
+    void setLangfusePublicKey(const QString &value);
+
+    QString langfuseSecretKey() const { return m_langfuseSecretKey; }
+    void setLangfuseSecretKey(const QString &value);
+
+    bool langfuseCaptureContent() const { return m_langfuseCaptureContent; }
+    void setLangfuseCaptureContent(bool value);
+
     bool providerConfigured() const { return m_providerConfigured; }
     QString validationError() const { return m_validationError; }
 
@@ -87,6 +107,11 @@ signals:
     void temperatureTextChanged();
     void maxTokensTextChanged();
     void msPerCharChanged();
+    void langfuseEnabledChanged();
+    void langfuseHostChanged();
+    void langfusePublicKeyChanged();
+    void langfuseSecretKeyChanged();
+    void langfuseCaptureContentChanged();
     void providerConfiguredChanged();
     void validationErrorChanged();
     void personaPromptChanged();
@@ -115,10 +140,15 @@ private:
     QString m_temperatureText;
     QString m_maxTokensText;
     QString m_personaPrompt;
+    QString m_langfuseHost;
+    QString m_langfusePublicKey;
+    QString m_langfuseSecretKey;
     QString m_validationError;
     QString m_personaError;
     QString m_saveError;
     int m_msPerChar = 80;
+    bool m_langfuseEnabled = false;
+    bool m_langfuseCaptureContent = true;
     bool m_providerConfigured = false;
     bool m_windowVisible = false;
 };

@@ -126,6 +126,39 @@ QJsonObject modelConfigToJson(const ProviderConfigFile::ModelConfig &cfg)
     }
     return object;
 }
+
+ProviderConfigFile::LangfuseConfig langfuseConfigFromJson(const QJsonObject &object)
+{
+    static const QSet<QString> knownFields {
+        QStringLiteral("enabled"),
+        QStringLiteral("host"),
+        QStringLiteral("publicKey"),
+        QStringLiteral("secretKey"),
+        QStringLiteral("captureContent"),
+    };
+
+    ProviderConfigFile::LangfuseConfig cfg;
+    cfg.enabled = object.value(QStringLiteral("enabled")).toBool(false);
+    cfg.host = object.value(QStringLiteral("host")).toString().trimmed();
+    cfg.publicKey = object.value(QStringLiteral("publicKey")).toString().trimmed();
+    cfg.secretKey = object.value(QStringLiteral("secretKey")).toString().trimmed();
+    if (object.contains(QStringLiteral("captureContent"))) {
+        cfg.captureContent = object.value(QStringLiteral("captureContent")).toBool(true);
+    }
+    cfg.extraFields = withoutKnownFields(object, knownFields);
+    return cfg;
+}
+
+QJsonObject langfuseConfigToJson(const ProviderConfigFile::LangfuseConfig &cfg)
+{
+    QJsonObject object = cfg.extraFields;
+    object.insert(QStringLiteral("enabled"), cfg.enabled);
+    object.insert(QStringLiteral("host"), cfg.host);
+    object.insert(QStringLiteral("publicKey"), cfg.publicKey);
+    object.insert(QStringLiteral("secretKey"), cfg.secretKey);
+    object.insert(QStringLiteral("captureContent"), cfg.captureContent);
+    return object;
+}
 } // namespace
 
 ProviderConfigFile::ProviderConfigFile(QString path)
@@ -141,6 +174,7 @@ ProviderConfigFile::LoadStatus ProviderConfigFile::load()
     m_configs.clear();
     m_activeModelConfig.clear();
     m_msPerChar = kDefaultMsPerChar;
+    m_langfuseConfig = {};
 
     QFile file(m_path);
     if (!file.exists()) {
@@ -170,6 +204,7 @@ ProviderConfigFile::LoadStatus ProviderConfigFile::load()
         QStringLiteral("schemaVersion"),
         QStringLiteral("activeModelConfig"),
         QStringLiteral("chat"),
+        QStringLiteral("langfuse"),
         QStringLiteral("msPerChar"),
         QStringLiteral("modelConfigs"),
     };
@@ -184,6 +219,7 @@ ProviderConfigFile::LoadStatus ProviderConfigFile::load()
     m_chatExtraFields = withoutKnownFields(chat, knownChatFields);
     m_msPerChar = clampMsPerChar(chat.value(QStringLiteral("msPerChar"))
                                      .toInt(root.value(QStringLiteral("msPerChar")).toInt(kDefaultMsPerChar)));
+    m_langfuseConfig = langfuseConfigFromJson(root.value(QStringLiteral("langfuse")).toObject());
 
     const auto configs = root.value(QStringLiteral("modelConfigs")).toArray();
     for (const auto &value : configs) {
@@ -223,6 +259,7 @@ bool ProviderConfigFile::save()
     root.insert(QStringLiteral("schemaVersion"), 1);
     root.insert(QStringLiteral("activeModelConfig"), m_activeModelConfig);
     root.insert(QStringLiteral("chat"), chat);
+    root.insert(QStringLiteral("langfuse"), langfuseConfigToJson(m_langfuseConfig));
     root.insert(QStringLiteral("modelConfigs"), configs);
 
     QSaveFile file(m_path);
@@ -359,6 +396,25 @@ int ProviderConfigFile::msPerChar() const
 void ProviderConfigFile::setMsPerChar(int value)
 {
     m_msPerChar = clampMsPerChar(value);
+}
+
+ProviderConfigFile::LangfuseConfig ProviderConfigFile::langfuseConfig() const
+{
+    return m_langfuseConfig;
+}
+
+void ProviderConfigFile::setLangfuseConfig(const LangfuseConfig &cfg)
+{
+    LangfuseConfig normalized = cfg;
+    normalized.host = normalized.host.trimmed();
+    normalized.publicKey = normalized.publicKey.trimmed();
+    normalized.secretKey = normalized.secretKey.trimmed();
+    QJsonObject mergedExtraFields = m_langfuseConfig.extraFields;
+    for (auto it = normalized.extraFields.begin(); it != normalized.extraFields.end(); ++it) {
+        mergedExtraFields.insert(it.key(), it.value());
+    }
+    normalized.extraFields = mergedExtraFields;
+    m_langfuseConfig = normalized;
 }
 
 int ProviderConfigFile::configIndex(const QString &name) const

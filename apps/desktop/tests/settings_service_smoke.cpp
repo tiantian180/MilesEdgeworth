@@ -72,9 +72,16 @@ int main(int argc, char *argv[])
         cfg.model = QStringLiteral("deepseek-chat");
         cfg.temperature = 0.7;
         cfg.maxTokens = std::nullopt;
+        ProviderConfigFile::LangfuseConfig langfuse;
+        langfuse.enabled = true;
+        langfuse.host = QStringLiteral("https://cloud.langfuse.com");
+        langfuse.publicKey = QStringLiteral("pk-lf-test");
+        langfuse.secretKey = QStringLiteral("sk-lf-test");
+        langfuse.captureContent = false;
         assert(file.setConfig(cfg.name, cfg));
         file.setActiveModelConfig(cfg.name);
         file.setMsPerChar(60);
+        file.setLangfuseConfig(langfuse);
         assert(file.save());
 
         QFile saved(path);
@@ -82,6 +89,12 @@ int main(int argc, char *argv[])
         const auto savedDoc = QJsonDocument::fromJson(saved.readAll());
         assert(savedDoc.object().value(QStringLiteral("msPerChar")).isUndefined());
         assert(savedDoc.object().value(QStringLiteral("chat")).toObject().value(QStringLiteral("msPerChar")).toInt() == 60);
+        const auto savedLangfuse = savedDoc.object().value(QStringLiteral("langfuse")).toObject();
+        assert(savedLangfuse.value(QStringLiteral("enabled")).toBool());
+        assert(savedLangfuse.value(QStringLiteral("host")).toString() == QStringLiteral("https://cloud.langfuse.com"));
+        assert(savedLangfuse.value(QStringLiteral("publicKey")).toString() == QStringLiteral("pk-lf-test"));
+        assert(savedLangfuse.value(QStringLiteral("secretKey")).toString() == QStringLiteral("sk-lf-test"));
+        assert(!savedLangfuse.value(QStringLiteral("captureContent")).toBool());
 
         ProviderConfigFile reopened(path);
         assert(reopened.load() == ProviderConfigFile::LoadStatus::Ok);
@@ -90,6 +103,11 @@ int main(int argc, char *argv[])
         assert(reopened.config(QStringLiteral("deepseek")).temperature.has_value());
         assert(!reopened.config(QStringLiteral("deepseek")).maxTokens.has_value());
         assert(reopened.msPerChar() == 60);
+        assert(reopened.langfuseConfig().enabled);
+        assert(reopened.langfuseConfig().host == QStringLiteral("https://cloud.langfuse.com"));
+        assert(reopened.langfuseConfig().publicKey == QStringLiteral("pk-lf-test"));
+        assert(reopened.langfuseConfig().secretKey == QStringLiteral("sk-lf-test"));
+        assert(!reopened.langfuseConfig().captureContent);
     }
 
     {
@@ -114,6 +132,14 @@ int main(int argc, char *argv[])
     "msPerChar": 90,
     "chatUnknown": "keep-chat"
   },
+  "langfuse": {
+    "enabled": true,
+    "host": "https://cloud.langfuse.com",
+    "publicKey": "pk-lf-test",
+    "secretKey": "sk-lf-test",
+    "captureContent": false,
+    "langfuseUnknown": "keep-langfuse"
+  },
   "modelConfigs": [
     {
       "name": "deepseek",
@@ -130,9 +156,15 @@ int main(int argc, char *argv[])
         ProviderConfigFile file(path);
         assert(file.load() == ProviderConfigFile::LoadStatus::Ok);
         assert(file.msPerChar() == 90);
+        assert(file.langfuseConfig().enabled);
+        assert(file.langfuseConfig().extraFields.value(QStringLiteral("langfuseUnknown")).toString()
+               == QStringLiteral("keep-langfuse"));
         auto cfg = file.config(QStringLiteral("deepseek"));
         assert(cfg.extraFields.value(QStringLiteral("providerUnknown")).toString() == QStringLiteral("keep-provider"));
         cfg.model = QStringLiteral("deepseek-reasoner");
+        auto langfuse = file.langfuseConfig();
+        langfuse.host = QStringLiteral("https://us.cloud.langfuse.com");
+        file.setLangfuseConfig(langfuse);
         assert(file.setConfig(cfg.name, cfg));
         assert(file.save());
 
@@ -145,6 +177,9 @@ int main(int argc, char *argv[])
         const auto chat = root.value(QStringLiteral("chat")).toObject();
         assert(chat.value(QStringLiteral("msPerChar")).toInt() == 90);
         assert(chat.value(QStringLiteral("chatUnknown")).toString() == QStringLiteral("keep-chat"));
+        const auto savedLangfuse = root.value(QStringLiteral("langfuse")).toObject();
+        assert(savedLangfuse.value(QStringLiteral("host")).toString() == QStringLiteral("https://us.cloud.langfuse.com"));
+        assert(savedLangfuse.value(QStringLiteral("langfuseUnknown")).toString() == QStringLiteral("keep-langfuse"));
         const auto configs = root.value(QStringLiteral("modelConfigs")).toArray();
         assert(configs.size() == 1);
         const auto savedCfg = configs.at(0).toObject();
@@ -285,6 +320,8 @@ int main(int argc, char *argv[])
         assert(!service.temperature().has_value());
         assert(!service.maxTokens().has_value());
         assert(service.msPerChar() == 80);
+        assert(!service.langfuseConfig().enabled);
+        assert(service.langfuseConfig().captureContent);
         assert(!service.providerConfigured());
 
         auto cfg = modelConfig(QStringLiteral("deepseek"),
@@ -296,6 +333,13 @@ int main(int argc, char *argv[])
         assert(service.setModelConfig(cfg.name, cfg));
         service.setActiveModelConfig(cfg.name);
         service.setMsPerChar(120);
+        ProviderConfigFile::LangfuseConfig langfuse;
+        langfuse.enabled = true;
+        langfuse.host = QStringLiteral("https://cloud.langfuse.com");
+        langfuse.publicKey = QStringLiteral("pk-lf-test");
+        langfuse.secretKey = QStringLiteral("sk-lf-test");
+        langfuse.captureContent = false;
+        service.setLangfuseConfig(langfuse);
         assert(service.save());
 
         SettingsService reopened(path);
@@ -308,16 +352,25 @@ int main(int argc, char *argv[])
         assert(qFuzzyCompare(*reopened.temperature() + 1.0, 0.3 + 1.0));
         assert(!reopened.maxTokens().has_value());
         assert(reopened.msPerChar() == 120);
+        assert(reopened.langfuseConfig().enabled);
+        assert(reopened.langfuseConfig().host == QStringLiteral("https://cloud.langfuse.com"));
+        assert(reopened.langfuseConfig().publicKey == QStringLiteral("pk-lf-test"));
+        assert(reopened.langfuseConfig().secretKey == QStringLiteral("sk-lf-test"));
+        assert(!reopened.langfuseConfig().captureContent);
         assert(reopened.providerConfigured());
 
         SettingsController controller(&reopened);
         controller.openWindow();
         assert(controller.configName() == QStringLiteral("deepseek"));
         assert(controller.apiKey() == QStringLiteral("sk-secret"));
+        assert(controller.langfuseEnabled());
+        assert(controller.langfuseHost() == QStringLiteral("https://cloud.langfuse.com"));
         controller.setApiKey(QStringLiteral("sk-replaced"));
+        controller.setLangfuseHost(QStringLiteral("https://us.cloud.langfuse.com"));
         controller.save();
         SettingsService replaced(path);
         assert(replaced.apiKey() == QStringLiteral("sk-replaced"));
+        assert(replaced.langfuseConfig().host == QStringLiteral("https://us.cloud.langfuse.com"));
     }
 
     {
