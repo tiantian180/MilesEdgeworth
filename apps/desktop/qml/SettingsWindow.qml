@@ -20,36 +20,147 @@ ApplicationWindow {
         App.SettingsController.revert()
     }
 
+    component SettingsTextField: TextField {
+        id: field
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: 40
+        color: "#111111"
+        placeholderTextColor: "#7c858d"
+        selectedTextColor: "#111111"
+        selectionColor: "#b9d0f2"
+        leftPadding: 12
+        rightPadding: 12
+        background: Rectangle {
+            color: "#fffdf8"
+            border.color: field.activeFocus ? "#6f6258" : "#d8d1c8"
+            border.width: field.activeFocus ? 2 : 1
+        }
+    }
+
+    component LightButton: Button {
+        id: button
+
+        Layout.preferredHeight: 40
+        contentItem: Text {
+            text: button.text
+            color: button.enabled ? "#26201b" : "#8f8982"
+            font.pixelSize: 14
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+        background: Rectangle {
+            color: button.enabled ? (button.down ? "#eee7da" : "#fffdf8") : "#ebe7df"
+            border.color: "#d8d1c8"
+        }
+    }
+
+    component SettingsTabButton: TabButton {
+        id: tabButton
+
+        implicitHeight: 40
+        contentItem: Text {
+            text: tabButton.text
+            color: tabButton.checked ? "#fffdf8" : "#26201b"
+            font.pixelSize: 14
+            font.weight: Font.DemiBold
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+        background: Rectangle {
+            color: tabButton.checked ? "#2f2d2b" : "transparent"
+        }
+    }
+
+    component SettingsSlider: Slider {
+        id: slider
+
+        background: Item {
+            x: slider.leftPadding
+            y: slider.topPadding + slider.availableHeight / 2 - height / 2
+            implicitWidth: 200
+            implicitHeight: 6
+            width: slider.availableWidth
+            height: 6
+
+            Rectangle {
+                anchors.fill: parent
+                radius: height / 2
+                color: "#d7d9dc"
+            }
+
+            Rectangle {
+                width: slider.visualPosition * parent.width
+                height: parent.height
+                radius: height / 2
+                color: "#2f2d2b"
+            }
+        }
+
+        handle: Rectangle {
+            x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
+            y: slider.topPadding + slider.availableHeight / 2 - height / 2
+            implicitWidth: 28
+            implicitHeight: 28
+            radius: width / 2
+            color: "#111111"
+            border.color: "#d8d1c8"
+            border.width: 1
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
         spacing: 12
 
-        ScrollView {
-            id: settingsScroll
+        Label {
+            text: qsTr("Miles 设置")
+            color: "#26201b"
+            font.pixelSize: 20
+            font.weight: Font.DemiBold
+        }
+
+        TabBar {
+            id: settingsTabs
+
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40
+            background: Item {}
+
+            SettingsTabButton {
+                text: qsTr("模型配置")
+            }
+
+            SettingsTabButton {
+                text: qsTr("角色人格")
+            }
+        }
+
+        StackLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            clip: true
+            currentIndex: settingsTabs.currentIndex
 
-            ColumnLayout {
-                width: settingsScroll.availableWidth
-                spacing: 12
+            ScrollView {
+                id: modelScroll
 
-                Label {
-                    text: qsTr("Provider 配置")
-                    color: "#26201b"
-                    font.pixelSize: 18
-                    font.weight: Font.DemiBold
-                }
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
                 GridLayout {
+                    width: modelScroll.availableWidth
                     columns: 2
                     columnSpacing: 12
                     rowSpacing: 10
-                    Layout.fillWidth: true
 
                     Label { text: qsTr("当前配置"); color: "#26201b" }
                     RowLayout {
+                        id: configBar
+
                         Layout.fillWidth: true
 
                         ComboBox {
@@ -58,9 +169,23 @@ ApplicationWindow {
                             Layout.preferredHeight: 40
                             model: App.SettingsController.configNames
                             currentIndex: App.SettingsController.configNames.indexOf(App.SettingsController.activeModelConfig)
+                            delegate: ItemDelegate {
+                                width: configSelector.width
+                                text: modelData
+                                contentItem: Text {
+                                    text: modelData
+                                    color: "#26201b"
+                                    font.pixelSize: 14
+                                    elide: Text.ElideRight
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+                                background: Rectangle {
+                                    color: highlighted ? "#eee7da" : "#fffdf8"
+                                }
+                            }
                             contentItem: Text {
                                 leftPadding: 14
-                                rightPadding: 38
+                                rightPadding: 30
                                 text: configSelector.displayText
                                 color: "#fffdf8"
                                 font.pixelSize: 14
@@ -68,15 +193,19 @@ ApplicationWindow {
                                 elide: Text.ElideRight
                             }
                             indicator: Text {
-                                x: configSelector.width - width - 12
-                                y: (configSelector.height - height) / 2
-                                text: "⌄"
-                                color: "#d8d1c8"
-                                font.pixelSize: 22
+                                x: configSelector.width - width - 8
+                                y: 0
+                                width: 24
+                                height: configSelector.height
+                                text: "▾"
+                                color: "#fffdf8"
+                                opacity: 0.85
+                                font.pixelSize: 16
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                             }
                             background: Rectangle {
                                 color: "#2f2d2b"
-                                border.color: "#2f2d2b"
                             }
                             popup: Popup {
                                 y: configSelector.height
@@ -101,181 +230,90 @@ ApplicationWindow {
                             }
                         }
 
-                        Button {
+                        LightButton {
                             id: addConfigButton
                             text: qsTr("新增")
-                            Layout.preferredWidth: Math.max(96, (parent.width - parent.spacing * 2) * 0.25)
-                            Layout.preferredHeight: 40
-                            contentItem: Text {
-                                text: addConfigButton.text
-                                color: "#26201b"
-                                font.pixelSize: 14
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            background: Rectangle {
-                                color: addConfigButton.down ? "#eee7da" : "#fffdf8"
-                                border.color: "#d8d1c8"
-                            }
+                            Layout.preferredWidth: Math.max(96, (configBar.width - configBar.spacing * 2) * 0.25)
                             onClicked: App.SettingsController.addConfig()
                         }
 
-                        Button {
+                        LightButton {
                             id: deleteConfigButton
                             text: qsTr("删除")
                             enabled: App.SettingsController.activeModelConfig.length > 0
-                            Layout.preferredWidth: Math.max(96, (parent.width - parent.spacing * 2) * 0.25)
-                            Layout.preferredHeight: 40
-                            contentItem: Text {
-                                text: deleteConfigButton.text
-                                color: deleteConfigButton.enabled ? "#26201b" : "#8f8982"
-                                font.pixelSize: 14
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                            }
-                            background: Rectangle {
-                                color: deleteConfigButton.enabled
-                                        ? (deleteConfigButton.down ? "#eee7da" : "#fffdf8")
-                                        : "#ebe7df"
-                                border.color: "#d8d1c8"
-                            }
+                            Layout.preferredWidth: Math.max(96, (configBar.width - configBar.spacing * 2) * 0.25)
                             onClicked: App.SettingsController.deleteConfig(App.SettingsController.activeModelConfig)
                         }
                     }
 
                     Label { text: qsTr("名称"); color: "#26201b" }
-                    TextField {
+                    SettingsTextField {
                         id: configNameField
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 40
                         text: App.SettingsController.configName
                         placeholderText: "GPT 4o Mini"
-                        color: "#111111"
-                        leftPadding: 12
-                        rightPadding: 12
-                        placeholderTextColor: "#7c858d"
-                        selectedTextColor: "#111111"
-                        selectionColor: "#b9d0f2"
-                        background: Rectangle {
-                            color: "#fffdf8"
-                            border.color: configNameField.activeFocus ? "#6f6258" : "#d8d1c8"
-                            border.width: configNameField.activeFocus ? 2 : 1
-                        }
                         onTextEdited: App.SettingsController.configName = text
                     }
 
                     Label { text: qsTr("Base URL"); color: "#26201b" }
-                    TextField {
+                    SettingsTextField {
                         id: baseUrlField
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 40
                         text: App.SettingsController.baseUrl
                         placeholderText: "https://api.openai.com"
-                        color: "#111111"
-                        leftPadding: 12
-                        rightPadding: 12
-                        placeholderTextColor: "#7c858d"
-                        selectedTextColor: "#111111"
-                        selectionColor: "#b9d0f2"
-                        background: Rectangle {
-                            color: "#fffdf8"
-                            border.color: baseUrlField.activeFocus ? "#6f6258" : "#d8d1c8"
-                            border.width: baseUrlField.activeFocus ? 2 : 1
-                        }
                         onTextEdited: App.SettingsController.baseUrl = text
                     }
 
                     Label { text: qsTr("API Key"); color: "#26201b" }
-                    TextField {
+                    SettingsTextField {
                         id: apiKeyField
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 40
                         text: App.SettingsController.apiKey
                         echoMode: TextInput.Password
                         placeholderText: "sk-..."
-                        color: "#111111"
-                        leftPadding: 12
-                        rightPadding: 12
-                        placeholderTextColor: "#7c858d"
-                        selectedTextColor: "#111111"
-                        selectionColor: "#b9d0f2"
-                        background: Rectangle {
-                            color: "#fffdf8"
-                            border.color: apiKeyField.activeFocus ? "#6f6258" : "#d8d1c8"
-                            border.width: apiKeyField.activeFocus ? 2 : 1
-                        }
                         onTextEdited: App.SettingsController.apiKey = text
                     }
 
                     Label { text: qsTr("Model"); color: "#26201b" }
-                    TextField {
+                    SettingsTextField {
                         id: modelField
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 40
                         text: App.SettingsController.model
                         placeholderText: "gpt-4o-mini"
-                        color: "#111111"
-                        leftPadding: 12
-                        rightPadding: 12
-                        placeholderTextColor: "#7c858d"
-                        selectedTextColor: "#111111"
-                        selectionColor: "#b9d0f2"
-                        background: Rectangle {
-                            color: "#fffdf8"
-                            border.color: modelField.activeFocus ? "#6f6258" : "#d8d1c8"
-                            border.width: modelField.activeFocus ? 2 : 1
-                        }
                         onTextEdited: App.SettingsController.model = text
                     }
 
                     Label { text: qsTr("Temperature"); color: "#26201b" }
-                    TextField {
+                    SettingsTextField {
                         id: temperatureField
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 40
                         text: App.SettingsController.temperatureText
                         placeholderText: "可留空；0-2，越高回复越发散，常用 0.7"
-                        color: "#111111"
-                        leftPadding: 12
-                        rightPadding: 12
-                        placeholderTextColor: "#7c858d"
-                        selectedTextColor: "#111111"
-                        selectionColor: "#b9d0f2"
                         inputMethodHints: Qt.ImhFormattedNumbersOnly
-                        background: Rectangle {
-                            color: "#fffdf8"
-                            border.color: temperatureField.activeFocus ? "#6f6258" : "#d8d1c8"
-                            border.width: temperatureField.activeFocus ? 2 : 1
-                        }
                         onTextEdited: App.SettingsController.temperatureText = text
                     }
 
                     Label { text: qsTr("Max Tokens"); color: "#26201b" }
-                    TextField {
+                    SettingsTextField {
                         id: maxTokensField
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 40
                         text: App.SettingsController.maxTokensText
                         placeholderText: "可留空；回复长度上限，正整数，如 2048"
-                        color: "#111111"
-                        leftPadding: 12
-                        rightPadding: 12
-                        placeholderTextColor: "#7c858d"
-                        selectedTextColor: "#111111"
-                        selectionColor: "#b9d0f2"
                         inputMethodHints: Qt.ImhDigitsOnly
-                        background: Rectangle {
-                            color: "#fffdf8"
-                            border.color: maxTokensField.activeFocus ? "#6f6258" : "#d8d1c8"
-                            border.width: maxTokensField.activeFocus ? 2 : 1
-                        }
                         onTextEdited: App.SettingsController.maxTokensText = text
                     }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 12
+
+                GridLayout {
+                    columns: 2
+                    columnSpacing: 12
+                    rowSpacing: 10
+                    Layout.fillWidth: true
 
                     Label { text: qsTr("文字节奏"); color: "#26201b" }
                     RowLayout {
                         Layout.fillWidth: true
-                        Slider {
+                        SettingsSlider {
                             id: msPerCharSlider
                             Layout.fillWidth: true
                             from: 40
@@ -293,50 +331,58 @@ ApplicationWindow {
                 }
 
                 Label {
-                    visible: App.SettingsController.validationError.length > 0
-                    text: App.SettingsController.validationError
-                    color: "#b65a45"
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                }
-
-                Label {
                     text: qsTr("角色人格")
                     color: "#26201b"
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
                 }
 
-                TextArea {
-                    id: personaField
+                ScrollView {
+                    id: personaScroll
+
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 180
-                    text: App.SettingsController.personaPrompt
-                    color: "#26201b"
-                    wrapMode: TextArea.Wrap
-                    selectByMouse: true
-                    placeholderText: qsTr("当前皮肤没有 persona.md，保存后会创建。")
-                    placeholderTextColor: "#82786e"
-                    selectedTextColor: "#26201b"
-                    selectionColor: "#b9d0f2"
-                    background: Rectangle {
-                        radius: 6
-                        color: "#fffdf8"
-                        border.color: personaField.activeFocus ? "#7b604c" : "#d8d1c8"
-                        border.width: personaField.activeFocus ? 2 : 1
+                    Layout.fillHeight: true
+                    clip: true
+                    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                    TextArea {
+                        id: personaField
+                        width: personaScroll.availableWidth
+                        height: Math.max(personaScroll.availableHeight, implicitHeight)
+                        text: App.SettingsController.personaPrompt
+                        color: "#26201b"
+                        wrapMode: TextArea.Wrap
+                        selectByMouse: true
+                        placeholderText: qsTr("当前皮肤没有 persona.md，保存后会创建。")
+                        placeholderTextColor: "#82786e"
+                        selectedTextColor: "#26201b"
+                        selectionColor: "#b9d0f2"
+                        background: Rectangle {
+                            color: "#fffdf8"
+                            border.color: personaField.activeFocus ? "#7b604c" : "#d8d1c8"
+                            border.width: personaField.activeFocus ? 2 : 1
+                        }
+                        onTextEdited: App.SettingsController.personaPrompt = text
                     }
-                    onTextEdited: App.SettingsController.personaPrompt = text
                 }
-
-                Label {
-                    visible: App.SettingsController.personaError.length > 0
-                    text: App.SettingsController.personaError
-                    color: "#b65a45"
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                }
-
             }
+        }
+
+        Label {
+            visible: App.SettingsController.validationError.length > 0
+            text: App.SettingsController.validationError
+            color: "#b65a45"
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        Label {
+            visible: App.SettingsController.personaError.length > 0
+            text: App.SettingsController.personaError
+            color: "#b65a45"
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
         }
 
         Label {
@@ -353,22 +399,10 @@ ApplicationWindow {
 
             Item { Layout.fillWidth: true }
 
-            Button {
+            LightButton {
                 id: cancelButton
                 text: qsTr("取消")
                 Layout.preferredWidth: 92
-                Layout.preferredHeight: 40
-                contentItem: Text {
-                    text: cancelButton.text
-                    color: "#26201b"
-                    font.pixelSize: 14
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                background: Rectangle {
-                    color: cancelButton.down ? "#eee7da" : "#fffdf8"
-                    border.color: "#d8d1c8"
-                }
                 onClicked: App.SettingsController.revert()
             }
 

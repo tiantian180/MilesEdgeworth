@@ -89,6 +89,13 @@ def main() -> int:
     require("SettingsControllerForeign" in controller_h, "SettingsControllerForeign QML singleton boilerplate required")
     require("QJSEngine::setObjectOwnership" in controller_h, "SettingsController singleton must keep C++ ownership")
     require("ApplicationWindow" in settings_qml, "SettingsWindow.qml must be ApplicationWindow")
+    require("TabBar" in settings_qml, "SettingsWindow must split settings into tabs")
+    require("模型配置" in settings_qml and "角色人格" in settings_qml,
+            "SettingsWindow tabs must separate model config from persona settings")
+    require("component SettingsTabButton" in settings_qml,
+            "Settings tabs must use the compact project tab style")
+    require("component SettingsSlider" in settings_qml and "visualPosition" in settings_qml,
+            "Settings slider must explicitly style the filled track direction")
     require("echoMode" in settings_qml, "API key field must use echoMode for masking")
     require("App.SettingsController.apiKey = apiKeyField.text" in settings_qml,
             "Settings save button must explicitly read the API key field")
