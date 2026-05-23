@@ -8,7 +8,7 @@
 
 #include <optional>
 
-// SettingsService owns user-facing provider settings stored in providers.json.
+// SettingsService owns user-facing provider settings stored in settings.json.
 class SettingsService : public QObject
 {
     Q_OBJECT

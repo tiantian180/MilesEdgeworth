@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 用 `providers.json` 替换 Keychain/QSettings 的模型配置存储，支持多组模型配置、可选 temperature/maxTokens、未配置时禁用聊天，并删除 Go mock provider。
+**Goal:** 用 `settings.json` 替换 Keychain/QSettings 的模型配置存储，支持多组模型配置、可选 temperature/maxTokens、未配置时禁用聊天，并删除 Go mock provider。
 
-**Architecture:** Qt 负责读取和保存 `providers.json`，启动 sidecar 时把当前配置写入环境变量。Go sidecar 只接收环境变量并调用 provider；没有配置时 provider 为 nil，聊天请求返回 `RUN_ERROR`。旧 SecretStore、MacSecretStore、mock provider 和相关测试检查一起删除。
+**Architecture:** Qt 负责读取和保存 `settings.json`，启动 sidecar 时把当前配置写入环境变量。Go sidecar 只接收环境变量并调用 provider；没有配置时 provider 为 nil，聊天请求返回 `RUN_ERROR`。旧 SecretStore、MacSecretStore、mock provider 和相关测试检查一起删除。
 
 **Tech Stack:** Qt 6/C++17/QML, Go 1.22, CMake/Ninja/CTest, Python contract checks.
 
@@ -14,7 +14,7 @@
 
 Included:
 
-- 新增 `ProviderConfigFile`，读写 `<AppDataLocation>/providers.json`。
+- 新增 `ProviderConfigFile`，读写 `<AppDataLocation>/settings.json`。
 - `SettingsService` 改为使用 `ProviderConfigFile`。
 - 设置页支持多组配置、新增、删除、切换、保存。
 - `temperature` 和 `maxTokens` 可留空。
@@ -135,7 +135,7 @@ Add checks for:
 
 ```text
 ProviderConfigFile
-providers.json
+settings.json
 QSaveFile
 modelConfigs
 activeModelConfig
@@ -209,7 +209,7 @@ assert(reopened.msPerChar() == 60);
 Also add tests for:
 
 ```cpp
-// invalid JSON becomes ParseError and creates providers.json.bak
+// invalid JSON becomes ParseError and creates settings.json.bak
 // unknown fields survive load/save through extraFields
 // deleting active config selects the first remaining config
 // duplicate or empty names are rejected by setConfig()
@@ -295,7 +295,7 @@ Use modelConfigs array order as UI order.
 Keep extra root fields and per-config extra fields.
 Clamp msPerChar to 40..200.
 Reject empty duplicate config names.
-Backup invalid JSON to providers.json.bak.
+Backup invalid JSON to settings.json.bak.
 ```
 
 - [ ] **Step 4: Run test and confirm green**
@@ -914,7 +914,7 @@ Expected: push succeeds.
 Use GitHub tooling with:
 
 ```text
-Title: Replace Keychain settings with providers.json
+Title: Replace Keychain settings with settings.json
 Base: main
 Head: feature/model-config-json
 Draft: true
@@ -924,7 +924,7 @@ PR body:
 
 ```markdown
 ## Summary
-- replace SecretStore/Keychain settings with providers.json
+- replace SecretStore/Keychain settings with settings.json
 - support multiple provider configs and optional temperature/maxTokens
 - remove mock provider fallback and return RUN_ERROR when model config is missing
 

@@ -25,7 +25,7 @@ QString defaultConfigPath()
     if (dir.isEmpty()) {
         dir = QDir::home().filePath(QStringLiteral(".MilesEdgeworth"));
     }
-    return QDir(dir).filePath(QStringLiteral("providers.json"));
+    return QDir(dir).filePath(QStringLiteral("settings.json"));
 }
 
 int clampMsPerChar(int value)
@@ -53,8 +53,8 @@ QJsonObject withoutKnownFields(const QJsonObject &object, const QSet<QString> &k
 QString backupPathFor(const QString &path)
 {
     QFileInfo info(path);
-    if (info.fileName() == QStringLiteral("providers.json")) {
-        return info.dir().filePath(QStringLiteral("providers.json.bak"));
+    if (info.fileName() == QStringLiteral("settings.json")) {
+        return info.dir().filePath(QStringLiteral("settings.json.bak"));
     }
     return path + QStringLiteral(".bak");
 }

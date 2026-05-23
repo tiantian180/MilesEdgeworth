@@ -40,21 +40,23 @@ def main() -> int:
     stage_doc = read("docs/v2/阶段记录/Phase 2.2 用户配置与安全存储.md")
     design_doc = read("docs/v2/设计方案/模型配置与密钥存储设计.md")
 
-    # providers.json storage
+    # settings.json storage
     require("class ProviderConfigFile" in provider_config_h, "ProviderConfigFile class missing")
     require("enum class LoadStatus" in provider_config_h, "ProviderConfigFile must expose LoadStatus")
     require("struct ModelConfig" in provider_config_h, "ProviderConfigFile must expose ModelConfig")
     require("std::optional<double>" in provider_config_h, "temperature must be optional")
     require("std::optional<int>" in provider_config_h, "maxTokens must be optional")
     require("QJsonObject extraFields" in provider_config_h, "unknown config fields must be preserved")
-    require("QSaveFile" in provider_config_cpp, "providers.json writes must use QSaveFile")
-    require("providers.json" in provider_config_cpp, "default file name must be providers.json")
+    require("QSaveFile" in provider_config_cpp, "settings.json writes must use QSaveFile")
+    require("settings.json" in provider_config_cpp, "default file name must be settings.json")
+    require("providers.json" not in provider_config_cpp, "ProviderConfigFile must not use the old providers.json name")
+    require("model-configs.json" not in provider_config_cpp, "ProviderConfigFile must not use the discarded model-configs.json name")
     require("QStandardPaths::AppDataLocation" in provider_config_cpp,
-            "default providers.json path must use AppDataLocation")
-    require("setPermissions" in provider_config_cpp, "providers.json save must set owner-only permissions when possible")
-    require("providers.json.bak" in provider_config_cpp, "invalid JSON must be backed up")
-    require("modelConfigs" in provider_config_cpp, "providers.json must store modelConfigs")
-    require("activeModelConfig" in provider_config_cpp, "providers.json must store activeModelConfig")
+            "default settings.json path must use AppDataLocation")
+    require("setPermissions" in provider_config_cpp, "settings.json save must set owner-only permissions when possible")
+    require("settings.json.bak" in provider_config_cpp, "invalid JSON must be backed up")
+    require("modelConfigs" in provider_config_cpp, "settings.json must store modelConfigs")
+    require("activeModelConfig" in provider_config_cpp, "settings.json must store activeModelConfig")
     require("moveConfig" in provider_config_h, "ProviderConfigFile must preserve user ordering")
 
     # SettingsService
@@ -143,14 +145,14 @@ def main() -> int:
 
     # Tests and docs
     require("ProviderConfigFile" in smoke, "settings smoke test must cover ProviderConfigFile")
-    require("providers.json.bak" in smoke, "settings smoke test must cover invalid JSON backup")
+    require("settings.json.bak" in smoke, "settings smoke test must cover invalid JSON backup")
     require("extraFields" in smoke, "settings smoke test must cover unknown field preservation")
     require("msPerChar" in smoke, "smoke test must cover msPerChar persistence")
-    require("apiKey" in smoke, "smoke test must cover apiKey persistence in providers.json")
+    require("apiKey" in smoke, "smoke test must cover apiKey persistence in settings.json")
     require("Phase 2.2" in stage_doc, "Phase 2.2 stage record must exist")
     require("Phase 2.2" in index_doc, "doc index must link Phase 2.2 record")
-    require("providers.json" in design_doc and "ProviderConfigFile" in design_doc,
-            "design doc must describe providers.json and ProviderConfigFile")
+    require("settings.json" in design_doc and "ProviderConfigFile" in design_doc,
+            "design doc must describe settings.json and ProviderConfigFile")
 
     print("phase 2.2 model config JSON contract ok")
     return 0

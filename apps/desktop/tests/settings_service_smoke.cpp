@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     setupQSettingsScope(tmp);
 
     {
-        const QString path = tmp.filePath(QStringLiteral("providers.json"));
+        const QString path = tmp.filePath(QStringLiteral("settings.json"));
         ProviderConfigFile file(path);
         assert(file.load() == ProviderConfigFile::LoadStatus::FileNotFound);
         assert(file.configNames().isEmpty());
@@ -95,12 +95,12 @@ int main(int argc, char *argv[])
     {
         QTemporaryDir invalidDir;
         assert(invalidDir.isValid());
-        const QString path = invalidDir.filePath(QStringLiteral("providers.json"));
+        const QString path = invalidDir.filePath(QStringLiteral("settings.json"));
         assert(writeFile(path, QStringLiteral("{not-json")));
         ProviderConfigFile file(path);
         assert(file.load() == ProviderConfigFile::LoadStatus::ParseError);
         assert(!QFile::exists(path));
-        assert(QFile::exists(invalidDir.filePath(QStringLiteral("providers.json.bak"))));
+        assert(QFile::exists(invalidDir.filePath(QStringLiteral("settings.json.bak"))));
         assert(file.lastError().contains(QStringLiteral("已备份")));
     }
 
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
         const QByteArray previousMilesDataDir = qgetenv("MILES_DATA_DIR");
         qputenv("MILES_DATA_DIR", personaDir.path().toUtf8());
 
-        SettingsService service(personaDir.filePath(QStringLiteral("providers.json")));
+        SettingsService service(personaDir.filePath(QStringLiteral("settings.json")));
         PetRuntime runtime;
         assert(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"));
 
@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
 }
 )JSON")));
 
-        SettingsService service(personaDir.filePath(QStringLiteral("providers.json")));
+        SettingsService service(personaDir.filePath(QStringLiteral("settings.json")));
         auto cfg = modelConfig(QStringLiteral("deepseek"),
                                QStringLiteral("https://before.example.com"),
                                QStringLiteral("sk-before"),
@@ -339,7 +339,7 @@ int main(int argc, char *argv[])
         assert(controller.windowVisible());
         assert(!controller.personaError().isEmpty());
         assert(service.baseUrl() == QStringLiteral("https://before.example.com"));
-        SettingsService reopened(personaDir.filePath(QStringLiteral("providers.json")));
+        SettingsService reopened(personaDir.filePath(QStringLiteral("settings.json")));
         assert(reopened.baseUrl() == QStringLiteral("https://before.example.com"));
 
         if (hadMilesDataDir) {

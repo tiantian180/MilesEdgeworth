@@ -135,7 +135,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 ### Phase 2.2：用户配置与安全存储 ✓
 
 > 已完成。详见 `阶段记录/Phase 2.2 用户配置与安全存储.md`。
-> 后续修正：Keychain / 不落盘是当时方案。当前改为 Qt 把模型配置写入 `providers.json`，保存后重启 sidecar，并通过环境变量传入当前配置。
+> 后续修正：Keychain / 不落盘是当时方案。当前改为 Qt 把模型配置写入 `settings.json`，保存后重启 sidecar，并通过环境变量传入当前配置。
 
 目标：把临时配置升级为用户可维护配置。
 

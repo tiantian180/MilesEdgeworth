@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
     QCoreApplication app(argc, argv);
     QTemporaryDir settingsDir;
     require(settingsDir.isValid(), "settings temp dir should be valid");
-    SettingsService settings(settingsDir.filePath(QStringLiteral("providers.json")));
+    SettingsService settings(settingsDir.filePath(QStringLiteral("settings.json")));
     auto cfg = modelConfig(QStringLiteral("test"),
                            QStringLiteral("https://api.example.test/v1"),
                            QStringLiteral("sk-test"),
