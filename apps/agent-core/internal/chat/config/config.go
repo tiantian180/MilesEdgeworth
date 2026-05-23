@@ -11,22 +11,17 @@ type ProviderConfig struct {
 	BaseURL     string
 	APIKey      string
 	Model       string
-	Temperature float64
-	MaxTokens   int
+	Temperature *float64
+	MaxTokens   *int
 }
-
-const (
-	defaultTemperature = 0.7
-	defaultMaxTokens   = 2048
-)
 
 func FromEnv() ProviderConfig {
 	return ProviderConfig{
 		BaseURL:     strings.TrimSpace(os.Getenv("MILES_PROVIDER_BASE_URL")),
 		APIKey:      strings.TrimSpace(os.Getenv("MILES_PROVIDER_API_KEY")),
 		Model:       strings.TrimSpace(os.Getenv("MILES_PROVIDER_MODEL")),
-		Temperature: parseFloat(os.Getenv("MILES_PROVIDER_TEMPERATURE"), defaultTemperature),
-		MaxTokens:   parseInt(os.Getenv("MILES_PROVIDER_MAX_TOKENS"), defaultMaxTokens),
+		Temperature: parseFloat(os.Getenv("MILES_PROVIDER_TEMPERATURE")),
+		MaxTokens:   parseInt(os.Getenv("MILES_PROVIDER_MAX_TOKENS")),
 	}
 }
 
@@ -34,24 +29,24 @@ func (c ProviderConfig) Enabled() bool {
 	return c.BaseURL != "" && c.APIKey != "" && c.Model != ""
 }
 
-func parseFloat(s string, def float64) float64 {
+func parseFloat(s string) *float64 {
 	if strings.TrimSpace(s) == "" {
-		return def
+		return nil
 	}
 	v, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
 	if err != nil {
-		return def
+		return nil
 	}
-	return v
+	return &v
 }
 
-func parseInt(s string, def int) int {
+func parseInt(s string) *int {
 	if strings.TrimSpace(s) == "" {
-		return def
+		return nil
 	}
 	v, err := strconv.Atoi(strings.TrimSpace(s))
-	if err != nil {
-		return def
+	if err != nil || v < 1 {
+		return nil
 	}
-	return v
+	return &v
 }

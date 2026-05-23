@@ -24,10 +24,10 @@ func TestFromEnv(t *testing.T) {
 	if cfg.Model != "gpt-test" {
 		t.Fatalf("Model = %q", cfg.Model)
 	}
-	if cfg.Temperature != 0.3 {
+	if cfg.Temperature == nil || *cfg.Temperature != 0.3 {
 		t.Fatalf("Temperature = %v", cfg.Temperature)
 	}
-	if cfg.MaxTokens != 1024 {
+	if cfg.MaxTokens == nil || *cfg.MaxTokens != 1024 {
 		t.Fatalf("MaxTokens = %v", cfg.MaxTokens)
 	}
 	if !cfg.Enabled() {
@@ -44,11 +44,11 @@ func TestFromEnvDefaults(t *testing.T) {
 
 	cfg := config.FromEnv()
 
-	if cfg.Temperature != 0.7 {
-		t.Fatalf("default Temperature should be 0.7, got %v", cfg.Temperature)
+	if cfg.Temperature != nil {
+		t.Fatalf("default Temperature should be nil, got %v", cfg.Temperature)
 	}
-	if cfg.MaxTokens != 2048 {
-		t.Fatalf("default MaxTokens should be 2048, got %v", cfg.MaxTokens)
+	if cfg.MaxTokens != nil {
+		t.Fatalf("default MaxTokens should be nil, got %v", cfg.MaxTokens)
 	}
 	if cfg.Enabled() {
 		t.Fatal("Enabled should be false when required env missing")

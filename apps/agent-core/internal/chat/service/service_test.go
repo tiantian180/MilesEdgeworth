@@ -594,6 +594,35 @@ func TestStreamChatForwardsBuiltParams(t *testing.T) {
 	}
 }
 
+func TestStreamChatWithoutProviderReturnsRunError(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "指出矛盾。")
+
+	events, err := newTestService(s, nil, 8192).StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []chat.StreamEvent
+	for event := range events {
+		got = append(got, event)
+	}
+	if len(got) != 1 || got[0].Type != "RUN_ERROR" {
+		t.Fatalf("events = %+v, want single RUN_ERROR", got)
+	}
+	if !strings.Contains(got[0].Error, "未配置模型") {
+		t.Fatalf("RUN_ERROR = %q, want missing model config message", got[0].Error)
+	}
+}
+
 func TestBuildMessagesFallsBackToTruncationWhenSummaryFails(t *testing.T) {
 	s := openTestStore(t)
 	conv, err := s.CreateConversation("miles-edgeworth")

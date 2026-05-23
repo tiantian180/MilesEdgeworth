@@ -346,6 +346,29 @@ func TestChatDoesNotPersistAssistantAfterRunError(t *testing.T) {
 	}
 }
 
+func TestChatWithoutProviderStreamsRunError(t *testing.T) {
+	st, server := newTestServer(t, nil, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	events := readSSEEvents(t, resp.Body)
+	if len(events) != 1 || events[0].Type != "RUN_ERROR" {
+		t.Fatalf("events = %+v, want single RUN_ERROR", events)
+	}
+	if !strings.Contains(events[0].Error, "未配置模型") {
+		t.Fatalf("RUN_ERROR = %q, want missing model config message", events[0].Error)
+	}
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 1 || messages[0].Role != store.RoleUser {
+		t.Fatalf("messages = %+v, want only user row", messages)
+	}
+}
+
 func TestSummarizingEventIsFirstSSEEventWhenTriggered(t *testing.T) {
 	provider := &fakeProvider{completeText: "古い会話の要約"}
 	st, server := newTestServer(t, provider, 2000)
