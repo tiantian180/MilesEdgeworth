@@ -21,6 +21,10 @@ ApplicationWindow {
 
     onVisibleChanged: App.DesktopShell.setChatWindowDockVisible(visible)
 
+    function scheduleTranscriptScroll() {
+        transcriptScrollTimer.restart()
+    }
+
     function open() {
         App.ChatController.loadConversations()
         show()
@@ -36,10 +40,16 @@ ApplicationWindow {
         }
 
         function onMessagesChanged() {
-            Qt.callLater(function() {
-                transcript.positionViewAtEnd()
-            })
+            chatWindow.scheduleTranscriptScroll()
         }
+    }
+
+    Timer {
+        id: transcriptScrollTimer
+
+        interval: 33
+        repeat: false
+        onTriggered: transcript.positionViewAtEnd()
     }
 
     ColumnLayout {
@@ -345,10 +355,16 @@ ApplicationWindow {
 
                                 readonly property bool isUser: modelData.role === "user"
                                 readonly property string bodyText: modelData.text.length > 0 ? modelData.text : "…"
+                                readonly property real maxBubbleWidth: parent.width * 0.82
+                                readonly property real minimumReadableBubbleWidth: Math.min(maxBubbleWidth, 132)
+                                readonly property bool stableStreamingWidth: !isUser && modelData.pending === true
 
-                                width: Math.min(parent.width * 0.82,
-                                                Math.max(44, messageMetrics.width + 24,
-                                                         partial ? partialMetrics.width + 16 : 0))
+                                width: stableStreamingWidth
+                                       ? maxBubbleWidth
+                                       : Math.min(maxBubbleWidth,
+                                                  Math.max(minimumReadableBubbleWidth,
+                                                           messageMetrics.width + 32,
+                                                           partial ? partialMetrics.width + 24 : 0))
                                 implicitHeight: messageText.contentHeight + (partialLabel.visible ? partialLabel.implicitHeight + 4 : 0) + 16
                                 height: implicitHeight
                                 anchors.right: isUser ? parent.right : undefined
@@ -408,9 +424,7 @@ ApplicationWindow {
                             }
                         }
 
-                        onCountChanged: Qt.callLater(function() {
-                            transcript.positionViewAtEnd()
-                        })
+                        onCountChanged: chatWindow.scheduleTranscriptScroll()
                     }
                 }
             }

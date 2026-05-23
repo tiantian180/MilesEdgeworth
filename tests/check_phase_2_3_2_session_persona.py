@@ -129,6 +129,14 @@ def main() -> int:
     require("conversationId" in chat_cpp and 'QStringLiteral("default")' not in chat_cpp, "ChatController must stop hardcoding default conversation id")
     require("miles.chat.memory.summarizing" in chat_cpp, "ChatController must handle summarizing event")
     require("会话" in chat_qml and "新建" in chat_qml, "ChatWindow must expose conversation list controls")
+    require(
+        "id: transcriptScrollTimer" in chat_qml and "transcriptScrollTimer.restart()" in chat_qml,
+        "ChatWindow must throttle transcript autoscroll during streamed message updates",
+    )
+    require(
+        "minimumReadableBubbleWidth" in chat_qml and "stableStreamingWidth" in chat_qml,
+        "ChatWindow bubbles must keep readable short-message width and stable streaming width",
+    )
 
     require("PersonaStore" in desktop_cmake, "desktop CMake must compile PersonaStore")
     require("go.sum" in agent_cmake, "agent CMake must rebuild when go.sum changes")
