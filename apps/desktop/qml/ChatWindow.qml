@@ -412,15 +412,10 @@ ApplicationWindow {
                                 readonly property bool isUser: role === "user"
                                 readonly property string bodyText: text.length > 0 ? text : "…"
                                 readonly property real maxBubbleWidth: parent.width * 0.82
-                                readonly property real minimumReadableBubbleWidth: Math.min(maxBubbleWidth, 132)
-                                readonly property bool stableStreamingWidth: !isUser && pending === true
 
-                                width: stableStreamingWidth
-                                       ? maxBubbleWidth
-                                       : Math.min(maxBubbleWidth,
-                                                  Math.max(minimumReadableBubbleWidth,
-                                                           messageMetrics.width + 32,
-                                                           partial ? partialMetrics.width + 24 : 0))
+                                width: Math.min(maxBubbleWidth,
+                                                Math.max(messageMetrics.width + 16,
+                                                         partial ? partialMetrics.width + 16 : 0))
                                 implicitHeight: messageText.contentHeight + (partialLabel.visible ? partialLabel.implicitHeight + 4 : 0) + 16
                                 height: implicitHeight
                                 anchors.right: isUser ? parent.right : undefined

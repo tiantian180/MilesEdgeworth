@@ -136,8 +136,12 @@ def main() -> int:
         "ChatWindow must throttle transcript autoscroll during streamed message updates",
     )
     require(
-        "minimumReadableBubbleWidth" in chat_qml and "stableStreamingWidth" in chat_qml,
-        "ChatWindow bubbles must keep readable short-message width and stable streaming width",
+        "minimumReadableBubbleWidth" not in chat_qml and "stableStreamingWidth" not in chat_qml,
+        "ChatWindow bubbles must not force a minimum or streaming width; padding and max width are enough",
+    )
+    require(
+        "messageMetrics.width + 16" in chat_qml and "Math.min(maxBubbleWidth" in chat_qml,
+        "ChatWindow bubbles must size to message content plus padding and wrap at max width",
     )
     require(
         "id: transcriptModel" in chat_qml
