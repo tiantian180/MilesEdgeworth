@@ -14,6 +14,7 @@ import (
 	"milesedgeworth/agent-core/internal/api"
 	"milesedgeworth/agent-core/internal/chat"
 	"milesedgeworth/agent-core/internal/chat/config"
+	"milesedgeworth/agent-core/internal/chat/observability"
 	"milesedgeworth/agent-core/internal/chat/openai"
 	chatservice "milesedgeworth/agent-core/internal/chat/service"
 	"milesedgeworth/agent-core/internal/mileslog"
@@ -38,6 +39,33 @@ func main() {
 		logger.Info("provider selected", "provider", "openai-compatible", "model", cfg.Model)
 	} else {
 		logger.Info("provider selected", "provider", "unconfigured")
+	}
+
+	if provider != nil && cfg.Langfuse.Enabled() {
+		tracerProvider, err := observability.NewLangfuseTracerProvider(context.Background(), observability.LangfuseOTLPConfig{
+			Host:      cfg.Langfuse.Host,
+			PublicKey: cfg.Langfuse.PublicKey,
+			SecretKey: cfg.Langfuse.SecretKey,
+		})
+		if err != nil {
+			logger.Warn("langfuse tracing disabled", "error", err)
+		} else {
+			defer func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := tracerProvider.Shutdown(ctx); err != nil {
+					logger.Warn("langfuse shutdown failed", "error", err)
+				}
+			}()
+			provider = observability.WrapProvider(provider, observability.Options{
+				TracerProvider: tracerProvider,
+				Model:          cfg.Model,
+				Temperature:    cfg.Temperature,
+				MaxTokens:      cfg.MaxTokens,
+				CaptureContent: cfg.Langfuse.CaptureContent,
+			})
+			logger.Info("langfuse tracing enabled", "hostSet", true, "captureContent", cfg.Langfuse.CaptureContent)
+		}
 	}
 
 	dataDir := os.Getenv("MILES_DATA_DIR")

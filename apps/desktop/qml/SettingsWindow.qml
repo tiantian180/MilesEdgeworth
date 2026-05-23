@@ -55,6 +55,34 @@ ApplicationWindow {
         }
     }
 
+    component SettingsCheckBox: CheckBox {
+        id: checkBox
+
+        Layout.preferredHeight: 32
+        indicator: Rectangle {
+            x: 0
+            y: checkBox.topPadding + checkBox.availableHeight / 2 - height / 2
+            implicitWidth: 20
+            implicitHeight: 20
+            color: checkBox.checked ? "#2f2d2b" : "#fffdf8"
+            border.color: "#6f6258"
+
+            Text {
+                anchors.centerIn: parent
+                text: checkBox.checked ? "✓" : ""
+                color: "#fffdf8"
+                font.pixelSize: 14
+            }
+        }
+        contentItem: Text {
+            text: checkBox.text
+            color: "#26201b"
+            font.pixelSize: 14
+            verticalAlignment: Text.AlignVCenter
+            leftPadding: checkBox.indicator.width + 8
+        }
+    }
+
     component SettingsTabButton: TabButton {
         id: tabButton
 
@@ -134,6 +162,10 @@ ApplicationWindow {
 
             SettingsTabButton {
                 text: qsTr("角色人格")
+            }
+
+            SettingsTabButton {
+                text: qsTr("其他设置")
             }
         }
 
@@ -304,32 +336,6 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 spacing: 12
 
-                GridLayout {
-                    columns: 2
-                    columnSpacing: 12
-                    rowSpacing: 10
-                    Layout.fillWidth: true
-
-                    Label { text: qsTr("文字节奏"); color: "#26201b" }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        SettingsSlider {
-                            id: msPerCharSlider
-                            Layout.fillWidth: true
-                            from: 40
-                            to: 200
-                            stepSize: 5
-                            value: App.SettingsController.msPerChar
-                            onMoved: App.SettingsController.msPerChar = Math.round(value)
-                        }
-                        Label {
-                            text: Math.round(msPerCharSlider.value) + " ms/字"
-                            color: "#26201b"
-                            Layout.preferredWidth: 72
-                        }
-                    }
-                }
-
                 Label {
                     text: qsTr("角色人格")
                     color: "#26201b"
@@ -364,6 +370,82 @@ ApplicationWindow {
                             border.width: personaField.activeFocus ? 2 : 1
                         }
                         onTextEdited: App.SettingsController.personaPrompt = text
+                    }
+                }
+            }
+
+            ScrollView {
+                id: otherScroll
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+                ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                GridLayout {
+                    width: otherScroll.availableWidth
+                    columns: 2
+                    columnSpacing: 12
+                    rowSpacing: 10
+
+                    Label { text: qsTr("文字节奏"); color: "#26201b" }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        SettingsSlider {
+                            id: msPerCharSlider
+                            Layout.fillWidth: true
+                            from: 40
+                            to: 200
+                            stepSize: 5
+                            value: App.SettingsController.msPerChar
+                            onMoved: App.SettingsController.msPerChar = Math.round(value)
+                        }
+                        Label {
+                            text: Math.round(msPerCharSlider.value) + " ms/字"
+                            color: "#26201b"
+                            Layout.preferredWidth: 72
+                        }
+                    }
+
+                    Label { text: qsTr("启用 Langfuse"); color: "#26201b" }
+                    SettingsCheckBox {
+                        id: langfuseEnabledField
+                        checked: App.SettingsController.langfuseEnabled
+                        onToggled: App.SettingsController.langfuseEnabled = checked
+                    }
+
+                    Label { text: qsTr("Langfuse Host"); color: "#26201b" }
+                    SettingsTextField {
+                        id: langfuseHostField
+                        text: App.SettingsController.langfuseHost
+                        placeholderText: "https://cloud.langfuse.com"
+                        onTextEdited: App.SettingsController.langfuseHost = text
+                    }
+
+                    Label { text: qsTr("Public Key"); color: "#26201b" }
+                    SettingsTextField {
+                        id: langfusePublicKeyField
+                        text: App.SettingsController.langfusePublicKey
+                        placeholderText: "pk-lf-..."
+                        onTextEdited: App.SettingsController.langfusePublicKey = text
+                    }
+
+                    Label { text: qsTr("Secret Key"); color: "#26201b" }
+                    SettingsTextField {
+                        id: langfuseSecretKeyField
+                        text: App.SettingsController.langfuseSecretKey
+                        echoMode: TextInput.Password
+                        placeholderText: "sk-lf-..."
+                        onTextEdited: App.SettingsController.langfuseSecretKey = text
+                    }
+
+                    Label { text: qsTr("记录内容"); color: "#26201b" }
+                    SettingsCheckBox {
+                        id: langfuseCaptureContentField
+                        checked: App.SettingsController.langfuseCaptureContent
+                        text: qsTr("Prompt / 回复")
+                        onToggled: App.SettingsController.langfuseCaptureContent = checked
                     }
                 }
             }
@@ -439,6 +521,11 @@ ApplicationWindow {
                     App.SettingsController.temperatureText = temperatureField.text
                     App.SettingsController.maxTokensText = maxTokensField.text
                     App.SettingsController.msPerChar = Math.round(msPerCharSlider.value)
+                    App.SettingsController.langfuseEnabled = langfuseEnabledField.checked
+                    App.SettingsController.langfuseHost = langfuseHostField.text
+                    App.SettingsController.langfusePublicKey = langfusePublicKeyField.text
+                    App.SettingsController.langfuseSecretKey = langfuseSecretKeyField.text
+                    App.SettingsController.langfuseCaptureContent = langfuseCaptureContentField.checked
                     App.SettingsController.personaPrompt = personaField.text
                     App.SettingsController.save()
                 }

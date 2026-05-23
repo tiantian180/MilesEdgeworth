@@ -43,6 +43,9 @@ public:
     int msPerChar() const;
     void setMsPerChar(int value);
 
+    ProviderConfigFile::LangfuseConfig langfuseConfig() const;
+    void setLangfuseConfig(const ProviderConfigFile::LangfuseConfig &cfg);
+
     bool providerConfigured() const;
     QString configPath() const;
     QString lastError() const;

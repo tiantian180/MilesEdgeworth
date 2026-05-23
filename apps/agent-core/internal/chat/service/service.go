@@ -124,8 +124,10 @@ func (s *Service) StreamChat(ctx context.Context, req BuildRequest) (<-chan chat
 		return nil, err
 	}
 	return s.provider.StreamChat(ctx, chat.ChatParams{
+		ConversationID:     req.ConversationID,
 		RunID:              req.RunID,
 		MessageID:          req.MessageID,
+		Operation:          "chat",
 		Messages:           messages,
 		KnownExpressionIDs: knownExpressionIDs,
 	})
@@ -157,8 +159,10 @@ func (s *Service) summarize(ctx context.Context, req BuildRequest, summaries []s
 	}
 
 	return s.provider.Complete(ctx, chat.ChatParams{
-		RunID:     req.RunID,
-		MessageID: req.MessageID,
+		ConversationID: req.ConversationID,
+		RunID:          req.RunID,
+		MessageID:      req.MessageID,
+		Operation:      "summary",
 		Messages: []chat.Message{
 			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: userPrompt},

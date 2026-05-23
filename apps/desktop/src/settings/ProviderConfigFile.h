@@ -22,6 +22,15 @@ public:
         QJsonObject extraFields;
     };
 
+    struct LangfuseConfig {
+        bool enabled = false;
+        QString host;
+        QString publicKey;
+        QString secretKey;
+        bool captureContent = true;
+        QJsonObject extraFields;
+    };
+
     explicit ProviderConfigFile(QString path = {});
 
     LoadStatus load();
@@ -41,6 +50,9 @@ public:
     int msPerChar() const;
     void setMsPerChar(int value);
 
+    LangfuseConfig langfuseConfig() const;
+    void setLangfuseConfig(const LangfuseConfig &cfg);
+
 private:
     int configIndex(const QString &name) const;
     void selectFallbackActiveConfig();
@@ -50,6 +62,7 @@ private:
     QString m_lastError;
     QList<ModelConfig> m_configs;
     int m_msPerChar = 80;
+    LangfuseConfig m_langfuseConfig;
     QJsonObject m_rootExtraFields;
     QJsonObject m_chatExtraFields;
 };

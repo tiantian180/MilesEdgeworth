@@ -203,6 +203,19 @@ void ChatController::launchSidecarProcess()
         if (maxTokens.has_value()) {
             env.insert(QStringLiteral("MILES_PROVIDER_MAX_TOKENS"), QString::number(*maxTokens));
         }
+
+        const auto langfuse = m_settings->langfuseConfig();
+        if (langfuse.enabled
+            && !langfuse.host.isEmpty()
+            && !langfuse.publicKey.isEmpty()
+            && !langfuse.secretKey.isEmpty()) {
+            env.insert(QStringLiteral("MILES_LANGFUSE_ENABLED"), QStringLiteral("1"));
+            env.insert(QStringLiteral("LANGFUSE_HOST"), langfuse.host);
+            env.insert(QStringLiteral("LANGFUSE_PUBLIC_KEY"), langfuse.publicKey);
+            env.insert(QStringLiteral("LANGFUSE_SECRET_KEY"), langfuse.secretKey);
+            env.insert(QStringLiteral("MILES_LANGFUSE_CAPTURE_CONTENT"),
+                       langfuse.captureContent ? QStringLiteral("1") : QStringLiteral("0"));
+        }
     }
     setProviderConfigured(providerConfigured);
 
@@ -221,6 +234,8 @@ void ChatController::launchSidecarProcess()
                                << QStringLiteral("baseUrlSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_PROVIDER_BASE_URL"))))
                                << QStringLiteral("apiKeySet=%1").arg(logBool(env.contains(QStringLiteral("MILES_PROVIDER_API_KEY"))))
                                << QStringLiteral("model=%1").arg(env.value(QStringLiteral("MILES_PROVIDER_MODEL")))
+                               << QStringLiteral("langfuseSet=%1").arg(logBool(env.contains(QStringLiteral("LANGFUSE_HOST"))))
+                               << QStringLiteral("langfuseCaptureContent=%1").arg(logBool(env.value(QStringLiteral("MILES_LANGFUSE_CAPTURE_CONTENT")) == QStringLiteral("1")))
                                << QStringLiteral("logLevel=%1").arg(env.value(QStringLiteral("MILES_LOG_LEVEL"), QStringLiteral("info")))
                                << QStringLiteral("logFileSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_LOG_FILE"))))
                                << QStringLiteral("dataDirSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_DATA_DIR"))))

@@ -90,10 +90,21 @@ void SettingsController::syncFromService()
     m_activeModelConfig = m_service->activeModelConfig();
     syncFromConfig(m_service->modelConfig(m_activeModelConfig));
     m_msPerChar = m_service->msPerChar();
+    const auto langfuse = m_service->langfuseConfig();
+    m_langfuseEnabled = langfuse.enabled;
+    m_langfuseHost = langfuse.host;
+    m_langfusePublicKey = langfuse.publicKey;
+    m_langfuseSecretKey = langfuse.secretKey;
+    m_langfuseCaptureContent = langfuse.captureContent;
 
     emit configNamesChanged();
     emit activeModelConfigChanged();
     emit msPerCharChanged();
+    emit langfuseEnabledChanged();
+    emit langfuseHostChanged();
+    emit langfusePublicKeyChanged();
+    emit langfuseSecretKeyChanged();
+    emit langfuseCaptureContentChanged();
 }
 
 void SettingsController::syncFromConfig(const ProviderConfigFile::ModelConfig &cfg)
@@ -186,6 +197,51 @@ void SettingsController::setMsPerChar(int value)
     emit msPerCharChanged();
 }
 
+void SettingsController::setLangfuseEnabled(bool value)
+{
+    if (m_langfuseEnabled == value) {
+        return;
+    }
+    m_langfuseEnabled = value;
+    emit langfuseEnabledChanged();
+}
+
+void SettingsController::setLangfuseHost(const QString &value)
+{
+    if (m_langfuseHost == value) {
+        return;
+    }
+    m_langfuseHost = value;
+    emit langfuseHostChanged();
+}
+
+void SettingsController::setLangfusePublicKey(const QString &value)
+{
+    if (m_langfusePublicKey == value) {
+        return;
+    }
+    m_langfusePublicKey = value;
+    emit langfusePublicKeyChanged();
+}
+
+void SettingsController::setLangfuseSecretKey(const QString &value)
+{
+    if (m_langfuseSecretKey == value) {
+        return;
+    }
+    m_langfuseSecretKey = value;
+    emit langfuseSecretKeyChanged();
+}
+
+void SettingsController::setLangfuseCaptureContent(bool value)
+{
+    if (m_langfuseCaptureContent == value) {
+        return;
+    }
+    m_langfuseCaptureContent = value;
+    emit langfuseCaptureContentChanged();
+}
+
 void SettingsController::setPersonaPrompt(const QString &value)
 {
     if (m_personaPrompt == value) {
@@ -260,6 +316,18 @@ void SettingsController::save()
         }
     }
 
+    ProviderConfigFile::LangfuseConfig langfuse;
+    langfuse.enabled = m_langfuseEnabled;
+    langfuse.host = m_langfuseHost.trimmed();
+    langfuse.publicKey = m_langfusePublicKey.trimmed();
+    langfuse.secretKey = m_langfuseSecretKey.trimmed();
+    langfuse.captureContent = m_langfuseCaptureContent;
+    if (langfuse.enabled
+        && (langfuse.host.isEmpty() || langfuse.publicKey.isEmpty() || langfuse.secretKey.isEmpty())) {
+        setValidationError(QStringLiteral("Langfuse Host、Public Key 和 Secret Key 都必须填写。"));
+        return;
+    }
+
     if (m_runtime != nullptr) {
         QString error;
         if (!PersonaStore::writeForManifest(m_runtime->manifest(), m_personaPrompt, &error)) {
@@ -285,6 +353,7 @@ void SettingsController::save()
         }
     }
     m_service->setMsPerChar(m_msPerChar);
+    m_service->setLangfuseConfig(langfuse);
     if (!m_service->save()) {
         const QString detail = m_service->lastError().trimmed();
         setSaveError(detail.isEmpty()

@@ -22,8 +22,10 @@ type Message struct {
 }
 
 type ChatParams struct {
+	ConversationID     string
 	RunID              string
 	MessageID          string
+	Operation          string
 	Messages           []Message
 	KnownExpressionIDs []string
 }

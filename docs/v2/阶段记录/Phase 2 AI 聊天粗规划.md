@@ -154,9 +154,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 ### Phase 2.3：会话历史与人设
 
-> 进行中。动画-文字同步部分（状态机 + 字符速率限制器 + PetRuntime 边界通知）已在 `阶段记录/Phase 2.3.1 动画-文字同步.md` 完成。剩余子阶段：
-> - **Phase 2.3.2**：完整 Miles persona + SQLite 会话历史 + 新建 / 清空对话 + 历史截断。
-> - **Phase 2.3.3**：Langfuse 可观测性接入（Phase 2.1 预留的 middleware hook 激活）。
+> 已完成。动画-文字同步部分已在 `阶段记录/Phase 2.3.1 动画-文字同步.md` 完成；完整 Miles persona + SQLite 会话历史已在 `阶段记录/Phase 2.3.2 会话历史与人设.md` 完成；Langfuse 可观测性接入已在 `阶段记录/Phase 2.3.3 Langfuse 可观测性.md` 完成。
 
 目标：让 Miles 有稳定人设和基础上下文，并完整落地动画-文字同步状态机。
 
@@ -168,7 +166,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 - 历史摘要或截断策略（可参考 Langfuse 实际 token 用量数据）。
 - ChatController 完整状态机：`IDLE` / `BUFFERING_FOR_START` / `STREAMING` / `GATED` / `WAITING_FOR_ANIMATION_END`。详见《AI 聊天动画编排设计》§5。
 - 字符速率限制器实现：`QTimer` + hold buffer drain + 积压追平。详见《AI 聊天动画编排设计》§7。
-- **Langfuse 可观测性接入**：激活 Phase 2.1 预留的 middleware hook，接入 Langfuse SDK（Go）。覆盖：每轮 LLM 调用的 trace（prompt、completion、latency、token 用量、cost）、session 关联、persona prompt 版本管理。Langfuse 地址/API key 作为可选配置项，未配置时静默跳过，不影响主流程。
+- **Langfuse 可观测性接入**：激活 Phase 2.1 预留的 middleware hook，通过 OpenTelemetry OTLP 接入 Langfuse。覆盖：每轮 LLM 调用的 trace（prompt、completion、latency、token 用量估算）、session 关联、persona prompt hash。Langfuse 地址/API key 作为可选配置项，未配置时静默跳过，不影响主流程。
 
 验收：
 
