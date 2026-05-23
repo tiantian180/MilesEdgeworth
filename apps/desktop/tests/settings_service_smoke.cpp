@@ -1,4 +1,4 @@
-#include "settings/SecretStore.h"
+#include "settings/ProviderConfigFile.h"
 #include "settings/SettingsController.h"
 #include "settings/SettingsService.h"
 #include "pet/PetRuntime.h"
@@ -6,66 +6,17 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTextStream>
 
 #include <cassert>
-#include <map>
-#include <utility>
 
 namespace {
-class InMemorySecretStore : public SecretStore
-{
-public:
-    bool available() const override { return true; }
-
-    QString read(const QString &service, const QString &account) override
-    {
-        ++m_readCount;
-        const auto it = m_store.find({service, account});
-        return it == m_store.end() ? QString() : it->second;
-    }
-
-    bool write(const QString &service, const QString &account, const QString &secret) override
-    {
-        if (secret.isEmpty()) {
-            m_store.erase({service, account});
-        } else {
-            m_store[{service, account}] = secret;
-        }
-        return true;
-    }
-
-    bool remove(const QString &service, const QString &account) override
-    {
-        m_store.erase({service, account});
-        return true;
-    }
-
-    QString peek(const QString &service, const QString &account) const
-    {
-        const auto it = m_store.find({service, account});
-        return it == m_store.end() ? QString() : it->second;
-    }
-
-    int readCount() const { return m_readCount; }
-
-private:
-    std::map<std::pair<QString, QString>, QString> m_store;
-    int m_readCount = 0;
-};
-
-class FailingSecretStore : public SecretStore
-{
-public:
-    bool available() const override { return true; }
-    QString read(const QString &, const QString &) override { return {}; }
-    bool write(const QString &, const QString &, const QString &) override { return false; }
-    bool remove(const QString &, const QString &) override { return false; }
-};
-
 void setupQSettingsScope(QTemporaryDir &dir)
 {
     QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -84,6 +35,19 @@ bool writeFile(const QString &path, const QString &content)
     stream << content;
     return true;
 }
+
+ProviderConfigFile::ModelConfig modelConfig(const QString &name,
+                                            const QString &baseUrl,
+                                            const QString &apiKey,
+                                            const QString &model)
+{
+    ProviderConfigFile::ModelConfig cfg;
+    cfg.name = name;
+    cfg.baseUrl = baseUrl;
+    cfg.apiKey = apiKey;
+    cfg.model = model;
+    return cfg;
+}
 } // namespace
 
 int main(int argc, char *argv[])
@@ -96,88 +60,264 @@ int main(int argc, char *argv[])
     setupQSettingsScope(tmp);
 
     {
-        InMemorySecretStore store;
-        SettingsService service(&store);
+        const QString path = tmp.filePath(QStringLiteral("settings.json"));
+        ProviderConfigFile file(path);
+        assert(file.load() == ProviderConfigFile::LoadStatus::FileNotFound);
+        assert(file.configNames().isEmpty());
+
+        ProviderConfigFile::ModelConfig cfg;
+        cfg.name = QStringLiteral("deepseek");
+        cfg.baseUrl = QStringLiteral("https://api.deepseek.com");
+        cfg.apiKey = QStringLiteral("sk-test");
+        cfg.model = QStringLiteral("deepseek-chat");
+        cfg.temperature = 0.7;
+        cfg.maxTokens = std::nullopt;
+        assert(file.setConfig(cfg.name, cfg));
+        file.setActiveModelConfig(cfg.name);
+        file.setMsPerChar(60);
+        assert(file.save());
+
+        QFile saved(path);
+        assert(saved.open(QIODevice::ReadOnly));
+        const auto savedDoc = QJsonDocument::fromJson(saved.readAll());
+        assert(savedDoc.object().value(QStringLiteral("msPerChar")).isUndefined());
+        assert(savedDoc.object().value(QStringLiteral("chat")).toObject().value(QStringLiteral("msPerChar")).toInt() == 60);
+
+        ProviderConfigFile reopened(path);
+        assert(reopened.load() == ProviderConfigFile::LoadStatus::Ok);
+        assert(reopened.activeModelConfig() == QStringLiteral("deepseek"));
+        assert(reopened.config(QStringLiteral("deepseek")).apiKey == QStringLiteral("sk-test"));
+        assert(reopened.config(QStringLiteral("deepseek")).temperature.has_value());
+        assert(!reopened.config(QStringLiteral("deepseek")).maxTokens.has_value());
+        assert(reopened.msPerChar() == 60);
+    }
+
+    {
+        QTemporaryDir invalidDir;
+        assert(invalidDir.isValid());
+        const QString path = invalidDir.filePath(QStringLiteral("settings.json"));
+        assert(writeFile(path, QStringLiteral("{not-json")));
+        ProviderConfigFile file(path);
+        assert(file.load() == ProviderConfigFile::LoadStatus::ParseError);
+        assert(!QFile::exists(path));
+        assert(QFile::exists(invalidDir.filePath(QStringLiteral("settings.json.bak"))));
+        assert(file.lastError().contains(QStringLiteral("已备份")));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("providers-extra.json"));
+        assert(writeFile(path, QStringLiteral(R"JSON(
+{
+  "rootUnknown": "keep-root",
+  "activeModelConfig": "deepseek",
+  "chat": {
+    "msPerChar": 90,
+    "chatUnknown": "keep-chat"
+  },
+  "modelConfigs": [
+    {
+      "name": "deepseek",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKey": "sk-test",
+      "model": "deepseek-chat",
+      "temperature": 0.7,
+      "providerUnknown": "keep-provider"
+    }
+  ]
+}
+)JSON")));
+
+        ProviderConfigFile file(path);
+        assert(file.load() == ProviderConfigFile::LoadStatus::Ok);
+        assert(file.msPerChar() == 90);
+        auto cfg = file.config(QStringLiteral("deepseek"));
+        assert(cfg.extraFields.value(QStringLiteral("providerUnknown")).toString() == QStringLiteral("keep-provider"));
+        cfg.model = QStringLiteral("deepseek-reasoner");
+        assert(file.setConfig(cfg.name, cfg));
+        assert(file.save());
+
+        QFile saved(path);
+        assert(saved.open(QIODevice::ReadOnly));
+        const auto doc = QJsonDocument::fromJson(saved.readAll());
+        const auto root = doc.object();
+        assert(root.value(QStringLiteral("rootUnknown")).toString() == QStringLiteral("keep-root"));
+        assert(root.value(QStringLiteral("msPerChar")).isUndefined());
+        const auto chat = root.value(QStringLiteral("chat")).toObject();
+        assert(chat.value(QStringLiteral("msPerChar")).toInt() == 90);
+        assert(chat.value(QStringLiteral("chatUnknown")).toString() == QStringLiteral("keep-chat"));
+        const auto configs = root.value(QStringLiteral("modelConfigs")).toArray();
+        assert(configs.size() == 1);
+        const auto savedCfg = configs.at(0).toObject();
+        assert(savedCfg.value(QStringLiteral("providerUnknown")).toString() == QStringLiteral("keep-provider"));
+        assert(savedCfg.value(QStringLiteral("model")).toString() == QStringLiteral("deepseek-reasoner"));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("providers-delete.json"));
+        ProviderConfigFile file(path);
+        ProviderConfigFile::ModelConfig first;
+        first.name = QStringLiteral("first");
+        first.baseUrl = QStringLiteral("https://first.example.com");
+        first.apiKey = QStringLiteral("sk-first");
+        first.model = QStringLiteral("first-model");
+        ProviderConfigFile::ModelConfig second = first;
+        second.name = QStringLiteral("second");
+        second.baseUrl = QStringLiteral("https://second.example.com");
+        second.apiKey = QStringLiteral("sk-second");
+        second.model = QStringLiteral("second-model");
+        assert(file.setConfig(first.name, first));
+        assert(file.setConfig(second.name, second));
+        file.setActiveModelConfig(second.name);
+        file.removeConfig(second.name);
+        assert(file.activeModelConfig() == first.name);
+
+        ProviderConfigFile::ModelConfig emptyName = first;
+        emptyName.name.clear();
+        assert(!file.setConfig(QString(), emptyName));
+
+        ProviderConfigFile::ModelConfig duplicate = first;
+        duplicate.name = first.name;
+        assert(!file.setConfig(QStringLiteral("other"), duplicate));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("settings-controller-configs.json"));
+        SettingsService service(path);
+        auto first = modelConfig(QStringLiteral("first"),
+                                 QStringLiteral("https://first.example.com"),
+                                 QStringLiteral("sk-first"),
+                                 QStringLiteral("first-model"));
+        auto second = modelConfig(QStringLiteral("second"),
+                                  QStringLiteral("https://second.example.com"),
+                                  QStringLiteral("sk-second"),
+                                  QStringLiteral("second-model"));
+        assert(service.setModelConfig(first.name, first));
+        assert(service.setModelConfig(second.name, second));
+        service.setActiveModelConfig(first.name);
+        assert(service.save());
+
+        SettingsController controller(&service);
+        controller.openWindow();
+        controller.selectConfig(second.name);
+        controller.revert();
+        assert(service.activeModelConfig() == first.name);
+
+        controller.openWindow();
+        controller.addConfig();
+        controller.setConfigName(second.name);
+        controller.setBaseUrl(QStringLiteral("https://new.example.com"));
+        controller.setApiKey(QStringLiteral("sk-new"));
+        controller.setModel(QStringLiteral("new-model"));
+        controller.save();
+        assert(!controller.validationError().isEmpty());
+
+        SettingsService reopened(path);
+        assert(reopened.modelConfig(second.name).baseUrl == QStringLiteral("https://second.example.com"));
+        assert(reopened.modelConfig(second.name).apiKey == QStringLiteral("sk-second"));
+        assert(reopened.modelConfig(second.name).model == QStringLiteral("second-model"));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("settings-controller-extra.json"));
+        assert(writeFile(path, QStringLiteral(R"JSON(
+{
+  "activeModelConfig": "deepseek",
+  "modelConfigs": [
+    {
+      "name": "deepseek",
+      "baseUrl": "https://api.deepseek.com",
+      "apiKey": "sk-test",
+      "model": "deepseek-chat",
+      "providerUnknown": "keep-provider"
+    }
+  ]
+}
+)JSON")));
+
+        SettingsService service(path);
+        SettingsController controller(&service);
+        controller.openWindow();
+        controller.setModel(QStringLiteral("deepseek-reasoner"));
+        controller.save();
+
+        SettingsService reopened(path);
+        const auto cfg = reopened.modelConfig(QStringLiteral("deepseek"));
+        assert(cfg.model == QStringLiteral("deepseek-reasoner"));
+        assert(cfg.extraFields.value(QStringLiteral("providerUnknown")).toString()
+               == QStringLiteral("keep-provider"));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("settings-controller-delete.json"));
+        SettingsService service(path);
+        auto first = modelConfig(QStringLiteral("first"),
+                                 QStringLiteral("https://first.example.com"),
+                                 QStringLiteral("sk-first"),
+                                 QStringLiteral("first-model"));
+        auto second = modelConfig(QStringLiteral("second"),
+                                  QStringLiteral("https://second.example.com"),
+                                  QStringLiteral("sk-second"),
+                                  QStringLiteral("second-model"));
+        assert(service.setModelConfig(first.name, first));
+        assert(service.setModelConfig(second.name, second));
+        service.setActiveModelConfig(first.name);
+        assert(service.save());
+
+        SettingsController controller(&service);
+        int savedCount = 0;
+        QObject::connect(&controller, &SettingsController::saved, [&savedCount]() {
+            ++savedCount;
+        });
+        controller.openWindow();
+        controller.deleteConfig(second.name);
+
+        assert(savedCount == 0);
+        assert(service.activeModelConfig() == first.name);
+        assert(!service.configNames().contains(second.name));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("settings-service.json"));
+        SettingsService service(path);
 
         assert(service.baseUrl().isEmpty());
         assert(service.model().isEmpty());
-        assert(qFuzzyCompare(service.temperature() + 1.0, 0.7 + 1.0));
-        assert(service.maxTokens() == 2048);
+        assert(!service.temperature().has_value());
+        assert(!service.maxTokens().has_value());
         assert(service.msPerChar() == 80);
+        assert(!service.providerConfigured());
 
-        service.setBaseUrl(QStringLiteral("https://api.example.com"));
-        service.setModel(QStringLiteral("gpt-test"));
-        service.setTemperature(0.3);
-        service.setMaxTokens(1024);
+        auto cfg = modelConfig(QStringLiteral("deepseek"),
+                               QStringLiteral("https://api.example.com"),
+                               QStringLiteral("sk-secret"),
+                               QStringLiteral("gpt-test"));
+        cfg.temperature = 0.3;
+        cfg.maxTokens = std::nullopt;
+        assert(service.setModelConfig(cfg.name, cfg));
+        service.setActiveModelConfig(cfg.name);
         service.setMsPerChar(120);
-        service.save();
-    }
+        assert(service.save());
 
-    {
-        InMemorySecretStore store;
-        SettingsService service(&store);
-        assert(service.baseUrl() == QStringLiteral("https://api.example.com"));
-        assert(service.model() == QStringLiteral("gpt-test"));
-        assert(qFuzzyCompare(service.temperature() + 1.0, 0.3 + 1.0));
-        assert(service.maxTokens() == 1024);
-        assert(service.msPerChar() == 120);
-    }
+        SettingsService reopened(path);
+        assert(reopened.configNames() == QStringList({QStringLiteral("deepseek")}));
+        assert(reopened.activeModelConfig() == QStringLiteral("deepseek"));
+        assert(reopened.baseUrl() == QStringLiteral("https://api.example.com"));
+        assert(reopened.apiKey() == QStringLiteral("sk-secret"));
+        assert(reopened.model() == QStringLiteral("gpt-test"));
+        assert(reopened.temperature().has_value());
+        assert(qFuzzyCompare(*reopened.temperature() + 1.0, 0.3 + 1.0));
+        assert(!reopened.maxTokens().has_value());
+        assert(reopened.msPerChar() == 120);
+        assert(reopened.providerConfigured());
 
-    {
-        InMemorySecretStore store;
-        store.write(QString::fromUtf8(SettingsService::kKeychainService),
-                    QString::fromUtf8(SettingsService::kKeychainAccount),
-                    QStringLiteral("sk-secret"));
-        SettingsService service(&store);
-        assert(store.readCount() == 0);
-
-        SettingsController controller(&service);
-        assert(store.readCount() == 0);
-
+        SettingsController controller(&reopened);
         controller.openWindow();
-        assert(store.readCount() == 0);
-        assert(controller.apiKey().isEmpty());
-
-        controller.openWindow();
-        assert(store.readCount() == 0);
-        controller.save();
-        assert(store.peek(QString::fromUtf8(SettingsService::kKeychainService),
-                          QString::fromUtf8(SettingsService::kKeychainAccount))
-            == QStringLiteral("sk-secret"));
-
-        controller.openWindow();
+        assert(controller.configName() == QStringLiteral("deepseek"));
+        assert(controller.apiKey() == QStringLiteral("sk-secret"));
         controller.setApiKey(QStringLiteral("sk-replaced"));
         controller.save();
-        assert(store.peek(QString::fromUtf8(SettingsService::kKeychainService),
-                          QString::fromUtf8(SettingsService::kKeychainAccount))
-            == QStringLiteral("sk-replaced"));
-        assert(store.readCount() == 0);
-    }
-
-    {
-        InMemorySecretStore store;
-        SettingsService service(&store);
-        assert(service.apiKey().isEmpty());
-
-        service.setApiKey(QStringLiteral("sk-secret"));
-        service.save();
-        assert(service.apiKey() == QStringLiteral("sk-secret"));
-
-        SettingsService reopen(&store);
-        assert(reopen.apiKey() == QStringLiteral("sk-secret"));
-
-        reopen.setApiKey(QString());
-        reopen.save();
-        SettingsService reopen2(&store);
-        assert(reopen2.apiKey().isEmpty());
-    }
-
-    {
-        FailingSecretStore store;
-        SettingsService service(&store);
-        service.setApiKey(QStringLiteral("sk-write-fails"));
-        assert(!service.save());
-        assert(service.apiKey() == QStringLiteral("sk-write-fails"));
+        SettingsService replaced(path);
+        assert(replaced.apiKey() == QStringLiteral("sk-replaced"));
     }
 
     {
@@ -187,8 +327,7 @@ int main(int argc, char *argv[])
         const QByteArray previousMilesDataDir = qgetenv("MILES_DATA_DIR");
         qputenv("MILES_DATA_DIR", personaDir.path().toUtf8());
 
-        InMemorySecretStore store;
-        SettingsService service(&store);
+        SettingsService service(personaDir.filePath(QStringLiteral("settings.json")));
         PetRuntime runtime;
         assert(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"));
 
@@ -237,9 +376,13 @@ int main(int argc, char *argv[])
 }
 )JSON")));
 
-        InMemorySecretStore store;
-        SettingsService service(&store);
-        service.setBaseUrl(QStringLiteral("https://before.example.com"));
+        SettingsService service(personaDir.filePath(QStringLiteral("settings.json")));
+        auto cfg = modelConfig(QStringLiteral("deepseek"),
+                               QStringLiteral("https://before.example.com"),
+                               QStringLiteral("sk-before"),
+                               QStringLiteral("deepseek-chat"));
+        assert(service.setModelConfig(cfg.name, cfg));
+        service.setActiveModelConfig(cfg.name);
         service.save();
 
         PetRuntime runtime;
@@ -255,7 +398,7 @@ int main(int argc, char *argv[])
         assert(controller.windowVisible());
         assert(!controller.personaError().isEmpty());
         assert(service.baseUrl() == QStringLiteral("https://before.example.com"));
-        SettingsService reopened(&store);
+        SettingsService reopened(personaDir.filePath(QStringLiteral("settings.json")));
         assert(reopened.baseUrl() == QStringLiteral("https://before.example.com"));
 
         if (hadMilesDataDir) {

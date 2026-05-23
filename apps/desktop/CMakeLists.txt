@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Widgets Multimedia Network QuickControls2)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick Widgets Multimedia Network QuickControls2)
 include(CTest)
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -27,8 +27,8 @@ set(DESKTOP_SOURCES
     src/logging/MilesLogHandler.cpp
     src/logging/MilesLogHandler.h
     src/main.cpp
-    src/settings/SecretStore.cpp
-    src/settings/SecretStore.h
+    src/settings/ProviderConfigFile.cpp
+    src/settings/ProviderConfigFile.h
     src/settings/SettingsController.cpp
     src/settings/SettingsController.h
     src/settings/SettingsLogging.cpp
@@ -92,8 +92,6 @@ if(APPLE)
     list(APPEND DESKTOP_SOURCES
         src/platform/MacPetWindowBehavior.h
         src/platform/MacPetWindowBehavior.mm
-        src/settings/MacSecretStore.h
-        src/settings/MacSecretStore.mm
     )
 endif()
 
@@ -135,11 +133,6 @@ target_link_libraries(MilesEdgeworthDesktop
         Qt6::QuickControls2
 )
 
-if(APPLE)
-    target_link_libraries(MilesEdgeworthDesktop PRIVATE "-framework Security")
-    target_compile_definitions(MilesEdgeworthDesktop PRIVATE MILES_HAS_MAC_SECRET_STORE)
-endif()
-
 set_target_properties(MilesEdgeworthDesktop PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME "MilesEdgeworth v2"
@@ -155,7 +148,7 @@ if(APPLE)
     add_custom_command(TARGET MilesEdgeworthDesktop POST_BUILD
         COMMAND /usr/bin/codesign --force --deep --sign -
                 "$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>"
-        COMMENT "Ad-hoc signing MilesEdgeworthDesktop.app for stable macOS keychain identity"
+        COMMENT "Ad-hoc signing MilesEdgeworthDesktop.app for local macOS runs"
         VERBATIM
     )
 endif()
@@ -324,8 +317,8 @@ if(BUILD_TESTING)
         src/chat/ChatStreamEvent.h
         src/chat/ChatTextPacer.cpp
         src/chat/ChatTextPacer.h
-        src/settings/SecretStore.cpp
-        src/settings/SecretStore.h
+        src/settings/ProviderConfigFile.cpp
+        src/settings/ProviderConfigFile.h
         src/settings/SettingsLogging.cpp
         src/settings/SettingsLogging.h
         src/settings/SettingsService.cpp
@@ -439,8 +432,8 @@ if(BUILD_TESTING)
         src/settings/SettingsLogging.h
         src/settings/SettingsService.cpp
         src/settings/SettingsService.h
-        src/settings/SecretStore.cpp
-        src/settings/SecretStore.h
+        src/settings/ProviderConfigFile.cpp
+        src/settings/ProviderConfigFile.h
         resources/pet_assets.qrc
     )
 
@@ -454,6 +447,7 @@ if(BUILD_TESTING)
     target_link_libraries(SettingsServiceSmoke
         PRIVATE
             Qt6::Core
+            Qt6::Gui
             Qt6::Qml
     )
 

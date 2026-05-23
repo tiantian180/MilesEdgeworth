@@ -11,6 +11,7 @@ import (
 )
 
 const SummarizingEventName = "miles.chat.memory.summarizing"
+const MissingProviderMessage = "未配置模型，请在设置中填写 API Key 和模型信息"
 
 type ModelCatalog interface {
 	ContextWindow(modelID string) int
@@ -106,6 +107,18 @@ func (s *Service) BuildMessages(ctx context.Context, req BuildRequest) ([]chat.M
 }
 
 func (s *Service) StreamChat(ctx context.Context, req BuildRequest) (<-chan chat.StreamEvent, error) {
+	if s.provider == nil {
+		events := make(chan chat.StreamEvent, 1)
+		events <- chat.StreamEvent{
+			Type:      "RUN_ERROR",
+			RunID:     req.RunID,
+			MessageID: req.MessageID,
+			Error:     MissingProviderMessage,
+		}
+		close(events)
+		return events, nil
+	}
+
 	messages, knownExpressionIDs, err := s.BuildMessages(ctx, req)
 	if err != nil {
 		return nil, err

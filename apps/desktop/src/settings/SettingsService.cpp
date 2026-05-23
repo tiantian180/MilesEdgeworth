@@ -1,152 +1,187 @@
 #include "SettingsService.h"
 
-#include "SecretStore.h"
 #include "settings/SettingsLogging.h"
 
-#include <QSettings>
+#include <QtGlobal>
+
+#include <algorithm>
+#include <utility>
 
 namespace {
-constexpr const char *kBaseUrlKey = "provider/baseUrl";
-constexpr const char *kModelKey = "provider/model";
-constexpr const char *kTemperatureKey = "provider/temperature";
-constexpr const char *kMaxTokensKey = "provider/maxTokens";
-constexpr const char *kMsPerCharKey = "chat/msPerChar";
+ProviderConfigFile::ModelConfig defaultConfig()
+{
+    return {};
+}
 } // namespace
 
-SettingsService::SettingsService(SecretStore *secretStore, QObject *parent)
+SettingsService::SettingsService(QString configPath, QObject *parent)
     : QObject(parent)
-    , m_secretStore(secretStore)
+    , m_configFile(std::move(configPath))
 {
-    load();
+    const auto status = m_configFile.load();
+    if (status == ProviderConfigFile::LoadStatus::ParseError
+        || status == ProviderConfigFile::LoadStatus::PermissionError) {
+        qCWarning(settingsLog).noquote() << "provider config load failed"
+                                         << QStringLiteral("path=%1").arg(m_configFile.path())
+                                         << QStringLiteral("error=%1").arg(m_configFile.lastError());
+    }
 }
 
-void SettingsService::load()
+QStringList SettingsService::configNames() const
 {
-    QSettings settings;
-    m_baseUrl = settings.value(QString::fromLatin1(kBaseUrlKey)).toString();
-    m_model = settings.value(QString::fromLatin1(kModelKey)).toString();
-    m_temperature = settings.value(QString::fromLatin1(kTemperatureKey), 0.7).toDouble();
-    m_maxTokens = settings.value(QString::fromLatin1(kMaxTokensKey), 2048).toInt();
-    m_msPerChar = settings.value(QString::fromLatin1(kMsPerCharKey), 80).toInt();
-
-    m_savedApiKey.clear();
-    m_apiKey.clear();
-    m_apiKeyLoaded = false;
+    return m_configFile.configNames();
 }
 
-void SettingsService::ensureApiKeyLoaded()
+QString SettingsService::activeModelConfig() const
 {
-    if (m_apiKeyLoaded) {
-        return;
-    }
+    return m_configFile.activeModelConfig();
+}
 
-    if (m_secretStore != nullptr && m_secretStore->available()) {
-        m_savedApiKey = m_secretStore->read(QString::fromUtf8(kKeychainService),
-                                            QString::fromUtf8(kKeychainAccount));
-        m_apiKey = m_savedApiKey;
-    } else {
-        m_savedApiKey.clear();
-        m_apiKey.clear();
-    }
+void SettingsService::setActiveModelConfig(const QString &name)
+{
+    m_configFile.setActiveModelConfig(name);
+}
 
-    m_apiKeyLoaded = true;
+ProviderConfigFile::ModelConfig SettingsService::modelConfig(const QString &name) const
+{
+    return m_configFile.config(name);
+}
+
+bool SettingsService::setModelConfig(const QString &name, const ProviderConfigFile::ModelConfig &cfg)
+{
+    const bool ok = m_configFile.setConfig(name, cfg);
+    if (ok) {
+        m_configFile.setActiveModelConfig(cfg.name);
+    }
+    return ok;
+}
+
+void SettingsService::removeModelConfig(const QString &name)
+{
+    m_configFile.removeConfig(name);
+}
+
+QString SettingsService::baseUrl() const
+{
+    return activeConfig().baseUrl;
 }
 
 void SettingsService::setBaseUrl(const QString &value)
 {
-    m_baseUrl = value.trimmed();
+    auto cfg = activeConfig();
+    cfg.baseUrl = value.trimmed();
+    updateActiveConfig(cfg);
 }
 
-void SettingsService::setModel(const QString &value)
+QString SettingsService::apiKey() const
 {
-    m_model = value.trimmed();
-}
-
-void SettingsService::setTemperature(double value)
-{
-    if (value < 0.0) {
-        value = 0.0;
-    }
-    if (value > 2.0) {
-        value = 2.0;
-    }
-    m_temperature = value;
-}
-
-void SettingsService::setMaxTokens(int value)
-{
-    if (value < 1) {
-        value = 1;
-    }
-    if (value > 32768) {
-        value = 32768;
-    }
-    m_maxTokens = value;
-}
-
-void SettingsService::setMsPerChar(int value)
-{
-    if (value < 40) {
-        value = 40;
-    }
-    if (value > 200) {
-        value = 200;
-    }
-    m_msPerChar = value;
+    return activeConfig().apiKey;
 }
 
 void SettingsService::setApiKey(const QString &value)
 {
-    m_apiKey = value;
-    m_apiKeyLoaded = true;
+    auto cfg = activeConfig();
+    cfg.apiKey = value.trimmed();
+    updateActiveConfig(cfg);
 }
 
-QString SettingsService::apiKey()
+QString SettingsService::model() const
 {
-    ensureApiKeyLoaded();
-    return m_apiKey;
+    return activeConfig().model;
 }
 
-bool SettingsService::secretStoreAvailable() const
+void SettingsService::setModel(const QString &value)
 {
-    return m_secretStore != nullptr && m_secretStore->available();
+    auto cfg = activeConfig();
+    cfg.model = value.trimmed();
+    updateActiveConfig(cfg);
+}
+
+std::optional<double> SettingsService::temperature() const
+{
+    return activeConfig().temperature;
+}
+
+void SettingsService::setTemperature(std::optional<double> value)
+{
+    if (value.has_value()) {
+        *value = std::clamp(*value, 0.0, 2.0);
+    }
+    auto cfg = activeConfig();
+    cfg.temperature = value;
+    updateActiveConfig(cfg);
+}
+
+std::optional<int> SettingsService::maxTokens() const
+{
+    return activeConfig().maxTokens;
+}
+
+void SettingsService::setMaxTokens(std::optional<int> value)
+{
+    if (value.has_value() && *value < 1) {
+        *value = 1;
+    }
+    auto cfg = activeConfig();
+    cfg.maxTokens = value;
+    updateActiveConfig(cfg);
+}
+
+int SettingsService::msPerChar() const
+{
+    return m_configFile.msPerChar();
+}
+
+void SettingsService::setMsPerChar(int value)
+{
+    m_configFile.setMsPerChar(value);
+}
+
+bool SettingsService::providerConfigured() const
+{
+    return !baseUrl().isEmpty() && !apiKey().isEmpty() && !model().isEmpty();
+}
+
+QString SettingsService::configPath() const
+{
+    return m_configFile.path();
+}
+
+QString SettingsService::lastError() const
+{
+    return m_configFile.lastError();
 }
 
 bool SettingsService::save()
 {
     qCDebug(settingsLog).noquote() << "settings save requested"
-                                   << QStringLiteral("baseUrlSet=%1").arg(!m_baseUrl.isEmpty() ? "true" : "false")
-                                   << QStringLiteral("modelSet=%1").arg(!m_model.isEmpty() ? "true" : "false")
-                                   << QStringLiteral("apiKeyLoaded=%1").arg(m_apiKeyLoaded ? "true" : "false")
-                                   << QStringLiteral("apiKeyChanged=%1").arg(m_apiKey != m_savedApiKey ? "true" : "false")
-                                   << QStringLiteral("secretStoreAvailable=%1").arg(secretStoreAvailable() ? "true" : "false");
-    {
-        QSettings settings;
-        settings.setValue(QString::fromLatin1(kBaseUrlKey), m_baseUrl);
-        settings.setValue(QString::fromLatin1(kModelKey), m_model);
-        settings.setValue(QString::fromLatin1(kTemperatureKey), m_temperature);
-        settings.setValue(QString::fromLatin1(kMaxTokensKey), m_maxTokens);
-        settings.setValue(QString::fromLatin1(kMsPerCharKey), m_msPerChar);
-    }
-
-    if (m_apiKeyLoaded && m_apiKey != m_savedApiKey && m_secretStore != nullptr && m_secretStore->available()) {
-        bool secretSaved = false;
-        if (m_apiKey.isEmpty()) {
-            secretSaved = m_secretStore->remove(QString::fromUtf8(kKeychainService),
-                                                QString::fromUtf8(kKeychainAccount));
-        } else {
-            secretSaved = m_secretStore->write(QString::fromUtf8(kKeychainService),
-                                               QString::fromUtf8(kKeychainAccount),
-                                               m_apiKey);
-        }
-        if (!secretSaved) {
-            qCWarning(settingsLog).noquote() << "settings secret save failed";
-            return false;
-        }
-        m_savedApiKey = m_apiKey;
+                                   << QStringLiteral("path=%1").arg(m_configFile.path())
+                                   << QStringLiteral("activeModelConfig=%1").arg(m_configFile.activeModelConfig())
+                                   << QStringLiteral("providerConfigured=%1").arg(providerConfigured() ? "true" : "false");
+    if (!m_configFile.save()) {
+        qCWarning(settingsLog).noquote() << "settings save failed"
+                                         << QStringLiteral("error=%1").arg(m_configFile.lastError());
+        return false;
     }
 
     emit saved();
     qCDebug(settingsLog).noquote() << "settings save completed";
     return true;
+}
+
+ProviderConfigFile::ModelConfig SettingsService::activeConfig() const
+{
+    const QString active = m_configFile.activeModelConfig();
+    if (active.isEmpty()) {
+        return defaultConfig();
+    }
+    return m_configFile.config(active);
+}
+
+void SettingsService::updateActiveConfig(const ProviderConfigFile::ModelConfig &cfg)
+{
+    if (cfg.name.trimmed().isEmpty()) {
+        return;
+    }
+    m_configFile.setConfig(m_configFile.activeModelConfig(), cfg);
 }

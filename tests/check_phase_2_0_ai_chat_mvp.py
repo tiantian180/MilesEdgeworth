@@ -27,7 +27,7 @@ def main() -> int:
     agent_cmake = read("apps/agent-core/CMakeLists.txt")
     go_mod = read("apps/agent-core/go.mod")
     server_go = read("apps/agent-core/internal/api/server.go")
-    mock_provider_go = read("apps/agent-core/internal/chat/mock_provider.go")
+    service_go = read("apps/agent-core/internal/chat/service/service.go")
     server_test = read("apps/agent-core/internal/api/server_test.go")
     parser_h = read("apps/desktop/src/chat/ChatStreamEvent.h")
     parser_cpp = read("apps/desktop/src/chat/ChatStreamEvent.cpp")
@@ -62,9 +62,8 @@ def main() -> int:
     require("/health" in server_go, "sidecar must expose /health")
     require("/v1/chat/messages" in server_go, "sidecar must expose chat messages endpoint")
     require("text/event-stream" in server_go, "chat endpoint must use SSE")
-    require("RUN_STARTED" in mock_provider_go, "mock provider must emit RUN_STARTED")
-    require("TEXT_MESSAGE_CONTENT" in mock_provider_go, "mock provider must emit token content")
-    require("miles.pet.expression.requested" in mock_provider_go, "mock provider must emit pet expression custom events")
+    require("s.provider == nil" in service_go, "chat service must handle an unconfigured provider")
+    require("RUN_ERROR" in service_go, "chat service must emit RUN_ERROR when provider is unconfigured")
     require("httptest.NewServer" in server_test, "Go tests must cover HTTP server")
 
     for token in ["ChatStreamEvent", "ChatStreamEventParser", "ingest", "QJsonDocument"]:
@@ -134,7 +133,7 @@ def main() -> int:
     require('"action": "thinking", "allowedStates": ["thinking"]' in manifest, "neutral thinking must map to thinking action")
     require("miles.pet.expression.requested" in parser_smoke, "parser smoke must cover custom expression events")
     require("controller.applyStreamEvent" in controller_smoke, "controller smoke must cover event application")
-    require("Phase 2.0" in phase_record and "mock provider" in phase_record, "phase record must document Phase 2.0")
+    require("Phase 2.0" in phase_record, "phase record must document Phase 2.0")
     require("Phase 2.0 AI Chat MVP 骨架" in index_doc, "v2 index must link the Phase 2.0 record")
 
     print("phase 2.0 ai chat mvp contract ok")

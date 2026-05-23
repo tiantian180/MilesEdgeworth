@@ -22,22 +22,38 @@ type Provider struct {
 	baseURL     string
 	apiKey      string
 	model       string
-	temperature float64
-	maxTokens   int
+	temperature *float64
+	maxTokens   *int
 	httpClient  *http.Client
 }
 
 var logger = mileslog.New("MILES.CHAT.PROVIDER")
 
-func NewProvider(baseURL, apiKey, model string, temperature float64, maxTokens int) *Provider {
+func NewProvider(baseURL, apiKey, model string, temperature *float64, maxTokens *int) *Provider {
 	return &Provider{
 		baseURL:     normalizeChatCompletionsURL(baseURL),
 		apiKey:      apiKey,
 		model:       model,
-		temperature: temperature,
-		maxTokens:   maxTokens,
+		temperature: cloneFloat64(temperature),
+		maxTokens:   cloneInt(maxTokens),
 		httpClient:  &http.Client{Timeout: 120 * time.Second},
 	}
+}
+
+func cloneFloat64(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
 }
 
 func normalizeChatCompletionsURL(raw string) string {
@@ -71,8 +87,8 @@ type chatCompletionRequest struct {
 	Model       string        `json:"model"`
 	Messages    []chatMessage `json:"messages"`
 	Stream      bool          `json:"stream"`
-	Temperature float64       `json:"temperature,omitempty"`
-	MaxTokens   int           `json:"max_tokens,omitempty"`
+	Temperature *float64      `json:"temperature,omitempty"`
+	MaxTokens   *int          `json:"max_tokens,omitempty"`
 }
 
 type chatCompletionStreamChunk struct {

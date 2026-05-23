@@ -108,6 +108,8 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 ### Phase 2.1：OpenAI-compatible Provider
 
+> 后续修正：`docs/v2/设计方案/模型配置与密钥存储设计.md` 决定删除 mock provider。下面的 mock fallback 是当时记录，不是当前目标。现在没有配置模型时，sidecar 仍启动，但聊天不可用：Qt 显示"未配置模型"并禁用输入框；如果仍收到聊天请求，sidecar 返回 `RUN_ERROR`。
+
 目标：用真实大模型完成一轮流式聊天，并落地 `[EXPR:tag]` 协议骨架。
 
 范围：
@@ -133,6 +135,7 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 ### Phase 2.2：用户配置与安全存储 ✓
 
 > 已完成。详见 `阶段记录/Phase 2.2 用户配置与安全存储.md`。
+> 后续修正：Keychain / 不落盘是当时方案。当前改为 Qt 把模型配置写入 `settings.json`，保存后重启 sidecar，并通过环境变量传入当前配置。
 
 目标：把临时配置升级为用户可维护配置。
 

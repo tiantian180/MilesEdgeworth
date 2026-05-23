@@ -1,7 +1,7 @@
 #include "chat/ChatController.h"
 #include "chat/ChatStreamEvent.h"
 #include "pet/PetRuntime.h"
-#include "settings/SecretStore.h"
+#include "settings/ProviderConfigFile.h"
 #include "settings/SettingsService.h"
 
 #include <QCoreApplication>
@@ -11,6 +11,7 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QThread>
+#include <QTemporaryDir>
 
 #include <functional>
 #include <stdexcept>
@@ -37,17 +38,35 @@ bool waitFor(const std::function<bool()> &predicate, int timeoutMs = 1500)
     QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
     return predicate();
 }
+
+ProviderConfigFile::ModelConfig modelConfig(const QString &name,
+                                            const QString &baseUrl,
+                                            const QString &apiKey,
+                                            const QString &model)
+{
+    ProviderConfigFile::ModelConfig cfg;
+    cfg.name = name;
+    cfg.baseUrl = baseUrl;
+    cfg.apiKey = apiKey;
+    cfg.model = model;
+    return cfg;
+}
 } // namespace
 
 int main(int argc, char *argv[])
 {
     QCoreApplication app(argc, argv);
-    NullSecretStore secretStore;
-    SettingsService settings(&secretStore);
-    settings.setBaseUrl(QStringLiteral("https://api.example.test/v1"));
-    settings.setModel(QStringLiteral("miles-test-model"));
-    settings.setTemperature(0.2);
-    settings.setMaxTokens(128);
+    QTemporaryDir settingsDir;
+    require(settingsDir.isValid(), "settings temp dir should be valid");
+    SettingsService settings(settingsDir.filePath(QStringLiteral("settings.json")));
+    auto cfg = modelConfig(QStringLiteral("test"),
+                           QStringLiteral("https://api.example.test/v1"),
+                           QStringLiteral("sk-test"),
+                           QStringLiteral("miles-test-model"));
+    cfg.temperature = 0.2;
+    cfg.maxTokens = 128;
+    require(settings.setModelConfig(cfg.name, cfg), "settings should accept model config");
+    settings.setActiveModelConfig(cfg.name);
     settings.setMsPerChar(40);
 
     PetRuntime runtime;
@@ -84,14 +103,21 @@ int main(int argc, char *argv[])
     }
 
     {
-        SettingsService providerSettings(&secretStore);
-        providerSettings.setBaseUrl(QStringLiteral("https://api.example.test/v1"));
-        providerSettings.setModel(QStringLiteral("miles-test-model"));
+        SettingsService providerSettings(settingsDir.filePath(QStringLiteral("provider-settings.json")));
+        auto incomplete = modelConfig(QStringLiteral("test"),
+                                      QStringLiteral("https://api.example.test/v1"),
+                                      QString(),
+                                      QStringLiteral("miles-test-model"));
+        require(providerSettings.setModelConfig(incomplete.name, incomplete),
+                "settings should accept incomplete config");
+        providerSettings.setActiveModelConfig(incomplete.name);
         ChatController providerController(&runtime, &providerSettings);
         require(!providerController.providerConfigured(),
                 "providerConfigured should stay false until base URL, API key, and model are all present");
 
-        providerSettings.setApiKey(QStringLiteral("sk-test"));
+        incomplete.apiKey = QStringLiteral("sk-test");
+        require(providerSettings.setModelConfig(incomplete.name, incomplete),
+                "settings should update provider config");
         providerController.handleSettingsSaved();
         require(providerController.providerConfigured(),
                 "providerConfigured should become true after complete provider settings are saved");

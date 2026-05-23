@@ -31,14 +31,13 @@ func main() {
 	cfg := config.FromEnv()
 
 	var provider chat.Provider
-	label := "mock-fallback"
+	label := "unconfigured"
 	if cfg.Enabled() {
 		provider = openai.NewProvider(cfg.BaseURL, cfg.APIKey, cfg.Model, cfg.Temperature, cfg.MaxTokens)
 		label = "openai-compatible"
 		logger.Info("provider selected", "provider", "openai-compatible", "model", cfg.Model)
 	} else {
-		provider = chat.NewMockProvider(35 * time.Millisecond)
-		logger.Info("provider selected", "provider", "mock-fallback")
+		logger.Info("provider selected", "provider", "unconfigured")
 	}
 
 	dataDir := os.Getenv("MILES_DATA_DIR")

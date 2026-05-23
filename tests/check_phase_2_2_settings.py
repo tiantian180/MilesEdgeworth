@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the Phase 2.2 settings + secret-store contract."""
+"""Check the Phase 2.2 model config JSON contract."""
 
 from __future__ import annotations
 
@@ -22,10 +22,8 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    secret_h = read("apps/desktop/src/settings/SecretStore.h")
-    secret_cpp = read("apps/desktop/src/settings/SecretStore.cpp")
-    mac_secret_h = read("apps/desktop/src/settings/MacSecretStore.h")
-    mac_secret_mm = read("apps/desktop/src/settings/MacSecretStore.mm")
+    provider_config_h = read("apps/desktop/src/settings/ProviderConfigFile.h")
+    provider_config_cpp = read("apps/desktop/src/settings/ProviderConfigFile.cpp")
     settings_h = read("apps/desktop/src/settings/SettingsService.h")
     settings_cpp = read("apps/desktop/src/settings/SettingsService.cpp")
     controller_h = read("apps/desktop/src/settings/SettingsController.h")
@@ -40,164 +38,131 @@ def main() -> int:
     root_cmake = read("CMakeLists.txt")
     index_doc = read("docs/v2/文档索引.md")
     stage_doc = read("docs/v2/阶段记录/Phase 2.2 用户配置与安全存储.md")
+    design_doc = read("docs/v2/设计方案/模型配置与密钥存储设计.md")
 
-    # SecretStore interface
-    require("class SecretStore" in secret_h, "SecretStore.h must declare class SecretStore")
-    require("virtual bool available()" in secret_h, "SecretStore must expose available()")
-    require("virtual QString read(" in secret_h, "SecretStore must expose read()")
-    require("virtual bool write(" in secret_h, "SecretStore must expose write()")
-    require("virtual bool remove(" in secret_h, "SecretStore must expose remove()")
-    require("std::unique_ptr<SecretStore> create()" in secret_h, "factory create() must be declared")
-    require("class NullSecretStore" in secret_h, "NullSecretStore must be declared")
-    require(
-        "Q_OS_MACOS" in secret_cpp or "MILES_HAS_MAC_SECRET_STORE" in secret_cpp,
-        "SecretStore.cpp factory must branch on macOS",
-    )
-
-    # macOS implementation
-    require("Security/Security.h" in mac_secret_mm, "MacSecretStore.mm must include Security framework")
-    require("SecItemAdd" in mac_secret_mm, "MacSecretStore must use SecItemAdd")
-    require("SecItemCopyMatching" in mac_secret_mm, "MacSecretStore must use SecItemCopyMatching")
-    require("SecItemDelete" in mac_secret_mm, "MacSecretStore must use SecItemDelete")
-    require(
-        "kSecClassGenericPassword" in mac_secret_mm,
-        "MacSecretStore must use generic-password keychain class",
-    )
-    require(
-        "kSecUseDataProtectionKeychain" in mac_secret_mm,
-        "MacSecretStore must use the macOS Data Protection Keychain to avoid legacy login-keychain ACL prompts",
-    )
-    require(
-        "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly" in mac_secret_mm,
-        "MacSecretStore must keep provider API keys device-local in the data-protection keychain",
-    )
-    require(
-        "errSecMissingEntitlement" in mac_secret_mm and "fallback" in mac_secret_mm.lower(),
-        "MacSecretStore must fall back for local debug builds when Data Protection Keychain lacks entitlements",
-    )
-    require(
-        '".debug-fallback"' in mac_secret_mm,
-        "MacSecretStore debug fallback must use a separate service name instead of reading old login-keychain items",
-    )
-    require(
-        "readLegacySecret" not in mac_secret_mm and "legacySecret" not in mac_secret_mm,
-        "MacSecretStore must not read or migrate legacy login-keychain API keys before the app has shipped",
-    )
-    require("class MacSecretStore" in mac_secret_h, "MacSecretStore.h must declare class MacSecretStore")
+    # settings.json storage
+    require("class ProviderConfigFile" in provider_config_h, "ProviderConfigFile class missing")
+    require("enum class LoadStatus" in provider_config_h, "ProviderConfigFile must expose LoadStatus")
+    require("struct ModelConfig" in provider_config_h, "ProviderConfigFile must expose ModelConfig")
+    require("std::optional<double>" in provider_config_h, "temperature must be optional")
+    require("std::optional<int>" in provider_config_h, "maxTokens must be optional")
+    require("QJsonObject extraFields" in provider_config_h, "unknown config fields must be preserved")
+    require("QSaveFile" in provider_config_cpp, "settings.json writes must use QSaveFile")
+    require("settings.json" in provider_config_cpp, "default file name must be settings.json")
+    require("providers.json" not in provider_config_cpp, "ProviderConfigFile must not use the old providers.json name")
+    require("model-configs.json" not in provider_config_cpp, "ProviderConfigFile must not use the discarded model-configs.json name")
+    require("QStandardPaths::AppDataLocation" in provider_config_cpp,
+            "default settings.json path must use AppDataLocation")
+    require("setPermissions" in provider_config_cpp, "settings.json save must set owner-only permissions when possible")
+    require("settings.json.bak" in provider_config_cpp, "invalid JSON must be backed up")
+    require("modelConfigs" in provider_config_cpp, "settings.json must store modelConfigs")
+    require("activeModelConfig" in provider_config_cpp, "settings.json must store activeModelConfig")
+    require("moveConfig" in provider_config_h, "ProviderConfigFile must preserve user ordering")
 
     # SettingsService
     require("class SettingsService" in settings_h, "SettingsService class missing")
-    require("baseUrl" in settings_h and "setBaseUrl" in settings_h, "baseUrl getter/setter required")
-    require("model" in settings_h and "setModel" in settings_h, "model getter/setter required")
-    require("temperature" in settings_h and "setTemperature" in settings_h, "temperature getter/setter required")
-    require("maxTokens" in settings_h and "setMaxTokens" in settings_h, "maxTokens getter/setter required")
-    require("msPerChar" in settings_h and "setMsPerChar" in settings_h, "msPerChar getter/setter required")
-    require("apiKey" in settings_h and "setApiKey" in settings_h, "apiKey accessor/setter required")
-    require("secretStoreAvailable" in settings_h, "secretStoreAvailable query required")
-    require("bool save()" in settings_h, "SettingsService.save() must report secret-store write failures")
-    require("void saved()" in settings_h, "saved() signal required")
-    require("QSettings" in settings_cpp, "SettingsService must persist through QSettings")
-    require("provider/baseUrl" in settings_cpp, "QSettings key provider/baseUrl required")
-    require("provider/model" in settings_cpp, "QSettings key provider/model required")
-    require("provider/temperature" in settings_cpp, "QSettings key provider/temperature required")
-    require("provider/maxTokens" in settings_cpp, "QSettings key provider/maxTokens required")
-    require("chat/msPerChar" in settings_cpp, "QSettings key chat/msPerChar required")
-    require("provider/apiKey" not in settings_cpp, "API key must never be stored as a QSettings key")
+    require("ProviderConfigFile" in settings_h + settings_cpp,
+            "SettingsService must persist model settings through ProviderConfigFile")
+    require("SecretStore" not in settings_h + settings_cpp,
+            "SettingsService must not depend on SecretStore")
+    require("QSettings" not in settings_cpp,
+            "provider settings must not be written to QSettings")
+    for token in ["configNames", "activeModelConfig", "providerConfigured", "msPerChar", "save"]:
+        require(token in settings_h, f"SettingsService missing {token}")
 
     # SettingsController + QML window
     require("class SettingsController" in controller_h, "SettingsController class missing")
     require("Q_INVOKABLE" in controller_h, "SettingsController must expose Q_INVOKABLE methods")
     require("openWindow" in controller_h, "SettingsController.openWindow() required")
-    require("saveError" in controller_h and "saveError" in settings_qml,
-            "Settings window must surface provider setting save failures")
-    require(
-        "App.SettingsController.apiKey = apiKeyField.text" in settings_qml,
-        "Settings save button must explicitly read the API key field instead of relying on TextField edit signals",
-    )
+    for token in [
+        "configNames",
+        "activeModelConfig",
+        "configName",
+        "baseUrl",
+        "apiKey",
+        "model",
+        "temperatureText",
+        "maxTokensText",
+        "validationError",
+        "providerConfigured",
+    ]:
+        require(token in controller_h + controller_cpp + settings_qml,
+                f"SettingsController/QML missing {token}")
     require("SettingsControllerForeign" in controller_h, "SettingsControllerForeign QML singleton boilerplate required")
     require("QJSEngine::setObjectOwnership" in controller_h, "SettingsController singleton must keep C++ ownership")
+    require("openConfigDirectory" in controller_h + controller_cpp + settings_qml,
+            "SettingsWindow must expose an open config directory action")
+    require("QDesktopServices::openUrl" in controller_cpp,
+            "SettingsController.openConfigDirectory() must open the settings directory")
     require("ApplicationWindow" in settings_qml, "SettingsWindow.qml must be ApplicationWindow")
+    require("TabBar" in settings_qml, "SettingsWindow must split settings into tabs")
+    require("模型配置" in settings_qml and "角色人格" in settings_qml,
+            "SettingsWindow tabs must separate model config from persona settings")
+    require("component SettingsTabButton" in settings_qml,
+            "Settings tabs must use the compact project tab style")
+    require("component SettingsSlider" in settings_qml and "visualPosition" in settings_qml,
+            "Settings slider must explicitly style the filled track direction")
     require("echoMode" in settings_qml, "API key field must use echoMode for masking")
+    require("App.SettingsController.apiKey = apiKeyField.text" in settings_qml,
+            "Settings save button must explicitly read the API key field")
+    require("新增" in settings_qml, "SettingsWindow must allow adding model configs")
+    require("删除" in settings_qml, "SettingsWindow must allow deleting model configs")
+    require("打开配置目录" in settings_qml, "SettingsWindow must show an open config directory button")
+
+    # Chat UI and controller wiring
     require("设置" in chat_qml, "ChatWindow must surface a 设置 button")
     require("SettingsController" in chat_qml, "ChatWindow must reference the SettingsController singleton")
     require("TextEdit" in chat_qml, "chat message text must be selectable")
     require("selectByMouse: true" in chat_qml, "chat message text must support mouse selection")
     require("readOnly: true" in chat_qml, "chat message text selection must not make bubbles editable")
-    require(
-        "providerConfigured" in chat_h and "providerConfigured" in chat_qml,
-        "ChatWindow disconnected placeholder must know whether provider settings are complete",
-    )
-    require(
-        "未连接，先点设置填写模型配置" in chat_qml
-        and "未连接，点重连或稍后重试" in chat_qml,
-        "disabled input placeholder must distinguish missing config from disconnected configured state",
-    )
-    require(
-        "disconnectedInput" in chat_qml,
-        "ChatWindow must expose a distinct disconnected input style",
-    )
-
-    # ChatController wiring
+    require("providerConfigured" in chat_h + chat_cpp + chat_qml,
+            "ChatWindow must know whether provider settings are complete")
+    require("sidecarReady && providerConfigured" in chat_qml,
+            "ChatWindow input must be disabled until the sidecar and provider config are ready")
+    require("先点设置填写模型配置" in chat_qml,
+            "disabled input placeholder must tell the user to fill model config")
     require("SettingsService" in chat_h, "ChatController must take a SettingsService")
     require("providerConfiguredChanged" in chat_h, "ChatController must notify provider config completeness")
     require("QProcessEnvironment" in chat_cpp, "ChatController must build a QProcessEnvironment")
     require("MILES_PROVIDER_BASE_URL" in chat_cpp, "ChatController must inject MILES_PROVIDER_BASE_URL")
     require("MILES_PROVIDER_API_KEY" in chat_cpp, "ChatController must inject MILES_PROVIDER_API_KEY")
     require("MILES_PROVIDER_MODEL" in chat_cpp, "ChatController must inject MILES_PROVIDER_MODEL")
-    require("MILES_PROVIDER_TEMPERATURE" in chat_cpp, "ChatController must inject MILES_PROVIDER_TEMPERATURE")
-    require("MILES_PROVIDER_MAX_TOKENS" in chat_cpp, "ChatController must inject MILES_PROVIDER_MAX_TOKENS")
-    require(
-        '"-parent-pid"' in chat_cpp and "applicationPid" in chat_cpp,
-        "ChatController must pass parent pid to sidecar for orphan cleanup",
-    )
-    require("restartSidecar" in chat_h and "restartSidecar" in chat_cpp, "ChatController must expose restartSidecar()")
-    require("scheduleSidecarStart" in chat_h and "scheduleSidecarStart" in chat_cpp,
-            "ChatController restart must schedule sidecar starts")
-    require("kSidecarRestartMaxAttempts" in chat_cpp,
-            "ChatController restart must cap sidecar restart retries")
-    require("kSidecarRestartRetryDelayMs" in chat_cpp,
-            "ChatController restart must delay retry starts after a fast sidecar exit")
-    require(
-        "terminateForeignSidecar" in chat_cpp and "service" in chat_cpp and "SIGTERM" in chat_cpp,
-        "ChatController must recover when an orphan miles-agent already occupies the sidecar port",
-    )
-    require(
-        "handleSettingsSaved" in chat_h and "handleSettingsSaved" in chat_cpp,
-        "ChatController must respond to saved settings",
-    )
+    require("MILES_PROVIDER_TEMPERATURE" in chat_cpp, "ChatController must inject optional temperature")
+    require("MILES_PROVIDER_MAX_TOKENS" in chat_cpp, "ChatController must inject optional maxTokens")
+    require("未配置模型" in chat_cpp, "ChatController status must expose missing model config")
 
-    # main.cpp wiring
+    # main.cpp wiring and build
     require("setOrganizationName" in main_cpp, "main must set QCoreApplication organization name")
     require("setApplicationName" in main_cpp, "main must set QCoreApplication application name")
     require("SettingsService" in main_cpp, "main must construct SettingsService")
     require("SettingsController" in main_cpp, "main must construct SettingsController")
+    require("SecretStore" not in main_cpp, "main must not construct SecretStore")
     require("loadFromModule" in main_cpp and "SettingsWindow" in main_cpp, "main must load SettingsWindow QML")
-
-    # Tests
-    require("InMemorySecretStore" in smoke, "smoke test must define InMemorySecretStore")
-    require("FailingSecretStore" in smoke, "smoke test must cover SecretStore write failures")
-    require("msPerChar" in smoke, "smoke test must cover msPerChar persistence")
-    require("apiKey" in smoke, "smoke test must cover apiKey routing through SecretStore")
+    require("ProviderConfigFile.cpp" in desktop_cmake, "desktop CMake must compile ProviderConfigFile.cpp")
+    require("SecretStore" not in desktop_cmake, "desktop CMake must not compile SecretStore")
+    require("MacSecretStore" not in desktop_cmake, "desktop CMake must not compile MacSecretStore")
+    require("Security" not in desktop_cmake, "desktop CMake must not link the Apple Security framework")
+    require("codesign" in desktop_cmake and "Ad-hoc signing" in desktop_cmake,
+            "desktop CMake must ad-hoc sign local macOS app bundles")
     require("SettingsServiceSmoke" in desktop_cmake, "desktop CMake must register SettingsServiceSmoke target")
     require("settings_service_smoke" in desktop_cmake, "desktop CMake must register settings_service_smoke test")
-    require(
-        '"-framework Security"' in desktop_cmake or "Security" in desktop_cmake,
-        "desktop CMake must link Apple Security framework on macOS",
-    )
-    require("MacSecretStore.mm" in desktop_cmake, "desktop CMake must list MacSecretStore.mm under the APPLE block")
-    require(
-        "/usr/bin/codesign" in desktop_cmake and "$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>" in desktop_cmake,
-        "desktop CMake must ad-hoc sign the app bundle so Data Protection Keychain has a stable app identity",
-    )
     require("SettingsWindow.qml" in desktop_cmake, "desktop CMake must add SettingsWindow.qml to the QML module")
     require("SettingsLogging.cpp" in desktop_cmake, "desktop CMake must compile settings logging category")
     require("check_phase_2_2_settings" in root_cmake, "root CMake must register Phase 2.2 contract check")
 
-    # Docs
+    # Tests and docs
+    require("ProviderConfigFile" in smoke, "settings smoke test must cover ProviderConfigFile")
+    require("settings.json.bak" in smoke, "settings smoke test must cover invalid JSON backup")
+    require("extraFields" in smoke, "settings smoke test must cover unknown field preservation")
+    require("msPerChar" in smoke, "smoke test must cover msPerChar persistence")
+    require("apiKey" in smoke, "smoke test must cover apiKey persistence in settings.json")
     require("Phase 2.2" in stage_doc, "Phase 2.2 stage record must exist")
     require("Phase 2.2" in index_doc, "doc index must link Phase 2.2 record")
+    require("settings.json" in design_doc and "ProviderConfigFile" in design_doc,
+            "design doc must describe settings.json and ProviderConfigFile")
+    require("bool setConfig" in design_doc, "design doc must match ProviderConfigFile::setConfig return type")
 
-    print("phase 2.2 settings contract ok")
+    print("phase 2.2 model config JSON contract ok")
     return 0
 
 
