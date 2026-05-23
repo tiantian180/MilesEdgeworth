@@ -1,6 +1,6 @@
 # AI 聊天动画编排设计
 
-本文档定义 MilesEdgeworth v2 中模型流式回复与桌宠动画的同步编排机制。它是长期维护文档，指导 sidecar 流式事件设计、ChatController 状态机、PetRuntime "干净收尾"接口和文字速率限制器的实现。
+本文档定义 MilesEdgeworth v2 中模型流式回复与桌宠动画的同步编排机制。它是长期维护文档，指导 sidecar 流式事件设计、ChatController 状态机、PetRuntime 边界接口和文字速率限制器的实现。
 
 相关文档分工：
 
@@ -8,17 +8,21 @@
 - `桌宠运行时与动画调度设计.md`：PetRuntime 调度模型、PetState、ExpressionMapping 解析。
 - `皮肤包播放行为设计.md`：phased 动画、Recipe、ActionPool、expressionMappings 层级模型。
 
-> **当前代码状态（Phase 2.0 合入后）**：sidecar 已支持 mock 流式输出和 `miles.pet.expression.requested` 事件，ChatController 已能将 expression 事件转为 `PetRuntime::requestExpression(...)` 调用。但 `TEXT_MESSAGE_CONTENT` 直接 append 到 UI，与 expression 事件松散并行，没有同步机制。本设计要解决的就是这个缺口，按 Phase 2.x 子阶段分批落地：协议骨架在 2.1 引入，完整状态机和速率限制器在 2.3 完成，phased 动画体验在 2.4 自然变好。
+> **当前代码状态（Phase 2.3 完成后）**：sidecar 已支持真实 OpenAI-compatible provider、`[EXPR:tag]` 解析、persona prompt、SQLite 会话历史和 Langfuse 可观测性。ChatController 已实现 5 状态门控状态机、ChatTextPacer 字符速率限制器和 PetRuntime 通知 API。但现有代码有两个接口（`requestBoundaryAndNotify` / `requestCleanFinishAndNotify`）行为一致，需合并为统一的 `requestCleanFinishAndNotify`；phased 动画（enter / loop / exit）尚未落地；expression 切换使用单个 pending expression 而非分段队列。
 
 ## 1. 设计目标
 
-让模型的流式回复和桌宠动画看起来像同一个动作——桌宠"边做动作边说话"，文字内容和动画语义对应。具体要求：
+让模型的流式回复和桌宠动画看起来像同一个动作——桌宠"边做动作边说话"，文字内容和动画语义对应。
 
-- 桌宠不强行硬切动画，始终通过当前循环边界 + exit 段自然收尾再切。
-- 文字内容和动画在视觉上同步出现，不会出现"文字早于动作"或"动作早于文字"的不协调。
-- 同一回复中可以多次切换表达，文字流随动画过渡而暂停 / 放行。
-- 模型回复结束后，动画自然收尾再回 idle，不会硬切。
-- 文字以拟人语速流出，不快得像 dump，也不慢得让人等。
+具体要求：
+
+- 文字和动画**分段同步**：expression A 的动画在播放时，才流出 expression A 对应的文字。
+- 动画过渡**自然平滑**：有 exit 段的动画先播 exit 再切下一个；定帧动画可以直接切。
+- 文字以**拟人语速**流出，不快得像 dump，也不慢得让人等。
+- **响应迅速**：用户发消息后 ~200ms 内桌宠开始反应。
+- **取消优雅**：不丢已到达本地的文字，不硬切动画。
+- 同一回复中可以**多次切换表达**，每段 expression 的文字和动画一一对应。
+- 模型回复结束后，动画**自然收尾**再回 idle。
 
 非目标：
 
@@ -26,13 +30,82 @@
 - 不做唇形 / 表情逐帧对齐，粒度到 expression 段即可。
 - 不要求模型输出严格 JSON schema，使用文本内嵌标记更适合流式输出，对各 provider 都友好。
 
-## 2. 总体架构
+## 2. 目标效果
+
+以下场景描述用户在聊天时看到的动画效果，作为所有技术实现的验收基准。
+
+### 2.1 场景 1：正常对话
+
+你发了一条消息"你怎么看这个推论？"
+
+1. **Miles 正在站着待机**（idle_stand 循环播放）。
+2. 消息发出后，**Miles 很快反应**——约 200ms 内，他开始抬手抱胸（thinking 动画的 enter 阶段）。
+3. **抱胸保持**，手指轻敲——thinking 的 loop 阶段。模型在想的时候他一直保持这个姿势。
+4. 模型开始回复，第一段是 `[EXPR:objection]`（异议！）。
+5. Miles **先放下双臂**（thinking 的 exit），然后**伸手指向前方**（objecting 播一次然后定住）。
+6. **文字开始出现**："异议！这个推论还有漏洞。"——一个字一个字按节奏流出，约每秒 12 字。
+7. Miles **保持定在最后一帧**（手指向前方），和文字同步。
+8. 模型切换到 `[EXPR:polite]`（礼貌）。
+9. **文字暂停**——因为 objecting 没有 exit，不用等退出动画，直接切到 bow（鞠躬）。
+10. **文字继续**："不过我理解您的观点。"——继续按节奏流出。
+11. 模型回复结束（RUN_FINISHED）。
+12. 文字继续吐完，Miles 完成鞠躬，回到站立待机。
+13. 一切结束，Miles 安静地站着等你的下一条消息。
+
+### 2.2 场景 2：短回复
+
+1. 你问了个简单问题。
+2. Miles 开始抱胸思考（enter → loop）。
+3. 模型很快回了，只有几个字：`[EXPR:neutral]好的。`
+4. Miles 放下双臂（thinking exit），切到普通说话姿势。
+5. "好的。" 三个字流出。
+6. Miles 自然回到待机。
+
+### 2.3 场景 3：连续多段 expression
+
+模型输出：`[EXPR:objection]异议！[EXPR:polite]但是…[EXPR:objection]不对，我再想想。`
+
+1. Miles **指向前方**（objecting），"异议！" 流出。
+2. 直接切到**鞠躬**（bow）——objecting 无 exit，不用等。"但是…" 流出。
+3. 直接切到**再次指向前方**（objecting）——bow 也无 exit，不用等。"不对，我再想想。" 流出。
+4. 每个动画至少播放一个完整周期，不会在中间硬切。
+
+### 2.4 场景 4：用户取消
+
+1. 模型正在回复，文字在流出，Miles 在做动作。
+2. 用户点了取消。
+3. **已经收到的文字继续按节奏吐完**（不丢内容）。
+4. Miles **自然收尾当前动画**（播 exit 如果有），回到待机。
+5. 没有任何突兀的硬切。
+
+### 2.5 各类动画在聊天中的表现
+
+| 类型 | 例子 | 行为 | 切换时 |
+|------|------|------|--------|
+| **entry-only** | objecting（伸手指）、bow（鞠躬） | 播完后停在最后一帧 | 直接切到下一个动画 |
+| **enter-hold-exit** | back_away（后撤警惕） | enter → 定帧保持 → exit 收尾 | 播 exit 再切 |
+| **enter-loop-exit** | thinking（抱胸思考） | enter → loop 循环 → exit 收尾 | 等 loop 播完一轮 → 播 exit → 切 |
+| **loop-only** | idle_stand（站立待机） | 一直循环 | 等循环播完一轮 → 切 |
+
+关键区分：**entry-only 和 enter-hold-exit 都会定帧**，但 entry-only 定住后就"完成了"，随时可被替换；enter-hold-exit 定住后是"等待状态"，结束时需要播 exit 做恢复动作。
+
+### 2.6 核心原则
+
+| 原则 | 含义 |
+|------|------|
+| 文字跟动画同步 | expression A 的动画在播放时，才流出 expression A 对应的文字 |
+| 动画过渡平滑 | 有 exit 的动画先播 exit 再切下一个；没有 exit 的直接切 |
+| 文字节奏拟人 | 不一下全显，也不太慢，约每秒 12 字 |
+| 响应迅速 | 发消息后 ~200ms 内看到 Miles 开始反应 |
+| 取消优雅 | 不丢文字，不硬切动画 |
+
+## 3. 总体架构
 
 ```mermaid
 flowchart LR
     Model["模型 Provider"]
     Sidecar["Go sidecar<br/>token 解析 + 事件分流"]
-    Controller["ChatController<br/>状态机 + hold buffer"]
+    Controller["ChatController<br/>状态机 + segment queue"]
     Ticker["字符速率限制器"]
     UI["ChatWindow"]
     Runtime["PetRuntime"]
@@ -41,8 +114,8 @@ flowchart LR
     Sidecar -->|TEXT_MESSAGE_CONTENT| Controller
     Sidecar -->|miles.pet.expression.requested| Controller
     Controller -->|requestExpression| Runtime
-    Controller -->|requestCleanFinishAndNotify<br/>requestBoundaryAndNotify| Runtime
-    Runtime -. cleanFinishReady / expressionBoundaryReached .-> Controller
+    Controller -->|requestCleanFinishAndNotify| Runtime
+    Runtime -. cleanFinishReady .-> Controller
     Controller --> Ticker
     Ticker --> UI
 ```
@@ -52,13 +125,41 @@ flowchart LR
 | 层 | 职责 |
 | --- | --- |
 | Go sidecar | 接 provider 流，解析 `[EXPR:x]` 标记，分发为 expression 事件和纯文本事件 |
-| ChatController 状态机 | 根据动画状态门控文字流，维护 hold buffer |
-| PetRuntime | 提供"干净收尾"和"边界通知"两个异步接口，按 ExpressionMapping 决定具体动画 |
-| 字符速率限制器 | 用拟人节奏从 hold buffer 抽字符送到 UI，并在积压时追平 |
+| ChatController 状态机 | 按 expression 分段门控文字流，维护 segment queue |
+| PetRuntime | 提供"干净收尾"异步接口（等安全点 + 播 exit），按 ExpressionMapping 决定具体动画 |
+| 字符速率限制器 | 用拟人节奏从队列中抽字符送到 UI，并在积压时追平 |
 
-## 3. 模型输出约定
+## 4. 聊天相关的动画类型
 
-### 3.1 标记格式
+皮肤中的动画用于聊天编排时，按 phase 结构分为四类。分类决定了动画何时到达"安全点"以及切换时是否有 exit 需要播。
+
+| 类型 | phase 结构 | 示例 | 安全点 | 切换行为 |
+| --- | --- | --- | --- | --- |
+| **entry-only** | 单段 onceThenHold* | objecting、bow | 定帧后 | 直接切（无 exit） |
+| **enter-hold-exit** | enter + hold + exit | back_away（后撤警惕） | 定帧后 | 播 exit → 切 |
+| **enter-loop-exit** | enter + loop + exit | thinking、pointing、crossed | loop 播完一轮 | 播 exit → 切 |
+| **loop-only** | 单段 loop | idle_stand | 循环播完一轮 | 直接切（无 exit） |
+
+*\* `onceThenHold` 是本方案新增的 loopMode。当前 manifest 中 objecting、bow 使用 `onceThenIdle`（播完后自动回 idle）。实现 entry-only 行为需要：在 schema 中新增 `onceThenHold` 值、在 `PetSurfaceWindow` 中增加定帧处理、迁移相关 action 的 manifest 声明。*
+
+**干净收尾（clean finish）** 是统一的过渡机制：等动画到达安全点 → 播 exit（如果有）→ 回调。无论是 expression 切换、回复开始还是回复结束，都走同一条路径。这确保所有过渡都平滑自然。
+
+各类型调用 `requestCleanFinishAndNotify` 的详细行为：
+
+| 类型与当前状态 | 行为 |
+| --- | --- |
+| entry-only，已定帧 | 立即回调（无 exit） |
+| entry-only，播放中 | 等播完定帧 → 回调（无 exit） |
+| enter-hold-exit，在 hold | 播 exit → exit 完成后回调 |
+| enter-hold-exit，在 enter | 等 enter 播完 → 播 exit → 回调 |
+| enter-loop-exit，在 loop | 等 loop 播完一轮 → 播 exit → 回调 |
+| enter-loop-exit，在 enter | 等 enter 播完 → 播 exit → 回调 |
+| loop-only | 等循环播完一轮 → 回调（无 exit） |
+| idle / 无活跃动画 | 立即回调 |
+
+## 5. 模型输出约定
+
+### 5.1 标记格式
 
 模型在每段文字开头输出 `[EXPR:tag]`：
 
@@ -72,7 +173,7 @@ flowchart LR
 - 表达延续时不重复标注（同一 tag 不连续标）。
 - `tag` 名只能取自当前皮肤声明的 `expressions` 列表（见 `皮肤包播放行为设计.md` §Expression 与 ExpressionMapping）。
 
-### 3.2 System prompt 注入
+### 5.2 System prompt 注入
 
 sidecar 在请求开始时把当前皮肤的 expression 清单注入 system prompt：
 
@@ -90,7 +191,7 @@ sidecar 在请求开始时把当前皮肤的 expression 清单注入 system prom
 
 清单由 sidecar 读取 Qt 上报的当前皮肤 manifest，每次会话开始或换皮肤时刷新。
 
-### 3.3 sidecar 兜底
+### 5.3 sidecar 兜底
 
 模型不按格式输出时，sidecar 一处兜底，不上送 Qt：
 
@@ -98,19 +199,49 @@ sidecar 在请求开始时把当前皮肤的 expression 清单注入 system prom
 - 未知 tag → 降级为 `neutral` 并日志告警。
 - 标记出现在文字中间 → 也算新段开始（提示要求段首，但解析时宽容）。
 
-## 4. SSE 事件流设计
+## 6. SSE 事件流设计
 
-### 4.1 事件序列
+### 6.1 事件类型
 
-完整流式回复示意：
+sidecar 向 ChatController 发送两类 CUSTOM 事件：
+
+| 事件名 | 含义 | 后面是否跟 TEXT |
+| --- | --- | --- |
+| `miles.pet.expression.requested` | 一段新的文字开始，伴随 expression 切换 | **是**，后面紧跟 `TEXT_MESSAGE_CONTENT` |
+| `miles.pet.lifecycle` | 非文字性状态变化（模型推理中等） | **否** |
+
+**`miles.pet.expression.requested`**（文字段事件）：由 sidecar 在解析到 `[EXPR:tag]` 标记时发出。ChatController 为它创建 segment 入队。
+
+```json
+{ "expression": "objection" }
+```
+
+**`miles.pet.lifecycle`**（生命周期事件）：不对应文字输出，ChatController **不为它创建 segment**，而是直接请求 PetRuntime 切换动画。
+
+```json
+{ "state": "thinking" }
+```
+
+当前定义的 lifecycle 状态：
+
+| state | 时机 | ChatController 行为 |
+| --- | --- | --- |
+| `thinking` | `RUN_STARTED` 后、首个 `[EXPR:tag]` 前 | 请求 thinking expression，不影响 segment queue |
+
+> 注：当前 Go provider 在流结束时还发一个 `state: "idle"` 的 expression 事件（`provider.go:365`）。这个事件与 `RUN_FINISHED` 语义重复——ChatController 的 `WAITING_FOR_ANIMATION_END` 已通过 cleanFinish 处理回 idle 的过渡。Phase 2.4 应移除该 idle 事件，避免被 segment queue 误入队。
+
+### 6.2 事件序列
+
+完整流式回复示意（带 thinking 阶段）：
 
 ```
 RUN_STARTED
-CUSTOM miles.pet.expression.requested { state: "speaking", expression: "objection" }
+CUSTOM miles.pet.lifecycle { state: "thinking" }
+CUSTOM miles.pet.expression.requested { expression: "objection" }
 TEXT_MESSAGE_CONTENT "异议！"
 TEXT_MESSAGE_CONTENT "这个推论"
 TEXT_MESSAGE_CONTENT "还有漏洞。"
-CUSTOM miles.pet.expression.requested { state: "speaking", expression: "polite" }
+CUSTOM miles.pet.expression.requested { expression: "polite" }
 TEXT_MESSAGE_CONTENT "不过我理解"
 TEXT_MESSAGE_CONTENT "您的观点。"
 RUN_FINISHED
@@ -118,11 +249,12 @@ RUN_FINISHED
 
 约束：
 
-- expression 事件**永远**出现在它对应段的文字之前。
+- `expression.requested` 事件**永远**出现在它对应段的文字之前。
 - `[EXPR:x]` 标记本身不进入 `TEXT_MESSAGE_CONTENT`，Qt 侧看不到它。
+- `lifecycle` 事件不参与 segment queue，ChatController 直接处理。
 - 一次 RUN 中允许任意数量的 expression 切换。
 
-### 4.2 sidecar 的 token 解析
+### 6.2 sidecar 的 token 解析
 
 sidecar 维护小型 lookahead buffer 处理 `[EXPR:x]` 跨 token 边界的情况：
 
@@ -140,131 +272,241 @@ state PARSING_TAG:
 
 最大标记长度 = `[EXPR:` + 最长 tag 名 + `]`，由 manifest expression 清单算出。
 
-## 5. ChatController 状态机
+## 7. ChatController 状态机
 
-### 5.1 状态定义
+### 7.1 状态定义
 
 | 状态 | 含义 |
 | --- | --- |
 | `IDLE` | 没有活跃回复 |
 | `BUFFERING_FOR_START` | RUN_STARTED 已收到，等待 PetRuntime 干净收尾当前动画 |
 | `STREAMING` | 当前 expression 动画进行中，文字正常流出 |
-| `GATED` | 收到新 expression 事件，等待当前动画到达边界 |
-| `WAITING_FOR_ANIMATION_END` | RUN_FINISHED 已到、动画未结束，等待动画自然收尾后回 idle |
+| `GATED` | 收到新 expression 事件或 segment queue 有待处理段，等待双条件满足（动画干净收尾 + 当前段文字吐完） |
+| `WAITING_FOR_ANIMATION_END` | RUN_FINISHED 已到且所有 segment 已处理完，等待动画自然收尾后回 idle |
 
-### 5.2 状态转移
+### 7.2 Segment Queue
+
+ChatController 维护一个 segment queue 来实现 expression 和文字的分段同步。每个 segment 代表一段 expression 对应的文字：
+
+```cpp
+struct ExpressionSegment {
+    int segmentId;
+    QString expression;
+    QString textBuffer;
+};
+
+// 当前正在播放动画 + 吐字的段
+int m_activeSegmentId = -1;         // -1 表示没有活跃段
+QString m_activeExpression;
+
+// 等待激活的段
+QList<ExpressionSegment> m_segmentQueue;
+int m_nextSegmentId = 0;  // 全局单调递增，跨 reply session 不重置
+```
+
+active segment 和 segment queue 的关系：**active segment 是正在播放的段，queue 是等待激活的段**。当一段被"激活"时，它从 queue 头部取出，其 segmentId 和 expression 存入 `m_activeSegmentId` / `m_activeExpression`，其 textBuffer 喂给速率限制器。
+
+segment queue 的工作方式：
+
+- 新 `expression.requested` 到来 → 创建新 segment（分配递增 `segmentId`），追加到 queue 尾部。
+- 后续 `TEXT_MESSAGE_CONTENT` → 如果 queue 非空，追加到 queue **最后一个** segment 的 textBuffer；如果 queue 空（STREAMING 状态），直接喂速率限制器（使用 `m_activeSegmentId`）。
+- **双条件门控**：GATED 状态下，切换到下一段需要两个条件**同时满足**：
+  1. `cleanFinishReady`：当前动画已干净收尾（exit 已播完）。
+  2. `segmentDrained(segmentId)`：速率限制器已吐完当前段的所有文字。
+- 双条件都满足 → **激活下一段**：取 queue 头部 segment，设 `m_activeSegmentId = segment.segmentId`、`m_activeExpression = segment.expression`，请求 expression，把 textBuffer 喂给速率限制器（带 segmentId）。
+- 如果激活后 queue 还有剩余 segment → 请求新一轮 cleanFinish，留在 GATED。
+- queue 空了 → 转 STREAMING。
+
+**为什么需要双条件**：如果只等动画收尾就切换，上一段长文本还在速率限制器里按节奏吐字时，动画已经切到新 expression——违背"expression A 的动画播放时才流出 expression A 的文字"的核心原则。双条件确保文字和动画严格分段同步。
+
+> 注：`lifecycle` 事件（如 thinking）**不创建 segment**，不经过 segment queue，直接由 ChatController 调用 PetRuntime。
+
+### 7.3 状态转移
 
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
     IDLE --> BUFFERING_FOR_START: RUN_STARTED<br/>requestCleanFinishAndNotify
-    BUFFERING_FOR_START --> STREAMING: cleanFinishReady<br/>requestExpression + flush
-    STREAMING --> GATED: 新 expression<br/>requestBoundaryAndNotify
-    GATED --> STREAMING: boundaryReached<br/>requestExpression + flush
-    STREAMING --> WAITING_FOR_ANIMATION_END: RUN_FINISHED 且动画未结束<br/>requestBoundaryAndNotify
-    STREAMING --> IDLE: RUN_FINISHED 且动画已结束
-    WAITING_FOR_ANIMATION_END --> IDLE: boundaryReached<br/>requestCleanFinish
+    BUFFERING_FOR_START --> STREAMING: cleanFinishReady + queue 空<br/>requestExpression + flush
+    BUFFERING_FOR_START --> GATED: cleanFinishReady + queue 非空<br/>requestExpression + flush 首段<br/>requestCleanFinish
+    STREAMING --> GATED: expression.requested<br/>requestCleanFinishAndNotify
+    GATED --> STREAMING: 双条件满足 + queue 空<br/>requestExpression + flush
+    GATED --> GATED: 双条件满足 + queue 非空<br/>requestExpression + flush 首段<br/>requestCleanFinish
+    STREAMING --> WAITING_FOR_ANIMATION_END: 流已结束 + queue 空<br/>requestCleanFinishAndNotify
+    GATED --> WAITING_FOR_ANIMATION_END: 双条件满足 + 流已结束 + 处理完最后 segment<br/>requestCleanFinishAndNotify
+    WAITING_FOR_ANIMATION_END --> IDLE: cleanFinishReady + pacerEmpty
 ```
 
-### 5.3 各状态的事件处理
+### 7.4 各状态的事件处理
 
 **`BUFFERING_FOR_START`**
 
-- `TEXT_MESSAGE_CONTENT` → 进 hold buffer，不喂给速率限制器。
-- expression 事件 → 更新"待请求 expression"，仍 buffer 文字。
-- `cleanFinishReady` → 转 STREAMING，调 `requestExpression`，hold buffer 转喂速率限制器。
+| 事件 | 处理 |
+| --- | --- |
+| `TEXT_MESSAGE_CONTENT` | 追加到 segment queue 末尾 segment 的 textBuffer。如果 queue 为空（还没收到 expression），暂存到独立的 hold buffer。 |
+| `expression.requested` | 创建新 segment 入队。如果 hold buffer 有内容，移入该 segment 的 textBuffer。 |
+| `lifecycle.thinking` | 记录 `pendingThinkingExpression`，等 cleanFinish 后请求。 |
+| `RUN_FINISHED` | 标记 `streamFinished = true`，不清空 segment queue，继续等 cleanFinishReady。 |
+| `cleanFinishReady` | **先判断 queue 是否为空**：如果 queue 为空且有 `pendingThinkingExpression`，请求 thinking expression，转 STREAMING（等后续 expression.requested 到来再入 GATED）。如果 queue 非空，**跳过 pendingThinking**（首个文字段已排队，thinking 已无意义），直接激活 queue 头部 segment：设 active segment，请求 expression，喂 textBuffer 给速率限制器（带 segmentId）。如果 queue 还有剩余，转 GATED 并请求 `requestCleanFinishAndNotify`；否则转 STREAMING。如果 streamFinished 且 queue 已空，直接转 WAITING_FOR_ANIMATION_END。 |
 
 **`STREAMING`**
 
-- `TEXT_MESSAGE_CONTENT` → 直接喂速率限制器。
-- expression 事件 → 调 `requestBoundaryAndNotify`，转 GATED。
-- `RUN_FINISHED` → 看动画状态：未结束转 WAITING_FOR_ANIMATION_END 并调 `requestBoundaryAndNotify`；已结束直接转 IDLE。
+| 事件 | 处理 |
+| --- | --- |
+| `TEXT_MESSAGE_CONTENT` | 直接喂速率限制器（使用 `m_activeSegmentId`）。 |
+| `expression.requested` | 创建新 segment 入队，转 GATED，请求 `requestCleanFinishAndNotify`。进入 GATED 时初始化双条件标志：`m_animationReady = false`；`m_textDrained` 根据当前 pacer 状态初始化——如果 `m_activeSegmentId == -1`（无活跃段，如 thinking 阶段）或 pacer 中该 segmentId 的文字已全部吐出，则 `m_textDrained = true`，否则 `false`。 |
+| `lifecycle.thinking` | 仅在 `m_activeSegmentId == -1` 时处理（尚无文字段）。直接请求 thinking expression。 |
+| `RUN_FINISHED` | 标记 `streamFinished`。queue 应已空（STREAMING 时 queue 是空的）。请求 `requestCleanFinishAndNotify`，转 WAITING_FOR_ANIMATION_END。注意：pacer 可能仍在吐 active segment 的文字，需要在 WAITING_FOR_ANIMATION_END 等 pacerEmpty。 |
 
 **`GATED`**
 
-- `TEXT_MESSAGE_CONTENT` → 进 hold buffer。
-- expression 事件 → 覆盖待请求 expression（中间又变了以最新为准）。
-- `boundaryReached` → 调 `requestExpression`，hold buffer 转喂速率限制器，转 STREAMING。
-- 安全超时 → 强制 flush，转 STREAMING。
+GATED 状态下维护两个标志：`m_animationReady`（cleanFinishReady 已到达）和 `m_textDrained`（当前段文字已吐完）。两者都 true 时才执行切换。
+
+| 事件 | 处理 |
+| --- | --- |
+| `TEXT_MESSAGE_CONTENT` | 追加到 segment queue 末尾 segment 的 textBuffer。 |
+| `expression.requested` | 创建新 segment 入队。 |
+| `RUN_FINISHED` | 标记 `streamFinished = true`。不清空 segment queue，继续等双条件。 |
+| `cleanFinishReady` | 设 `m_animationReady = true`。如果 `m_textDrained` 也为 true，执行切换（见下）。 |
+| `segmentDrained` | 设 `m_textDrained = true`。如果 `m_animationReady` 也为 true，执行切换（见下）。 |
+| 安全超时（2000ms） | 强制 `m_animationReady = true`，记录 warning，然后检查能否切换。 |
+
+**GATED 切换逻辑**（双条件满足时）：**激活下一段**——取 queue 头部 segment，设 `m_activeSegmentId = segment.segmentId`、`m_activeExpression = segment.expression`，请求 expression，喂其 textBuffer 给速率限制器（带 segmentId）。重置 `m_animationReady = false, m_textDrained = false`。如果 queue 还有剩余，再次请求 `requestCleanFinishAndNotify`，留在 GATED。如果 queue 已空且 streamFinished，请求 `requestCleanFinishAndNotify` 并转 WAITING_FOR_ANIMATION_END。如果 queue 已空且流未结束，转 STREAMING。
 
 **`WAITING_FOR_ANIMATION_END`**
 
-- `TEXT_MESSAGE_CONTENT` → 理论上不应到达，但安全起见 append 速率限制器（防数据丢失）。
-- `boundaryReached` → 调 `requestCleanFinish` 回 idle，转 IDLE。
+此状态等待两个条件：`cleanFinishReady`（动画收尾完成）和 `pacerEmpty`（速率限制器已吐完所有文字，包括 active segment 的剩余文字）。用 `m_animationReady` 和 `m_pacerEmpty` 两个标志追踪。进入此状态时初始化：`m_animationReady = false`；`m_pacerEmpty = (pacer.pendingCount() == 0)`。如果进入时 pacer 已空，`m_pacerEmpty` 直接为 true，只需等 `cleanFinishReady`。
 
-### 5.4 取消与错误
+| 事件 | 处理 |
+| --- | --- |
+| `TEXT_MESSAGE_CONTENT` | 理论上不应到达，安全起见追加到速率限制器。 |
+| `cleanFinishReady` | 设 `m_animationReady = true`。如果 `m_pacerEmpty` 也为 true，`returnToIdle` 并转 IDLE。 |
+| `pacerEmpty` | 设 `m_pacerEmpty = true`。如果 `m_animationReady` 也为 true，`returnToIdle` 并转 IDLE。 |
+
+### 7.5 Reply Session
+
+ChatController 内部用 reply session 概念管理一次回复的生命周期。它不是独立类，而是一组关联状态的逻辑分组：
+
+```
+reply session 包含：
+  streamId          — 唯一标识本次流
+  assistantMessageIndex — 当前正在写入的 assistant 消息位置
+  segmentQueue      — expression 分段队列
+  streamFinished    — provider stream 是否已结束
+  cancelled         — 是否被用户取消
+```
+
+reply session 开始于 `RUN_STARTED`，结束于以下条件**全部满足**：
+
+1. provider stream 结束（收到 `RUN_FINISHED`）或用户取消。
+2. segment queue 为空。
+3. 速率限制器队列为空。
+4. 当前 expression 动画已 clean finish。
+
+`assistantMessageIndex` 在 reply session 结束后重置为 -1。在此之前保持有效，因为速率限制器可能仍在吐字。
+
+### 7.6 取消与错误
 
 用户取消、provider 出错、网络断开时：
 
-- 任何状态都立即转 IDLE。
-- hold buffer 内容直接喂速率限制器（不丢用户已经"看到一半"的回复）。
-- 调 `requestCleanFinish` 让动画干净收尾，不硬切。
+- 任何状态都标记 `cancelled = true`，递增 `asyncGeneration` 使所有待执行回调失效。
+- segment queue 中所有剩余 textBuffer **全部 drain 到速率限制器**（不丢用户已经"看到一半"的回复）。
+- 速率限制器继续按人类节奏吐完剩余字符。
+- 调 `requestCleanFinish` 让动画干净收尾（播 exit 段后回 idle），不硬切。
+- `assistantMessageIndex` 在速率限制器清空后重置。
 
-## 6. PetRuntime 接口扩展
+### 7.7 安全超时
 
-### 6.1 新增方法
+| 超时 | 默认值 | 所在层 | 用途 |
+| --- | --- | --- | --- |
+| start timeout | 3000ms | ChatController | `BUFFERING_FOR_START` 状态下，如果 cleanFinishReady 迟迟不到，按 cleanFinishReady 的同一套逻辑处理（判断 queue 是否为空、是否有 pendingThinking、激活首段等），记录 warning |
+| gate timeout | 2000ms | ChatController | `GATED` 状态下，如果 cleanFinishReady 迟迟不到，强制设 `m_animationReady = true` 并记录 warning |
+| cleanFinish safety timeout | 2000ms | PetRuntime | 内部 cleanFinish 的兜底超时，防止动画长度异常或调度 bug |
+
+gate timeout 覆盖最坏情况：等安全点（~200-400ms）+ 播 exit 段（~200-400ms）。2000ms 留有充裕余量。start timeout 更长是因为回复开始时的旧动画可能包含完整的 loop + exit。三层超时独立运作，互为兜底。
+
+## 8. PetRuntime 接口
+
+### 8.1 方法定义
 
 ```cpp
 class PetRuntime {
 public:
-    // 在当前 recipe 最近的自然边界播完 exit 后回调
+    // 等当前动画到安全点，播 exit（如果有），然后回调。
+    // 用于所有动画过渡：expression 切换、回复开始收尾、回复结束收尾。
     void requestCleanFinishAndNotify(std::function<void()> callback);
 
-    // 在当前 recipe 最近的自然边界回调（不一定播 exit）
-    void requestBoundaryAndNotify(std::function<void()> callback);
+    // 聊天过程中抑制 3000ms 自动 returnToIdle。
+    // reply session 开始时 true，结束时 false。
+    void setSuppressAutoIdle(bool suppress);
 };
 ```
 
-差异：
+ChatController 在所有需要过渡的场景都调用同一个接口。回调后 ChatController 根据上下文决定做什么：请求新的 expression（切换），或调用 `returnToIdle()`（回复结束）。
 
-- `requestCleanFinishAndNotify` 用于"准备切到下一个完全无关的动画"——需要播 exit 段，让整个 recipe 完整收尾。
-- `requestBoundaryAndNotify` 用于"我想切下一个 expression"——只等到自然循环边界，由后续切换逻辑决定下一个动画是否需要 enter / exit 衔接。
+各动画类型的行为表见 §4。
 
-实现要求：
+**Postcondition（回调时 PetRuntime 的状态）**：回调触发时，之前的动画已完成（exit 已播完或无 exit 的动画已停在最后一帧）。PetRuntime **不会**自动回到 idle——它停在 "action 结束、等待指令" 状态。调用方必须在回调中做以下之一：
 
-- 当前已是 idle 或没有活跃 recipe → 立即同步回调。
-- 当前动画 `loop` 模式（无 phase） → 当前一轮循环结束后回调。
-- 当前动画 `phased` loop 段 → 当前 loop 一轮结束后回调（boundary），或 loop 结束 → 播 exit → 回调（cleanFinish）。
-- 当前动画 `oneshot` 已结束、定格在最后一帧 → 立即回调。
-- 当前动画 `oneshot` 未结束 → 等播完后回调。
+- `requestExpression()`：开始下一个 expression 动画。
+- `returnToIdle()`：回到 idle 待机。
 
-### 6.2 边界的定义
+如果调用方在回调后 3000ms 内既不请求新 expression 也不 returnToIdle，PetRuntime 自动 `returnToIdle` 作为安全兜底。**此安全兜底仅在没有活跃 reply session 时启用**——聊天过程中 ChatController 自己管理所有过渡（通过 GATED 双条件门控和 WAITING_FOR_ANIMATION_END 状态），不需要也不应触发自动 idle。实现上 ChatController 在 reply session 开始时调用 `setSuppressAutoIdle(true)`，结束时调用 `setSuppressAutoIdle(false)`。
 
-"自然边界"由当前 action 类型决定：
+### 8.2 实现机制
 
-| Action 类型 | cleanFinish 边界 | boundary 边界 |
-| --- | --- | --- |
-| `loop`（单段） | 当前一轮循环结束 | 当前一轮循环结束 |
-| `phased` loop 段 | 当前一轮 loop 结束 → 播 exit 段 | 当前一轮 loop 结束 |
-| `oneshot` 进行中 | 自然播完 | 自然播完 |
-| `oneshot` + `onceThenHold` 已定格 | 立即 | 立即 |
-| `idle` / 无活跃 recipe | 立即 | 立即 |
+`requestCleanFinishAndNotify` 使用 `m_cleanFinishCallback` 单 slot。行为：
 
-Phase 2.0–2.3 阶段还没有 phased 动画，所有 action 都是单段 loop 或 oneshot。本接口在 Phase 2.4 phased 动画落地后体验自然变好，**不需要改协议**。
+- 如果当前已在安全点且无 exit phase → 立即回调。
+- 如果当前已在安全点且有 exit phase → 播 exit，exit 播完后回调。
+- 如果未在安全点 → 等到安全点后，如有 exit phase 则播 exit 再回调；如无 exit 则直接回调。
+- 安全超时（2000ms）兜底。
 
-### 6.3 安全超时
+phase 之间的自动转移（enter → loop，由 `nextPhase` 字段驱动）**不算**到达安全点。安全点是"当前动画到达了可以开始收尾的位置"，而不是"动画内部切换了 phase"。
 
-接口内部维护超时 timer，默认 1500ms。如果到时仍未到达边界（例如动画长度异常或调度 bug），强制触发 callback 并切换。这是兜底，正常情况不会触发。
+**callback slot 规则**：如果调用时已有一个 pending 的 cleanFinish callback，这是 ChatController 逻辑错误——状态机应该保证同一时间只有一个 pending cleanFinish。实现中用 `Q_ASSERT(!m_cleanFinishCallback)` 做 debug 断言，release 中记录 warning 并替换旧回调。
 
-ChatController 一侧也有自己的 800ms 超时用于 GATED，作为更保守的二次兜底，确保聊天 UI 不卡死。
+### 8.3 playbackSerial 防护
 
-## 7. 字符速率限制器
+PetRuntime 维护 `m_playbackSerial`，每次 `setCurrentPhase()` 递增。`handleAnimationFinished()` 在执行 cleanFinish 回调前记录当前 serial；如果 callback 触发了新的播放（serial 变了），则跳过旧动画的后续收尾逻辑（recipe step、pending request、autoReturnToIdle）。
 
-### 7.1 工作模型
+ChatController 的 callback 还有自己的 `streamId + asyncGeneration` 校验。过时的 callback 被静默丢弃。
 
-ChatController 内部维护一个待显示字符队列 + `QTimer`：
+### 8.4 phase 自动转移与 cleanFinish 的关系
+
+phased action 中 phase 之间的自动转移（由 `nextPhase` 驱动）是 action 内部行为，对 ChatController 不可见：
+
+- enter → loop：enter 播完后自动开始 loop。不触发 cleanFinish 回调。
+- loop 播完一轮：到达安全点。如果有 pending cleanFinish 请求，开始播 exit（如有）。
+- exit 播完：action 真正结束。触发 cleanFinish 回调。
+
+## 9. 字符速率限制器
+
+### 9.1 工作模型
+
+ChatController 内部维护一个待显示字符队列 + `QTimer`，并通过 `streamId` 和 `segmentId` 追踪当前正在吐的是哪个回复的哪个 segment 的文字：
 
 ```
-text 进 hold buffer
-  STREAMING 时 → 队列直接转喂速率限制器
-  非 STREAMING 时 → buffer 暂存，状态切到 STREAMING 时再喂
+喂入文字：
+  ChatController 调用 pacer.append(text, streamId, segmentId)
+  STREAMING 时 → 直接喂速率限制器（使用当前 streamId + segmentId）
+  非 STREAMING 时 → 进 segment queue 暂存，双条件满足后取首段喂速率限制器
 
 QTimer 每 msPerChar 触发：
   从队列头取一个字符（CJK / Latin 都按字符）追加到 UI
-  队列空时不做事
+  某个 segmentId 的最后一个字符吐出 → emit segmentDrained(segmentId)
+  整个队列空 → emit pacerEmpty()
 ```
 
-### 7.2 默认参数
+现有 `streamId` 机制保持不变：`discardBeforeStream(streamId)` 丢弃旧回复残留字符，`chunkReady(chunk, streamId)` 让 ChatController 校验回复归属。`segmentId` 是新增的正交维度，追踪段内文字进度。
+
+**`segmentDrained(int segmentId)` 信号**：当速率限制器吐完某个 segmentId 的最后一个字符后发出。ChatController 在 GATED 状态下监听此信号，作为双条件门控的第二个条件。这确保上一段文字完全显示后才切换到下一段的动画。
+
+**`pacerEmpty()` 信号**：当速率限制器的整个队列为空时发出（不限定 segmentId）。ChatController 在 WAITING_FOR_ANIMATION_END 状态下监听此信号，确保最后一段文字全部吐完后才回到 idle。`pacerEmpty` 和 `segmentDrained` 是独立信号：`segmentDrained` 标记某一段文字结束，`pacerEmpty` 标记所有文字结束。
+
+**跨 session 安全性**：`segmentDrained` 和 `pacerEmpty` 不携带 `streamId`，因为两层机制已防止旧 session 信号干扰：(1) `m_nextSegmentId` 全局单调递增、跨 reply session 不重置，旧 session 的 segmentId 不会与新 session 碰撞；(2) reply session 开始时调用 `discardBeforeStream(streamId)` 清空旧队列，旧文字不会自然 drain 出信号。
+
+### 9.2 默认参数
 
 | 参数 | 默认值 | 含义 |
 | --- | --- | --- |
@@ -273,17 +515,17 @@ QTimer 每 msPerChar 触发：
 | `maxBacklog` | 30 字符 | 队列积压上限 |
 | `backlogSpeedupFactor` | 0.5 | 积压时 `msPerChar` 临时乘以此系数 |
 
-`msPerChar` 在 Phase 2.2 设置面板暴露给用户。
+`msPerChar` 在设置面板的"其他设置"tab 暴露给用户。
 
-### 7.3 积压追平
+### 9.3 积压追平
 
 如果待显示队列长度超过 `maxBacklog`，临时把 `msPerChar` 乘以 `backlogSpeedupFactor`，直到积压回落。避免用户在 gate 打开后还要等几秒才看到全部文字。
 
-机制让"长动画 + 短文字"和"短动画 + 长文字"两个极端情况下文字都不显拖沓。
+## 10. 完整时序示例
 
-## 8. 完整时序示例
+### 10.1 带 phased 动画的多段 expression
 
-以"用户问'你怎么看这个推论？' → 模型回复两段不同表达"为例：
+场景：用户问"你怎么看这个推论？" → Miles 先思考，然后回复两段不同表达。
 
 ```mermaid
 sequenceDiagram
@@ -297,65 +539,144 @@ sequenceDiagram
     User->>UI: 发送消息
     UI->>CC: sendMessage
     CC->>SC: POST /v1/chat/messages
+
     SC-->>CC: RUN_STARTED
     CC->>PR: requestCleanFinishAndNotify
-    Note over CC: 状态 = BUFFERING_FOR_START
+    Note over CC: BUFFERING_FOR_START
+
+    SC-->>CC: lifecycle(thinking)
+    Note over CC: 记录 pendingThinking
+
+    PR->>PR: 当前 idle → 立即回调
     PR-->>CC: cleanFinishReady
-    SC-->>CC: expression(objection)
+    CC->>PR: requestExpression(thinking, neutral)
+    Note over PR: 播 thinking 动画<br/>enter（抬手抱胸）→ loop（思考循环）
+    Note over CC: queue 空，转 STREAMING
+
+    Note over SC: 模型开始回复
+
+    SC-->>CC: expression.requested(objection)
+    Note over CC: 创建 segment[0]={objection, ""}<br/>segmentId=0
+    CC->>PR: requestCleanFinishAndNotify
+    Note over CC: 转 GATED<br/>等 cleanFinishReady + segmentDrained(无文字，立即满足)
+
+    PR->>PR: thinking loop 播完一轮 → 播 exit（放下双臂）
+    PR-->>CC: cleanFinishReady
+    Note over CC: m_animationReady=true, m_textDrained=true<br/>双条件满足
+
     CC->>PR: requestExpression(speaking, objection)
-    Note over CC: 状态 = STREAMING
+    Note over PR: 播 objecting 动画（entry-only）<br/>→ 伸手指向前方 → 定帧
+    Note over CC: queue 空，转 STREAMING
+
     SC-->>CC: TEXT "异议！这个推论还有漏洞。"
-    CC->>Tick: append
-    Tick-->>UI: 按速率喂字符
-    SC-->>CC: expression(polite)
-    CC->>PR: requestBoundaryAndNotify
-    Note over CC: 状态 = GATED，新 text 进 hold buffer
+    CC->>Tick: append(text, streamId, segmentId=0)
+    Tick-->>UI: 按速率逐字显示
+
+    SC-->>CC: expression.requested(polite)
+    Note over CC: 创建 segment[1]={polite, ""}<br/>segmentId=1
+    CC->>PR: requestCleanFinishAndNotify
+    Note over CC: 转 GATED<br/>等 cleanFinishReady + segmentDrained(0)
+
     SC-->>CC: TEXT "不过我理解您的观点。"
-    PR-->>CC: expressionBoundaryReached
+    Note over CC: 追加到 segment[1].textBuffer
+
+    PR->>PR: objecting 已定帧，无 exit → 立即回调
+    PR-->>CC: cleanFinishReady
+    Note over CC: m_animationReady=true
+
+    Tick->>Tick: segmentId=0 的文字全部吐完
+    Tick-->>CC: segmentDrained(0)
+    Note over CC: m_textDrained=true<br/>双条件满足
+
     CC->>PR: requestExpression(speaking, polite)
-    CC->>Tick: 转喂 hold buffer
-    Note over CC: 状态 = STREAMING
+    Note over PR: 播 bow 动画（entry-only）<br/>→ 鞠躬 → 定帧
+    CC->>Tick: append(segment[1].textBuffer, streamId, segmentId=1)
+    Note over CC: queue 空，转 STREAMING
+
+    Tick-->>UI: 按速率逐字显示
+
     SC-->>CC: RUN_FINISHED
-    Note over CC: 动画未结束，调 requestBoundaryAndNotify
-    Note over CC: 状态 = WAITING_FOR_ANIMATION_END
-    Tick-->>UI: 剩余字符喂完
-    PR-->>CC: expressionBoundaryReached
-    CC->>PR: requestCleanFinish
-    PR->>PR: 播 exit 段回 idle
-    Note over CC: 状态 = IDLE
+    CC->>PR: requestCleanFinishAndNotify
+    Note over CC: WAITING_FOR_ANIMATION_END<br/>等 cleanFinishReady + pacerEmpty
+
+    PR->>PR: bow 已定帧，无 exit → 立即回调
+    PR-->>CC: cleanFinishReady
+    Note over CC: m_animationReady=true
+
+    Tick->>Tick: segmentId=1 的文字全部吐完
+    Tick-->>CC: pacerEmpty
+    Note over CC: m_pacerEmpty=true<br/>双条件满足
+
+    CC->>PR: returnToIdle
+    Note over CC: IDLE
 ```
 
-## 9. 四种动画-文字长度组合
+### 10.2 带 thinking 的长回复
+
+场景：模型先思考较长时间，thinking 动画使用 enter-loop-exit。
+
+```mermaid
+sequenceDiagram
+    participant CC as ChatController
+    participant PR as PetRuntime
+    participant SC as sidecar
+
+    SC-->>CC: RUN_STARTED
+    CC->>PR: requestCleanFinishAndNotify
+    Note over CC: BUFFERING_FOR_START
+
+    SC-->>CC: lifecycle(thinking)
+    Note over CC: 记录 pendingThinking
+
+    PR-->>CC: cleanFinishReady（idle → 即时）
+    CC->>PR: requestExpression(thinking, neutral)
+    Note over PR: 播 thinking 动画<br/>enter（抬手抱胸）→ loop（思考循环）
+    Note over CC: queue 空，转 STREAMING
+
+    Note over SC: 几秒后模型开始回复
+    SC-->>CC: expression.requested(objection)
+    Note over CC: segment[0]={objection, ""}, segmentId=0
+    CC->>PR: requestCleanFinishAndNotify
+    Note over CC: 转 GATED<br/>等 cleanFinishReady + segmentDrained(无文字，立即满足)
+
+    PR->>PR: thinking loop 播完一轮 → 到达安全点
+    Note over PR: 播 exit（放下双臂）
+    PR->>PR: exit 播完
+    PR-->>CC: cleanFinishReady
+    Note over CC: 双条件满足
+
+    CC->>PR: requestExpression(speaking, objection)
+    Note over PR: 播 objecting 动画<br/>（伸手指向前方 → 定帧）
+    Note over CC: queue 空，转 STREAMING
+```
+
+说明：thinking 通过 `lifecycle` 事件触发，不进入 segment queue。当第一个 `expression.requested` 到达时，进入 GATED 等待 thinking 动画 cleanFinish（loop 播完一轮 → 播 exit → 回调）。此时因 thinking 不是文字段，segmentDrained 条件立即满足。
+
+## 11. 四种动画-文字长度组合
 
 | 组合 | 行为 |
 | --- | --- |
-| **A. 可 loop 动画 + 文字长** | 动画 enter → loop 持续循环。下一 expression 或 RUN_FINISHED → boundary 等当前循环结束 → 播 exit → 切换 / 回 idle |
-| **B. oneshot 动画 + 文字长** | 动画播一次定格末帧（`onceThenHold`），文字继续流出。下一 expression 到来 → 立即切换 |
-| **C. 动画 + 文字短** | 文字提前流完，RUN_FINISHED 后转 WAITING_FOR_ANIMATION_END，动画自然收尾后回 idle |
-| **D. 文字快速涌入** | hold buffer 积压触发追平机制，速率限制器临时提速消化积压，避免用户长时间等待 |
+| **A. 可循环动画 + 文字长** | 动画 enter → loop 持续循环。下一 expression 到来 → 等当前循环结束 → 播 exit（如有）→ 切到新动画。RUN_FINISHED → clean finish 播 exit → 回 idle |
+| **B. entry-only 动画 + 文字长** | 动画播一次定格末帧（onceThenHold），文字继续流出。下一 expression 到来 → 立即切换（已定帧 + 无 exit = 即时回调） |
+| **C. 动画 + 文字短** | 文字提前流完，RUN_FINISHED 后 segment queue 已空，转 WAITING_FOR_ANIMATION_END。动画 clean finish 后回 idle |
+| **D. 文字快速涌入** | segment queue / 速率限制器积压触发追平机制，临时提速消化积压 |
 
-## 10. 与 Phase 2.4 phased 动画的关系
+## 12. expression 到 action 的映射与验收
 
-本设计**不依赖** phased 动画。Phase 2.0–2.3 的 oneshot 和单段 loop 动画都能跑通本协议。但用户感知会有差距：
+expression 通过 `ExpressionMappingResolver` 映射到具体 action。一个 expression 可能映射到多个 action（例如 `objection` 映射到 `objecting` 或 `doubleClick.holdIt`，按权重随机选择）。
 
-- 没有 phased：动画切换时只能"loop 转一轮就切"，缺少 exit 动作的自然过渡，仍有点跳。
-- 有 phased（Phase 2.4 后）：每次切换都能播 exit 段，过渡平滑得多。
+验收分层：
 
-协议层面**不需要改动**。`requestCleanFinishAndNotify` / `requestBoundaryAndNotify` 接口在两阶段都成立，行为自然升级。
+- **expression 层**：确认模型输出的 expression tag 被正确解析并请求。验证方式：查看日志中的 `chat expression requested` 条目。
+- **action 层**：确认所有候选 action 都能正常播放。验证方式：在单元测试中传入固定 `randomValue` 做确定性验证（`ExpressionMappingResolver::resolve` 已接受 `randomValue` 参数）。
+- **体验层**：随机选择有利于自然感。如果某个场景需要确定性动作（例如强剧情"异议！"必须播 `objecting`），皮肤可以配置 `selection: first_available` 或直接在 recipe 里指定 action。
 
-## 11. 实施分摊
+## 13. 文档维护规则
 
-| 子阶段 | 本设计对应工作 |
-| --- | --- |
-| **Phase 2.1** | sidecar 端 token 解析、`[EXPR:x]` 处理、expression 事件改为段首先发；Qt 端拆出 hold buffer 雏形（暂不实现完整状态机）。 |
-| **Phase 2.2** | 设置面板暴露 `msPerChar` 等速率参数。 |
-| **Phase 2.3** | persona prompt 接入完整 expression 清单注入；ChatController 状态机完整落地；速率限制器和积压追平机制实现。 |
-| **Phase 2.4** | phased 动画落地，PetRuntime 端的 `requestCleanFinishAndNotify` 行为升级（播 exit 段），不改协议。 |
-
-## 12. 文档维护规则
-
-- 修改 SSE 事件流时同步更新 §4。
-- 修改 ChatController 状态机时同步更新 §5。
-- PetRuntime 新增 / 修改 cleanFinish / boundary 接口时同步更新 §6。
-- 速率限制器参数和追平算法调整时同步更新 §7。
+- 修改 SSE 事件类型（expression.requested / lifecycle）时同步更新 §6。
+- 修改 ChatController 状态机、segment queue 或双条件门控逻辑时同步更新 §7。
+- PetRuntime 新增 / 修改 cleanFinish 接口或 postcondition 时同步更新 §4 和 §8。
+- 速率限制器参数、segmentId 机制或追平算法调整时同步更新 §9。
+- 新增动画类型或改变 phase 自动转移规则时同步更新 §4。
+- 修改 loopMode schema（如 onceThenHold）时同步更新 §4 和 `皮肤包播放行为设计.md`。
 - 与桌宠运行时调度模型有交叉（如 `interruptHint` 含义变化）时，同步更新 `桌宠运行时与动画调度设计.md`。
