@@ -55,8 +55,45 @@ ApplicationWindow {
                         ComboBox {
                             id: configSelector
                             Layout.fillWidth: true
+                            Layout.preferredHeight: 40
                             model: App.SettingsController.configNames
                             currentIndex: App.SettingsController.configNames.indexOf(App.SettingsController.activeModelConfig)
+                            contentItem: Text {
+                                leftPadding: 14
+                                rightPadding: 38
+                                text: configSelector.displayText
+                                color: "#fffdf8"
+                                font.pixelSize: 14
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                            }
+                            indicator: Text {
+                                x: configSelector.width - width - 12
+                                y: (configSelector.height - height) / 2
+                                text: "⌄"
+                                color: "#d8d1c8"
+                                font.pixelSize: 22
+                            }
+                            background: Rectangle {
+                                color: "#2f2d2b"
+                                border.color: "#2f2d2b"
+                            }
+                            popup: Popup {
+                                y: configSelector.height
+                                width: configSelector.width
+                                implicitHeight: contentItem.implicitHeight
+                                padding: 1
+                                contentItem: ListView {
+                                    clip: true
+                                    implicitHeight: contentHeight
+                                    model: configSelector.popup.visible ? configSelector.delegateModel : null
+                                    currentIndex: configSelector.highlightedIndex
+                                }
+                                background: Rectangle {
+                                    color: "#fffdf8"
+                                    border.color: "#d8d1c8"
+                                }
+                            }
                             onActivated: {
                                 if (currentText.length > 0) {
                                     App.SettingsController.selectConfig(currentText)
@@ -65,13 +102,43 @@ ApplicationWindow {
                         }
 
                         Button {
+                            id: addConfigButton
                             text: qsTr("新增")
+                            Layout.preferredWidth: Math.max(96, (parent.width - parent.spacing * 2) * 0.25)
+                            Layout.preferredHeight: 40
+                            contentItem: Text {
+                                text: addConfigButton.text
+                                color: "#26201b"
+                                font.pixelSize: 14
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            background: Rectangle {
+                                color: addConfigButton.down ? "#eee7da" : "#fffdf8"
+                                border.color: "#d8d1c8"
+                            }
                             onClicked: App.SettingsController.addConfig()
                         }
 
                         Button {
+                            id: deleteConfigButton
                             text: qsTr("删除")
                             enabled: App.SettingsController.activeModelConfig.length > 0
+                            Layout.preferredWidth: Math.max(96, (parent.width - parent.spacing * 2) * 0.25)
+                            Layout.preferredHeight: 40
+                            contentItem: Text {
+                                text: deleteConfigButton.text
+                                color: deleteConfigButton.enabled ? "#26201b" : "#8f8982"
+                                font.pixelSize: 14
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                            }
+                            background: Rectangle {
+                                color: deleteConfigButton.enabled
+                                        ? (deleteConfigButton.down ? "#eee7da" : "#fffdf8")
+                                        : "#ebe7df"
+                                border.color: "#d8d1c8"
+                            }
                             onClicked: App.SettingsController.deleteConfig(App.SettingsController.activeModelConfig)
                         }
                     }
@@ -80,8 +147,20 @@ ApplicationWindow {
                     TextField {
                         id: configNameField
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 40
                         text: App.SettingsController.configName
-                        placeholderText: "deepseek"
+                        placeholderText: "GPT 4o Mini"
+                        color: "#111111"
+                        leftPadding: 12
+                        rightPadding: 12
+                        placeholderTextColor: "#7c858d"
+                        selectedTextColor: "#111111"
+                        selectionColor: "#b9d0f2"
+                        background: Rectangle {
+                            color: "#fffdf8"
+                            border.color: configNameField.activeFocus ? "#6f6258" : "#d8d1c8"
+                            border.width: configNameField.activeFocus ? 2 : 1
+                        }
                         onTextEdited: App.SettingsController.configName = text
                     }
 
@@ -89,8 +168,20 @@ ApplicationWindow {
                     TextField {
                         id: baseUrlField
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 40
                         text: App.SettingsController.baseUrl
                         placeholderText: "https://api.openai.com"
+                        color: "#111111"
+                        leftPadding: 12
+                        rightPadding: 12
+                        placeholderTextColor: "#7c858d"
+                        selectedTextColor: "#111111"
+                        selectionColor: "#b9d0f2"
+                        background: Rectangle {
+                            color: "#fffdf8"
+                            border.color: baseUrlField.activeFocus ? "#6f6258" : "#d8d1c8"
+                            border.width: baseUrlField.activeFocus ? 2 : 1
+                        }
                         onTextEdited: App.SettingsController.baseUrl = text
                     }
 
@@ -98,9 +189,21 @@ ApplicationWindow {
                     TextField {
                         id: apiKeyField
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 40
                         text: App.SettingsController.apiKey
                         echoMode: TextInput.Password
                         placeholderText: "sk-..."
+                        color: "#111111"
+                        leftPadding: 12
+                        rightPadding: 12
+                        placeholderTextColor: "#7c858d"
+                        selectedTextColor: "#111111"
+                        selectionColor: "#b9d0f2"
+                        background: Rectangle {
+                            color: "#fffdf8"
+                            border.color: apiKeyField.activeFocus ? "#6f6258" : "#d8d1c8"
+                            border.width: apiKeyField.activeFocus ? 2 : 1
+                        }
                         onTextEdited: App.SettingsController.apiKey = text
                     }
 
@@ -108,8 +211,20 @@ ApplicationWindow {
                     TextField {
                         id: modelField
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 40
                         text: App.SettingsController.model
                         placeholderText: "gpt-4o-mini"
+                        color: "#111111"
+                        leftPadding: 12
+                        rightPadding: 12
+                        placeholderTextColor: "#7c858d"
+                        selectedTextColor: "#111111"
+                        selectionColor: "#b9d0f2"
+                        background: Rectangle {
+                            color: "#fffdf8"
+                            border.color: modelField.activeFocus ? "#6f6258" : "#d8d1c8"
+                            border.width: modelField.activeFocus ? 2 : 1
+                        }
                         onTextEdited: App.SettingsController.model = text
                     }
 
@@ -117,9 +232,21 @@ ApplicationWindow {
                     TextField {
                         id: temperatureField
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 40
                         text: App.SettingsController.temperatureText
-                        placeholderText: "留空"
+                        placeholderText: "可留空；0-2，越高回复越发散，常用 0.7"
+                        color: "#111111"
+                        leftPadding: 12
+                        rightPadding: 12
+                        placeholderTextColor: "#7c858d"
+                        selectedTextColor: "#111111"
+                        selectionColor: "#b9d0f2"
                         inputMethodHints: Qt.ImhFormattedNumbersOnly
+                        background: Rectangle {
+                            color: "#fffdf8"
+                            border.color: temperatureField.activeFocus ? "#6f6258" : "#d8d1c8"
+                            border.width: temperatureField.activeFocus ? 2 : 1
+                        }
                         onTextEdited: App.SettingsController.temperatureText = text
                     }
 
@@ -127,9 +254,21 @@ ApplicationWindow {
                     TextField {
                         id: maxTokensField
                         Layout.fillWidth: true
+                        Layout.preferredHeight: 40
                         text: App.SettingsController.maxTokensText
-                        placeholderText: "留空"
+                        placeholderText: "可留空；回复长度上限，正整数，如 2048"
+                        color: "#111111"
+                        leftPadding: 12
+                        rightPadding: 12
+                        placeholderTextColor: "#7c858d"
+                        selectedTextColor: "#111111"
+                        selectionColor: "#b9d0f2"
                         inputMethodHints: Qt.ImhDigitsOnly
+                        background: Rectangle {
+                            color: "#fffdf8"
+                            border.color: maxTokensField.activeFocus ? "#6f6258" : "#d8d1c8"
+                            border.width: maxTokensField.activeFocus ? 2 : 1
+                        }
                         onTextEdited: App.SettingsController.maxTokensText = text
                     }
 
@@ -215,13 +354,42 @@ ApplicationWindow {
             Item { Layout.fillWidth: true }
 
             Button {
+                id: cancelButton
                 text: qsTr("取消")
+                Layout.preferredWidth: 92
+                Layout.preferredHeight: 40
+                contentItem: Text {
+                    text: cancelButton.text
+                    color: "#26201b"
+                    font.pixelSize: 14
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    color: cancelButton.down ? "#eee7da" : "#fffdf8"
+                    border.color: "#d8d1c8"
+                }
                 onClicked: App.SettingsController.revert()
             }
 
             Button {
+                id: saveButton
                 text: qsTr("保存")
                 highlighted: true
+                Layout.preferredWidth: 92
+                Layout.preferredHeight: 40
+                contentItem: Text {
+                    text: saveButton.text
+                    color: "#111111"
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    color: saveButton.down ? "#d7dbe0" : "#eceff2"
+                    border.color: "#c6ccd2"
+                }
                 onClicked: {
                     App.SettingsController.configName = configNameField.text
                     App.SettingsController.baseUrl = baseUrlField.text
