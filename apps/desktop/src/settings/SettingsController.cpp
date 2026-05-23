@@ -196,7 +196,7 @@ void SettingsController::openWindow()
     syncFromService();
     reloadPersona();
     setValidationError(QString());
-    setSaveError(QString());
+    setSaveError(m_service != nullptr ? m_service->lastError().trimmed() : QString());
     setWindowVisible(true);
 }
 
@@ -270,6 +270,10 @@ void SettingsController::save()
     }
 
     if (hasProviderInput) {
+        if (m_activeModelConfig.trimmed().isEmpty() && m_configNames.contains(cfg.name)) {
+            setValidationError(QStringLiteral("配置名称重复或无效。"));
+            return;
+        }
         const QString oldName = m_activeModelConfig.trimmed().isEmpty() ? cfg.name : m_activeModelConfig;
         if (!m_service->setModelConfig(oldName, cfg)) {
             setValidationError(QStringLiteral("配置名称重复或无效。"));
@@ -318,8 +322,15 @@ void SettingsController::selectConfig(const QString &name)
     if (m_service == nullptr) {
         return;
     }
-    m_service->setActiveModelConfig(name);
-    syncFromService();
+    const QString trimmed = name.trimmed();
+    if (!m_configNames.contains(trimmed)) {
+        return;
+    }
+    if (m_activeModelConfig != trimmed) {
+        m_activeModelConfig = trimmed;
+        emit activeModelConfigChanged();
+    }
+    syncFromConfig(m_service->modelConfig(trimmed));
     setValidationError(QString());
 }
 

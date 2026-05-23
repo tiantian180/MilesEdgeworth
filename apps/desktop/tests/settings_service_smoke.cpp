@@ -77,6 +77,12 @@ int main(int argc, char *argv[])
         file.setMsPerChar(60);
         assert(file.save());
 
+        QFile saved(path);
+        assert(saved.open(QIODevice::ReadOnly));
+        const auto savedDoc = QJsonDocument::fromJson(saved.readAll());
+        assert(savedDoc.object().value(QStringLiteral("msPerChar")).isUndefined());
+        assert(savedDoc.object().value(QStringLiteral("chat")).toObject().value(QStringLiteral("msPerChar")).toInt() == 60);
+
         ProviderConfigFile reopened(path);
         assert(reopened.load() == ProviderConfigFile::LoadStatus::Ok);
         assert(reopened.activeModelConfig() == QStringLiteral("deepseek"));
@@ -93,7 +99,9 @@ int main(int argc, char *argv[])
         assert(writeFile(path, QStringLiteral("{not-json")));
         ProviderConfigFile file(path);
         assert(file.load() == ProviderConfigFile::LoadStatus::ParseError);
+        assert(!QFile::exists(path));
         assert(QFile::exists(invalidDir.filePath(QStringLiteral("providers.json.bak"))));
+        assert(file.lastError().contains(QStringLiteral("已备份")));
     }
 
     {
@@ -102,7 +110,10 @@ int main(int argc, char *argv[])
 {
   "rootUnknown": "keep-root",
   "activeModelConfig": "deepseek",
-  "msPerChar": 90,
+  "chat": {
+    "msPerChar": 90,
+    "chatUnknown": "keep-chat"
+  },
   "modelConfigs": [
     {
       "name": "deepseek",
@@ -118,6 +129,7 @@ int main(int argc, char *argv[])
 
         ProviderConfigFile file(path);
         assert(file.load() == ProviderConfigFile::LoadStatus::Ok);
+        assert(file.msPerChar() == 90);
         auto cfg = file.config(QStringLiteral("deepseek"));
         assert(cfg.extraFields.value(QStringLiteral("providerUnknown")).toString() == QStringLiteral("keep-provider"));
         cfg.model = QStringLiteral("deepseek-reasoner");
@@ -129,6 +141,10 @@ int main(int argc, char *argv[])
         const auto doc = QJsonDocument::fromJson(saved.readAll());
         const auto root = doc.object();
         assert(root.value(QStringLiteral("rootUnknown")).toString() == QStringLiteral("keep-root"));
+        assert(root.value(QStringLiteral("msPerChar")).isUndefined());
+        const auto chat = root.value(QStringLiteral("chat")).toObject();
+        assert(chat.value(QStringLiteral("msPerChar")).toInt() == 90);
+        assert(chat.value(QStringLiteral("chatUnknown")).toString() == QStringLiteral("keep-chat"));
         const auto configs = root.value(QStringLiteral("modelConfigs")).toArray();
         assert(configs.size() == 1);
         const auto savedCfg = configs.at(0).toObject();
@@ -162,6 +178,43 @@ int main(int argc, char *argv[])
         ProviderConfigFile::ModelConfig duplicate = first;
         duplicate.name = first.name;
         assert(!file.setConfig(QStringLiteral("other"), duplicate));
+    }
+
+    {
+        const QString path = tmp.filePath(QStringLiteral("settings-controller-configs.json"));
+        SettingsService service(path);
+        auto first = modelConfig(QStringLiteral("first"),
+                                 QStringLiteral("https://first.example.com"),
+                                 QStringLiteral("sk-first"),
+                                 QStringLiteral("first-model"));
+        auto second = modelConfig(QStringLiteral("second"),
+                                  QStringLiteral("https://second.example.com"),
+                                  QStringLiteral("sk-second"),
+                                  QStringLiteral("second-model"));
+        assert(service.setModelConfig(first.name, first));
+        assert(service.setModelConfig(second.name, second));
+        service.setActiveModelConfig(first.name);
+        assert(service.save());
+
+        SettingsController controller(&service);
+        controller.openWindow();
+        controller.selectConfig(second.name);
+        controller.revert();
+        assert(service.activeModelConfig() == first.name);
+
+        controller.openWindow();
+        controller.addConfig();
+        controller.setConfigName(second.name);
+        controller.setBaseUrl(QStringLiteral("https://new.example.com"));
+        controller.setApiKey(QStringLiteral("sk-new"));
+        controller.setModel(QStringLiteral("new-model"));
+        controller.save();
+        assert(!controller.validationError().isEmpty());
+
+        SettingsService reopened(path);
+        assert(reopened.modelConfig(second.name).baseUrl == QStringLiteral("https://second.example.com"));
+        assert(reopened.modelConfig(second.name).apiKey == QStringLiteral("sk-second"));
+        assert(reopened.modelConfig(second.name).model == QStringLiteral("second-model"));
     }
 
     {

@@ -51,4 +51,5 @@ private:
     QList<ModelConfig> m_configs;
     int m_msPerChar = 80;
     QJsonObject m_rootExtraFields;
+    QJsonObject m_chatExtraFields;
 };

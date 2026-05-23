@@ -137,6 +137,7 @@ ProviderConfigFile::LoadStatus ProviderConfigFile::load()
 {
     m_lastError.clear();
     m_rootExtraFields = {};
+    m_chatExtraFields = {};
     m_configs.clear();
     m_activeModelConfig.clear();
     m_msPerChar = kDefaultMsPerChar;
@@ -153,24 +154,36 @@ ProviderConfigFile::LoadStatus ProviderConfigFile::load()
     QJsonParseError parseError;
     const auto doc = QJsonDocument::fromJson(file.readAll(), &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
-        m_lastError = parseError.errorString();
         const QString backupPath = backupPathFor(m_path);
         QFile::remove(backupPath);
-        QFile::copy(m_path, backupPath);
+        bool backedUp = QFile::rename(m_path, backupPath);
+        if (!backedUp && QFile::copy(m_path, backupPath)) {
+            backedUp = QFile::remove(m_path);
+        }
+        m_lastError = backedUp
+            ? QStringLiteral("配置文件损坏，已备份为 %1，请检查或重新配置。").arg(QFileInfo(backupPath).fileName())
+            : QStringLiteral("配置文件损坏，且备份失败：%1").arg(parseError.errorString());
         return LoadStatus::ParseError;
     }
 
     static const QSet<QString> knownRootFields {
         QStringLiteral("schemaVersion"),
         QStringLiteral("activeModelConfig"),
+        QStringLiteral("chat"),
         QStringLiteral("msPerChar"),
         QStringLiteral("modelConfigs"),
+    };
+    static const QSet<QString> knownChatFields {
+        QStringLiteral("msPerChar"),
     };
 
     const auto root = doc.object();
     m_rootExtraFields = withoutKnownFields(root, knownRootFields);
     m_activeModelConfig = root.value(QStringLiteral("activeModelConfig")).toString().trimmed();
-    m_msPerChar = clampMsPerChar(root.value(QStringLiteral("msPerChar")).toInt(kDefaultMsPerChar));
+    const auto chat = root.value(QStringLiteral("chat")).toObject();
+    m_chatExtraFields = withoutKnownFields(chat, knownChatFields);
+    m_msPerChar = clampMsPerChar(chat.value(QStringLiteral("msPerChar"))
+                                     .toInt(root.value(QStringLiteral("msPerChar")).toInt(kDefaultMsPerChar)));
 
     const auto configs = root.value(QStringLiteral("modelConfigs")).toArray();
     for (const auto &value : configs) {
@@ -204,9 +217,12 @@ bool ProviderConfigFile::save()
     }
 
     QJsonObject root = m_rootExtraFields;
+    QJsonObject chat = m_chatExtraFields;
+    chat.insert(QStringLiteral("msPerChar"), m_msPerChar);
+
     root.insert(QStringLiteral("schemaVersion"), 1);
     root.insert(QStringLiteral("activeModelConfig"), m_activeModelConfig);
-    root.insert(QStringLiteral("msPerChar"), m_msPerChar);
+    root.insert(QStringLiteral("chat"), chat);
     root.insert(QStringLiteral("modelConfigs"), configs);
 
     QSaveFile file(m_path);
