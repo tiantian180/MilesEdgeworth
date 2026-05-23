@@ -120,6 +120,10 @@ def main() -> int:
     require("MILES_PROVIDER_MODEL" in chat_cpp, "ChatController must inject MILES_PROVIDER_MODEL")
     require("MILES_PROVIDER_TEMPERATURE" in chat_cpp, "ChatController must inject MILES_PROVIDER_TEMPERATURE")
     require("MILES_PROVIDER_MAX_TOKENS" in chat_cpp, "ChatController must inject MILES_PROVIDER_MAX_TOKENS")
+    require(
+        '"-parent-pid"' in chat_cpp and "applicationPid" in chat_cpp,
+        "ChatController must pass parent pid to sidecar for orphan cleanup",
+    )
     require("restartSidecar" in chat_h and "restartSidecar" in chat_cpp, "ChatController must expose restartSidecar()")
     require("scheduleSidecarStart" in chat_h and "scheduleSidecarStart" in chat_cpp,
             "ChatController restart must schedule sidecar starts")

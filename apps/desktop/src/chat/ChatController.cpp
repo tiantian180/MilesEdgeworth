@@ -222,7 +222,17 @@ void ChatController::launchSidecarProcess()
     if (m_sidecarRestartPending) {
         ++m_sidecarRestartAttempts;
     }
-    m_sidecarProcess.start(executablePath, {QStringLiteral("-addr"), QStringLiteral("127.0.0.1:39710")});
+    // sidecar 需要知道父进程 PID；即使开发期主 app 被调试器强杀，
+    // sidecar 也能自行退出，避免残留进程长期占用 39710 端口。
+    m_sidecarProcess.start(
+        executablePath,
+        {
+            QStringLiteral("-addr"),
+            QStringLiteral("127.0.0.1:39710"),
+            QStringLiteral("-parent-pid"),
+            QString::number(QCoreApplication::applicationPid()),
+        }
+    );
 }
 
 void ChatController::scheduleSidecarStart(int delayMs)
