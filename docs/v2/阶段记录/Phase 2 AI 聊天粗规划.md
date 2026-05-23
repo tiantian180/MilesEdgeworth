@@ -74,11 +74,11 @@ flowchart LR
 
     User --> Chat
     Chat --> Controller
-    Controller -- POST /v1/chat/messages --> Sidecar
+    Controller -->|"POST /v1/chat/messages"| Sidecar
     Sidecar --> Provider
-    Sidecar -- SSE stream（同一 HTTP 连接） --> Controller
+    Sidecar -->|"SSE stream（同一 HTTP 连接）"| Controller
     Controller --> Chat
-    Controller -- requestExpression --> PetBridge
+    Controller -->|"requestExpression"| PetBridge
     PetBridge --> PetRuntime["PetRuntime"]
     PetRuntime --> Pet
 ```
