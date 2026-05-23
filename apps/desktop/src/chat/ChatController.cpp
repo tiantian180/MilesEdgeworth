@@ -1300,6 +1300,11 @@ void ChatController::abortPendingConversationCreate()
 
 void ChatController::isolateConversationAsyncState()
 {
+    const bool shouldResetPetAnimation = m_sending
+        || !m_currentReply.isNull()
+        || !m_pendingConversationCreateReply.isNull()
+        || m_phase != ChatPhase::IDLE;
+
     m_cancelled = true;
     ++m_asyncGeneration;
     ++m_chatRequestId;
@@ -1318,7 +1323,9 @@ void ChatController::isolateConversationAsyncState()
     if (m_pacer != nullptr) {
         m_pacer->discardBeforeStream(m_currentStreamId);
     }
-    if (m_runtime != nullptr) {
+    // 只有切走正在进行的聊天回复时才收回到 idle。
+    // 启动恢复历史会话只是 UI 同步，不能打断 startup.briefcase 入场。
+    if (shouldResetPetAnimation && m_runtime != nullptr) {
         m_runtime->returnToIdle();
     }
 

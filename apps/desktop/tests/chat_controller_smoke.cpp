@@ -69,6 +69,20 @@ int main(int argc, char *argv[])
     require(controller.conversationSkinHint().isEmpty(),
             "conversation skin hint should be empty by default");
 
+    // 启动后恢复历史会话只是 UI 状态同步，不应该打断桌宠入场 recipe。
+    {
+        PetRuntime startupRuntime;
+        require(startupRuntime.currentActionId() == QStringLiteral("briefcase_in"),
+                "startup conversation restore test should begin during briefcase_in");
+        ChatController startupController(&startupRuntime, &settings);
+
+        startupController.switchConversation(QStringLiteral("restored-conversation"));
+        require(startupRuntime.currentActionId() == QStringLiteral("briefcase_in"),
+                "switchConversation without an active chat stream must not interrupt startup animation");
+        require(startupRuntime.currentRecipeId() == QStringLiteral("startup.briefcase"),
+                "switchConversation without an active chat stream must keep the startup recipe active");
+    }
+
     {
         SettingsService providerSettings(&secretStore);
         providerSettings.setBaseUrl(QStringLiteral("https://api.example.test/v1"));
