@@ -128,6 +128,10 @@ def main() -> int:
     require("kSidecarRestartRetryDelayMs" in chat_cpp,
             "ChatController restart must delay retry starts after a fast sidecar exit")
     require(
+        "terminateForeignSidecar" in chat_cpp and "service" in chat_cpp and "SIGTERM" in chat_cpp,
+        "ChatController must recover when an orphan miles-agent already occupies the sidecar port",
+    )
+    require(
         "handleSettingsSaved" in chat_h and "handleSettingsSaved" in chat_cpp,
         "ChatController must respond to saved settings",
     )

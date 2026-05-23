@@ -19,6 +19,11 @@
 #include <QUrl>
 #include <QUrlQuery>
 
+#ifdef Q_OS_UNIX
+#include <cerrno>
+#include <csignal>
+#endif
+
 namespace {
 Q_LOGGING_CATEGORY(chatLog, "miles.chat", QtInfoMsg)
 
@@ -43,6 +48,23 @@ InterruptHint interruptHintFromValue(const QVariantMap &value)
 QString logBool(bool value)
 {
     return value ? QStringLiteral("true") : QStringLiteral("false");
+}
+
+bool terminateForeignSidecar(qint64 pid, const QString &service)
+{
+    if (service != QStringLiteral("miles-agent") || pid <= 0 || pid == QCoreApplication::applicationPid()) {
+        return false;
+    }
+
+#ifdef Q_OS_UNIX
+    if (::kill(static_cast<pid_t>(pid), SIGTERM) == 0) {
+        return true;
+    }
+    return errno == ESRCH;
+#else
+    Q_UNUSED(pid)
+    return false;
+#endif
 }
 
 } // namespace
@@ -134,6 +156,7 @@ void ChatController::startSidecar()
 {
     m_sidecarRestartPending = false;
     m_sidecarRestartAttempts = 0;
+    m_foreignSidecarCleanupAttempted = false;
     launchSidecarProcess();
 }
 
@@ -218,6 +241,7 @@ void ChatController::restartSidecar()
     setStatusText(QStringLiteral("重启中"));
     m_sidecarRestartPending = true;
     m_sidecarRestartAttempts = 0;
+    m_foreignSidecarCleanupAttempted = false;
 
     if (m_sidecarProcess.state() != QProcess::NotRunning) {
         m_sidecarStoppingForRestart = true;
@@ -249,6 +273,7 @@ void ChatController::checkHealth()
         const QJsonObject health = QJsonDocument::fromJson(body).object();
         const qint64 ownedPid = m_sidecarProcess.processId();
         const int healthPid = health.value(QStringLiteral("pid")).toInt();
+        const QString service = health.value(QStringLiteral("service")).toString();
         const bool healthy = reply->error() == QNetworkReply::NoError
             && ownedPid > 0
             && healthPid == ownedPid;
@@ -256,11 +281,30 @@ void ChatController::checkHealth()
                                     << QStringLiteral("healthy=%1").arg(logBool(healthy))
                                     << QStringLiteral("pid=%1").arg(healthPid)
                                     << QStringLiteral("ownedPid=%1").arg(ownedPid)
+                                    << QStringLiteral("service=%1").arg(service)
                                     << QStringLiteral("provider=%1").arg(health.value(QStringLiteral("provider")).toString())
                                     << QStringLiteral("error=%1").arg(reply->errorString());
+        if (!healthy
+                && reply->error() == QNetworkReply::NoError
+                && service == QStringLiteral("miles-agent")
+                && healthPid > 0
+                && healthPid != ownedPid
+                && !m_foreignSidecarCleanupAttempted) {
+            m_foreignSidecarCleanupAttempted = true;
+            if (terminateForeignSidecar(healthPid, service)) {
+                qCDebug(chatLog).noquote() << "terminated foreign sidecar"
+                                            << QStringLiteral("pid=%1").arg(healthPid);
+                reply->deleteLater();
+                setSidecarReady(false);
+                setStatusText(QStringLiteral("重启中"));
+                scheduleSidecarStart(kSidecarRestartRetryDelayMs);
+                return;
+            }
+        }
         reply->deleteLater();
         setSidecarReady(healthy);
         if (healthy) {
+            m_foreignSidecarCleanupAttempted = false;
             m_sidecarRestartPending = false;
             m_sidecarRestartAttempts = 0;
             loadConversations();
