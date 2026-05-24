@@ -320,8 +320,6 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
     const QString preservedLoopMode = m_currentLoopMode;
     const bool preservedAutoReturnToIdle = m_currentAutoReturnToIdle;
     const QUrl preservedAnimationUrl = m_currentAnimationUrl;
-    const int preservedFrameStart = m_currentFrameStart;
-    const int preservedFrameEnd = m_currentFrameEnd;
     const bool preservedPlaybackAtBoundary = m_currentPlaybackAtBoundary;
     const int preservedPlaybackSerial = m_playbackSerial;
     const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
@@ -364,8 +362,6 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
         m_currentLoopMode = QStringLiteral("loop");
         m_currentAutoReturnToIdle = false;
         m_currentAnimationUrl.clear();
-        m_currentFrameStart = -1;
-        m_currentFrameEnd = -1;
         m_currentPlaybackAtBoundary = false;
         ++m_playbackSerial;
 
@@ -455,15 +451,11 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
         const bool currentAutoReturnToIdle = (currentLoopMode == QStringLiteral("onceThenIdle"));
         const bool loopModeChangedDuringPreserve = (preservedLoopMode != currentLoopMode);
         const bool autoReturnChangedDuringPreserve = (preservedAutoReturnToIdle != currentAutoReturnToIdle);
-        const bool playbackMetadataChanged = (preservedAnimationUrl != currentVariant.url)
-            || (preservedFrameStart != currentVariant.frameStart)
-            || (preservedFrameEnd != currentVariant.frameEnd);
+        const bool playbackMetadataChanged = (preservedAnimationUrl != currentVariant.url);
 
         m_currentLoopMode = currentLoopMode;
         m_currentAutoReturnToIdle = currentAutoReturnToIdle;
         m_currentAnimationUrl = currentVariant.url;
-        m_currentFrameStart = currentVariant.frameStart;
-        m_currentFrameEnd = currentVariant.frameEnd;
         m_currentPlaybackAtBoundary = (playbackMetadataChanged
                 || loopModeChangedDuringPreserve
                 || autoReturnChangedDuringPreserve)

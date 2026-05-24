@@ -898,8 +898,6 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
 
     const AnimationVariant nextVariant = variantForFacing(phase.variants, m_currentFacing);
     const QUrl nextAnimationUrl = nextVariant.url;
-    const int nextFrameStart = nextVariant.frameStart;
-    const int nextFrameEnd = nextVariant.frameEnd;
     const QString nextLoopMode = phase.loopMode.isEmpty() ? "loop" : phase.loopMode;
     const QString nextPhaseId = phaseId.isEmpty() ? "single" : phaseId;
     const bool nextAutoReturnToIdle = (nextLoopMode == "onceThenIdle");
@@ -908,17 +906,13 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     const bool phaseChanged = (m_currentPhaseId != nextPhaseId);
     const bool loopModeChanged = (m_currentLoopMode != nextLoopMode);
     const bool autoReturnChanged = (m_currentAutoReturnToIdle != nextAutoReturnToIdle);
-    const bool animationChanged = (m_currentAnimationUrl != nextAnimationUrl)
-        || (m_currentFrameStart != nextFrameStart)
-        || (m_currentFrameEnd != nextFrameEnd);
+    const bool animationChanged = (m_currentAnimationUrl != nextAnimationUrl);
 
     m_currentActionId = actionId;
     m_currentPhaseId = nextPhaseId;
     m_currentLoopMode = nextLoopMode;
     m_currentAutoReturnToIdle = nextAutoReturnToIdle;
     m_currentAnimationUrl = nextAnimationUrl;
-    m_currentFrameStart = nextFrameStart;
-    m_currentFrameEnd = nextFrameEnd;
     stopAutoIdleTimer();
     m_currentPlaybackAtBoundary = false;
     ++m_playbackSerial;

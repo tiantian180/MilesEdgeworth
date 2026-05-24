@@ -21,14 +21,6 @@
 struct AnimationVariant
 {
     QUrl url;
-
-    // Kept until Task 4 removes runtime frame-range playback.
-    int frameStart = -1;
-    int frameEnd = -1;
-    bool hasFrameRange() const
-    {
-        return frameStart >= 0 && frameEnd >= frameStart;
-    }
 };
 
 struct ClipDefinition

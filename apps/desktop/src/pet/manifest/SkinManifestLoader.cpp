@@ -246,17 +246,6 @@ AnimationVariant parseAnimationVariant(
             return variant;
         }
 
-        if (object.contains(QStringLiteral("frameRange"))) {
-            const auto localFrames = frameRangeFromJson(object.value(QStringLiteral("frameRange")).toArray());
-            if (localFrames.first < 0) {
-                if (ok) {
-                    *ok = false;
-                }
-                return {};
-            }
-            variant.frameStart = localFrames.first;
-            variant.frameEnd = localFrames.second;
-        }
     }
 
     return variant;
@@ -963,7 +952,7 @@ SkinManifest SkinManifestLoader::fallbackManifest()
 
     ActionDefinition fallbackAction;
     fallbackAction.loopMode = "loop";
-    fallbackAction.variants.insert("right", AnimationVariant {QUrl(QString::fromUtf8(kFallbackAnimationUrl)), -1, -1});
+    fallbackAction.variants.insert("right", AnimationVariant {QUrl(QString::fromUtf8(kFallbackAnimationUrl))});
     manifest.actions.insert(kFallbackActionId, fallbackAction);
 
     RecipeDefinition idleRecipe;

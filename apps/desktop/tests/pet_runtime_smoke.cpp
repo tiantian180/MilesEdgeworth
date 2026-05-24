@@ -786,15 +786,11 @@ int main(int argc, char *argv[])
     runtime.submitExpressionRequest("speaking", "neutral", 0.0);
     require(runtime.currentActionId() == "talking", "speaking + neutral 应映射到 talking 分段说话动作，而不是站立待机");
     require(runtime.currentPhaseId() == "enter"
-                && runtime.currentAnimationUrl().toString() == "qrc:/skins/miles-edgeworth/generated/clips/talking.enter.right.gif"
-                && runtime.currentFrameStart() == -1
-                && runtime.currentFrameEnd() == -1,
+                && runtime.currentAnimationUrl().toString() == "qrc:/skins/miles-edgeworth/generated/clips/talking.enter.right.gif",
             "talking enter 应使用预切片 generated clip，而不是运行时 frameRange");
     runtime.handleAnimationFinished();
     require(runtime.currentPhaseId() == "loop"
-                && runtime.currentAnimationUrl().toString() == "qrc:/skins/miles-edgeworth/generated/clips/talking.loop.right.gif"
-                && runtime.currentFrameStart() == -1
-                && runtime.currentFrameEnd() == -1,
+                && runtime.currentAnimationUrl().toString() == "qrc:/skins/miles-edgeworth/generated/clips/talking.loop.right.gif",
             "talking enter 播完后应进入预切片 talking loop clip");
     runtime.submitExpressionRequest("idle", "polite", 0.0);
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
@@ -815,26 +811,18 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "objecting",
             "onceThenHold should stay on the entry-only action after clean finish");
 
-    SkinManifest &frameRangeManifest = const_cast<SkinManifest &>(runtime.manifest());
-    ActionDefinition rangedObjecting = frameRangeManifest.actions.value(QStringLiteral("objecting"));
-    AnimationVariant rangedObjectingRight = rangedObjecting.variants.value(QStringLiteral("right"));
-    rangedObjectingRight.frameStart = 2;
-    rangedObjectingRight.frameEnd = 4;
-    rangedObjecting.variants.insert(QStringLiteral("right"), rangedObjectingRight);
-    frameRangeManifest.actions.insert(QStringLiteral("objecting"), rangedObjecting);
     runtime.setFacing("right");
     runtime.playAction("objecting");
-    require(runtime.currentFrameStart() == 2 && runtime.currentFrameEnd() == 4,
-            "test setup should use a temporary objecting frame range");
-    const int rangedObjectingSerial = runtime.playbackSerial();
+    const QUrl objectingUrl = runtime.currentAnimationUrl();
+    const int objectingSerial = runtime.playbackSerial();
     require(runtime.reloadActiveSkinPreservingPlayback(),
             "preserve reload should keep current objecting action while refreshing manifest metadata");
     require(runtime.currentActionId() == "objecting",
             "preserve reload should keep the current action when it still exists");
-    require(runtime.currentFrameStart() == -1 && runtime.currentFrameEnd() == -1,
-            "preserve reload should recompute frame range from the reloaded manifest");
-    require(runtime.playbackSerial() != rangedObjectingSerial,
-            "preserve reload should restart playback when animation frame range changes");
+    require(runtime.currentAnimationUrl() == objectingUrl,
+            "preserve reload should keep the current full objecting GIF URL");
+    require(runtime.playbackSerial() == objectingSerial,
+            "preserve reload should not restart playback when the full GIF URL is unchanged");
 
     runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
     require(runtime.currentActionId() == "talking", "未知 expression 应降级到 speaking neutral 的 talking 动作");

@@ -498,10 +498,6 @@ int main(int argc, char **argv)
         "built-in Miles thinking enter should resolve to generated clip qrc URL"
     );
     require(
-        thinkingEnterRight.frameStart == -1 && thinkingEnterRight.frameEnd == -1,
-        "built-in Miles generated clip variants should not carry legacy runtime frame ranges"
-    );
-    require(
         builtInMiles.personaPrompt.contains(QStringLiteral("Miles Edgeworth"))
             || builtInMiles.personaPrompt.contains(QStringLiteral("御剑怜侍")),
         "built-in Miles persona should load from qrc"

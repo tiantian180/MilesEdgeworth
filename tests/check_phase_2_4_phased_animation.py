@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -36,6 +37,7 @@ def main() -> int:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     pacer_h = read("apps/desktop/src/chat/ChatTextPacer.h")
@@ -99,14 +101,19 @@ def main() -> int:
         "cancelCleanFinishNotification",
         "kCleanFinishSafetyMs = 2000",
         "kAutoIdleAfterCleanFinishMs = 3000",
-        "currentFrameStart",
-        "currentFrameEnd",
     ]:
         require(token in runtime_h + runtime_cpp, f"runtime missing {token}")
 
-    require("onceThenHold" in surface_cpp and "loadManualFrameRange" in surface_cpp
-            and "m_manualFrameTimer" in surface_h,
-            "native surface must handle onceThenHold and play frameRange phases without relying on QMovie seeking")
+    for token in ["currentFrameStart", "currentFrameEnd"]:
+        require(token not in runtime_h, f"runtime must not expose {token}")
+    for token in ["hasFrameRange", "frameStart", "frameEnd"]:
+        require(not re.search(rf"\b{token}\b", manifest_h),
+                f"manifest runtime AnimationVariant must not keep {token}")
+    for token in ["loadManualFrameRange", "m_manualFrameTimer", "QImageReader", "m_manualFrames"]:
+        require(token not in surface_h + surface_cpp,
+                f"native surface must not keep runtime frameRange playback token {token}")
+    require("onceThenHold" in surface_cpp,
+            "native surface must still handle onceThenHold full-GIF playback")
     require("GenerateMilesClips" in desktop_cmake and "split_manifest_clips.py" in desktop_cmake,
             "desktop build must generate built-in Miles pre-cut clips")
 
