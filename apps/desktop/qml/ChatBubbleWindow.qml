@@ -16,6 +16,7 @@ ApplicationWindow {
     property string assistantText: ""
     property bool assistantPending: false
     property bool bubbleDismissed: false
+    property bool suppressNextAssistantBubble: false
     property int assistantMessageIndex: -1
     property int dismissedAssistantMessageIndex: -1
     property int suppressedAssistantMessageIndex: -1
@@ -63,6 +64,7 @@ ApplicationWindow {
             suppressedAssistantMessageIndex = -1
             trackedAssistantMessageIndex = -1
             bubbleDismissed = false
+            suppressNextAssistantBubble = false
             hideTimer.stop()
             visible = false
             return
@@ -77,6 +79,14 @@ ApplicationWindow {
             suppressedAssistantMessageIndex = -1
             trackedAssistantMessageIndex = -1
             bubbleDismissed = false
+
+            if (suppressNextAssistantBubble && nextPending === true) {
+                suppressedAssistantMessageIndex = nextAssistantMessageIndex
+                bubbleDismissed = true
+                suppressNextAssistantBubble = false
+            } else if (suppressNextAssistantBubble) {
+                suppressNextAssistantBubble = false
+            }
         }
 
         if (nextPending === true) {
@@ -135,6 +145,9 @@ ApplicationWindow {
             dismissedAssistantMessageIndex = index
             suppressedAssistantMessageIndex = index
             bubbleDismissed = true
+            suppressNextAssistantBubble = false
+        } else if (App.ChatController.sending === true) {
+            suppressNextAssistantBubble = true
         }
 
         trackedAssistantMessageIndex = -1
