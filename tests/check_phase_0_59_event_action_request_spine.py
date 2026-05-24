@@ -76,7 +76,7 @@ def main() -> int:
     for token in [
         "struct ActionRequest",
         "enum class ActionRequestKind",
-        "ActionPool",
+        "AnimationPool",
         "Recipe",
         "Action",
         "ReturnToIdle",
@@ -147,7 +147,7 @@ def main() -> int:
     for token in [
         "RuntimeSnapshot PetRuntime::snapshot() const",
         "void PetRuntime::submitActionRequest(const ActionRequest &request)",
-        "ActionRequestKind::ActionPool",
+        "ActionRequestKind::AnimationPool",
         "ActionRequestKind::Recipe",
         "ActionRequestKind::ReturnToIdle",
     ]:

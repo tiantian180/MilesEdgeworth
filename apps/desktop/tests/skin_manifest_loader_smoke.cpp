@@ -202,6 +202,38 @@ int main(int argc, char **argv)
 
     require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
 {
+  "schemaVersion": 3,
+  "defaultFacing": "right",
+  "states": { "idle": { "action": "idle_stand" } },
+  "actions": {
+    "idle_stand": {
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/idle/stand.gif"
+        }
+      }
+    }
+  },
+  "actionPools": {
+    "legacy.pool": {
+      "entries": [
+        { "command": "returnToIdle" }
+      ]
+    }
+  }
+}
+)JSON")), "legacy actionPools manifest should be written");
+    const SkinManifest legacyPoolsManifest = SkinManifestLoader::loadFromDirectory(dir.path());
+    require(legacyPoolsManifest.animationPools.contains(QStringLiteral("legacy.pool")),
+            "loader should keep legacy actionPools fallback");
+    require(
+        legacyPoolsManifest.animationPools.value(QStringLiteral("legacy.pool")).entries.first().request.kind
+            == ActionRequestKind::ReturnToIdle,
+        "legacy actionPools entries should parse command requests"
+    );
+
+    require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
   "schemaVersion": 4,
   "clips": {
     "../bad": {

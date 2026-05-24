@@ -28,14 +28,14 @@ def main() -> int:
 
     loader_header = ROOT / "apps/desktop/src/pet/manifest/SkinManifestLoader.h"
     loader_cpp = ROOT / "apps/desktop/src/pet/manifest/SkinManifestLoader.cpp"
-    pool_selector_header = ROOT / "apps/desktop/src/pet/selection/ActionPoolSelector.h"
-    pool_selector_cpp = ROOT / "apps/desktop/src/pet/selection/ActionPoolSelector.cpp"
+    pool_selector_header = ROOT / "apps/desktop/src/pet/selection/AnimationPoolSelector.h"
+    pool_selector_cpp = ROOT / "apps/desktop/src/pet/selection/AnimationPoolSelector.cpp"
     trigger_engine_header = ROOT / "apps/desktop/src/pet/behavior/BehaviorTriggerEngine.h"
     trigger_engine_cpp = ROOT / "apps/desktop/src/pet/behavior/BehaviorTriggerEngine.cpp"
     require(loader_header.is_file(), "应新增 SkinManifestLoader.h")
     require(loader_cpp.is_file(), "应新增 SkinManifestLoader.cpp")
-    require(pool_selector_header.is_file(), "应新增 ActionPoolSelector.h")
-    require(pool_selector_cpp.is_file(), "应新增 ActionPoolSelector.cpp")
+    require(pool_selector_header.is_file(), "应新增 AnimationPoolSelector.h")
+    require(pool_selector_cpp.is_file(), "应新增 AnimationPoolSelector.cpp")
     require(trigger_engine_header.is_file(), "应新增 BehaviorTriggerEngine.h")
     require(trigger_engine_cpp.is_file(), "应新增 BehaviorTriggerEngine.cpp")
 
@@ -46,9 +46,9 @@ def main() -> int:
 
     pool_selector_text = pool_selector_header.read_text(encoding="utf-8") + pool_selector_cpp.read_text(encoding="utf-8")
     trigger_engine_text = trigger_engine_header.read_text(encoding="utf-8") + trigger_engine_cpp.read_text(encoding="utf-8")
-    require("class ActionPoolSelector" in pool_selector_text, "ActionPoolSelector 应作为独立候选池选择器存在")
-    require("resolvePoolId" in pool_selector_text, "ActionPoolSelector 应处理语言覆盖池选择")
-    require("selectEntry" in pool_selector_text, "ActionPoolSelector 应处理候选池权重抽取")
+    require("class AnimationPoolSelector" in pool_selector_text, "AnimationPoolSelector 应作为独立候选池选择器存在")
+    require("resolvePoolId" in pool_selector_text, "AnimationPoolSelector 应处理语言覆盖池选择")
+    require("selectEntry" in pool_selector_text, "AnimationPoolSelector 应处理候选池权重抽取")
     require("class BehaviorTriggerEngine" in trigger_engine_text, "BehaviorTriggerEngine 应作为独立触发规则执行器存在")
     require("BehaviorTriggerContext" in trigger_engine_text, "BehaviorTriggerEngine 应使用显式上下文匹配当前运行状态")
     require("matches" in trigger_engine_text, "BehaviorTriggerEngine 应处理触发条件匹配")
@@ -72,15 +72,15 @@ def main() -> int:
     runtime_sources = runtime_cpp + runtime_skin_cpp
     require("SkinManifestLoader::loadFromResource" in runtime_sources or "SkinManifestLoader::loadFromDescriptor" in runtime_sources, "PetRuntime 应调用 SkinManifestLoader 加载 manifest")
     require("SkinManifestLoader::fallbackManifest" in runtime_sources, "PetRuntime 应调用 SkinManifestLoader fallback")
-    require("ActionPoolSelector::resolvePoolId" in runtime_cpp, "PetRuntime 应委托 ActionPoolSelector 解析候选池")
-    require("ActionPoolSelector::selectEntry" in runtime_cpp, "PetRuntime 应委托 ActionPoolSelector 权重抽取")
+    require("AnimationPoolSelector::resolvePoolId" in runtime_cpp, "PetRuntime 应委托 AnimationPoolSelector 解析候选池")
+    require("AnimationPoolSelector::selectEntry" in runtime_cpp, "PetRuntime 应委托 AnimationPoolSelector 权重抽取")
     require("BehaviorTriggerEngine::matches" in pipeline_cpp, "InteractionPipeline 应委托 BehaviorTriggerEngine 匹配触发条件")
     require("BehaviorTriggerEngine::selectEntry" in pipeline_cpp, "InteractionPipeline 应委托 BehaviorTriggerEngine 权重抽取")
     require("src/pet/manifest/SkinManifestLoader.cpp" in desktop_cmake, "桌面 CMake 应编译 SkinManifestLoader.cpp")
     require("src/pet/manifest/SkinManifestLoader.h" in desktop_cmake, "桌面 CMake 应列出 SkinManifestLoader.h")
     require("src/pet/PetRuntimeSkin.cpp" in desktop_cmake, "桌面 CMake 应编译 PetRuntimeSkin.cpp")
-    require("src/pet/selection/ActionPoolSelector.cpp" in desktop_cmake, "桌面 CMake 应编译 ActionPoolSelector.cpp")
-    require("src/pet/selection/ActionPoolSelector.h" in desktop_cmake, "桌面 CMake 应列出 ActionPoolSelector.h")
+    require("src/pet/selection/AnimationPoolSelector.cpp" in desktop_cmake, "桌面 CMake 应编译 AnimationPoolSelector.cpp")
+    require("src/pet/selection/AnimationPoolSelector.h" in desktop_cmake, "桌面 CMake 应列出 AnimationPoolSelector.h")
     require("src/pet/behavior/BehaviorTriggerEngine.cpp" in desktop_cmake, "桌面 CMake 应编译 BehaviorTriggerEngine.cpp")
     require("src/pet/behavior/BehaviorTriggerEngine.h" in desktop_cmake, "桌面 CMake 应列出 BehaviorTriggerEngine.h")
     require("check_phase_0_56_pet_runtime_service_split" in root_cmake, "CTest 未注册 Phase 0.56 检查")
