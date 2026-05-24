@@ -6,9 +6,7 @@
 
 - `总体架构设计.md`：模块边界和通信协议总览。
 - `桌宠运行时与动画调度设计.md`：PetRuntime 调度模型、PetState、ExpressionMapping 解析。
-- `皮肤包播放行为设计.md`：phased 动画、Recipe、ActionPool、expressionMappings 层级模型。
-
-> **当前代码状态（Phase 2.3 完成后）**：sidecar 已支持真实 OpenAI-compatible provider、`[EXPR:tag]` 解析、persona prompt、SQLite 会话历史和 Langfuse 可观测性。ChatController 已实现 5 状态门控状态机、ChatTextPacer 字符速率限制器和 PetRuntime 通知 API。但现有代码有两个接口（`requestBoundaryAndNotify` / `requestCleanFinishAndNotify`）行为一致，需合并为统一的 `requestCleanFinishAndNotify`；phased 动画（enter / loop / exit）尚未落地；expression 切换使用单个 pending expression 而非分段队列。
+- `皮肤包播放行为设计.md`：phased 动画、Recipe、AnimationPool、expressionMappings 层级模型。
 
 ## 1. 设计目标
 

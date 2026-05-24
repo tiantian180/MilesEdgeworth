@@ -15,9 +15,7 @@ Phase 0.66 将 HitZone 从 `PetRuntime` 中抽出，由 manifest 声明、`HitZo
 - `HitZoneMatcher` 将窗口点击坐标映射到逻辑坐标：`logicalX = x * hitZoneSize / windowWidth`
 - 支持 `variants`（per-facing rect/polygon）
 
-> **当前代码状态（Phase 1 收官后）**：运行时代码仍使用 `canvas.hitZoneSize` + `hitZones[*].variants`，并按 `clickBehaviors.singleClick` 的顺序命中第一个 zone。Miles manifest 已保留 `fallback` zone，并使用修正后的 240×240 分区值。本文后半部分的 `windowWidth/imageWidth/perFacing` 是下一版 HitZone 坐标系设计，尚未落地。
-
-当前命中链路：
+命中链路：
 
 ```mermaid
 sequenceDiagram
@@ -413,7 +411,7 @@ flowchart TD
 
 ## 7. 可视化编辑器设计（Pet Skin Studio: HitZone Panel）
 
-HitZone 编辑器作为 **Pet Skin Studio** 的第一个 panel 落地。Studio 是一个统一的开发者工具应用，长期会容纳 HitZone、Action / Recipe、ActionPool、BehaviorRule、Asset 浏览、Manifest 校验等所有皮肤创作工作。
+HitZone 编辑器作为 **Pet Skin Studio** 的第一个 panel 落地。Studio 是一个统一的开发者工具应用，长期会容纳 HitZone、Action / Recipe、AnimationPool、BehaviorRule、Asset 浏览、Manifest 校验等所有皮肤创作工作。
 
 本节只描述 HitZone Panel 的设计；Studio 整体框架（main window、皮肤选择、panel 切换、状态栏等）由独立设计文档 `Pet Skin Studio 工具设计.md` 描述（待补）。
 
