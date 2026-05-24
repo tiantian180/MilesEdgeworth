@@ -110,6 +110,7 @@ Phase 1 框架主干和收尾体验修复已经完成，当前主线进入 Phase
 - Custom Interaction Host API 已接入，Miles 旧版双击概率“看招”丢检察官徽章已作为皮肤侧高级交互回归。
 - 语音语言已改为可选 Audio Capability，Miles 皮肤通过 manifest 声明日语、英语、中文，右键菜单按声明动态生成语音子菜单。
 - ExpressionMapping schema 已接入，后续 AI / Agent 可以请求当前皮肤声明的 expression，由运行时映射到具体动作。
+- Phase 2.4 聊天动画编排已接入：thinking enter/loop/exit、onceThenHold 定帧动作、segment queue 双条件门控、lifecycle SSE 事件和 runtime-controlled recipe step。
 
 Phase 2 期间可以并行处理的框架债务（统一跟踪见 [技术债务与评审待办](docs/v2/参考资料/技术债务与评审待办.md#readme-同步的框架债务)）：
 
@@ -134,5 +135,6 @@ Phase 2 期间可以并行处理的框架债务（统一跟踪见 [技术债务�
 - [Phase 0.65-0.73 工作报告](docs/v2/阶段记录/Phase%200.65-0.73%20工作报告.md)
 - [Phase 1 收尾与体验问题修复计划](docs/v2/阶段记录/Phase%201%20收尾与体验问题修复计划.md)
 - [Phase 2 AI 聊天粗规划](docs/v2/阶段记录/Phase%202%20AI%20聊天粗规划.md)
+- [Phase 2.4 Phased 动画与动画链](docs/v2/阶段记录/Phase%202.4%20Phased%20动画与动画链.md)
 
 图片素材和音频素材来自游戏《逆转裁判》和《逆转检事》。本项目仅用于个人学习和技术验证。

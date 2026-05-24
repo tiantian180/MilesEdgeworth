@@ -2222,7 +2222,7 @@ git commit -m "feat: 聊天动画按表达分段门控"
 - Modify: `docs/v2/参考资料/技术债务与评审待办.md`
 - Modify: `README.md`
 
-- [ ] **Step 1: Add Phase 2.4 contract check**
+- [x] **Step 1: Add Phase 2.4 contract check**
 
 Create `tests/check_phase_2_4_phased_animation.py`:
 
@@ -2281,6 +2281,8 @@ def main() -> int:
         "reloadActiveSkinPreservingPlayback",
         "setSuppressAutoIdle",
         "m_cleanFinishCallback",
+        "requestCleanFinishAndNotify",
+        "cancelCleanFinishNotification",
         "kCleanFinishSafetyMs = 2000",
         "kAutoIdleAfterCleanFinishMs = 3000",
         "currentFrameStart",
@@ -2333,7 +2335,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 2: Register contract check in CMake**
+- [x] **Step 2: Register contract check in CMake**
 
 In root `CMakeLists.txt`, after `check_phase_2_3_3_langfuse`, add:
 
@@ -2347,7 +2349,7 @@ In root `CMakeLists.txt`, after `check_phase_2_3_3_langfuse`, add:
         )
 ```
 
-- [ ] **Step 3: Clean up P2.4 debt entries**
+- [x] **Step 3: Clean up P2.4 debt entries**
 
 In `docs/v2/参考资料/技术债务与评审待办.md`, replace the whole section `## AI 聊天动画编排评审待办` through the last `[P2.4]` item with:
 
@@ -2369,7 +2371,7 @@ In `## 设置与皮肤热重载待办`, replace the `[P2.3.2 收尾 / P2.4 前�
 状态：Phase 2.4 已通过 `reloadActiveSkinPreservingPlayback()` 收口。设置保存只刷新 persona/manifest 和 sidecar 配置，不重新触发 `startup.briefcase`。主动切换皮肤和完整重载仍保留启动入场。
 ```
 
-- [ ] **Step 4: Update README Phase 2 status**
+- [x] **Step 4: Update README Phase 2 status**
 
 In `README.md`, add this bullet under the completed mainline capabilities list after the ExpressionMapping bullet:
 
@@ -2383,7 +2385,7 @@ Add this link under `## 文档` after `Phase 2 AI 聊天粗规划`:
 - [Phase 2.4 Phased 动画与动画链](docs/v2/阶段记录/Phase%202.4%20Phased%20动画与动画链.md)
 ```
 
-- [ ] **Step 5: Run contract check to verify pass**
+- [x] **Step 5: Run contract check to verify pass**
 
 Run:
 
