@@ -9,16 +9,18 @@ ChatTextPacer::ChatTextPacer(QObject *parent)
     connect(&m_timer, &QTimer::timeout, this, &ChatTextPacer::tick);
 }
 
-void ChatTextPacer::append(const QString &text, quint64 streamId)
+void ChatTextPacer::append(const QString &text, quint64 streamId, int segmentId)
 {
     if (text.isEmpty()) {
         return;
     }
 
-    if (!m_queue.isEmpty() && m_queue.last().streamId == streamId) {
+    if (!m_queue.isEmpty()
+            && m_queue.last().streamId == streamId
+            && m_queue.last().segmentId == segmentId) {
         m_queue.last().text.append(text);
     } else {
-        m_queue.append(QueuedChunk{text, streamId});
+        m_queue.append(QueuedChunk{text, streamId, segmentId});
     }
     if (!m_timer.isActive()) {
         m_timer.start(effectiveInterval());
@@ -42,12 +44,27 @@ void ChatTextPacer::setMsPerChar(int value)
 
 void ChatTextPacer::discardBeforeStream(quint64 streamId)
 {
+    const bool hadQueuedText = !isEmpty();
     for (qsizetype i = m_queue.size() - 1; i >= 0; --i) {
         if (m_queue.at(i).streamId < streamId) {
             m_queue.removeAt(i);
         }
     }
     stopIfEmpty();
+    if (hadQueuedText && isEmpty()) {
+        emit pacerEmpty();
+    }
+}
+
+int ChatTextPacer::pendingCountForSegment(int segmentId) const
+{
+    int total = 0;
+    for (const QueuedChunk &chunk : m_queue) {
+        if (chunk.segmentId == segmentId) {
+            total += chunk.text.size();
+        }
+    }
+    return total;
 }
 
 int ChatTextPacer::effectiveInterval() const
@@ -78,14 +95,20 @@ void ChatTextPacer::tick()
 
     const QString chunk = front.text.left(popCount);
     const quint64 streamId = front.streamId;
+    const int segmentId = front.segmentId;
     front.text.remove(0, popCount);
     if (front.text.isEmpty()) {
         m_queue.removeFirst();
     }
+    const bool segmentNowDrained = segmentId >= 0 && pendingCountForSegment(segmentId) == 0;
     emit chunkReady(chunk, streamId);
+    if (segmentNowDrained) {
+        emit segmentDrained(segmentId);
+    }
 
     if (isEmpty()) {
         m_timer.stop();
+        emit pacerEmpty();
         return;
     }
 

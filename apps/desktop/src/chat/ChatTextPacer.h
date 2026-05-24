@@ -13,21 +13,25 @@ class ChatTextPacer : public QObject
 public:
     explicit ChatTextPacer(QObject *parent = nullptr);
 
-    void append(const QString &text, quint64 streamId = 0);
+    void append(const QString &text, quint64 streamId = 0, int segmentId = -1);
     void discardBeforeStream(quint64 streamId);
 
     int msPerChar() const { return m_msPerChar; }
     void setMsPerChar(int value);
 
     int pendingCount() const { return static_cast<int>(queuedCharCount()); }
+    int pendingCountForSegment(int segmentId) const;
 
 signals:
     void chunkReady(const QString &chunk, quint64 streamId);
+    void segmentDrained(int segmentId);
+    void pacerEmpty();
 
 private:
     struct QueuedChunk {
         QString text;
         quint64 streamId = 0;
+        int segmentId = -1;
     };
 
     void tick();
