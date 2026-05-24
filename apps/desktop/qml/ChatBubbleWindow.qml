@@ -64,14 +64,12 @@ ApplicationWindow {
             suppressedAssistantMessageIndex = -1
             trackedAssistantMessageIndex = -1
             bubbleDismissed = false
-            suppressNextAssistantBubble = false
+            suppressNextAssistantBubble = App.ChatController.sending === true && suppressNextAssistantBubble
             hideTimer.stop()
             visible = false
             return
         }
 
-        const previousAssistantText = assistantText
-        const previousAssistantPending = assistantPending
         const assistantMessageChanged = nextAssistantMessageIndex !== assistantMessageIndex
         if (assistantMessageChanged) {
             assistantMessageIndex = nextAssistantMessageIndex
@@ -93,12 +91,6 @@ ApplicationWindow {
             trackedAssistantMessageIndex = nextAssistantMessageIndex
         }
 
-        const assistantStreamFinished = !assistantMessageChanged
-                                      && trackedAssistantMessageIndex === nextAssistantMessageIndex
-                                      && previousAssistantPending === true
-                                      && nextPending !== true
-                                      && nextText.indexOf(previousAssistantText) === 0
-
         assistantText = nextText
         assistantPending = nextPending
 
@@ -108,11 +100,7 @@ ApplicationWindow {
             return
         }
 
-        const assistantCanShowCompleted = trackedAssistantMessageIndex === nextAssistantMessageIndex
-                                        && (assistantStreamFinished
-                                            || (visible && nextText === previousAssistantText))
-
-        if (assistantPending !== true && !assistantCanShowCompleted) {
+        if (assistantPending !== true && trackedAssistantMessageIndex !== nextAssistantMessageIndex) {
             trackedAssistantMessageIndex = -1
             hideTimer.stop()
             visible = false
@@ -282,6 +270,7 @@ ApplicationWindow {
             TextArea {
                 id: bubbleText
 
+                width: bubbleScroll.availableWidth
                 text: bubbleWindow.assistantText
                 readOnly: true
                 selectByMouse: true
