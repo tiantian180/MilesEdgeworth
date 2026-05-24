@@ -264,9 +264,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	}
 	if !send(ctx, events, chat.StreamEvent{
 		Type:  "CUSTOM",
-		Name:  "miles.pet.expression.requested",
+		Name:  "miles.pet.lifecycle",
 		RunID: runID,
-		Value: map[string]any{"state": "thinking", "expression": "neutral"},
+		Value: map[string]any{"state": "thinking"},
 	}) {
 		return
 	}
@@ -361,16 +361,6 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		Type:      "TEXT_MESSAGE_END",
 		RunID:     runID,
 		MessageID: messageID,
-	})
-	send(ctx, events, chat.StreamEvent{
-		Type:  "CUSTOM",
-		Name:  "miles.pet.expression.requested",
-		RunID: runID,
-		Value: map[string]any{
-			"state":         "idle",
-			"expression":    "neutral",
-			"interruptHint": "afterCurrent",
-		},
 	})
 	send(ctx, events, chat.StreamEvent{Type: "RUN_FINISHED", RunID: runID})
 }

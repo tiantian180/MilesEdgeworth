@@ -94,9 +94,9 @@ func TestStreamChatHappyPath(t *testing.T) {
 
 	mustFind(func(e chat.StreamEvent) bool { return e.Type == "RUN_STARTED" }, "RUN_STARTED")
 	mustFind(func(e chat.StreamEvent) bool {
-		return e.Type == "CUSTOM" && e.Name == "miles.pet.expression.requested" &&
+		return e.Type == "CUSTOM" && e.Name == "miles.pet.lifecycle" &&
 			e.Value["state"] == "thinking"
-	}, "thinking expression")
+	}, "thinking lifecycle")
 	mustFind(func(e chat.StreamEvent) bool { return e.Type == "TEXT_MESSAGE_START" }, "TEXT_MESSAGE_START")
 	mustFind(func(e chat.StreamEvent) bool {
 		return e.Type == "CUSTOM" && e.Value["state"] == "speaking" && e.Value["expression"] == "objection"
@@ -110,10 +110,11 @@ func TestStreamChatHappyPath(t *testing.T) {
 	mustFind(func(e chat.StreamEvent) bool {
 		return e.Type == "TEXT_MESSAGE_CONTENT" && e.Delta == "再见。"
 	}, "polite text")
-	mustFind(func(e chat.StreamEvent) bool {
-		return e.Type == "CUSTOM" && e.Value["state"] == "idle" &&
-			e.Value["interruptHint"] == "afterCurrent"
-	}, "idle afterCurrent expression")
+	for _, e := range got {
+		if e.Type == "CUSTOM" && e.Name == "miles.pet.expression.requested" && e.Value["state"] == "idle" {
+			t.Fatalf("stream end must not emit idle expression event: %+v", got)
+		}
+	}
 	mustFind(func(e chat.StreamEvent) bool { return e.Type == "RUN_FINISHED" }, "RUN_FINISHED")
 }
 

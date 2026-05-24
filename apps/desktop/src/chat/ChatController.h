@@ -144,6 +144,8 @@ private:
     ChatPhase m_phase = ChatPhase::IDLE;
     QString m_pendingState;
     QString m_pendingExpression;
+    QString m_pendingThinkingState;
+    QString m_pendingThinkingExpression;
     ChatTextPacer *m_pacer = nullptr;
     QTimer m_gateTimeout;
     static constexpr int kGateTimeoutMs = 800;

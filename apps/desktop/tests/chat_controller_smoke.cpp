@@ -144,11 +144,12 @@ int main(int argc, char *argv[])
 
     ChatStreamEvent thinkingEvent;
     thinkingEvent.type = QStringLiteral("CUSTOM");
-    thinkingEvent.name = QStringLiteral("miles.pet.expression.requested");
+    thinkingEvent.name = QStringLiteral("miles.pet.lifecycle");
     thinkingEvent.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
-    thinkingEvent.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
     controller.applyStreamEvent(thinkingEvent);
-    runtime.handleAnimationFinished();
+    for (int i = 0; i < 5 && runtime.currentState() != QStringLiteral("thinking"); ++i) {
+        runtime.handleAnimationFinished();
+    }
     require(runtime.currentState() == QStringLiteral("thinking"), "custom thinking event should update runtime state");
     require(runtime.currentActionId() == QStringLiteral("thinking"), "thinking neutral should play thinking action");
 
@@ -452,7 +453,13 @@ int main(int argc, char *argv[])
         require(fastRuntime.currentActionId() != QStringLiteral("objecting"),
                 "fast response should still wait for clean finish before applying start expression");
 
-        fastRuntime.handleAnimationFinished();
+        for (int i = 0;
+             i < 5
+             && fastRuntime.currentActionId() != QStringLiteral("objecting")
+             && fastRuntime.currentActionId() != QStringLiteral("crossed");
+             ++i) {
+            fastRuntime.handleAnimationFinished();
+        }
         require(fastRuntime.currentActionId() == QStringLiteral("objecting")
                     || fastRuntime.currentActionId() == QStringLiteral("crossed"),
                 "RUN_FINISHED during BUFFERING_FOR_START must preserve and apply the pending objection expression");
@@ -677,7 +684,9 @@ int main(int argc, char *argv[])
         require(gfRuntime.currentState() == QStringLiteral("thinking"),
                 "RUN_FINISHED during GATED should activate the final gated expression first");
 
-        gfRuntime.handleAnimationFinished();
+        for (int i = 0; i < 5 && gfRuntime.currentState() != QStringLiteral("idle"); ++i) {
+            gfRuntime.handleAnimationFinished();
+        }
         require(gfRuntime.currentState() == QStringLiteral("idle"),
                 "RUN_FINISHED during GATED should idle only after final expression cleanFinish");
     }

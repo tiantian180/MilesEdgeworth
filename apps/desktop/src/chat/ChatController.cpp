@@ -31,6 +31,7 @@ constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kConversationsUrl = "http://127.0.0.1:39710/v1/conversations";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
 constexpr auto kExpressionRequestedEvent = "miles.pet.expression.requested";
+constexpr auto kLifecycleEvent = "miles.pet.lifecycle";
 constexpr auto kMemorySummarizingEvent = "miles.chat.memory.summarizing";
 constexpr int kSidecarRestartDelayMs = 150;
 constexpr int kSidecarRestartRetryDelayMs = 300;
@@ -735,6 +736,8 @@ void ChatController::cancelCurrentReply()
     clearDeferredCleanFinishRequest();
     m_pendingExpression.clear();
     m_pendingState.clear();
+    m_pendingThinkingExpression.clear();
+    m_pendingThinkingState.clear();
     m_finishPendingAfterStart = false;
     m_finishPendingAfterGate = false;
     m_activeRunId.clear();
@@ -805,6 +808,8 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         m_holdBuffer.clear();
         m_pendingExpression.clear();
         m_pendingState.clear();
+        m_pendingThinkingExpression.clear();
+        m_pendingThinkingState.clear();
         m_finishPendingAfterStart = false;
         m_finishPendingAfterGate = false;
         transitionTo(ChatPhase::BUFFERING_FOR_START);
@@ -881,6 +886,8 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
 
         m_pendingExpression.clear();
         m_pendingState.clear();
+        m_pendingThinkingExpression.clear();
+        m_pendingThinkingState.clear();
         m_finishPendingAfterStart = false;
         m_finishPendingAfterGate = false;
         setSending(false);
@@ -905,6 +912,26 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
 
     if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kMemorySummarizingEvent)) {
         setStatusText(QStringLiteral("整理记忆中..."));
+        return;
+    }
+
+    if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kLifecycleEvent)) {
+        const QString state = event.value.value(QStringLiteral("state")).toString();
+        qCDebug(chatLog).noquote() << "chat lifecycle event"
+                                    << QStringLiteral("phase=%1").arg(static_cast<int>(m_phase))
+                                    << QStringLiteral("state=%1").arg(state);
+
+        if (state == QStringLiteral("thinking")) {
+            if (m_phase == ChatPhase::BUFFERING_FOR_START) {
+                m_pendingThinkingState = QStringLiteral("thinking");
+                m_pendingThinkingExpression = QStringLiteral("neutral");
+                return;
+            }
+            if (m_phase == ChatPhase::STREAMING) {
+                requestPetExpression(QStringLiteral("thinking"), QStringLiteral("neutral"));
+                return;
+            }
+        }
         return;
     }
 
@@ -972,7 +999,11 @@ void ChatController::handleCleanFinishReady()
         requestPetExpression(m_pendingState, m_pendingExpression);
         m_pendingExpression.clear();
         m_pendingState.clear();
+    } else if (!m_pendingThinkingExpression.isEmpty()) {
+        requestPetExpression(m_pendingThinkingState, m_pendingThinkingExpression);
     }
+    m_pendingThinkingExpression.clear();
+    m_pendingThinkingState.clear();
     transitionTo(ChatPhase::STREAMING);
     drainHoldBufferToPacer();
 
@@ -1119,6 +1150,8 @@ void ChatController::handleBoundaryReached()
             m_pendingExpression.clear();
             m_pendingState.clear();
         }
+        m_pendingThinkingExpression.clear();
+        m_pendingThinkingState.clear();
         if (m_finishPendingAfterGate) {
             m_finishPendingAfterGate = false;
             transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
@@ -1153,6 +1186,8 @@ void ChatController::handleGateTimeout()
         m_pendingExpression.clear();
         m_pendingState.clear();
     }
+    m_pendingThinkingExpression.clear();
+    m_pendingThinkingState.clear();
     if (m_finishPendingAfterGate) {
         m_finishPendingAfterGate = false;
         transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
@@ -1414,6 +1449,8 @@ void ChatController::failCurrentReply(const QString &message)
     clearDeferredCleanFinishRequest();
     m_pendingExpression.clear();
     m_pendingState.clear();
+    m_pendingThinkingExpression.clear();
+    m_pendingThinkingState.clear();
     m_finishPendingAfterStart = false;
     m_finishPendingAfterGate = false;
     if (hasBufferedText
@@ -1479,6 +1516,8 @@ void ChatController::isolateConversationAsyncState()
     clearDeferredCleanFinishRequest();
     m_pendingExpression.clear();
     m_pendingState.clear();
+    m_pendingThinkingExpression.clear();
+    m_pendingThinkingState.clear();
     m_finishPendingAfterStart = false;
     m_finishPendingAfterGate = false;
     m_holdBuffer.clear();

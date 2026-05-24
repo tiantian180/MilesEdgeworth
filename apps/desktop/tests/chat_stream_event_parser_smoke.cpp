@@ -44,6 +44,15 @@ int main()
     require(events[0].value.value("state").toString() == "speaking", "custom state should parse");
     require(events[0].value.value("expression").toString() == "objection", "custom expression should parse");
 
+    events = parser.ingest(
+        "event: message\n"
+        "data: {\"type\":\"CUSTOM\",\"name\":\"miles.pet.lifecycle\","
+        "\"value\":{\"state\":\"thinking\"}}\n\n"
+    );
+    require(events.size() == 1, "lifecycle custom event should parse");
+    require(events[0].name == "miles.pet.lifecycle", "lifecycle name should parse");
+    require(events[0].value.value("state").toString() == "thinking", "lifecycle state should parse");
+
     events = parser.ingest("data: {not-json}\n\n");
     require(events.isEmpty(), "malformed JSON should be ignored");
 
