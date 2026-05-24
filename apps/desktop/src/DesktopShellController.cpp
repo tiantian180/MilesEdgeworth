@@ -50,13 +50,47 @@ int DesktopShellController::screenCount() const
     return QGuiApplication::screens().size();
 }
 
+int DesktopShellController::petWindowX() const
+{
+    return m_petWindow != nullptr ? m_petWindow->x() : 0;
+}
+
+int DesktopShellController::petWindowY() const
+{
+    return m_petWindow != nullptr ? m_petWindow->y() : 0;
+}
+
+int DesktopShellController::petWindowWidth() const
+{
+    return m_petWindow != nullptr ? m_petWindow->width() : 0;
+}
+
+int DesktopShellController::petWindowHeight() const
+{
+    return m_petWindow != nullptr ? m_petWindow->height() : 0;
+}
+
 void DesktopShellController::setPetWindow(QWindow *window)
 {
     if (m_petWindow == window) {
         return;
     }
 
+    if (m_petWindow != nullptr) {
+        disconnect(m_petWindow, nullptr, this, nullptr);
+    }
+
     m_petWindow = window;
+
+    if (m_petWindow != nullptr) {
+        auto notifyGeometryChanged = [this]() {
+            emit petWindowGeometryChanged();
+        };
+        connect(m_petWindow, &QWindow::xChanged, this, notifyGeometryChanged);
+        connect(m_petWindow, &QWindow::yChanged, this, notifyGeometryChanged);
+        connect(m_petWindow, &QWindow::widthChanged, this, notifyGeometryChanged);
+        connect(m_petWindow, &QWindow::heightChanged, this, notifyGeometryChanged);
+    }
 
 #ifdef Q_OS_MACOS
     // 基础行为只负责“像桌宠窗口”：不因失焦隐藏、透明、禁用普通窗口动画。
@@ -65,6 +99,7 @@ void DesktopShellController::setPetWindow(QWindow *window)
 #endif
 
     applyCurrentLayerMode();
+    emit petWindowGeometryChanged();
 }
 
 void DesktopShellController::setAlwaysOnTop(bool alwaysOnTop)
@@ -144,6 +179,7 @@ void DesktopShellController::placePetWindowForStartup(double petScale)
     // 这里直接设置窗口位置，刻意绕过普通移动用的 clampedPetWindowPosition()。
     const QPointF startupPosition = legacyStartupPosition(petScale);
     m_petWindow->setPosition(startupPosition.toPoint());
+    emit petWindowGeometryChanged();
 }
 
 void DesktopShellController::movePetWindowBy(double dx, double dy)
@@ -164,6 +200,7 @@ void DesktopShellController::movePetWindowTo(double x, double y)
 
     const QPointF clampedPosition = clampedPetWindowPosition(QPointF(x, y));
     m_petWindow->setPosition(clampedPosition.toPoint());
+    emit petWindowGeometryChanged();
 }
 
 void DesktopShellController::setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize)

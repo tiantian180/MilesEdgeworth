@@ -22,6 +22,10 @@ class DesktopShellController : public QObject
     Q_PROPERTY(bool alwaysOnTop READ alwaysOnTop WRITE setAlwaysOnTop NOTIFY alwaysOnTopChanged)
     Q_PROPERTY(QString screenLayoutMode READ screenLayoutMode WRITE setScreenLayoutMode NOTIFY screenLayoutModeChanged)
     Q_PROPERTY(int screenCount READ screenCount NOTIFY screenCountChanged)
+    Q_PROPERTY(int petWindowX READ petWindowX NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petWindowY READ petWindowY NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petWindowWidth READ petWindowWidth NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petWindowHeight READ petWindowHeight NOTIFY petWindowGeometryChanged)
 
 public:
     explicit DesktopShellController(QObject *parent = nullptr);
@@ -30,6 +34,10 @@ public:
     bool alwaysOnTop() const;
     QString screenLayoutMode() const;
     int screenCount() const;
+    int petWindowX() const;
+    int petWindowY() const;
+    int petWindowWidth() const;
+    int petWindowHeight() const;
     void setPetWindow(QWindow *window);
 
 public slots:
@@ -49,6 +57,7 @@ signals:
     void alwaysOnTopChanged();
     void screenLayoutModeChanged();
     void screenCountChanged();
+    void petWindowGeometryChanged();
 
 private:
     void createTrayIcon();
