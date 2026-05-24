@@ -61,6 +61,17 @@ def path_label(path: list[str]) -> str:
     return ".".join(path)
 
 
+def diff_message(label: str, expected: set[str], actual: set[str]) -> str:
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    parts = [label]
+    if missing:
+        parts.append("missing=" + ",".join(missing))
+    if extra:
+        parts.append("extra=" + ",".join(extra))
+    return "; ".join(parts)
+
+
 def walk_json(value: Any, path: list[str]):
     if isinstance(value, dict):
         for key, item in value.items():
@@ -91,12 +102,40 @@ def assert_manifest_contract(manifest_text: str, manifest: dict[str, Any]) -> No
     clips = manifest.get("clips")
     require(isinstance(animation_pools, dict), "manifest must contain top-level animationPools")
     require(isinstance(clips, dict), "manifest must contain top-level clips")
-    require(set(clips.keys()) == set(EXPECTED_CLIPS.keys()), "manifest must contain exactly the 12 required clips")
+    expected_clip_ids = set(EXPECTED_CLIPS.keys())
+    actual_clip_ids = set(clips.keys())
+    require(
+        expected_clip_ids <= actual_clip_ids,
+        diff_message("manifest missing required thinking/talking clips", expected_clip_ids, actual_clip_ids),
+    )
 
     for clip_id, frame_range in EXPECTED_CLIPS.items():
         clip = clips.get(clip_id)
         require(isinstance(clip, dict), f"{clip_id} must be an object")
+        require(
+            isinstance(clip.get("source"), str) and clip["source"].startswith("file:"),
+            f"{clip_id} source must use file:",
+        )
         require(clip.get("frameRange") == frame_range, f"{clip_id} frameRange must be {frame_range}")
+
+    for clip_id, clip in clips.items():
+        require(isinstance(clip, dict), f"{clip_id} must be an object")
+        require(
+            isinstance(clip.get("source"), str) and clip["source"].startswith("file:"),
+            f"{clip_id} source must use file:",
+        )
+        require(isinstance(clip.get("frameRange"), list), f"{clip_id} must declare frameRange")
+
+    variant_paths_missing_clip = []
+    for path, item in walk_json(manifest.get("actions", {}), ["actions"]):
+        if path[-1] == "variants" and isinstance(item, dict):
+            for facing, variant in item.items():
+                if isinstance(variant, dict) and "clip" not in variant:
+                    variant_paths_missing_clip.append(path_label(path + [str(facing)]))
+    require(
+        not variant_paths_missing_clip,
+        "action variants must use clip key: " + ", ".join(variant_paths_missing_clip),
+    )
 
     legacy_dispatch_paths = []
     for section_name in DISPATCH_SECTIONS:
@@ -196,7 +235,10 @@ def assert_generated_clips(clips: dict[str, Any]) -> None:
 
     aliases = {file_node.attrib.get("alias", "") for file_node in resource.findall("file")}
     expected_aliases = {f"{clip_id}.gif" for clip_id in clips}
-    require(aliases == expected_aliases, "clips.qrc aliases must exactly match manifest clips")
+    require(
+        aliases == expected_aliases,
+        diff_message("clips.qrc aliases must exactly match manifest clips", expected_aliases, aliases),
+    )
 
 
 def main() -> int:
