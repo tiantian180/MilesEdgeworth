@@ -77,7 +77,7 @@ def main() -> int:
         entries = action_pools[pool_id].get("entries", [])
         require(entries, f"{pool_id} 至少需要一个候选动作")
         if pool_id == "click.fallback":
-            require(entries == [{"type": "returnToIdle", "weight": 1}], "click.fallback 应只请求 returnToIdle")
+            require(entries == [{"command": "returnToIdle", "weight": 1}], "click.fallback 应只请求 returnToIdle")
         else:
             require(all("recipe" in entry for entry in entries), f"{pool_id} 候选应引用 recipe")
 

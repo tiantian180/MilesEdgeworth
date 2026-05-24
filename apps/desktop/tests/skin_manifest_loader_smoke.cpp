@@ -136,6 +136,41 @@ int main(int argc, char **argv)
   "animationPools": {
     "click.fallback": {
       "entries": [
+        { "command": "returnToIdle" },
+        { "weight": 2 }
+      ]
+    },
+    "menu.tea": {
+      "entries": [
+        { "recipe": "thinking.holdUntilCancelled" }
+      ]
+    },
+    "idle.random": {
+      "entries": [
+        { "action": "idle_stand" }
+      ]
+    }
+  },
+  "skinCommands": {
+    "miles.feedTea": {
+      "label": "喂食红茶",
+      "request": { "pool": "menu.tea" }
+    }
+  },
+  "behaviorTriggers": {
+    "runtime.started": {
+      "entries": [
+        { "recipe": "thinking.holdUntilCancelled" }
+      ]
+    },
+    "idle.loopFinished": {
+      "entries": [
+        { "pool": "idle.random", "weight": 70 },
+        { "weight": 30 }
+      ]
+    },
+    "test.returnToIdle": {
+      "entries": [
         { "command": "returnToIdle" }
       ]
     }
@@ -177,6 +212,38 @@ int main(int argc, char **argv)
         manifest.animationPools.value(QStringLiteral("click.fallback")).entries.first().request.kind
             == ActionRequestKind::ReturnToIdle,
         "animationPools entries should parse command requests"
+    );
+    require(
+        manifest.animationPools.value(QStringLiteral("click.fallback")).entries.size() == 2
+            && manifest.animationPools.value(QStringLiteral("click.fallback")).entries.at(1).request.kind
+                == ActionRequestKind::None
+            && manifest.animationPools.value(QStringLiteral("click.fallback")).entries.at(1).weight == 2,
+        "animationPools should preserve v4 skip entries as weighted no-op entries"
+    );
+    require(
+        manifest.skinCommands.value(QStringLiteral("miles.feedTea")).request.kind
+            == ActionRequestKind::AnimationPool,
+        "skinCommands request should parse v4 pool key dispatch"
+    );
+    require(
+        manifest.behaviorTriggers.value(QStringLiteral("runtime.started")).entries.first().request.kind
+            == ActionRequestKind::Recipe,
+        "behaviorTriggers should parse v4 recipe key dispatch"
+    );
+    require(
+        manifest.behaviorTriggers.value(QStringLiteral("idle.loopFinished")).entries.first().request.kind
+            == ActionRequestKind::AnimationPool,
+        "behaviorTriggers should parse v4 pool key dispatch"
+    );
+    require(
+        manifest.behaviorTriggers.value(QStringLiteral("idle.loopFinished")).entries.at(1).request.kind
+            == ActionRequestKind::None,
+        "behaviorTriggers should preserve v4 skip entries as no-op entries"
+    );
+    require(
+        manifest.behaviorTriggers.value(QStringLiteral("test.returnToIdle")).entries.first().request.kind
+            == ActionRequestKind::ReturnToIdle,
+        "behaviorTriggers should parse v4 command returnToIdle dispatch"
     );
     require(
         manifest.recipes.value(QStringLiteral("pool.recipeStep")).steps.first().request.kind

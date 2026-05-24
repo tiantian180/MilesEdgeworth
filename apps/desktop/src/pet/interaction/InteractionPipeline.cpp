@@ -123,13 +123,7 @@ void appendBehaviorTriggerRequests(
     }
 
     const BehaviorTriggerEntry entry = BehaviorTriggerEngine::selectEntry(trigger, context, event.randomValue);
-    if (entry.type == "pool" && !entry.poolId.isEmpty()) {
-        appendIfPlayable(requests, ActionRequest::animationPool(entry.poolId));
-    } else if (entry.type == "recipe" && !entry.recipeId.isEmpty()) {
-        appendIfPlayable(requests, ActionRequest::recipe(entry.recipeId));
-    } else if (entry.type == "action" && !entry.actionId.isEmpty()) {
-        appendIfPlayable(requests, ActionRequest::action(entry.actionId));
-    }
+    appendIfPlayable(requests, entry.request);
 }
 } // namespace
 

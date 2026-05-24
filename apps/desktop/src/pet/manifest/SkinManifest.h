@@ -153,9 +153,11 @@ struct BehaviorRuleCondition
 };
 
 // BehaviorTriggerEntry 是 BehaviorTriggerDefinition 里的单个候选。
-// type 指明这条候选指向 pool / recipe / action，by weight 随机抽取。
+// request 是 v4 键名派发后的统一请求；空 request 表示 weighted no-op。
 struct BehaviorTriggerEntry
 {
+    ActionRequest request;
+    // legacy 字段仅保留给旧 schema 兼容和历史静态检查；运行时不再依赖 type 派发。
     QString type;
     BehaviorRuleCondition when;
     QString poolId;

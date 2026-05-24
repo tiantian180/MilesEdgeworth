@@ -346,7 +346,6 @@
         "notAction": "sleep"
       },
       "request": {
-        "type": "pool",
         "pool": "menu.tea"
       }
     }
@@ -1221,7 +1220,6 @@
       "label": "运行时启动后的入场动作",
       "entries": [
         {
-          "type": "recipe",
           "recipe": "startup.briefcase",
           "weight": 1
         }
@@ -1236,12 +1234,10 @@
       },
       "entries": [
         {
-          "type": "pool",
           "pool": "idle.random",
           "weight": 70
         },
         {
-          "type": "none",
           "weight": 30
         }
       ]
@@ -1253,7 +1249,6 @@
           "when": {
             "action": "walk"
           },
-          "type": "pool",
           "pool": "walk.finished",
           "weight": 1
         },
@@ -1261,7 +1256,6 @@
           "when": {
             "action": "run"
           },
-          "type": "pool",
           "pool": "run.finished",
           "weight": 1
         }
@@ -1599,7 +1593,7 @@
       "label": "无特定区域",
       "entries": [
         {
-          "type": "returnToIdle",
+          "command": "returnToIdle",
           "weight": 1
         }
       ]

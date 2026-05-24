@@ -767,7 +767,9 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
 
             if (entry.request.kind != ActionRequestKind::None
                     || !entry.recipeId.isEmpty()
-                    || !entry.actionId.isEmpty()) {
+                    || !entry.actionId.isEmpty()
+                    || entryObject.contains(QStringLiteral("weight"))
+                    || entryObject.value(QStringLiteral("type")).toString() == QStringLiteral("none")) {
                 pool.entries.append(entry);
             }
         }
@@ -794,6 +796,7 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
             const QJsonObject entryObject = entryValue.toObject();
 
             BehaviorTriggerEntry entry;
+            entry.request = requestFromJsonObject(entryObject);
             entry.type = entryObject.value("type").toString();
             entry.when = behaviorRuleConditionFromJsonObject(entryObject.value("when").toObject());
             entry.poolId = entryObject.value("pool").toString();
@@ -804,7 +807,9 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
                 entry.weight = 1;
             }
 
-            if (!entry.type.isEmpty()) {
+            if (entry.request.kind != ActionRequestKind::None
+                    || !entry.type.isEmpty()
+                    || entryObject.contains(QStringLiteral("weight"))) {
                 trigger.entries.append(entry);
             }
         }

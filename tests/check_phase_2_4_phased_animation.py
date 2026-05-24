@@ -22,6 +22,16 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def walk_dispatch_objects(value):
+    if isinstance(value, dict):
+        yield value
+        for item in value.values():
+            yield from walk_dispatch_objects(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from walk_dispatch_objects(item)
+
+
 def main() -> int:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
@@ -42,6 +52,13 @@ def main() -> int:
     actions = manifest.get("actions", {})
     clips = manifest.get("clips", {})
     recipes = manifest.get("recipes", {})
+    legacy_dispatch_types = {"pool", "recipe", "action", "none", "returnToIdle", "toggleFacing"}
+    bad_dispatch_types = [
+        value.get("type")
+        for value in walk_dispatch_objects(manifest)
+        if isinstance(value.get("type"), str) and value.get("type") in legacy_dispatch_types
+    ]
+    require(not bad_dispatch_types, "Miles manifest v4 must use key dispatch instead of dispatch type fields")
     require(actions["objecting"]["loopMode"] == "onceThenHold", "objecting must be onceThenHold")
     require(actions["bow"]["loopMode"] == "onceThenHold", "bow must be onceThenHold")
     require(set(actions["thinking"].get("phases", {}).keys()) >= {"enter", "loop", "exit"},
