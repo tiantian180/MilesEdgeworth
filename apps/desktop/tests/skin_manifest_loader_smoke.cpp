@@ -93,6 +93,16 @@ int main(int argc, char **argv)
         }
       }
     }
+  },
+  "recipes": {
+    "thinking.holdUntilCancelled": {
+      "scope": "agent",
+      "steps": [
+        { "action": "objecting", "phase": "enter" },
+        { "action": "objecting", "phase": "loop", "duration": "runtime" },
+        { "action": "objecting", "phase": "exit" }
+      ]
+    }
   }
 }
 )JSON")), "manifest.json should be written");
@@ -119,6 +129,11 @@ int main(int argc, char **argv)
             "clip variant should resolve to the clip file URL");
     require(objectingVariant.frameStart == 0 && objectingVariant.frameEnd == 3,
             "loader should convert 1-based manifest frameRange to 0-based inclusive runtime frame range");
+    const RecipeDefinition thinkingRecipe = manifest.recipes.value(QStringLiteral("thinking.holdUntilCancelled"));
+    require(thinkingRecipe.steps.size() == 3,
+            "loader should parse runtime-controlled recipe steps");
+    require(thinkingRecipe.steps.at(1).durationMode == QStringLiteral("runtime"),
+            "loader should preserve duration runtime on recipe step");
     require(manifest.personaPrompt == filesystemPersona, "filesystem skin persona.md should load into manifest");
 
     QTemporaryDir personaDataDir;

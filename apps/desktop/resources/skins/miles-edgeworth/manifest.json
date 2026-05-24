@@ -54,7 +54,7 @@
     "neutral": {
       "selection": "first_available",
       "actions": [
-        { "action": "thinking", "allowedStates": ["thinking"] },
+        { "recipe": "thinking.holdUntilCancelled", "allowedStates": ["thinking"] },
         { "action": "crossed", "allowedStates": ["speaking"] },
         { "action": "idle_stand", "allowedStates": ["idle", "error"] }
       ]
@@ -530,15 +530,31 @@
     "thinking": {
       "label": "抱胸思考",
       "category": "cognitive",
-      "loopMode": "loop",
       "priority": 20,
       "tags": ["thinking", "cognitive"],
-      "variants": {
-        "right": {
-          "animation": "skin:assets/body/gestures/thinking-right.gif"
+      "initialPhase": "enter",
+      "exitPhase": "exit",
+      "phases": {
+        "enter": {
+          "loopMode": "once",
+          "variants": {
+            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [1, 4] },
+            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [1, 4] }
+          }
         },
-        "left": {
-          "animation": "skin:assets/body/gestures/thinking-left.gif"
+        "loop": {
+          "loopMode": "loop",
+          "variants": {
+            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [5, 8] },
+            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [5, 8] }
+          }
+        },
+        "exit": {
+          "loopMode": "onceThenHold",
+          "variants": {
+            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [44, 47] },
+            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [44, 47] }
+          }
         }
       }
     },
@@ -945,6 +961,15 @@
       "label": "随机思考",
       "scope": "idle",
       "action": "idle_thinking_once"
+    },
+    "thinking.holdUntilCancelled": {
+      "label": "聊天思考直到取消",
+      "scope": "agent",
+      "steps": [
+        { "action": "thinking", "phase": "enter" },
+        { "action": "thinking", "phase": "loop", "duration": "runtime" },
+        { "action": "thinking", "phase": "exit" }
+      ]
     },
     "turn.once": {
       "label": "转身一次",
@@ -1648,7 +1673,7 @@
       "label": "模型思考",
       "entries": [
         {
-          "recipe": "idle.randomThinking",
+          "recipe": "thinking.holdUntilCancelled",
           "weight": 1
         }
       ]

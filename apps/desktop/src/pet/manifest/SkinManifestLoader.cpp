@@ -603,6 +603,15 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
             step.facing = stepObject.value("facing").toString(recipeObject.value("facing").toString());
             step.repeat = stepObject.value("repeat").toInt(1);
             step.durationMs = stepObject.value("durationMs").toInt(0);
+            const QJsonValue durationValue = stepObject.value(QStringLiteral("duration"));
+            if (durationValue.isString()) {
+                step.durationMode = durationValue.toString();
+                step.runtimeControlled = step.durationMode == QStringLiteral("runtime");
+            } else if (durationValue.isDouble()) {
+                step.durationMs = durationValue.toInt(0);
+            } else if (durationValue.isObject()) {
+                step.durationMode = QStringLiteral("param");
+            }
 
             if (!step.actionId.isEmpty() || !step.phaseId.isEmpty() || !step.recipeId.isEmpty()) {
                 recipe.steps.append(step);

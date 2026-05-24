@@ -217,6 +217,9 @@ private:
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
     void playRecipeStep(const RecipeStep &step);
+    bool currentRecipeStepRuntimeControlled() const;
+    bool currentRecipeHasNextStep() const;
+    bool advanceRuntimeControlledRecipeStepForCleanFinish();
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
     double movementScaleFactor() const;
@@ -249,6 +252,7 @@ private:
     QString m_currentActionId;
     QString m_currentRecipeId;
     int m_currentRecipeStepIndex = -1;
+    bool m_currentRecipeStepRuntimeControlled = false;
     QString m_currentPhaseId;
     QString m_currentFacing;
     QString m_currentMovementDirection;

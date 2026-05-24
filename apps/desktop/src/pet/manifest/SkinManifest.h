@@ -81,6 +81,8 @@ struct RecipeStep
     QString facing;
     int repeat = 1;
     int durationMs = 0;
+    QString durationMode;
+    bool runtimeControlled = false;
 };
 
 // RecipeDefinition 是“按时间线把动作和副作用编排起来”的脚本。

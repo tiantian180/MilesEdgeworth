@@ -841,6 +841,30 @@ int main(int argc, char *argv[])
         require(sleepCleanFinishCallbacks == 1,
                 "cleanFinish should callback after exit finishes");
 
+        runtime.playRecipe("thinking.holdUntilCancelled");
+        require(runtime.currentRecipeId() == "thinking.holdUntilCancelled",
+                "thinking recipe should become the active recipe");
+        require(runtime.currentActionId() == "thinking",
+                "thinking recipe should play the thinking action");
+        require(runtime.currentPhaseId() == "enter",
+                "thinking recipe should start at enter phase");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "thinking enter step should advance to loop step");
+
+        int thinkingCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&thinkingCleanFinishCallbacks]() {
+            ++thinkingCleanFinishCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "exit",
+                "cleanFinish should end the runtime loop step and advance to exit step");
+        require(thinkingCleanFinishCallbacks == 0,
+                "thinking cleanFinish should wait for exit step completion");
+        runtime.handleAnimationFinished();
+        require(thinkingCleanFinishCallbacks == 1,
+                "thinking cleanFinish should callback after exit step completes");
+
         runtime.playRecipe("sleep.enterLoopExit");
         int sleepEnterCleanFinishCallbacks = 0;
         runtime.requestCleanFinishAndNotify([&sleepEnterCleanFinishCallbacks]() {

@@ -606,12 +606,15 @@ void PetRuntime::hideCurrentProp()
 
 void PetRuntime::clearActiveRecipe()
 {
-    if (m_currentRecipeId.isEmpty() && m_currentRecipeStepIndex == -1) {
+    if (m_currentRecipeId.isEmpty()
+            && m_currentRecipeStepIndex == -1
+            && !m_currentRecipeStepRuntimeControlled) {
         return;
     }
 
     m_currentRecipeId.clear();
     m_currentRecipeStepIndex = -1;
+    m_currentRecipeStepRuntimeControlled = false;
     emit currentRecipeChanged();
 }
 
@@ -635,13 +638,18 @@ void PetRuntime::playNextRecipeStep()
 
     // 如果 recipe 的最后一步是站立、睡眠循环这类持续态，它已经接管画面了。
     // 此时清掉 recipe 标记，避免 idle timer 误以为还有一段编排没结束。
-    if (isLastStep && (m_currentLoopMode == "loop" || m_currentLoopMode == "hold")) {
+    if (isLastStep
+            && !m_currentRecipeStepRuntimeControlled
+            && (m_currentLoopMode == "loop" || m_currentLoopMode == "hold")) {
         clearActiveRecipe();
     }
 }
 
 void PetRuntime::playRecipeStep(const RecipeStep &step)
 {
+    m_currentRecipeStepRuntimeControlled = step.runtimeControlled
+        && step.phaseId == QStringLiteral("loop");
+
     const QString recipeFacing = resolveRecipeFacing(step.facing);
     if (!recipeFacing.isEmpty() && recipeFacing != m_currentFacing) {
         setFacing(recipeFacing);
@@ -670,6 +678,32 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
     if (!step.actionId.isEmpty()) {
         playActionInternal(step.actionId, false);
     }
+}
+
+bool PetRuntime::currentRecipeStepRuntimeControlled() const
+{
+    return m_currentRecipeStepRuntimeControlled;
+}
+
+bool PetRuntime::currentRecipeHasNextStep() const
+{
+    if (m_currentRecipeId.isEmpty() || !m_manifest.recipes.contains(m_currentRecipeId)) {
+        return false;
+    }
+
+    const RecipeDefinition recipe = m_manifest.recipes.value(m_currentRecipeId);
+    return m_currentRecipeStepIndex + 1 < recipe.steps.size();
+}
+
+bool PetRuntime::advanceRuntimeControlledRecipeStepForCleanFinish()
+{
+    if (!currentRecipeStepRuntimeControlled() || !currentRecipeHasNextStep()) {
+        return false;
+    }
+
+    m_currentRecipeStepRuntimeControlled = false;
+    playNextRecipeStep();
+    return true;
 }
 
 QString PetRuntime::resolveRecipeMovementDirection(const QString &movementDirection) const
@@ -928,6 +962,10 @@ bool PetRuntime::continueCleanFinishIfPossible()
 {
     if (!m_cleanFinishCallback || !cleanFinishBoundaryReached()) {
         return false;
+    }
+
+    if (advanceRuntimeControlledRecipeStepForCleanFinish()) {
+        return true;
     }
 
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
