@@ -531,6 +531,10 @@ void PetRuntime::handleAnimationFinished()
         return;
     }
 
+    if (m_currentRecipeStepRuntimeControlled) {
+        return;
+    }
+
     if (!m_currentRecipeId.isEmpty()) {
         const RecipeDefinition recipe = m_manifest.recipes.value(m_currentRecipeId);
         if (m_currentRecipeStepIndex + 1 < recipe.steps.size()) {

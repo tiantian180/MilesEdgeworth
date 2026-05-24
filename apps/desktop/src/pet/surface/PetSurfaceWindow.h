@@ -1,8 +1,10 @@
 #pragma once
 
 #include <QPoint>
+#include <QPixmap>
 #include <QString>
 #include <QTimer>
+#include <QVector>
 #include <QWidget>
 
 class DesktopShellController;
@@ -50,8 +52,13 @@ private:
     void syncSizeFromRuntime();
     void restartMovieFromRuntime();
     void handleMovieFrameChanged(int frame);
+    bool loadManualFrameRange(const QString &path);
+    void stopManualFrameRange();
+    void showManualFrame(int playbackSerial);
+    void advanceManualFrame(int playbackSerial);
+    void completeManualFrameRangeLoop(int playbackSerial);
+    void consumeFrameMovementDelta();
     int currentEffectiveEndFrame();
-    void jumpToFrameStartIfNeeded(int playbackSerial);
     bool jumpToFrameStartNowIfNeeded();
     void warnInvalidFrameRangeOnce(const QString &reason, int frameStart, int frameEnd, int frameCount);
     void scheduleAnimationCompletion(int playbackSerial, int delayMs);
@@ -76,6 +83,11 @@ private:
     PropSurfaceWindow *m_propWindow = nullptr;
     QTimer m_singleClickTimer;
     QTimer m_propExpireTimer;
+    QTimer m_manualFrameTimer;
+    QVector<QPixmap> m_manualFrames;
+    QVector<int> m_manualFrameDelays;
+    int m_manualFrameIndex = 0;
+    bool m_manualFramePlayback = false;
     QPoint m_pressPosition;
     QPoint m_pendingSingleClickPosition;
     QPoint m_pendingContextMenuPosition;

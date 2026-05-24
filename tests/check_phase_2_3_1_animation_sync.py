@@ -87,8 +87,8 @@ def main() -> int:
     require("sidecar health" in controller_cpp and '"pid"' in controller_cpp
             and "ownedPid" in controller_cpp,
             "ChatController should log sidecar health diagnostics and reject stale sidecar pids")
-    require('"action": "crossed", "allowedStates": ["speaking"]' in manifest,
-            "Miles manifest should map speaking neutral fallback to a visible speaking action")
+    require('"action": "talking", "allowedStates": ["speaking"]' in manifest,
+            "Miles manifest should map speaking neutral fallback to the phased talking action")
     require('"action": "idle_stand", "allowedStates": ["idle", "error"]' in manifest,
             "Miles manifest should not map speaking neutral fallback to idle_stand")
 

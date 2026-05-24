@@ -783,7 +783,12 @@ int main(int argc, char *argv[])
     runtime.submitExpressionRequest("speaking", "objection", 0.0);
     require(runtime.currentActionId() == "objecting", "speaking + objection 应映射到异议动作");
     runtime.submitExpressionRequest("speaking", "neutral", 0.0);
-    require(runtime.currentActionId() == "crossed", "speaking + neutral 应映射到可见说话动作，而不是站立待机");
+    require(runtime.currentActionId() == "talking", "speaking + neutral 应映射到 talking 分段说话动作，而不是站立待机");
+    require(runtime.currentPhaseId() == "enter" && runtime.currentFrameStart() == 0 && runtime.currentFrameEnd() == 3,
+            "talking enter 应使用 crossed 1-4 帧");
+    runtime.handleAnimationFinished();
+    require(runtime.currentPhaseId() == "loop" && runtime.currentFrameStart() == 4 && runtime.currentFrameEnd() == 7,
+            "talking enter 播完后应进入 5-8 帧说话循环");
     runtime.submitExpressionRequest("idle", "polite", 0.0);
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
     runtime.playAction("objecting");
@@ -825,10 +830,10 @@ int main(int argc, char *argv[])
             "preserve reload should restart playback when animation frame range changes");
 
     runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
-    require(runtime.currentActionId() == "crossed", "未知 expression 应降级到 speaking neutral 的可见说话动作");
+    require(runtime.currentActionId() == "talking", "未知 expression 应降级到 speaking neutral 的 talking 动作");
     runtime.playAction("bow");
     runtime.submitExpressionRequest("unknown-state", "neutral", 0.0);
-    require(runtime.currentActionId() == "crossed", "未知 expression state 应回退到当前 PetState 的 neutral 映射");
+    require(runtime.currentActionId() == "talking", "未知 expression state 应回退到当前 PetState 的 neutral 映射");
 
     {
         runtime.playAction("bow");
@@ -871,14 +876,18 @@ int main(int argc, char *argv[])
         runtime.handleAnimationFinished();
         require(runtime.currentPhaseId() == "loop",
                 "thinking enter step should advance to loop step");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "runtime-controlled thinking loop should not auto-advance to exit without cleanFinish");
+        require(runtime.currentRecipeId() == "thinking.holdUntilCancelled",
+                "runtime-controlled thinking recipe should remain active while loop is held by runtime");
 
         int thinkingCleanFinishCallbacks = 0;
         runtime.requestCleanFinishAndNotify([&thinkingCleanFinishCallbacks]() {
             ++thinkingCleanFinishCallbacks;
         });
-        runtime.handleAnimationFinished();
         require(runtime.currentPhaseId() == "exit",
-                "cleanFinish should end the runtime loop step and advance to exit step");
+                "cleanFinish requested at a held runtime loop boundary should advance to exit step");
         require(thinkingCleanFinishCallbacks == 0,
                 "thinking cleanFinish should wait for exit step completion");
         runtime.handleAnimationFinished();

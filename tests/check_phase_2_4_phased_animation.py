@@ -26,6 +26,7 @@ def main() -> int:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
+    surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     pacer_h = read("apps/desktop/src/chat/ChatTextPacer.h")
     pacer_cpp = read("apps/desktop/src/chat/ChatTextPacer.cpp")
@@ -43,6 +44,17 @@ def main() -> int:
     require(actions["bow"]["loopMode"] == "onceThenHold", "bow must be onceThenHold")
     require(set(actions["thinking"].get("phases", {}).keys()) >= {"enter", "loop", "exit"},
             "thinking must expose enter/loop/exit phases")
+    require(set(actions["talking"].get("phases", {}).keys()) >= {"enter", "loop", "exit"},
+            "talking must expose enter/loop/exit phases")
+    require(actions["talking"]["phases"]["enter"]["variants"]["right"]["frameRange"] == [1, 4],
+            "talking enter must use crossed frames 1-4")
+    require(actions["talking"]["phases"]["loop"]["variants"]["right"]["frameRange"] == [5, 8],
+            "talking loop must use crossed frames 5-8")
+    require(actions["talking"]["phases"]["exit"]["variants"]["right"]["frameRange"] == [9, 11],
+            "talking exit must use crossed frames 9-11")
+    require({"action": "talking", "allowedStates": ["speaking"]} in
+            manifest["expressionMappings"]["neutral"]["actions"],
+            "neutral speaking must map to talking")
     require("thinking.holdUntilCancelled" in recipes, "manifest must define thinking.holdUntilCancelled")
     require(any(step.get("duration") == "runtime"
                 for step in recipes["thinking.holdUntilCancelled"].get("steps", [])),
@@ -61,8 +73,9 @@ def main() -> int:
     ]:
         require(token in runtime_h + runtime_cpp, f"runtime missing {token}")
 
-    require("onceThenHold" in surface_cpp and "jumpToFrame" in surface_cpp,
-            "native surface must handle onceThenHold and frameRange playback")
+    require("onceThenHold" in surface_cpp and "loadManualFrameRange" in surface_cpp
+            and "m_manualFrameTimer" in surface_h,
+            "native surface must handle onceThenHold and play frameRange phases without relying on QMovie seeking")
 
     for token in [
         "append(const QString &text, quint64 streamId = 0, int segmentId = -1)",

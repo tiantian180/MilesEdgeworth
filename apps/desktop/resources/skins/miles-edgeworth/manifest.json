@@ -55,7 +55,7 @@
       "selection": "first_available",
       "actions": [
         { "recipe": "thinking.holdUntilCancelled", "allowedStates": ["thinking"] },
-        { "action": "crossed", "allowedStates": ["speaking"] },
+        { "action": "talking", "allowedStates": ["speaking"] },
         { "action": "idle_stand", "allowedStates": ["idle", "error"] }
       ]
     },
@@ -63,7 +63,7 @@
       "selection": "weighted_random",
       "fallback": "neutral",
       "actions": [
-        { "action": "objecting", "weight": 3, "allowedStates": ["speaking"] },
+        { "recipe": "doubleClick.objection", "weight": 3, "allowedStates": ["speaking"] },
         { "recipe": "doubleClick.holdIt", "weight": 1, "allowedStates": ["speaking"] }
       ]
     },
@@ -109,7 +109,7 @@
       "action": "thinking"
     },
     "speaking": {
-      "action": "objecting"
+      "action": "talking"
     },
     "error": {
       "action": "idle_stand"
@@ -795,6 +795,38 @@
         },
         "left": {
           "animation": "skin:assets/body/interaction/crossed-left.gif"
+        }
+      }
+    },
+    "talking": {
+      "label": "抱臂说话",
+      "category": "speaking",
+      "priority": 40,
+      "tags": ["speaking", "talking", "crossed"],
+      "initialPhase": "enter",
+      "exitPhase": "exit",
+      "phases": {
+        "enter": {
+          "loopMode": "once",
+          "nextPhase": "loop",
+          "variants": {
+            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [1, 4] },
+            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [1, 4] }
+          }
+        },
+        "loop": {
+          "loopMode": "loop",
+          "variants": {
+            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [5, 8] },
+            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [5, 8] }
+          }
+        },
+        "exit": {
+          "loopMode": "onceThenHold",
+          "variants": {
+            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [9, 11] },
+            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [9, 11] }
+          }
         }
       }
     },

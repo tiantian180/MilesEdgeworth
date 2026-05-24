@@ -363,11 +363,15 @@ int main(int argc, char *argv[])
     require(hbController.messages().constFirst().toMap().value("text").toString()
                 .isEmpty(),
             "hold buffer should not flush content before cleanFinishReady");
-    hbRuntime.handleAnimationFinished();
-    require(waitFor([&hbController]() {
-                return hbController.messages().constFirst().toMap().value("text").toString()
-                    == QStringLiteral("片段一");
-            }),
+    bool hbFirstSegmentDrained = false;
+    for (int i = 0; i < 5 && !hbFirstSegmentDrained; ++i) {
+        hbRuntime.handleAnimationFinished();
+        hbFirstSegmentDrained = waitFor([&hbController]() {
+            return hbController.messages().constFirst().toMap().value("text").toString()
+                == QStringLiteral("片段一");
+        });
+    }
+    require(hbFirstSegmentDrained,
             "hold buffer should drain through the pacer after cleanFinishReady");
 
     hbContent.delta = QStringLiteral("片段二");
@@ -413,12 +417,16 @@ int main(int argc, char *argv[])
                 "BUFFERING_FOR_START must NOT push streamed text to the UI yet");
 
         // Simulate PetRuntime reaching a clean finish on the previous animation.
-        smRuntime.handleAnimationFinished();
-        require(waitFor([&smController]() {
+        bool smBufferedTextStarted = false;
+        for (int i = 0; i < 5 && !smBufferedTextStarted; ++i) {
+            smRuntime.handleAnimationFinished();
+            smBufferedTextStarted = waitFor([&smController]() {
                     const auto messages = smController.messages();
                     return !messages.isEmpty()
                         && messages.constLast().toMap().value(QStringLiteral("text")).toString().startsWith(QStringLiteral("异"));
-                }),
+                });
+        }
+        require(smBufferedTextStarted,
                 "cleanFinishReady should let buffered text start draining through the pacer");
         // Full pacer drain timing is covered by ChatTextPacerSmoke.
     }
