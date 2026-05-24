@@ -18,6 +18,11 @@ ApplicationWindow {
     property bool conversationPanelOpen: false
     property string pendingDeleteConversationId: ""
     property string pendingDeleteConversationTitle: ""
+    property bool compactMode: false
+    property int expandedWidth: 420
+    property int expandedHeight: 560
+    property int compactWidth: 420
+    property int compactHeight: 128
 
     onVisibleChanged: App.DesktopShell.setChatWindowDockVisible(visible)
 
@@ -67,11 +72,38 @@ ApplicationWindow {
     }
 
     function open() {
+        showExpanded()
         App.ChatController.loadConversations()
         show()
         raise()
         requestActivate()
         input.forceActiveFocus()
+    }
+
+    function showExpanded() {
+        compactMode = false
+        minimumWidth = 360
+        minimumHeight = 420
+        width = Math.max(360, expandedWidth)
+        height = Math.max(420, expandedHeight)
+    }
+
+    function showCompact() {
+        if (!compactMode) {
+            expandedWidth = width
+            expandedHeight = height
+        }
+        conversationPanelOpen = false
+        compactMode = true
+        minimumWidth = 360
+        minimumHeight = compactHeight
+        width = Math.max(360, Math.min(width, compactWidth))
+        height = compactHeight
+        input.forceActiveFocus()
+    }
+
+    function hideChatUi() {
+        hide()
     }
 
     Connections {
@@ -128,6 +160,8 @@ ApplicationWindow {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
+            visible: !chatWindow.compactMode
+            Layout.preferredHeight: chatWindow.compactMode ? 0 : 36
 
             ToolButton {
                 id: conversationToggleButton
@@ -217,12 +251,36 @@ ApplicationWindow {
                     App.ChatController.checkHealth()
                 }
             }
+
+            Button {
+                id: collapseButton
+
+                text: "收起"
+                font.pixelSize: 13
+                Layout.preferredWidth: 76
+                Layout.preferredHeight: 36
+                contentItem: Text {
+                    text: collapseButton.text
+                    color: collapseButton.enabled ? "#5a4031" : "#9a9086"
+                    font: collapseButton.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 6
+                    color: collapseButton.down ? "#e1d8ce" : "#f3ede5"
+                    border.color: "#bfae9e"
+                }
+                onClicked: chatWindow.showCompact()
+            }
         }
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.fillHeight: true
             spacing: chatWindow.conversationPanelOpen ? 10 : 0
+            visible: !chatWindow.compactMode
+            Layout.fillHeight: !chatWindow.compactMode
+            Layout.preferredHeight: chatWindow.compactMode ? 0 : -1
 
             Rectangle {
                 Layout.preferredWidth: chatWindow.conversationPanelOpen ? 168 : 0
@@ -494,6 +552,30 @@ ApplicationWindow {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
+            Layout.preferredHeight: chatWindow.compactMode ? 56 : 72
+
+            Button {
+                id: compactExpandButton
+
+                visible: chatWindow.compactMode
+                text: "展开"
+                font.pixelSize: 13
+                Layout.preferredWidth: visible ? 64 : 0
+                Layout.preferredHeight: chatWindow.compactMode ? 52 : 72
+                contentItem: Text {
+                    text: compactExpandButton.text
+                    color: "#5a4031"
+                    font: compactExpandButton.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 6
+                    color: compactExpandButton.down ? "#e1d8ce" : "#f3ede5"
+                    border.color: "#bfae9e"
+                }
+                onClicked: chatWindow.open()
+            }
 
             TextArea {
                 id: input
@@ -505,7 +587,7 @@ ApplicationWindow {
                 readonly property bool disabledInput: disconnectedInput || missingProviderConfig
 
                 Layout.fillWidth: true
-                Layout.preferredHeight: 72
+                Layout.preferredHeight: chatWindow.compactMode ? 52 : 72
                 wrapMode: TextArea.Wrap
                 placeholderText: missingProviderConfig
                         ? "先点设置填写模型配置"
@@ -547,7 +629,7 @@ ApplicationWindow {
                 font.pixelSize: 14
                 font.weight: Font.DemiBold
                 Layout.preferredWidth: 76
-                Layout.preferredHeight: 72
+                Layout.preferredHeight: chatWindow.compactMode ? 52 : 72
                 contentItem: Text {
                     text: sendButton.text
                     color: sendButton.enabled ? "#fffdf8" : "#9a9086"
@@ -562,6 +644,29 @@ ApplicationWindow {
                 }
 
                 onClicked: chatLayout.submitInput()
+            }
+
+            Button {
+                id: compactCloseButton
+
+                visible: chatWindow.compactMode
+                text: "关闭"
+                font.pixelSize: 13
+                Layout.preferredWidth: visible ? 64 : 0
+                Layout.preferredHeight: chatWindow.compactMode ? 52 : 72
+                contentItem: Text {
+                    text: compactCloseButton.text
+                    color: "#5a4031"
+                    font: compactCloseButton.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+                background: Rectangle {
+                    radius: 6
+                    color: compactCloseButton.down ? "#e1d8ce" : "#f3ede5"
+                    border.color: "#bfae9e"
+                }
+                onClicked: chatWindow.hideChatUi()
             }
         }
     }
