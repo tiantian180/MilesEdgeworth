@@ -16,6 +16,9 @@ ApplicationWindow {
     property string assistantText: ""
     property bool assistantPending: false
     property bool bubbleDismissed: false
+    property int assistantMessageIndex: -1
+    property int dismissedAssistantMessageIndex: -1
+    property int trackedAssistantMessageIndex: -1
 
     x: Math.round(App.DesktopShell.petWindowX
                   + App.DesktopShell.petWindowWidth / 2
@@ -27,12 +30,14 @@ ApplicationWindow {
         let found = false
         let nextText = ""
         let nextPending = false
+        let nextAssistantMessageIndex = -1
 
         for (let i = messages.length - 1; i >= 0; --i) {
             const message = messages[i]
             if (message.role === "assistant") {
                 nextText = message.text || ""
                 nextPending = message.pending === true
+                nextAssistantMessageIndex = i
                 found = true
                 break
             }
@@ -41,23 +46,53 @@ ApplicationWindow {
         if (!found || nextText.length === 0) {
             assistantText = ""
             assistantPending = false
+            assistantMessageIndex = -1
+            dismissedAssistantMessageIndex = -1
+            trackedAssistantMessageIndex = -1
+            bubbleDismissed = false
             hideTimer.stop()
             visible = false
             return
         }
 
-        const previousText = assistantText
-        assistantText = nextText
-        assistantPending = nextPending
-
-        if (nextText.length > previousText.length || nextText !== previousText) {
+        const previousAssistantText = assistantText
+        const previousAssistantPending = assistantPending
+        const assistantMessageChanged = nextAssistantMessageIndex !== assistantMessageIndex
+        if (assistantMessageChanged) {
+            assistantMessageIndex = nextAssistantMessageIndex
+            dismissedAssistantMessageIndex = -1
+            trackedAssistantMessageIndex = -1
             bubbleDismissed = false
         }
 
-        if (!bubbleDismissed) {
-            visible = true
-            raise()
+        if (nextPending === true) {
+            trackedAssistantMessageIndex = nextAssistantMessageIndex
         }
+
+        const assistantStreamFinished = !assistantMessageChanged
+                                      && trackedAssistantMessageIndex === nextAssistantMessageIndex
+                                      && previousAssistantPending === true
+                                      && nextPending !== true
+                                      && nextText.indexOf(previousAssistantText) === 0
+
+        assistantText = nextText
+        assistantPending = nextPending
+
+        if (assistantPending !== true && !assistantStreamFinished) {
+            trackedAssistantMessageIndex = -1
+            hideTimer.stop()
+            visible = false
+            return
+        }
+
+        if (bubbleDismissed || dismissedAssistantMessageIndex === nextAssistantMessageIndex) {
+            hideTimer.stop()
+            visible = false
+            return
+        }
+
+        visible = true
+        raise()
 
         if (assistantPending === true) {
             hideTimer.stop()
@@ -65,6 +100,17 @@ ApplicationWindow {
         }
 
         scheduleHide()
+    }
+
+    function hideCurrentBubble() {
+        if (assistantMessageIndex >= 0) {
+            dismissedAssistantMessageIndex = assistantMessageIndex
+            bubbleDismissed = true
+        }
+
+        trackedAssistantMessageIndex = -1
+        hideTimer.stop()
+        visible = false
     }
 
     function scheduleHide() {
@@ -80,7 +126,7 @@ ApplicationWindow {
         }
 
         function onOpenWindowRequested() {
-            bubbleWindow.hideTimer.stop()
+            bubbleWindow.hideCurrentBubble()
         }
     }
 
@@ -90,7 +136,10 @@ ApplicationWindow {
         id: hideTimer
 
         repeat: false
-        onTriggered: bubbleWindow.visible = false
+        onTriggered: {
+            bubbleWindow.trackedAssistantMessageIndex = -1
+            bubbleWindow.visible = false
+        }
     }
 
     Rectangle {
@@ -168,11 +217,7 @@ ApplicationWindow {
                     color: closeBubbleButton.down ? "#e1d8ce" : "#f3ede5"
                     border.color: "#d8d1c8"
                 }
-                onClicked: {
-                    bubbleWindow.bubbleDismissed = true
-                    bubbleWindow.hideTimer.stop()
-                    bubbleWindow.visible = false
-                }
+                onClicked: bubbleWindow.hideCurrentBubble()
             }
         }
 
@@ -207,7 +252,11 @@ ApplicationWindow {
                 bottomPadding: 0
                 background: Item {}
 
-                onTextChanged: cursorPosition = text.length
+                onTextChanged: {
+                    if (text.length > cursorPosition && !bubbleHover.hovered && !activeFocus) {
+                        cursorPosition = text.length
+                    }
+                }
             }
         }
     }
