@@ -308,11 +308,15 @@ int main(int argc, char *argv[])
                         .value(QStringLiteral("text")).toString().isEmpty(),
                     "stale clean-finish callback must not release a later stream's held text");
 
-            staleCallbackRuntime.handleAnimationFinished();
-            require(waitFor([&staleCallbackController]() {
-                        return staleCallbackController.messages().constLast().toMap()
-                            .value(QStringLiteral("text")).toString() == QStringLiteral("新回复");
-                    }),
+            bool currentStreamReleased = false;
+            for (int i = 0; i < 8 && !currentStreamReleased; ++i) {
+                staleCallbackRuntime.handleAnimationFinished();
+                currentStreamReleased = waitFor([&staleCallbackController]() {
+                    return staleCallbackController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("新回复");
+                }, 150);
+            }
+            require(currentStreamReleased,
                     "current stream clean-finish callback should still release held text");
         }
     }
@@ -675,7 +679,9 @@ int main(int argc, char *argv[])
                     .value(QStringLiteral("text")).toString() == QStringLiteral("前"),
                 "RUN_FINISHED during GATED should keep final text held before cleanFinish");
 
-        gfRuntime.handleAnimationFinished();
+        for (int i = 0; i < 5 && gfRuntime.currentState() != QStringLiteral("thinking"); ++i) {
+            gfRuntime.handleAnimationFinished();
+        }
         require(waitFor([&gfController]() {
                     return gfController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("前后");

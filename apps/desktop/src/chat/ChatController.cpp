@@ -927,7 +927,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
                 m_pendingThinkingExpression = QStringLiteral("neutral");
                 return;
             }
-            if (m_phase == ChatPhase::STREAMING) {
+            if (m_phase == ChatPhase::STREAMING && m_activeSegmentId == -1) {
                 requestPetExpression(QStringLiteral("thinking"), QStringLiteral("neutral"));
                 return;
             }

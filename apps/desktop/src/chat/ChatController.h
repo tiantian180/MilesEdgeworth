@@ -146,6 +146,8 @@ private:
     QString m_pendingExpression;
     QString m_pendingThinkingState;
     QString m_pendingThinkingExpression;
+    // Phase 2.4 segment queue 接入前保持 -1；非 -1 时 lifecycle.thinking 不应打断文字段。
+    int m_activeSegmentId = -1;
     ChatTextPacer *m_pacer = nullptr;
     QTimer m_gateTimeout;
     static constexpr int kGateTimeoutMs = 800;
