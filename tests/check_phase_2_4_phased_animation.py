@@ -35,10 +35,12 @@ def main() -> int:
     provider_go = read("apps/agent-core/internal/chat/openai/provider.go")
     provider_test = read("apps/agent-core/internal/chat/openai/provider_test.go")
     root_cmake = read("CMakeLists.txt")
+    desktop_cmake = read("apps/desktop/CMakeLists.txt")
     debt_doc = read("docs/v2/参考资料/技术债务与评审待办.md")
     readme = read("README.md")
 
     actions = manifest.get("actions", {})
+    clips = manifest.get("clips", {})
     recipes = manifest.get("recipes", {})
     require(actions["objecting"]["loopMode"] == "onceThenHold", "objecting must be onceThenHold")
     require(actions["bow"]["loopMode"] == "onceThenHold", "bow must be onceThenHold")
@@ -46,12 +48,24 @@ def main() -> int:
             "thinking must expose enter/loop/exit phases")
     require(set(actions["talking"].get("phases", {}).keys()) >= {"enter", "loop", "exit"},
             "talking must expose enter/loop/exit phases")
-    require(actions["talking"]["phases"]["enter"]["variants"]["right"]["frameRange"] == [1, 4],
-            "talking enter must use crossed frames 1-4")
-    require(actions["talking"]["phases"]["loop"]["variants"]["right"]["frameRange"] == [5, 8],
-            "talking loop must use crossed frames 5-8")
-    require(actions["talking"]["phases"]["exit"]["variants"]["right"]["frameRange"] == [9, 11],
-            "talking exit must use crossed frames 9-11")
+    expected_clips = {
+        "thinking.enter.right": ("file:assets/body/gestures/thinking-right.gif", [1, 4]),
+        "thinking.loop.right": ("file:assets/body/gestures/thinking-right.gif", [5, 8]),
+        "thinking.exit.right": ("file:assets/body/gestures/thinking-right.gif", [44, 47]),
+        "talking.enter.right": ("file:assets/body/interaction/crossed-right.gif", [1, 4]),
+        "talking.loop.right": ("file:assets/body/interaction/crossed-right.gif", [5, 8]),
+        "talking.exit.right": ("file:assets/body/interaction/crossed-right.gif", [9, 11]),
+    }
+    for clip_id, (source, frame_range) in expected_clips.items():
+        require(clips.get(clip_id, {}).get("source") == source, f"{clip_id} must declare source {source}")
+        require(clips.get(clip_id, {}).get("frameRange") == frame_range,
+                f"{clip_id} must declare frameRange {frame_range}")
+    require(actions["talking"]["phases"]["enter"]["variants"]["right"]["clip"] == "talking.enter.right",
+            "talking enter must reference generated clip")
+    require(actions["talking"]["phases"]["loop"]["variants"]["right"]["clip"] == "talking.loop.right",
+            "talking loop must reference generated clip")
+    require(actions["talking"]["phases"]["exit"]["variants"]["right"]["clip"] == "talking.exit.right",
+            "talking exit must reference generated clip")
     require({"action": "talking", "allowedStates": ["speaking"]} in
             manifest["expressionMappings"]["neutral"]["actions"],
             "neutral speaking must map to talking")
@@ -76,6 +90,8 @@ def main() -> int:
     require("onceThenHold" in surface_cpp and "loadManualFrameRange" in surface_cpp
             and "m_manualFrameTimer" in surface_h,
             "native surface must handle onceThenHold and play frameRange phases without relying on QMovie seeking")
+    require("GenerateMilesClips" in desktop_cmake and "split_manifest_clips.py" in desktop_cmake,
+            "desktop build must generate built-in Miles pre-cut clips")
 
     for token in [
         "append(const QString &text, quint64 streamId = 0, int segmentId = -1)",

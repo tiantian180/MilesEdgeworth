@@ -38,7 +38,7 @@ def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
-    action_pools = manifest.get("actionPools", {})
+    action_pools = manifest.get("animationPools", {})
 
     require(manifest.get("movementDirections") == MOVEMENT_DIRECTIONS, "manifest 应显式声明旧版 8 方向移动顺序")
 
@@ -52,7 +52,7 @@ def main() -> int:
         require(set(variants.keys()) == set(MOVEMENT_DIRECTIONS), f"{action_id} 应包含 8 个移动方向 variant")
         for direction_id in MOVEMENT_DIRECTIONS:
             variant = variants[direction_id]
-            require("animation" in variant, f"{action_id}.{direction_id} 缺少 animation")
+            require("clip" in variant, f"{action_id}.{direction_id} 缺少 clip")
             movement = variant.get("movement", {})
             require({"dx", "dy"} <= set(movement.keys()), f"{action_id}.{direction_id} 缺少每帧移动增量")
 

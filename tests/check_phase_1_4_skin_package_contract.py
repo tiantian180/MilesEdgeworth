@@ -56,7 +56,7 @@ require('prefix="/skins/miles-edgeworth"' in qrc, "qrc must expose built-in skin
 require('alias="skin.json"' in qrc, "qrc must include built-in skin.json")
 require('alias="manifest.json"' in qrc, "qrc must include built-in manifest.json under skin root")
 
-# Phase 1.4 之后，Miles 的内置皮肤既要支持 skin: URL，也要保持
+# Phase 1.4 之后，Miles 的内置皮肤既要支持 file: URL，也要保持
 # 旧 qrc:/pet 和 qrc:/audio alias 兼容层。这里集中守住资源目录契约，
 # 避免继续保留 Phase 0.54 的历史阶段测试。
 require(skin_assets.is_dir(), "Miles built-in skin must keep runtime assets under skins/miles-edgeworth/assets")

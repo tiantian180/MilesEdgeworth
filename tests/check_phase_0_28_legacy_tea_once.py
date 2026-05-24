@@ -22,7 +22,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     recipes = manifest.get("recipes", {})
-    action_pools = manifest.get("actionPools", {})
+    action_pools = manifest.get("animationPools", {})
 
     expected = {
         "tea.once": "tea",

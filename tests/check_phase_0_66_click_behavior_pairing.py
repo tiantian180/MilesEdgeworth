@@ -23,7 +23,7 @@ def main() -> int:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     click_behaviors = manifest.get("clickBehaviors", {})
     hit_zones = manifest.get("hitZones", {})
-    action_pools = manifest.get("actionPools", {})
+    action_pools = manifest.get("animationPools", {})
 
     single_click = click_behaviors.get("singleClick")
     require(isinstance(single_click, list) and single_click, "clickBehaviors.singleClick 应是非空列表")
@@ -32,7 +32,7 @@ def main() -> int:
         zone_id = entry.get("zone")
         pool_id = entry.get("pool")
         require(zone_id in hit_zones, f"singleClick[{index}] zone 未在 hitZones 中声明: {zone_id!r}")
-        require(pool_id in action_pools, f"singleClick[{index}] pool 未在 actionPools 中声明: {pool_id!r}")
+        require(pool_id in action_pools, f"singleClick[{index}] pool 未在 animationPools 中声明: {pool_id!r}")
 
     double_click = click_behaviors.get("doubleClick")
     require(isinstance(double_click, list) and double_click, "clickBehaviors.doubleClick 应是非空列表")
@@ -43,7 +43,7 @@ def main() -> int:
         request_targets = [entry.get("pool"), entry.get("recipe"), entry.get("action"), entry.get("customInteraction")]
         require(any(request_targets), f"doubleClick[{index}] 应声明 pool / recipe / action / customInteraction")
         if entry.get("pool"):
-            require(entry["pool"] in action_pools, f"doubleClick[{index}] pool 未在 actionPools 中声明")
+            require(entry["pool"] in action_pools, f"doubleClick[{index}] pool 未在 animationPools 中声明")
 
     matcher_cpp = read("apps/desktop/src/pet/interaction/HitZoneMatcher.cpp")
     matcher_h = read("apps/desktop/src/pet/interaction/HitZoneMatcher.h")

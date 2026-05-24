@@ -8,12 +8,36 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick Widgets Multimedia Network QuickControls2)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 include(CTest)
 
 qt_standard_project_setup(REQUIRES 6.5)
 if(Qt6_VERSION VERSION_GREATER_EQUAL "6.8.0")
     qt_policy(SET QTP0004 NEW)
 endif()
+
+set(MILES_REPOSITORY_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
+set(MILES_BUILTIN_SKIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/resources/skins/miles-edgeworth")
+set(MILES_GENERATED_CLIPS_QRC "${MILES_BUILTIN_SKIN_ROOT}/generated/clips.qrc")
+set(MILES_SPLIT_MANIFEST_CLIPS_SCRIPT "${MILES_REPOSITORY_ROOT}/tools/split_manifest_clips.py")
+
+add_custom_target(GenerateMilesClips
+    COMMAND ${Python3_EXECUTABLE}
+            "${MILES_SPLIT_MANIFEST_CLIPS_SCRIPT}"
+            "${MILES_BUILTIN_SKIN_ROOT}"
+    BYPRODUCTS "${MILES_GENERATED_CLIPS_QRC}"
+    WORKING_DIRECTORY "${MILES_REPOSITORY_ROOT}"
+    COMMENT "Generating Miles pre-cut animation clips"
+    VERBATIM
+)
+
+set_source_files_properties("${MILES_GENERATED_CLIPS_QRC}" PROPERTIES GENERATED TRUE)
+
+function(add_miles_generated_clips_qrc target_name)
+    target_sources(${target_name} PRIVATE "${MILES_GENERATED_CLIPS_QRC}")
+    add_dependencies(${target_name} GenerateMilesClips)
+    set_property(TARGET ${target_name} APPEND PROPERTY AUTOGEN_TARGET_DEPENDS GenerateMilesClips)
+endfunction()
 
 set(DESKTOP_SOURCES
     src/DesktopShellController.cpp
@@ -134,6 +158,8 @@ target_link_libraries(MilesEdgeworthDesktop
         Qt6::QuickControls2
 )
 
+add_miles_generated_clips_qrc(MilesEdgeworthDesktop)
+
 set_target_properties(MilesEdgeworthDesktop PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME "MilesEdgeworth v2"
@@ -239,6 +265,8 @@ if(BUILD_TESTING)
             Qt6::Core
     )
 
+    add_miles_generated_clips_qrc(SkinManifestLoaderSmoke)
+
     target_include_directories(SkinManifestLoaderSmoke
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -304,6 +332,8 @@ if(BUILD_TESTING)
             Qt6::Core
             Qt6::Qml
     )
+
+    add_miles_generated_clips_qrc(PetRuntimeSmoke)
 
     add_test(
         NAME pet_runtime_smoke
@@ -382,6 +412,8 @@ if(BUILD_TESTING)
             Qt6::Network
     )
 
+    add_miles_generated_clips_qrc(ChatControllerSmoke)
+
     add_test(NAME chat_controller_smoke COMMAND ChatControllerSmoke)
 
     qt_add_executable(SettingsServiceSmoke
@@ -451,6 +483,8 @@ if(BUILD_TESTING)
             Qt6::Gui
             Qt6::Qml
     )
+
+    add_miles_generated_clips_qrc(SettingsServiceSmoke)
 
     add_test(NAME settings_service_smoke COMMAND SettingsServiceSmoke)
 endif()

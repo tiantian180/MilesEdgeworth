@@ -782,13 +782,20 @@ int main(int argc, char *argv[])
     runtime.setAudioLanguage("jp");
     runtime.submitExpressionRequest("speaking", "objection", 0.0);
     require(runtime.currentActionId() == "objecting", "speaking + objection 应映射到异议动作");
+    runtime.setFacing("right");
     runtime.submitExpressionRequest("speaking", "neutral", 0.0);
     require(runtime.currentActionId() == "talking", "speaking + neutral 应映射到 talking 分段说话动作，而不是站立待机");
-    require(runtime.currentPhaseId() == "enter" && runtime.currentFrameStart() == 0 && runtime.currentFrameEnd() == 3,
-            "talking enter 应使用 crossed 1-4 帧");
+    require(runtime.currentPhaseId() == "enter"
+                && runtime.currentAnimationUrl().toString() == "qrc:/skins/miles-edgeworth/generated/clips/talking.enter.right.gif"
+                && runtime.currentFrameStart() == -1
+                && runtime.currentFrameEnd() == -1,
+            "talking enter 应使用预切片 generated clip，而不是运行时 frameRange");
     runtime.handleAnimationFinished();
-    require(runtime.currentPhaseId() == "loop" && runtime.currentFrameStart() == 4 && runtime.currentFrameEnd() == 7,
-            "talking enter 播完后应进入 5-8 帧说话循环");
+    require(runtime.currentPhaseId() == "loop"
+                && runtime.currentAnimationUrl().toString() == "qrc:/skins/miles-edgeworth/generated/clips/talking.loop.right.gif"
+                && runtime.currentFrameStart() == -1
+                && runtime.currentFrameEnd() == -1,
+            "talking enter 播完后应进入预切片 talking loop clip");
     runtime.submitExpressionRequest("idle", "polite", 0.0);
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
     runtime.playAction("objecting");

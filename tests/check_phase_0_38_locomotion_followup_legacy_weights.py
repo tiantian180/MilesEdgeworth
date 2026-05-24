@@ -54,7 +54,7 @@ def require(condition: bool, message: str) -> None:
 
 def action_pool_weights(pool_id: str) -> dict[str, int]:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    entries = manifest["actionPools"][pool_id]["entries"]
+    entries = manifest["animationPools"][pool_id]["entries"]
     recipes = [entry["recipe"] for entry in entries]
     duplicates = sorted(recipe for recipe, count in Counter(recipes).items() if count > 1)
 

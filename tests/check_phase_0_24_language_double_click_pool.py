@@ -25,7 +25,7 @@ def require(condition: bool, message: str) -> None:
 
 def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
-    action_pools = manifest.get("animationPools") or manifest.get("actionPools", {})
+    action_pools = manifest.get("animationPools") or manifest.get("animationPools", {})
 
     zh_pool = action_pools.get("doubleClick.random.zh", {})
     require(zh_pool, "中文语音应有 doubleClick.random.zh 候选池")

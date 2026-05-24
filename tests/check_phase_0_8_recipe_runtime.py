@@ -43,10 +43,10 @@ def main() -> int:
     require(tea_recipe.get("action") == "tea", "tea.once 应直接播放 tea GIF")
     require("steps" not in tea_recipe, "tea.once 不应额外串联 bow 或 idle_stand")
 
-    action_pools = manifest.get("animationPools") or manifest.get("actionPools", {})
-    require(action_pools, "manifest 缺少 animationPools/actionPools")
+    action_pools = manifest.get("animationPools") or manifest.get("animationPools", {})
+    require(action_pools, "manifest 缺少 clipPools/animationPools")
     for pool_id in ["idle.random", "menu.tea"]:
-        require(pool_id in action_pools, f"manifest animationPools/actionPools 缺少 {pool_id}")
+        require(pool_id in action_pools, f"manifest animationPools/animationPools 缺少 {pool_id}")
 
     idle_entries = action_pools["idle.random"].get("entries", [])
     require(len(idle_entries) >= 3, "idle.random 至少需要 3 个候选动作，才能模拟旧版随机待机")

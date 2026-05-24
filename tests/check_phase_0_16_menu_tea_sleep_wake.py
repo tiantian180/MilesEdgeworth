@@ -26,7 +26,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     recipes = manifest.get("recipes", {})
-    action_pools = manifest.get("actionPools", {})
+    action_pools = manifest.get("animationPools", {})
 
     tea_recipe = recipes.get("tea.once", {})
     require(tea_recipe.get("scope") == "menu", "tea.once 应作为菜单 recipe")
@@ -58,8 +58,8 @@ def main() -> int:
     tea_alt = actions.get("tea_alt", {})
     require(tea_alt.get("loopMode") == "onceThenIdle", "tea_alt 应播放一次后回 idle")
     variants = tea_alt.get("variants", {})
-    require(variants.get("right", {}).get("animation") == "skin:assets/body/menu/tea-alt-right.gif", "tea_alt.right 应使用 tea2")
-    require(variants.get("left", {}).get("animation") == "skin:assets/body/menu/tea-alt-left.gif", "tea_alt.left 应使用 tea3")
+    require(variants.get("right", {}).get("clip") == "file:assets/body/menu/tea-alt-right.gif", "tea_alt.right 应使用 tea2")
+    require(variants.get("left", {}).get("clip") == "file:assets/body/menu/tea-alt-left.gif", "tea_alt.left 应使用 tea3")
 
     qrc = read("apps/desktop/resources/pet_assets.qrc")
     for alias in ["tea-alt-right.gif", "tea-alt-left.gif"]:

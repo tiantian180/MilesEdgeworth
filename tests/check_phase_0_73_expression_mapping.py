@@ -40,7 +40,7 @@ def main() -> int:
     phase_record = read("docs/v2/阶段记录/第0阶段桌面壳验证.md")
     v1_record = read("docs/v2/阶段记录/v1 手感回归与定制化接入.md")
 
-    require(manifest.get("schemaVersion") == 3, "manifest.schemaVersion 应升级到 3")
+    require(manifest.get("schemaVersion", 0) >= 3, "manifest.schemaVersion 不应低于 3")
 
     expressions = {item.get("id"): item for item in manifest.get("expressions", []) if isinstance(item, dict)}
     for expression_id in ["neutral", "objection", "polite"]:
@@ -112,7 +112,7 @@ def main() -> int:
         'runtime.submitExpressionRequest("idle", "polite", 0.0)',
         'runtime.currentActionId() == "bow"',
         'runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0)',
-        'runtime.currentActionId() == "idle_stand"',
+        'runtime.currentActionId() == "talking"',
         'runtime.submitExpressionRequest("unknown-state", "neutral", 0.0)',
         '未知 expression state 应回退到当前 PetState',
     ]:

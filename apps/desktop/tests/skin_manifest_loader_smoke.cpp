@@ -348,15 +348,20 @@ int main(int argc, char **argv)
     require(
         builtInMiles.actions.value(QStringLiteral("idle_stand")).variants.value(QStringLiteral("right")).url.toString()
             == QStringLiteral("qrc:/skins/miles-edgeworth/assets/body/idle/stand-right.gif"),
-        "built-in Miles idle_stand should resolve legacy skin: URL to qrc"
+        "built-in Miles idle_stand should resolve file: URL to qrc"
     );
     const AnimationVariant thinkingEnterRight = builtInMiles
         .actions.value(QStringLiteral("thinking"))
         .phases.value(QStringLiteral("enter"))
         .variants.value(QStringLiteral("right"));
     require(
-        thinkingEnterRight.frameStart == 0 && thinkingEnterRight.frameEnd == 3,
-        "built-in Miles legacy animation frameRange should populate runtime frame range"
+        thinkingEnterRight.url.toString()
+            == QStringLiteral("qrc:/skins/miles-edgeworth/generated/clips/thinking.enter.right.gif"),
+        "built-in Miles thinking enter should resolve to generated clip qrc URL"
+    );
+    require(
+        thinkingEnterRight.frameStart == -1 && thinkingEnterRight.frameEnd == -1,
+        "built-in Miles generated clip variants should not carry legacy runtime frame ranges"
     );
     require(
         builtInMiles.personaPrompt.contains(QStringLiteral("Miles Edgeworth"))
