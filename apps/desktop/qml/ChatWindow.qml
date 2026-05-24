@@ -574,7 +574,7 @@ ApplicationWindow {
                     color: compactExpandButton.down ? "#e1d8ce" : "#f3ede5"
                     border.color: "#bfae9e"
                 }
-                onClicked: chatWindow.open()
+                onClicked: App.ChatController.openWindow()
             }
 
             TextArea {
