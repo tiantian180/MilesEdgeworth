@@ -1121,10 +1121,9 @@ void ChatController::handleBoundaryReached()
         }
         if (m_finishPendingAfterGate) {
             m_finishPendingAfterGate = false;
-            if (m_runtime != nullptr) {
-                m_runtime->setSuppressAutoIdle(false);
-            }
-            transitionTo(ChatPhase::IDLE);
+            transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+            drainHoldBufferToPacer();
+            requestBoundaryForCurrentStream();
             return;
         }
         transitionTo(ChatPhase::STREAMING);
@@ -1156,10 +1155,9 @@ void ChatController::handleGateTimeout()
     }
     if (m_finishPendingAfterGate) {
         m_finishPendingAfterGate = false;
-        if (m_runtime != nullptr) {
-            m_runtime->setSuppressAutoIdle(false);
-        }
-        transitionTo(ChatPhase::IDLE);
+        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+        drainHoldBufferToPacer();
+        requestBoundaryForCurrentStream();
         return;
     }
     transitionTo(ChatPhase::STREAMING);

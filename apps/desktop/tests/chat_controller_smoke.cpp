@@ -608,6 +608,80 @@ int main(int argc, char *argv[])
                 "the current gate timeout should still release its own buffered text");
     }
 
+    // RUN_FINISHED during a GATED expression switch must flush the final held text
+    // and wait for the new expression to clean-finish before idling.
+    {
+        PetRuntime gfRuntime;
+        for (int i = 0; i < 5 && gfRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            gfRuntime.handleAnimationFinished();
+        }
+
+        ChatController gfController(&gfRuntime, &settings);
+
+        ChatStreamEvent gfStarted;
+        gfStarted.type = QStringLiteral("RUN_STARTED");
+        gfController.applyStreamEvent(gfStarted);
+
+        ChatStreamEvent gfExpr1;
+        gfExpr1.type = QStringLiteral("CUSTOM");
+        gfExpr1.name = QStringLiteral("miles.pet.expression.requested");
+        gfExpr1.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        gfExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        gfController.applyStreamEvent(gfExpr1);
+        require(gfRuntime.currentState() == QStringLiteral("speaking"),
+                "GATED finish test should start speaking after initial cleanFinish");
+
+        ChatStreamEvent gfStart;
+        gfStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        gfStart.role = QStringLiteral("assistant");
+        gfController.applyStreamEvent(gfStart);
+
+        ChatStreamEvent gfText1;
+        gfText1.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        gfText1.delta = QStringLiteral("前");
+        gfController.applyStreamEvent(gfText1);
+        require(waitFor([&gfController]() {
+                    return gfController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前");
+                }),
+                "GATED finish test should stream first text before the gate");
+
+        ChatStreamEvent gfExpr2;
+        gfExpr2.type = QStringLiteral("CUSTOM");
+        gfExpr2.name = QStringLiteral("miles.pet.expression.requested");
+        gfExpr2.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        gfExpr2.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+        gfController.applyStreamEvent(gfExpr2);
+
+        ChatStreamEvent gfText2;
+        gfText2.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        gfText2.delta = QStringLiteral("后");
+        gfController.applyStreamEvent(gfText2);
+
+        ChatStreamEvent gfFinished;
+        gfFinished.type = QStringLiteral("RUN_FINISHED");
+        gfController.applyStreamEvent(gfFinished);
+
+        require(!gfController.sending(),
+                "RUN_FINISHED during GATED should clear sending while waiting for cleanFinish");
+        require(gfController.messages().constLast().toMap()
+                    .value(QStringLiteral("text")).toString() == QStringLiteral("前"),
+                "RUN_FINISHED during GATED should keep final text held before cleanFinish");
+
+        gfRuntime.handleAnimationFinished();
+        require(waitFor([&gfController]() {
+                    return gfController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前后");
+                }),
+                "RUN_FINISHED during GATED should drain final held text at cleanFinish");
+        require(gfRuntime.currentState() == QStringLiteral("thinking"),
+                "RUN_FINISHED during GATED should activate the final gated expression first");
+
+        gfRuntime.handleAnimationFinished();
+        require(gfRuntime.currentState() == QStringLiteral("idle"),
+                "RUN_FINISHED during GATED should idle only after final expression cleanFinish");
+    }
+
     // --- Phase 2.3.1 Task 7: RUN_FINISHED waits for cleanFinishReady before idle ---
     {
         PetRuntime fRuntime;

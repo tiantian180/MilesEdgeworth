@@ -504,10 +504,6 @@ void PetRuntime::handleAnimationFinished()
     const int finishingPlaybackSerial = m_playbackSerial;
     m_currentPlaybackAtBoundary = true;
 
-    if (continueCleanFinishIfPossible()) {
-        return;
-    }
-
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
     const PhaseDefinition phase = action.phases.value(m_currentPhaseId);
     if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
@@ -520,6 +516,10 @@ void PetRuntime::handleAnimationFinished()
     }
 
     applyFacingAfterCurrentAction(action);
+
+    if (continueCleanFinishIfPossible()) {
+        return;
+    }
 
     if (!m_currentRecipeId.isEmpty()) {
         const RecipeDefinition recipe = m_manifest.recipes.value(m_currentRecipeId);

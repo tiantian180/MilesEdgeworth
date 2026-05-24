@@ -841,6 +841,35 @@ int main(int argc, char *argv[])
         require(sleepCleanFinishCallbacks == 1,
                 "cleanFinish should callback after exit finishes");
 
+        runtime.playRecipe("sleep.enterLoopExit");
+        int sleepEnterCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&sleepEnterCleanFinishCallbacks]() {
+            ++sleepEnterCleanFinishCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "cleanFinish requested during enter should allow internal nextPhase to reach loop first");
+        require(sleepEnterCleanFinishCallbacks == 0,
+                "cleanFinish requested during enter should not callback before loop boundary");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "exit",
+                "cleanFinish from loop after enter should play exit");
+        runtime.handleAnimationFinished();
+        require(sleepEnterCleanFinishCallbacks == 1,
+                "cleanFinish requested during enter should callback after exit finishes");
+
+        runtime.setFacing("right");
+        runtime.playAction("turn_around");
+        int turnCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&turnCleanFinishCallbacks]() {
+            ++turnCleanFinishCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(turnCleanFinishCallbacks == 1,
+                "cleanFinish should callback at turn action boundary");
+        require(runtime.currentFacing() == "left",
+                "cleanFinish should preserve facingAfter side effect before callback");
+
         runtime.playAction("thinking");
         int replacedCleanFinishCallbacks = 0;
         runtime.requestCleanFinishAndNotify([&replacedCleanFinishCallbacks]() {
