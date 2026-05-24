@@ -301,6 +301,77 @@ int main(int argc, char **argv)
 
     require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
 {
+  "schemaVersion": 3,
+  "defaultFacing": "right",
+  "states": { "idle": { "action": "idle_stand" } },
+  "actions": {
+    "idle_stand": {
+      "variants": {
+        "right": {
+          "animation": "skin:assets/body/idle/stand.gif"
+        }
+      }
+    }
+  },
+  "recipes": {
+    "legacy.recipe": {
+      "action": "idle_stand"
+    }
+  },
+  "actionPools": {
+    "legacy.pool": {
+      "entries": [
+        { "type": "action", "action": "idle_stand" }
+      ]
+    }
+  },
+  "behaviorTriggers": {
+    "legacy.dispatch": {
+      "entries": [
+        { "type": "pool", "pool": "legacy.pool" },
+        { "type": "recipe", "recipe": "legacy.recipe" },
+        { "type": "action", "action": "idle_stand" },
+        { "type": "returnToIdle" },
+        { "type": "none", "weight": 2 }
+      ]
+    }
+  }
+}
+)JSON")), "legacy behaviorTriggers manifest should be written");
+    const SkinManifest legacyTriggersManifest = SkinManifestLoader::loadFromDirectory(dir.path());
+    const QList<BehaviorTriggerEntry> legacyTriggerEntries = legacyTriggersManifest
+        .behaviorTriggers
+        .value(QStringLiteral("legacy.dispatch"))
+        .entries;
+    require(legacyTriggerEntries.size() == 5,
+            "loader should keep all legacy behaviorTriggers entries");
+    require(
+        legacyTriggerEntries.at(0).request.kind == ActionRequestKind::AnimationPool
+            && legacyTriggerEntries.at(0).request.targetId == QStringLiteral("legacy.pool"),
+        "legacy behaviorTriggers type=pool should parse as AnimationPool request"
+    );
+    require(
+        legacyTriggerEntries.at(1).request.kind == ActionRequestKind::Recipe
+            && legacyTriggerEntries.at(1).request.targetId == QStringLiteral("legacy.recipe"),
+        "legacy behaviorTriggers type=recipe should parse as Recipe request"
+    );
+    require(
+        legacyTriggerEntries.at(2).request.kind == ActionRequestKind::Action
+            && legacyTriggerEntries.at(2).request.targetId == QStringLiteral("idle_stand"),
+        "legacy behaviorTriggers type=action should parse as Action request"
+    );
+    require(
+        legacyTriggerEntries.at(3).request.kind == ActionRequestKind::ReturnToIdle,
+        "legacy behaviorTriggers type=returnToIdle should parse as ReturnToIdle request"
+    );
+    require(
+        legacyTriggerEntries.at(4).request.kind == ActionRequestKind::None
+            && legacyTriggerEntries.at(4).weight == 2,
+        "legacy behaviorTriggers type=none should parse as weighted no-op"
+    );
+
+    require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
   "schemaVersion": 4,
   "clips": {
     "../bad": {

@@ -1075,6 +1075,20 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "idle_stand", "fallback 点击应保持待机动作");
     require(runtime.playbackSerial() == playbackSerialBeforeFallback, "fallback returnToIdle 不应重启 idle_stand 动画");
 
+    SkinManifest &noOpPoolManifest = const_cast<SkinManifest &>(runtime.manifest());
+    AnimationPoolDefinition noOpPool;
+    AnimationPoolEntry noOpEntry;
+    noOpEntry.weight = 1;
+    noOpPool.entries.append(noOpEntry);
+    noOpPoolManifest.animationPools.insert(QStringLiteral("test.noop"), noOpPool);
+    const QString actionBeforeNoOpPool = runtime.currentActionId();
+    const int serialBeforeNoOpPool = runtime.playbackSerial();
+    runtime.submitActionRequest(ActionRequest::animationPool("test.noop"));
+    require(runtime.currentActionId() == actionBeforeNoOpPool,
+            "抽中 only-weight no-op 动画池候选不应切换当前 action");
+    require(runtime.playbackSerial() == serialBeforeNoOpPool,
+            "抽中 only-weight no-op 动画池候选不应重启动画播放");
+
     const QString soundBeforeMutedPlay = runtime.currentSoundUrl().toString();
     runtime.toggleAudioMuted();
     runtime.playRecipe("doubleClick.holdIt");
