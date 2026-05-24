@@ -517,6 +517,11 @@ void PetRuntime::handleAnimationFinished()
 
     applyFacingAfterCurrentAction(action);
 
+    if (m_cleanFinishCallback && !m_currentRecipeStepRuntimeControlled && currentRecipeHasNextStep()) {
+        playNextRecipeStep();
+        return;
+    }
+
     if (continueCleanFinishIfPossible()) {
         return;
     }

@@ -52,7 +52,9 @@ bool recipeStepsEquivalent(const RecipeStep &left, const RecipeStep &right)
         && left.movementDirection == right.movementDirection
         && left.facing == right.facing
         && left.repeat == right.repeat
-        && left.durationMs == right.durationMs;
+        && left.durationMs == right.durationMs
+        && left.durationMode == right.durationMode
+        && left.runtimeControlled == right.runtimeControlled;
 }
 
 bool actionPhaseValid(const SkinManifest &manifest, const QString &actionId, const QString &phaseId)
@@ -422,6 +424,15 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
         m_currentActionId = preservedActionId;
         m_currentRecipeId = preservedRecipeId;
         m_currentRecipeStepIndex = preservedRecipeStepIndex;
+        m_currentRecipeStepRuntimeControlled = false;
+        if (!m_currentRecipeId.isEmpty() && m_manifest.recipes.contains(m_currentRecipeId)) {
+            const RecipeDefinition currentRecipe = m_manifest.recipes.value(m_currentRecipeId);
+            if (m_currentRecipeStepIndex >= 0 && m_currentRecipeStepIndex < currentRecipe.steps.size()) {
+                const RecipeStep currentStep = currentRecipe.steps.at(m_currentRecipeStepIndex);
+                m_currentRecipeStepRuntimeControlled = currentStep.runtimeControlled
+                    && currentStep.phaseId == QStringLiteral("loop");
+            }
+        }
         m_currentPhaseId = preservedPhaseId;
         if (m_manifest.facings.contains(preservedFacing)) {
             m_currentFacing = preservedFacing;

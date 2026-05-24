@@ -332,6 +332,26 @@ int main(int argc, char *argv[])
     require(runtime.playbackSerial() == preserveReloadSerial,
             "preserve reload must not restart the current animation");
 
+    SkinManifest &runtimeDurationManifest = const_cast<SkinManifest &>(runtime.manifest());
+    RecipeDefinition nonRuntimeThinkingRecipe = runtimeDurationManifest.recipes.value(QStringLiteral("thinking.holdUntilCancelled"));
+    require(nonRuntimeThinkingRecipe.steps.size() == 3,
+            "preserve reload runtime duration setup should find the thinking recipe");
+    nonRuntimeThinkingRecipe.steps[1].durationMode.clear();
+    nonRuntimeThinkingRecipe.steps[1].runtimeControlled = false;
+    runtimeDurationManifest.recipes.insert(QStringLiteral("thinking.holdUntilCancelled"), nonRuntimeThinkingRecipe);
+    runtime.playRecipe("thinking.holdUntilCancelled");
+    runtime.handleAnimationFinished();
+    require(runtime.currentRecipeId() == "thinking.holdUntilCancelled",
+            "preserve reload runtime duration setup should keep the synthetic recipe active");
+    require(runtime.currentPhaseId() == "loop",
+            "preserve reload runtime duration setup should reach the synthetic loop step");
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should succeed when runtime duration semantics changed");
+    require(runtime.currentRecipeId().isEmpty(),
+            "preserve reload should not keep playback when recipe step runtime duration semantics changed");
+    require(runtime.currentActionId() == runtime.manifest().stateToAction.value(QStringLiteral("idle")),
+            "runtime duration semantic changes should fall back to the manifest idle action");
+
     SkinManifest &editableManifest = const_cast<SkinManifest &>(runtime.manifest());
     ActionDefinition editedObjecting = editableManifest.actions.value(QStringLiteral("objecting"));
     PhaseDefinition removedPhase;
@@ -864,6 +884,23 @@ int main(int argc, char *argv[])
         runtime.handleAnimationFinished();
         require(thinkingCleanFinishCallbacks == 1,
                 "thinking cleanFinish should callback after exit step completes");
+
+        runtime.playRecipe("thinking.holdUntilCancelled");
+        int thinkingEnterCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&thinkingEnterCleanFinishCallbacks]() {
+            ++thinkingEnterCleanFinishCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "cleanFinish requested during thinking enter should advance to the runtime loop step first");
+        require(thinkingEnterCleanFinishCallbacks == 0,
+                "thinking enter cleanFinish should not callback before runtime loop exits");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "exit",
+                "thinking enter cleanFinish should advance runtime loop to exit");
+        runtime.handleAnimationFinished();
+        require(thinkingEnterCleanFinishCallbacks == 1,
+                "thinking enter cleanFinish should callback after exit step completes");
 
         runtime.playRecipe("sleep.enterLoopExit");
         int sleepEnterCleanFinishCallbacks = 0;
