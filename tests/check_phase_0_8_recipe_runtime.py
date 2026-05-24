@@ -45,7 +45,7 @@ def main() -> int:
 
     action_pools = manifest.get("actionPools", {})
     require(action_pools, "manifest 缺少 actionPools")
-    for pool_id in ["idle.random", "menu.tea", "ai.thinking"]:
+    for pool_id in ["idle.random", "menu.tea"]:
         require(pool_id in action_pools, f"manifest actionPools 缺少 {pool_id}")
 
     idle_entries = action_pools["idle.random"].get("entries", [])

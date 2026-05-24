@@ -60,8 +60,7 @@ def main() -> int:
     for action_id in ["idle_stand", "thinking", "objecting", "bow"]:
         require(action_id in actions, f"manifest 缺少 action: {action_id}")
         action = actions[action_id]
-        require("priority" in action, f"{action_id} 缺少 priority")
-        require("tags" in action, f"{action_id} 缺少 tags")
+        require("label" in action, f"{action_id} 缺少 label")
         if action_id == "thinking":
             phases = action.get("phases", {})
             require(set(phases.keys()) >= {"enter", "loop", "exit"}, "thinking 应声明 enter/loop/exit phases")

@@ -282,7 +282,6 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
         expression.label = expressionObject.value("label").toString(expression.id).trimmed();
         expression.description = expressionObject.value("description").toString().trimmed();
         expression.allowedStates = stringListFromJsonArray(expressionObject.value("allowedStates").toArray());
-        expression.priority = expressionObject.value("priority").toInt(0);
 
         if (!expression.id.isEmpty()) {
             manifest.expressions.insert(expression.id, expression);
@@ -495,18 +494,9 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
         action.label = actionObject.value("label").toString(it.key());
         action.category = actionObject.value("category").toString();
         action.loopMode = actionObject.value("loopMode").toString(actionObject.value("loop").toBool(true) ? "loop" : "onceThenIdle");
-        action.priority = actionObject.value("priority").toInt(0);
         action.blocksPointerInteraction = actionObject.value("blocksPointerInteraction").toBool(false);
         action.initialPhase = actionObject.value("initialPhase").toString();
         action.exitPhase = actionObject.value("exitPhase").toString();
-
-        const QJsonArray tags = actionObject.value("tags").toArray();
-        for (const QJsonValue &tag : tags) {
-            const QString tagText = tag.toString();
-            if (!tagText.isEmpty()) {
-                action.tags.append(tagText);
-            }
-        }
 
         const QJsonObject variants = actionObject.value("variants").toObject();
         for (auto variantIt = variants.constBegin(); variantIt != variants.constEnd(); ++variantIt) {
@@ -840,7 +830,7 @@ SkinManifest SkinManifestLoader::fallbackManifest()
     manifest.defaultSizeId = "medium";
     manifest.audio.defaultVoiceLanguage = "jp";
     manifest.audio.voiceLanguages.append(AudioLanguageDefinition {"jp", QStringLiteral("日语")});
-    manifest.expressions.insert("neutral", ExpressionDefinition {"neutral", QStringLiteral("默认"), QStringLiteral("默认站立表达"), {}, 0});
+    manifest.expressions.insert("neutral", ExpressionDefinition {"neutral", QStringLiteral("默认"), QStringLiteral("默认站立表达"), {}});
     ExpressionMappingDefinition neutralMapping;
     neutralMapping.selection = "first_available";
     neutralMapping.fallbackExpressionId.clear();

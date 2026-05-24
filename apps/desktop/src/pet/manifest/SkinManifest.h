@@ -58,9 +58,7 @@ struct ActionDefinition
     QString label;
     QString category;
     QString loopMode = "loop";
-    int priority = 0;
     bool blocksPointerInteraction = false;
-    QStringList tags;
     QHash<QString, AnimationVariant> variants;
     QHash<QString, QPointF> movementDeltas;
     QHash<QString, QString> facingAfter;
@@ -253,7 +251,6 @@ struct ExpressionDefinition
     QString label;
     QString description;
     QStringList allowedStates;
-    int priority = 0;
 };
 
 // ExpressionMappingEntry 是一条表达 → 请求的映射候选。

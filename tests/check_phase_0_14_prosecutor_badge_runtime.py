@@ -39,7 +39,8 @@ def main() -> None:
 
     for facing in ["right", "left"]:
         require(facing in badge.get("startOffsets", {}), f"徽章缺少 {facing} 起点偏移")
-        require(facing in badge.get("travel", {}), f"徽章缺少 {facing} 飞行偏移")
+        require(facing in badge.get("travelBase", {}), f"徽章缺少 {facing} 基础飞行偏移")
+        require(facing in badge.get("travelPerScale", {}), f"徽章缺少 {facing} scale 飞行补偿")
 
     actions = manifest.get("actions", {})
     pickup = actions.get("pickup_badge")
