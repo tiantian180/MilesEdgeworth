@@ -339,6 +339,15 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
             preservedRecipeId,
             preservedRecipeStepIndex
         );
+    const auto emitDerivedStateChanges = [&]() {
+        if (wasPointerInteractionEnabled != pointerInteractionEnabled()) {
+            emit pointerInteractionEnabledChanged();
+        }
+        if (wasSleeping != sleeping()
+                || wasSleepTransitioning != sleepTransitioning()) {
+            emit sleepStateChanged();
+        }
+    };
 
     if (!preservePlayback) {
         hideCurrentProp();
@@ -397,6 +406,7 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
                 emit currentSoundUrlChanged();
                 emit soundPlaybackSerialChanged();
             }
+            emitDerivedStateChanges();
             emit activeSkinChanged();
             emit skinManifestReloaded();
             return true;
@@ -418,13 +428,7 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
         m_currentAnimationUrl = preservedAnimationUrl;
         m_playbackSerial = preservedPlaybackSerial;
 
-        if (wasPointerInteractionEnabled != pointerInteractionEnabled()) {
-            emit pointerInteractionEnabledChanged();
-        }
-        if (wasSleeping != sleeping()
-                || wasSleepTransitioning != sleepTransitioning()) {
-            emit sleepStateChanged();
-        }
+        emitDerivedStateChanges();
 
         emit activeSkinChanged();
         emit skinManifestReloaded();

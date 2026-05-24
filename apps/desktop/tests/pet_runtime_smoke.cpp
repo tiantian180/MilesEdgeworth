@@ -367,6 +367,27 @@ int main(int argc, char *argv[])
     require(runtime.playbackSerial() != invalidPreserveReloadSerial,
             "invalid preserved playback fallback should restart with a safe animation");
 
+    SkinManifest &blockingManifest = const_cast<SkinManifest &>(runtime.manifest());
+    ActionDefinition reviewBlockingAction = blockingManifest.actions.value(QStringLiteral("objecting"));
+    reviewBlockingAction.blocksPointerInteraction = true;
+    blockingManifest.actions.insert(QStringLiteral("review_blocking"), reviewBlockingAction);
+    blockingManifest.stateToAction.insert(QStringLiteral("review_blocking_state"), QStringLiteral("review_blocking"));
+    runtime.setState("review_blocking_state");
+    require(!runtime.pointerInteractionEnabled(),
+            "invalid fallback signal setup should start from a pointer-blocking synthetic action");
+    int pointerInteractionChangesDuringInvalidFallback = 0;
+    QObject::connect(&runtime, &PetRuntime::pointerInteractionEnabledChanged, [&pointerInteractionChangesDuringInvalidFallback]() {
+        ++pointerInteractionChangesDuringInvalidFallback;
+    });
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should fall back from a removed pointer-blocking action");
+    require(runtime.currentState() == "idle",
+            "removed pointer-blocking action should fall back to idle state");
+    require(runtime.pointerInteractionEnabled(),
+            "invalid fallback should finish in pointer-enabled idle state");
+    require(pointerInteractionChangesDuringInvalidFallback > 0,
+            "invalid fallback must notify pointer interaction availability when final state changes");
+
     runtime.returnToIdle();
     require(runtime.reloadActiveSkin(), "runtime should reload active skin before startup assertions");
     PetEventBridge bridge(&runtime);
