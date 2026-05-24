@@ -141,7 +141,7 @@ private:
     QString m_pendingExpression;
     ChatTextPacer *m_pacer = nullptr;
     QTimer m_gateTimeout;
-    static constexpr int kGateTimeoutMs = 2000;
+    static constexpr int kGateTimeoutMs = 800;
     bool m_sidecarReady = false;
     bool m_providerConfigured = false;
     bool m_sending = false;
@@ -151,6 +151,7 @@ private:
     int m_sidecarRestartAttempts = 0;
     bool m_finishPendingAfterStart = false;
     bool m_finishPendingAfterGate = false;
+    bool m_cleanFinishRequestPending = false;
     // 用户取消后，剩余 SSE chunks 必须被丢弃，否则会拼到新建的 assistant 消息里产生"幽灵回复"。
     // 每次 sendMessage 复位 false。
     bool m_cancelled = false;

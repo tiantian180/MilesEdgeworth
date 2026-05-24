@@ -478,13 +478,12 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
 
 void PetRuntime::returnToIdle()
 {
-    clearCleanFinishCallback();
-
     const QString idleAction = actionForState(QStringLiteral("idle"));
     if (m_currentRecipeId.isEmpty()
             && m_currentState == QStringLiteral("idle")
             && !idleAction.isEmpty()
             && m_currentActionId == idleAction) {
+        continueCleanFinishIfPossible();
         return;
     }
 
@@ -497,6 +496,7 @@ void PetRuntime::returnToIdle()
     }
 
     setState("idle");
+    continueCleanFinishIfPossible();
 }
 
 void PetRuntime::handleAnimationFinished()

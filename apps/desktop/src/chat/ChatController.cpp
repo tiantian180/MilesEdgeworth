@@ -993,12 +993,20 @@ void ChatController::requestCleanFinishForCurrentStream()
         handleCleanFinishReady();
         return;
     }
+    if (m_cleanFinishRequestPending) {
+        return;
+    }
 
     const quint64 streamId = m_currentStreamId;
     const quint64 generation = m_asyncGeneration;
     QPointer<ChatController> self(this);
+    m_cleanFinishRequestPending = true;
     m_runtime->requestCleanFinishAndNotify([self, streamId, generation]() {
-        if (self != nullptr && self->runtimeCallbackStillCurrent(streamId, generation)) {
+        if (self == nullptr) {
+            return;
+        }
+        self->m_cleanFinishRequestPending = false;
+        if (self->runtimeCallbackStillCurrent(streamId, generation)) {
             self->handleCleanFinishReady();
         }
     });
@@ -1010,13 +1018,21 @@ void ChatController::requestBoundaryForCurrentStream()
         handleBoundaryReached();
         return;
     }
+    if (m_cleanFinishRequestPending) {
+        return;
+    }
 
     const quint64 streamId = m_currentStreamId;
     const quint64 generation = m_asyncGeneration;
     const quint64 boundaryId = ++m_boundaryRequestId;
     QPointer<ChatController> self(this);
+    m_cleanFinishRequestPending = true;
     m_runtime->requestCleanFinishAndNotify([self, streamId, generation, boundaryId]() {
-        if (self != nullptr && self->boundaryCallbackStillCurrent(streamId, generation, boundaryId)) {
+        if (self == nullptr) {
+            return;
+        }
+        self->m_cleanFinishRequestPending = false;
+        if (self->boundaryCallbackStillCurrent(streamId, generation, boundaryId)) {
             self->handleBoundaryReached();
         }
     });
