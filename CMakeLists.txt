@@ -609,6 +609,14 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_3_3_langfuse.py
         )
 
+        # Phase 2.4 的 phased 动画与动画链检查：守住 onceThenHold、
+        # cleanFinish、segment queue、lifecycle 事件和 runtime-controlled recipe step。
+        add_test(
+            NAME check_phase_2_4_phased_animation
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_4_phased_animation.py
+        )
+
         # Logging standard check: keeps Qt + Go logging categories, env vars,
         # payload safety, and sidecar stderr forwarding aligned with docs/v2/设计方案/日志规范设计.md.
         add_test(

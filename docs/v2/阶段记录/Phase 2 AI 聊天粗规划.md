@@ -177,21 +177,26 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 ### Phase 2.4：Phased 动画与动画链
 
-目标：让 thinking / speaking 动画可以维持任意长度，支持链式动画编排，并升级 PetRuntime 的"干净收尾"行为。
+> 详见 `阶段记录/Phase 2.4 Phased 动画与动画链.md`。
+
+目标：让 thinking / speaking 动画可以维持任意长度、自然过渡，实现"聊天时桌宠边做动作边说话"的完整体验。
 
 范围：
 
-- enter / loop / exit 三段动画系统：Qt 运行时支持 GIF 帧段播放或 asset compiler 预切分。
-- 动画链（例如异议动作 → speaking enter/loop 直到流结束 → exit）通过 Recipe `steps` 表达。
-- PetRuntime `requestCleanFinishAndNotify` / `requestBoundaryAndNotify` 升级为真正播 exit 段，不再"播完一轮 loop 就硬切"。详见《AI 聊天动画编排设计》§6。
-- manifest schema 校验（JSON Schema）同步实现，防止 manifest 格式错误静默失败。
-- expression fallback 和异常解析完善。
+- settings reload 拆分（Full / Preserve 模式）。
+- `onceThenHold` loopMode 新增 + manifest 迁移。
+- PetRuntime `requestBoundaryAndNotify` / `requestCleanFinishAndNotify` 合并为统一的 `requestCleanFinishAndNotify`（等安全点 → 播 exit → 回调）。
+- SSE 事件拆分：`expression.requested`（文字段）和 `lifecycle`（非文字状态），移除 idle expression 事件。
+- ChatController segment queue + 双条件门控（cleanFinishReady + segmentDrained）。
+- 速率限制器 segmentId 追踪 + `segmentDrained` 信号。
+- enter / loop / exit 三段动画运行时帧段播放。
+- 9 个 [P2.4] 技术债务全部清理。
 
 验收：
 
-- thinking 状态动画在模型回复期间可以无限循环保持，收到 done 后播放 exit 段自然退出。
-- 链式 recipe 可在 manifest 中声明并被 ChatController 触发。
-- expression 切换时观察到 exit 段被播完才进入下一个动画。
+- thinking 动画在模型回复期间无限循环保持，切换时播 exit 段自然退出。
+- expression 切换时上一段文字吐完 + 上一个动画播完 exit 才进入下一段。
+- objecting/bow 播完后定在最后一帧，不自动回 idle。
 - 输出未知 expression 时走 fallback，不打断聊天。
 
 ### Phase 2.5：Movement API

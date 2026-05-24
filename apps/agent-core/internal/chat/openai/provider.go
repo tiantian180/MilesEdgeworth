@@ -264,9 +264,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	}
 	if !send(ctx, events, chat.StreamEvent{
 		Type:  "CUSTOM",
-		Name:  "miles.pet.expression.requested",
+		Name:  "miles.pet.lifecycle",
 		RunID: runID,
-		Value: map[string]any{"state": "thinking", "expression": "neutral"},
+		Value: map[string]any{"state": "thinking"},
 	}) {
 		return
 	}
@@ -280,21 +280,30 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	}
 
 	sawFirstSpeaking := false
+	var pendingRawDelta strings.Builder
+	takeRawDelta := func() string {
+		raw := pendingRawDelta.String()
+		pendingRawDelta.Reset()
+		return raw
+	}
 	parser := expression.NewParser(
 		knownTags,
 		"neutral",
 		func(text string) {
+			rawDelta := takeRawDelta()
 			if !sawFirstSpeaking {
 				sawFirstSpeaking = true
 				logger.Debug("fallback expression inserted",
 					"expression", "neutral",
 					"textLen", len([]rune(text)))
 				send(ctx, events, chat.StreamEvent{
-					Type:  "CUSTOM",
-					Name:  "miles.pet.expression.requested",
-					RunID: runID,
-					Value: map[string]any{"state": "speaking", "expression": "neutral"},
+					Type:     "CUSTOM",
+					Name:     "miles.pet.expression.requested",
+					RunID:    runID,
+					RawDelta: rawDelta,
+					Value:    map[string]any{"state": "speaking", "expression": "neutral"},
 				})
+				rawDelta = ""
 			}
 			logger.Debug("text chunk parsed", "len", len([]rune(text)))
 			send(ctx, events, chat.StreamEvent{
@@ -302,16 +311,19 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 				RunID:     runID,
 				MessageID: messageID,
 				Delta:     text,
+				RawDelta:  rawDelta,
 			})
 		},
 		func(tag string) {
+			rawDelta := takeRawDelta()
 			sawFirstSpeaking = true
 			logger.Debug("expression tag parsed", "tag", tag)
 			send(ctx, events, chat.StreamEvent{
-				Type:  "CUSTOM",
-				Name:  "miles.pet.expression.requested",
-				RunID: runID,
-				Value: map[string]any{"state": "speaking", "expression": tag},
+				Type:     "CUSTOM",
+				Name:     "miles.pet.expression.requested",
+				RunID:    runID,
+				RawDelta: rawDelta,
+				Value:    map[string]any{"state": "speaking", "expression": tag},
 			})
 		},
 	)
@@ -341,6 +353,7 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 				if mileslog.PayloadLoggingEnabled() {
 					logger.Debug("provider delta payload", "text", choice.Delta.Content)
 				}
+				pendingRawDelta.WriteString(choice.Delta.Content)
 				parser.Feed(choice.Delta.Content)
 			}
 		}
@@ -361,16 +374,6 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		Type:      "TEXT_MESSAGE_END",
 		RunID:     runID,
 		MessageID: messageID,
-	})
-	send(ctx, events, chat.StreamEvent{
-		Type:  "CUSTOM",
-		Name:  "miles.pet.expression.requested",
-		RunID: runID,
-		Value: map[string]any{
-			"state":         "idle",
-			"expression":    "neutral",
-			"interruptHint": "afterCurrent",
-		},
 	})
 	send(ctx, events, chat.StreamEvent{Type: "RUN_FINISHED", RunID: runID})
 }

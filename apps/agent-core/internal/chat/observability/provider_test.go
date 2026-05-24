@@ -43,7 +43,13 @@ func TestStreamChatCreatesLangfuseGenerationSpan(t *testing.T) {
 
 	events := make(chan chat.StreamEvent, 4)
 	events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: "run-1"}
-	events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: "run-1", MessageID: "msg-1", Delta: "reply"}
+	events <- chat.StreamEvent{
+		Type:      "TEXT_MESSAGE_CONTENT",
+		RunID:     "run-1",
+		MessageID: "msg-1",
+		Delta:     "reply",
+		RawDelta:  "[EXPR:objection]reply",
+	}
 	events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: "run-1"}
 	close(events)
 
@@ -96,11 +102,14 @@ func TestStreamChatCreatesLangfuseGenerationSpan(t *testing.T) {
 			t.Fatalf("%s = %q, want %q", key, got, want)
 		}
 	}
-	if !strings.Contains(attrs["langfuse.observation.input"], "hello") {
-		t.Fatalf("input should include messages, got %q", attrs["langfuse.observation.input"])
+	if !strings.Contains(attrs["langfuse.observation.input"], `"model":"test-model"`) ||
+		!strings.Contains(attrs["langfuse.observation.input"], `"stream":true`) ||
+		!strings.Contains(attrs["langfuse.observation.input"], `"messages"`) ||
+		!strings.Contains(attrs["langfuse.observation.input"], "hello") {
+		t.Fatalf("input should include raw provider request fields, got %q", attrs["langfuse.observation.input"])
 	}
-	if !strings.Contains(attrs["langfuse.observation.output"], "reply") {
-		t.Fatalf("output should include streamed reply, got %q", attrs["langfuse.observation.output"])
+	if !strings.Contains(attrs["langfuse.observation.output"], "[EXPR:objection]reply") {
+		t.Fatalf("output should include raw streamed reply, got %q", attrs["langfuse.observation.output"])
 	}
 	if !strings.Contains(attrs["langfuse.observation.model.parameters"], `"temperature":0.4`) {
 		t.Fatalf("model parameters missing temperature: %q", attrs["langfuse.observation.model.parameters"])

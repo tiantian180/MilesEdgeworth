@@ -334,7 +334,7 @@ void SettingsController::save()
             setPersonaError(error);
             return;
         }
-        if (!m_runtime->reloadActiveSkin()) {
+        if (!m_runtime->reloadActiveSkinPreservingPlayback()) {
             setPersonaError(QStringLiteral("保存成功，但重新加载当前皮肤失败。"));
             return;
         }

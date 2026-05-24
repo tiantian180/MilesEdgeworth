@@ -149,7 +149,9 @@ void PetContextMenu::show(
 
         skinMenu->addSeparator();
         QAction *reloadSkinAction = skinMenu->addAction(QStringLiteral("重载当前皮肤"));
-        QObject::connect(reloadSkinAction, &QAction::triggered, runtime, &PetRuntime::reloadActiveSkin);
+        QObject::connect(reloadSkinAction, &QAction::triggered, runtime, [runtime]() {
+            runtime->reloadActiveSkin();
+        });
 
         QAction *openSkinDirectoryAction = skinMenu->addAction(QStringLiteral("打开皮肤目录"));
         QObject::connect(openSkinDirectoryAction, &QAction::triggered, parent, []() {

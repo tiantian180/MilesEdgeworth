@@ -2,7 +2,6 @@
   "schemaVersion": 3,
   "id": "miles-edgeworth",
   "name": "Miles Edgeworth",
-  "version": 1,
   "defaultFacing": "right",
   "facings": ["right", "left"],
   "movementDirections": ["east", "west", "northEast", "northWest", "southEast", "southWest", "north", "south"],
@@ -32,30 +31,27 @@
       "id": "neutral",
       "label": "默认",
       "description": "没有更合适表达时使用的平稳站立表达",
-      "allowedStates": ["idle", "thinking", "speaking", "error"],
-      "priority": 0
+      "allowedStates": ["idle", "thinking", "speaking", "error"]
     },
     {
       "id": "objection",
       "label": "异议",
       "description": "强烈反驳、指出漏洞、语气锐利时使用",
-      "allowedStates": ["speaking"],
-      "priority": 90
+      "allowedStates": ["speaking"]
     },
     {
       "id": "polite",
       "label": "礼貌",
       "description": "礼貌回应、致意或收束话题时使用",
-      "allowedStates": ["idle", "speaking"],
-      "priority": 40
+      "allowedStates": ["idle", "speaking"]
     }
   ],
   "expressionMappings": {
     "neutral": {
       "selection": "first_available",
       "actions": [
-        { "action": "thinking", "allowedStates": ["thinking"] },
-        { "action": "crossed", "allowedStates": ["speaking"] },
+        { "recipe": "thinking.holdUntilCancelled", "allowedStates": ["thinking"] },
+        { "action": "talking", "allowedStates": ["speaking"] },
         { "action": "idle_stand", "allowedStates": ["idle", "error"] }
       ]
     },
@@ -63,7 +59,7 @@
       "selection": "weighted_random",
       "fallback": "neutral",
       "actions": [
-        { "action": "objecting", "weight": 3, "allowedStates": ["speaking"] },
+        { "recipe": "doubleClick.objection", "weight": 3, "allowedStates": ["speaking"] },
         { "recipe": "doubleClick.holdIt", "weight": 1, "allowedStates": ["speaking"] }
       ]
     },
@@ -109,7 +105,7 @@
       "action": "thinking"
     },
     "speaking": {
-      "action": "objecting"
+      "action": "talking"
     },
     "error": {
       "action": "idle_stand"
@@ -370,10 +366,6 @@
         "right": { "x": 172, "y": 32 },
         "left": { "x": 2, "y": 32 }
       },
-      "travel": {
-        "right": { "x": 900, "y": 0 },
-        "left": { "x": -900, "y": 0 }
-      },
       "travelBase": {
         "right": { "x": 600, "y": 0 },
         "left": { "x": -600, "y": 0 }
@@ -389,8 +381,6 @@
       "label": "站立",
       "category": "idle",
       "loopMode": "loop",
-      "priority": 0,
-      "tags": ["idle", "standing"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/idle/stand-right.gif"
@@ -404,9 +394,7 @@
       "label": "公文包入场",
       "category": "startup",
       "loopMode": "once",
-      "priority": 80,
       "blocksPointerInteraction": true,
-      "tags": ["startup", "briefcase", "walking"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/startup/briefcase-in-right.gif",
@@ -418,8 +406,6 @@
       "label": "公文包停下",
       "category": "startup",
       "loopMode": "once",
-      "priority": 80,
-      "tags": ["startup", "briefcase", "standing"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/startup/briefcase-stop-right.gif"
@@ -430,8 +416,6 @@
       "label": "转身",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 15,
-      "tags": ["idle", "turn"],
       "facingAfter": {
         "right": "left",
         "left": "right"
@@ -449,8 +433,6 @@
       "label": "走路",
       "category": "locomotion",
       "loopMode": "onceThenIdle",
-      "priority": 8,
-      "tags": ["walk", "moving"],
       "variants": {
         "east": {
           "animation": "skin:assets/body/locomotion/walk-east.gif",
@@ -490,8 +472,6 @@
       "label": "跑步",
       "category": "locomotion",
       "loopMode": "onceThenIdle",
-      "priority": 8,
-      "tags": ["run", "moving"],
       "variants": {
         "east": {
           "animation": "skin:assets/body/locomotion/run-east.gif",
@@ -530,15 +510,29 @@
     "thinking": {
       "label": "抱胸思考",
       "category": "cognitive",
-      "loopMode": "loop",
-      "priority": 20,
-      "tags": ["thinking", "cognitive"],
-      "variants": {
-        "right": {
-          "animation": "skin:assets/body/gestures/thinking-right.gif"
+      "initialPhase": "enter",
+      "exitPhase": "exit",
+      "phases": {
+        "enter": {
+          "loopMode": "once",
+          "variants": {
+            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [1, 4] },
+            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [1, 4] }
+          }
         },
-        "left": {
-          "animation": "skin:assets/body/gestures/thinking-left.gif"
+        "loop": {
+          "loopMode": "loop",
+          "variants": {
+            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [5, 8] },
+            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [5, 8] }
+          }
+        },
+        "exit": {
+          "loopMode": "onceThenHold",
+          "variants": {
+            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [44, 47] },
+            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [44, 47] }
+          }
         }
       }
     },
@@ -546,8 +540,6 @@
       "label": "随机抱胸思考",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 12,
-      "tags": ["idle", "thinking", "cognitive"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/thinking-right.gif"
@@ -561,8 +553,6 @@
       "label": "轻敲脑袋",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "tapping_head"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/tapping-head-right.gif"
@@ -576,8 +566,6 @@
       "label": "耸肩摊手",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "shrug", "confident"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/shrug-right.gif"
@@ -591,8 +579,6 @@
       "label": "看手表",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "watch", "waiting"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/check-watch-right.gif"
@@ -606,8 +592,6 @@
       "label": "指指点点",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "pointing", "lecture"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/pointing-right.gif"
@@ -621,8 +605,6 @@
       "label": "坐下喝茶",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "tea", "rest"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/sitting-tea-right.gif"
@@ -636,8 +618,6 @@
       "label": "接电话",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "phone", "call"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/phone-call-right.gif"
@@ -651,8 +631,6 @@
       "label": "回头看",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "look_back"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/look-back-right.gif"
@@ -666,8 +644,6 @@
       "label": "抬头看",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "look_up", "head"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/look-up-right.gif"
@@ -681,8 +657,6 @@
       "label": "低头看",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["idle", "look_down", "legs"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/gestures/look-down-right.gif"
@@ -696,8 +670,6 @@
       "label": "受惊",
       "category": "interaction",
       "loopMode": "onceThenIdle",
-      "priority": 35,
-      "tags": ["click", "face", "scared"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/scared-right.gif"
@@ -711,8 +683,6 @@
       "label": "后退",
       "category": "interaction",
       "loopMode": "onceThenIdle",
-      "priority": 25,
-      "tags": ["click", "legs", "back"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/back-right.gif"
@@ -726,8 +696,6 @@
       "label": "拖拽晃动后蹲下",
       "category": "interaction",
       "loopMode": "hold",
-      "priority": 45,
-      "tags": ["drag", "shake", "crouch", "scared"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/crouch-right.gif"
@@ -741,8 +709,6 @@
       "label": "蹲下后完整站起",
       "category": "interaction",
       "loopMode": "onceThenIdle",
-      "priority": 45,
-      "tags": ["drag", "shake", "recover"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/stand-up-full-right.gif"
@@ -756,8 +722,6 @@
       "label": "受惊未蹲下时快速站起",
       "category": "interaction",
       "loopMode": "onceThenIdle",
-      "priority": 45,
-      "tags": ["drag", "shake", "recover", "quick"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/stand-up-quick-right.gif"
@@ -771,8 +735,6 @@
       "label": "抱臂等待",
       "category": "interaction",
       "loopMode": "onceThenIdle",
-      "priority": 40,
-      "tags": ["double_click", "hold_it", "crossed"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/crossed-right.gif"
@@ -782,12 +744,40 @@
         }
       }
     },
+    "talking": {
+      "label": "抱臂说话",
+      "category": "speaking",
+      "initialPhase": "enter",
+      "exitPhase": "exit",
+      "phases": {
+        "enter": {
+          "loopMode": "once",
+          "nextPhase": "loop",
+          "variants": {
+            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [1, 4] },
+            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [1, 4] }
+          }
+        },
+        "loop": {
+          "loopMode": "loop",
+          "variants": {
+            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [5, 8] },
+            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [5, 8] }
+          }
+        },
+        "exit": {
+          "loopMode": "onceThenHold",
+          "variants": {
+            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [9, 11] },
+            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [9, 11] }
+          }
+        }
+      }
+    },
     "objecting": {
       "label": "异议",
       "category": "gesture",
-      "loopMode": "onceThenIdle",
-      "priority": 40,
-      "tags": ["objecting", "speaking", "emphasis"],
+      "loopMode": "onceThenHold",
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/objecting-right.gif"
@@ -800,9 +790,7 @@
     "bow": {
       "label": "鞠躬",
       "category": "gesture",
-      "loopMode": "onceThenIdle",
-      "priority": 30,
-      "tags": ["bow", "polite"],
+      "loopMode": "onceThenHold",
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/bow-right.gif"
@@ -816,8 +804,6 @@
       "label": "捡起检察官徽章",
       "category": "interaction",
       "loopMode": "onceThenIdle",
-      "priority": 35,
-      "tags": ["prop", "badge", "pickup"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/interaction/pickup-right.gif"
@@ -831,8 +817,6 @@
       "label": "喝茶",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["tea", "rest"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/menu/tea-right.gif"
@@ -846,8 +830,6 @@
       "label": "喝茶候选动作",
       "category": "idle",
       "loopMode": "onceThenIdle",
-      "priority": 10,
-      "tags": ["tea", "rest"],
       "variants": {
         "right": {
           "animation": "skin:assets/body/menu/tea-alt-right.gif"
@@ -860,8 +842,6 @@
     "sleep": {
       "label": "睡觉",
       "category": "idle",
-      "priority": 10,
-      "tags": ["sleep", "idle"],
       "initialPhase": "enter",
       "exitPhase": "exit",
       "phases": {
@@ -945,6 +925,15 @@
       "label": "随机思考",
       "scope": "idle",
       "action": "idle_thinking_once"
+    },
+    "thinking.holdUntilCancelled": {
+      "label": "聊天思考直到取消",
+      "scope": "agent",
+      "steps": [
+        { "action": "thinking", "phase": "enter" },
+        { "action": "thinking", "phase": "loop", "duration": "runtime" },
+        { "action": "thinking", "phase": "exit" }
+      ]
     },
     "turn.once": {
       "label": "转身一次",
@@ -1640,15 +1629,6 @@
         },
         {
           "recipe": "teaAlt.once",
-          "weight": 1
-        }
-      ]
-    },
-    "ai.thinking": {
-      "label": "模型思考",
-      "entries": [
-        {
-          "recipe": "idle.randomThinking",
           "weight": 1
         }
       ]

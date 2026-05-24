@@ -144,11 +144,12 @@ int main(int argc, char *argv[])
 
     ChatStreamEvent thinkingEvent;
     thinkingEvent.type = QStringLiteral("CUSTOM");
-    thinkingEvent.name = QStringLiteral("miles.pet.expression.requested");
+    thinkingEvent.name = QStringLiteral("miles.pet.lifecycle");
     thinkingEvent.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
-    thinkingEvent.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
     controller.applyStreamEvent(thinkingEvent);
-    runtime.handleAnimationFinished();
+    for (int i = 0; i < 5 && runtime.currentState() != QStringLiteral("thinking"); ++i) {
+        runtime.handleAnimationFinished();
+    }
     require(runtime.currentState() == QStringLiteral("thinking"), "custom thinking event should update runtime state");
     require(runtime.currentActionId() == QStringLiteral("thinking"), "thinking neutral should play thinking action");
 
@@ -164,6 +165,8 @@ int main(int argc, char *argv[])
     messageContent.messageId = QStringLiteral("assistant-1");
     messageContent.delta = QStringLiteral("异议");
     controller.applyStreamEvent(messageContent);
+    require(controller.messages().constFirst().toMap().value("text").toString().isEmpty(),
+            "content delta without an active segment should still wait for the pacer");
     require(waitFor([&controller]() {
                 return controller.messages().constFirst().toMap().value("text").toString()
                     == QStringLiteral("异议");
@@ -176,6 +179,9 @@ int main(int argc, char *argv[])
     expressionEvent.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
     expressionEvent.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
     controller.applyStreamEvent(expressionEvent);
+    for (int i = 0; i < 5 && runtime.currentState() != QStringLiteral("speaking"); ++i) {
+        runtime.handleAnimationFinished();
+    }
     require(waitFor([&runtime]() {
                 return runtime.currentState() == QStringLiteral("speaking");
             }),
@@ -185,7 +191,10 @@ int main(int argc, char *argv[])
                 || runtime.currentActionId() == QStringLiteral("crossed"),
             "speaking objection should play a valid speaking action");
     const QString speakingAction = runtime.currentActionId();
-    require(runtime.currentAutoReturnToIdle(), "speaking objection action should return to idle after animation completion");
+    if (speakingAction == QStringLiteral("objecting")) {
+        require(!runtime.currentAutoReturnToIdle(),
+                "entry-only speaking objection action should stay held until cleanFinish handles the transition");
+    }
 
     ChatStreamEvent idleAfterCurrentEvent;
     idleAfterCurrentEvent.type = QStringLiteral("CUSTOM");
@@ -303,11 +312,15 @@ int main(int argc, char *argv[])
                         .value(QStringLiteral("text")).toString().isEmpty(),
                     "stale clean-finish callback must not release a later stream's held text");
 
-            staleCallbackRuntime.handleAnimationFinished();
-            require(waitFor([&staleCallbackController]() {
-                        return staleCallbackController.messages().constLast().toMap()
-                            .value(QStringLiteral("text")).toString() == QStringLiteral("新回复");
-                    }),
+            bool currentStreamReleased = false;
+            for (int i = 0; i < 8 && !currentStreamReleased; ++i) {
+                staleCallbackRuntime.handleAnimationFinished();
+                currentStreamReleased = waitFor([&staleCallbackController]() {
+                    return staleCallbackController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("新回复");
+                }, 150);
+            }
+            require(currentStreamReleased,
                     "current stream clean-finish callback should still release held text");
         }
     }
@@ -328,7 +341,7 @@ int main(int argc, char *argv[])
             "stream content after cancel must not append a new assistant message");
 
     // Hold buffer round-trip: feed deltas while the controller is waiting for
-    // cleanFinishReady, then let the pacer drain after the animation boundary.
+    // cleanFinishReady, then let the pacer drain after the animation clean finish.
     PetRuntime hbRuntime;
     hbRuntime.setState(QStringLiteral("speaking"));
     ChatController hbController(&hbRuntime, &settings);
@@ -350,11 +363,15 @@ int main(int argc, char *argv[])
     require(hbController.messages().constFirst().toMap().value("text").toString()
                 .isEmpty(),
             "hold buffer should not flush content before cleanFinishReady");
-    hbRuntime.handleAnimationFinished();
-    require(waitFor([&hbController]() {
-                return hbController.messages().constFirst().toMap().value("text").toString()
-                    == QStringLiteral("片段一");
-            }),
+    bool hbFirstSegmentDrained = false;
+    for (int i = 0; i < 5 && !hbFirstSegmentDrained; ++i) {
+        hbRuntime.handleAnimationFinished();
+        hbFirstSegmentDrained = waitFor([&hbController]() {
+            return hbController.messages().constFirst().toMap().value("text").toString()
+                == QStringLiteral("片段一");
+        });
+    }
+    require(hbFirstSegmentDrained,
             "hold buffer should drain through the pacer after cleanFinishReady");
 
     hbContent.delta = QStringLiteral("片段二");
@@ -400,12 +417,16 @@ int main(int argc, char *argv[])
                 "BUFFERING_FOR_START must NOT push streamed text to the UI yet");
 
         // Simulate PetRuntime reaching a clean finish on the previous animation.
-        smRuntime.handleAnimationFinished();
-        require(waitFor([&smController]() {
+        bool smBufferedTextStarted = false;
+        for (int i = 0; i < 5 && !smBufferedTextStarted; ++i) {
+            smRuntime.handleAnimationFinished();
+            smBufferedTextStarted = waitFor([&smController]() {
                     const auto messages = smController.messages();
                     return !messages.isEmpty()
                         && messages.constLast().toMap().value(QStringLiteral("text")).toString().startsWith(QStringLiteral("异"));
-                }),
+                });
+        }
+        require(smBufferedTextStarted,
                 "cleanFinishReady should let buffered text start draining through the pacer");
         // Full pacer drain timing is covered by ChatTextPacerSmoke.
     }
@@ -448,7 +469,13 @@ int main(int argc, char *argv[])
         require(fastRuntime.currentActionId() != QStringLiteral("objecting"),
                 "fast response should still wait for clean finish before applying start expression");
 
-        fastRuntime.handleAnimationFinished();
+        for (int i = 0;
+             i < 5
+             && fastRuntime.currentActionId() != QStringLiteral("objecting")
+             && fastRuntime.currentActionId() != QStringLiteral("crossed");
+             ++i) {
+            fastRuntime.handleAnimationFinished();
+        }
         require(fastRuntime.currentActionId() == QStringLiteral("objecting")
                     || fastRuntime.currentActionId() == QStringLiteral("crossed"),
                 "RUN_FINISHED during BUFFERING_FOR_START must preserve and apply the pending objection expression");
@@ -481,7 +508,7 @@ int main(int argc, char *argv[])
         gExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
         gController.applyStreamEvent(gExpr1);
         require(gRuntime.currentState() == QStringLiteral("speaking"),
-                "initial expression should apply after the synchronous clean finish boundary");
+                "initial expression should apply after synchronous cleanFinishReady");
 
         ChatStreamEvent gStart;
         gStart.type = QStringLiteral("TEXT_MESSAGE_START");
@@ -510,26 +537,26 @@ int main(int argc, char *argv[])
         gText2.delta = QStringLiteral("片段2");
         gController.applyStreamEvent(gText2);
 
-        const QString preBoundaryText = gController.messages().constLast()
+        const QString preCleanFinishText = gController.messages().constLast()
                 .toMap().value(QStringLiteral("text")).toString();
-        require(preBoundaryText == QStringLiteral("片段1"),
-                "GATED text should stay buffered before the animation boundary");
+        require(preCleanFinishText == QStringLiteral("片段1"),
+                "GATED text should stay buffered before cleanFinishReady");
         require(gRuntime.currentState() == QStringLiteral("speaking"),
-                "mid-run expression should not apply before the animation boundary");
+                "mid-run expression should not apply before cleanFinishReady");
 
         gRuntime.handleAnimationFinished();
         require(gRuntime.currentState() == QStringLiteral("thinking"),
-                "boundary callback should request the queued thinking expression");
+                "cleanFinish callback should request the queued thinking expression");
         require(gRuntime.currentActionId() == QStringLiteral("thinking"),
-                "queued thinking expression should switch to the thinking action at the boundary");
+                "queued thinking expression should switch to the thinking action at cleanFinishReady");
         require(waitFor([&gController]() {
                     return gController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("片段1片段2");
                 }),
-                "GATED text should drain through the pacer after the boundary callback");
+                "GATED text should drain through the pacer after the cleanFinish callback");
     }
 
-    // 旧 boundary 回调被 gate timeout 释放后，不能再释放同一回复里的下一次 GATED 文本。
+    // 旧 cleanFinish 回调被 gate timeout 释放后，不能再释放同一回复里的下一次 GATED 文本。
     {
         PetRuntime timeoutRuntime;
         for (int i = 0; i < 5 && timeoutRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
@@ -578,7 +605,7 @@ int main(int argc, char *argv[])
         require(waitFor([&timeoutController]() {
                     return timeoutController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("一二");
-                }, 1200),
+                }, 2600),
                 "gate timeout should release the first gated text");
 
         ChatStreamEvent timeoutExpr3;
@@ -596,22 +623,100 @@ int main(int argc, char *argv[])
         waitFor([]() { return false; }, 650);
         require(timeoutController.messages().constLast().toMap()
                     .value(QStringLiteral("text")).toString() == QStringLiteral("一二"),
-                "stale boundary safety timeout must not release the next gated text early");
+                "stale cleanFinish safety timeout must not release the next gated text early");
         require(waitFor([&timeoutController]() {
                     return timeoutController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("一二三");
-                }, 1000),
+                }, 2500),
                 "the current gate timeout should still release its own buffered text");
     }
 
-    // --- Phase 2.3.1 Task 7: RUN_FINISHED waits for animation boundary before idle ---
+    // RUN_FINISHED during a GATED expression switch must flush the final held text
+    // and wait for the new expression to clean-finish before idling.
+    {
+        PetRuntime gfRuntime;
+        for (int i = 0; i < 5 && gfRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            gfRuntime.handleAnimationFinished();
+        }
+
+        ChatController gfController(&gfRuntime, &settings);
+
+        ChatStreamEvent gfStarted;
+        gfStarted.type = QStringLiteral("RUN_STARTED");
+        gfController.applyStreamEvent(gfStarted);
+
+        ChatStreamEvent gfExpr1;
+        gfExpr1.type = QStringLiteral("CUSTOM");
+        gfExpr1.name = QStringLiteral("miles.pet.expression.requested");
+        gfExpr1.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        gfExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        gfController.applyStreamEvent(gfExpr1);
+        require(gfRuntime.currentState() == QStringLiteral("speaking"),
+                "GATED finish test should start speaking after initial cleanFinish");
+
+        ChatStreamEvent gfStart;
+        gfStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        gfStart.role = QStringLiteral("assistant");
+        gfController.applyStreamEvent(gfStart);
+
+        ChatStreamEvent gfText1;
+        gfText1.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        gfText1.delta = QStringLiteral("前");
+        gfController.applyStreamEvent(gfText1);
+        require(waitFor([&gfController]() {
+                    return gfController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前");
+                }),
+                "GATED finish test should stream first text before the gate");
+
+        ChatStreamEvent gfExpr2;
+        gfExpr2.type = QStringLiteral("CUSTOM");
+        gfExpr2.name = QStringLiteral("miles.pet.expression.requested");
+        gfExpr2.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        gfExpr2.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+        gfController.applyStreamEvent(gfExpr2);
+
+        ChatStreamEvent gfText2;
+        gfText2.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        gfText2.delta = QStringLiteral("后");
+        gfController.applyStreamEvent(gfText2);
+
+        ChatStreamEvent gfFinished;
+        gfFinished.type = QStringLiteral("RUN_FINISHED");
+        gfController.applyStreamEvent(gfFinished);
+
+        require(!gfController.sending(),
+                "RUN_FINISHED during GATED should clear sending while waiting for cleanFinish");
+        require(gfController.messages().constLast().toMap()
+                    .value(QStringLiteral("text")).toString() == QStringLiteral("前"),
+                "RUN_FINISHED during GATED should keep final text held before cleanFinish");
+
+        for (int i = 0; i < 5 && gfRuntime.currentState() != QStringLiteral("thinking"); ++i) {
+            gfRuntime.handleAnimationFinished();
+        }
+        require(waitFor([&gfController]() {
+                    return gfController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前后");
+                }),
+                "RUN_FINISHED during GATED should drain final held text at cleanFinish");
+        require(gfRuntime.currentState() == QStringLiteral("thinking"),
+                "RUN_FINISHED during GATED should activate the final gated expression first");
+
+        for (int i = 0; i < 5 && gfRuntime.currentState() != QStringLiteral("idle"); ++i) {
+            gfRuntime.handleAnimationFinished();
+        }
+        require(gfRuntime.currentState() == QStringLiteral("idle"),
+                "RUN_FINISHED during GATED should idle only after final expression cleanFinish");
+    }
+
+    // --- Phase 2.3.1 Task 7: RUN_FINISHED waits for cleanFinishReady before idle ---
     {
         PetRuntime fRuntime;
         for (int i = 0; i < 5 && fRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
             fRuntime.handleAnimationFinished();
         }
         require(fRuntime.currentActionId() == QStringLiteral("idle_stand"),
-                "RUN_FINISHED boundary test should start from idle runtime state");
+                "RUN_FINISHED cleanFinish test should start from idle runtime state");
 
         ChatController fController(&fRuntime, &settings);
 
@@ -626,7 +731,7 @@ int main(int argc, char *argv[])
         fExpr.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
         fController.applyStreamEvent(fExpr);
         require(fRuntime.currentState() == QStringLiteral("speaking"),
-                "RUN_FINISHED boundary test should enter speaking before finish");
+                "RUN_FINISHED cleanFinish test should enter speaking before finish");
         const QString fSpeakingAction = fRuntime.currentActionId();
 
         ChatStreamEvent fStart;
@@ -642,18 +747,18 @@ int main(int argc, char *argv[])
                     return fController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("结尾");
                 }),
-                "RUN_FINISHED boundary test should stream text before finish");
+                "RUN_FINISHED cleanFinish test should stream text before finish");
 
         ChatStreamEvent fFinished;
         fFinished.type = QStringLiteral("RUN_FINISHED");
         fFinished.runId = QStringLiteral("mock-run-finished");
         fController.applyStreamEvent(fFinished);
 
-        require(!fController.sending(), "RUN_FINISHED should clear sending while waiting for boundary");
+        require(!fController.sending(), "RUN_FINISHED should clear sending while waiting for cleanFinishReady");
         require(fController.statusText() == QStringLiteral("未连接"),
-                "RUN_FINISHED should restore non-sending status while waiting for boundary");
+                "RUN_FINISHED should restore non-sending status while waiting for cleanFinishReady");
         require(!fController.messages().constLast().toMap().value(QStringLiteral("pending")).toBool(),
-                "RUN_FINISHED should clear assistant pending before boundary");
+                "RUN_FINISHED should clear assistant pending before cleanFinishReady");
         require(fRuntime.currentState() == QStringLiteral("speaking"),
                 "RUN_FINISHED must not synchronously return to idle");
         require(fRuntime.currentActionId() == fSpeakingAction,
@@ -661,9 +766,9 @@ int main(int argc, char *argv[])
 
         fRuntime.handleAnimationFinished();
         require(fRuntime.currentState() == QStringLiteral("idle"),
-                "RUN_FINISHED should return to idle only after boundary callback");
+                "RUN_FINISHED should return to idle only after cleanFinish callback");
         require(fRuntime.currentActionId() == QStringLiteral("idle_stand"),
-                "RUN_FINISHED boundary callback should restore idle action");
+                "RUN_FINISHED cleanFinish callback should restore idle action");
     }
 
     // --- Phase 2.3.1 Task 8: cancel during GATED drains buffered text and idles ---
@@ -808,6 +913,213 @@ int main(int argc, char *argv[])
                 "RUN_ERROR during GATED must not create a ghost assistant message");
         require(eController.messages().constLast().toMap().value(QStringLiteral("error")).toBool(),
                 "RUN_ERROR during GATED should mark the assistant message as error");
+    }
+
+    // --- Phase 2.4: expression after unsegmented text must wait for pacerEmpty ---
+    {
+        SettingsService preTextSettings(settingsDir.filePath(QStringLiteral("pretext-settings.json")));
+        auto preTextCfg = modelConfig(QStringLiteral("pretext"),
+                                      QStringLiteral("https://api.example.test/v1"),
+                                      QStringLiteral("sk-test"),
+                                      QStringLiteral("miles-test-model"));
+        require(preTextSettings.setModelConfig(preTextCfg.name, preTextCfg),
+                "pretext settings should accept config");
+        preTextSettings.setActiveModelConfig(preTextCfg.name);
+        preTextSettings.setMsPerChar(80);
+
+        PetRuntime pRuntime;
+        for (int i = 0; i < 5 && pRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            pRuntime.handleAnimationFinished();
+        }
+        ChatController pController(&pRuntime, &preTextSettings);
+
+        ChatStreamEvent pStarted;
+        pStarted.type = QStringLiteral("RUN_STARTED");
+        pController.applyStreamEvent(pStarted);
+
+        ChatStreamEvent pStart;
+        pStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        pStart.role = QStringLiteral("assistant");
+        pController.applyStreamEvent(pStart);
+
+        ChatStreamEvent pText;
+        pText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        pText.delta = QStringLiteral("前前前");
+        pController.applyStreamEvent(pText);
+
+        ChatStreamEvent pExpr;
+        pExpr.type = QStringLiteral("CUSTOM");
+        pExpr.name = QStringLiteral("miles.pet.expression.requested");
+        pExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        pExpr.value.insert(QStringLiteral("expression"), QStringLiteral("polite"));
+        pController.applyStreamEvent(pExpr);
+
+        pRuntime.handleAnimationFinished();
+        require(pRuntime.currentActionId() != QStringLiteral("bow"),
+                "expression after unsegmented text must wait for pacerEmpty");
+        require(waitFor([&pController]() {
+                    return pController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前前前");
+                }, 1000),
+                "unsegmented text should drain before the following expression activates");
+        require(pRuntime.currentActionId() == QStringLiteral("bow"),
+                "expression after unsegmented text should activate after pacerEmpty and cleanFinish");
+    }
+
+    // --- Phase 2.4: multiple expression segments must drain one by one ---
+    {
+        PetRuntime qRuntime;
+        for (int i = 0; i < 5 && qRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            qRuntime.handleAnimationFinished();
+        }
+        ChatController qController(&qRuntime, &settings);
+
+        ChatStreamEvent qStarted;
+        qStarted.type = QStringLiteral("RUN_STARTED");
+        qController.applyStreamEvent(qStarted);
+
+        ChatStreamEvent qExpr1;
+        qExpr1.type = QStringLiteral("CUSTOM");
+        qExpr1.name = QStringLiteral("miles.pet.expression.requested");
+        qExpr1.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        qExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        qController.applyStreamEvent(qExpr1);
+
+        ChatStreamEvent qStart;
+        qStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        qStart.role = QStringLiteral("assistant");
+        qController.applyStreamEvent(qStart);
+
+        ChatStreamEvent qText1;
+        qText1.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        qText1.delta = QStringLiteral("第一段");
+        qController.applyStreamEvent(qText1);
+
+        ChatStreamEvent qExpr2;
+        qExpr2.type = QStringLiteral("CUSTOM");
+        qExpr2.name = QStringLiteral("miles.pet.expression.requested");
+        qExpr2.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        qExpr2.value.insert(QStringLiteral("expression"), QStringLiteral("polite"));
+        qController.applyStreamEvent(qExpr2);
+
+        ChatStreamEvent qText2;
+        qText2.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        qText2.delta = QStringLiteral("第二段");
+        qController.applyStreamEvent(qText2);
+
+        require(qRuntime.currentActionId() != QStringLiteral("bow"),
+                "second expression must not activate before the first segment cleanFinish is ready");
+        qRuntime.handleAnimationFinished();
+        require(qRuntime.currentActionId() != QStringLiteral("bow"),
+                "second expression must not activate before first segment text drains");
+        require(qRuntime.currentState() == QStringLiteral("speaking"),
+                "first queued expression should stay active until the dual gate opens");
+        require(waitFor([&qController]() {
+                    return qController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("第一段");
+                }),
+                "first segment text should drain before second segment starts");
+
+        require(qRuntime.currentActionId() == QStringLiteral("bow"),
+                "polite segment should activate bow after cleanFinish and first segment drain");
+        require(waitFor([&qController]() {
+                    return qController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("第一段第二段");
+                }),
+                "second segment text should drain after second expression activates");
+    }
+
+    // --- Phase 2.4: lifecycle thinking must clean-finish when RUN_FINISHED arrives during start buffering ---
+    {
+        PetRuntime ltRuntime;
+        require(ltRuntime.currentActionId() == QStringLiteral("briefcase_in"),
+                "lifecycle finish test should start before startup cleanFinish");
+        ChatController ltController(&ltRuntime, &settings);
+
+        ChatStreamEvent ltStarted;
+        ltStarted.type = QStringLiteral("RUN_STARTED");
+        ltController.applyStreamEvent(ltStarted);
+
+        ChatStreamEvent ltThinking;
+        ltThinking.type = QStringLiteral("CUSTOM");
+        ltThinking.name = QStringLiteral("miles.pet.lifecycle");
+        ltThinking.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        ltController.applyStreamEvent(ltThinking);
+
+        ChatStreamEvent ltFinished;
+        ltFinished.type = QStringLiteral("RUN_FINISHED");
+        ltController.applyStreamEvent(ltFinished);
+
+        for (int i = 0; i < 5 && ltRuntime.currentState() != QStringLiteral("thinking"); ++i) {
+            ltRuntime.handleAnimationFinished();
+        }
+        require(ltRuntime.currentState() == QStringLiteral("thinking"),
+                "pending lifecycle thinking should apply after start cleanFinish");
+        require(ltRuntime.currentState() != QStringLiteral("idle"),
+                "pending lifecycle thinking must not idle immediately when stream already finished");
+
+        for (int i = 0; i < 5 && ltRuntime.currentState() != QStringLiteral("idle"); ++i) {
+            ltRuntime.handleAnimationFinished();
+        }
+        require(ltRuntime.currentState() == QStringLiteral("idle"),
+                "lifecycle thinking should return to idle after its own cleanFinish");
+    }
+
+    // --- Phase 2.4: RUN_FINISHED waits for pacerEmpty before idle ---
+    {
+        SettingsService slowSettings(settingsDir.filePath(QStringLiteral("slow-settings.json")));
+        auto slowCfg = modelConfig(QStringLiteral("slow"),
+                                   QStringLiteral("https://api.example.test/v1"),
+                                   QStringLiteral("sk-test"),
+                                   QStringLiteral("miles-test-model"));
+        require(slowSettings.setModelConfig(slowCfg.name, slowCfg), "slow settings should accept config");
+        slowSettings.setActiveModelConfig(slowCfg.name);
+        slowSettings.setMsPerChar(80);
+
+        PetRuntime wRuntime;
+        for (int i = 0; i < 5 && wRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            wRuntime.handleAnimationFinished();
+        }
+        ChatController wController(&wRuntime, &slowSettings);
+
+        ChatStreamEvent wStarted;
+        wStarted.type = QStringLiteral("RUN_STARTED");
+        wController.applyStreamEvent(wStarted);
+
+        ChatStreamEvent wExpr;
+        wExpr.type = QStringLiteral("CUSTOM");
+        wExpr.name = QStringLiteral("miles.pet.expression.requested");
+        wExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        wExpr.value.insert(QStringLiteral("expression"), QStringLiteral("polite"));
+        wController.applyStreamEvent(wExpr);
+
+        ChatStreamEvent wStart;
+        wStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        wStart.role = QStringLiteral("assistant");
+        wController.applyStreamEvent(wStart);
+
+        ChatStreamEvent wText;
+        wText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        wText.delta = QStringLiteral("长长长长长");
+        wController.applyStreamEvent(wText);
+        wRuntime.handleAnimationFinished();
+
+        ChatStreamEvent wFinished;
+        wFinished.type = QStringLiteral("RUN_FINISHED");
+        wController.applyStreamEvent(wFinished);
+        wRuntime.handleAnimationFinished();
+
+        require(wRuntime.currentState() == QStringLiteral("speaking"),
+                "RUN_FINISHED cleanFinish should not idle before pacerEmpty");
+        require(waitFor([&wController]() {
+                    return wController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("长长长长长");
+                }, 1500),
+                "final text should drain after RUN_FINISHED");
+        require(waitFor([&wRuntime]() {
+                    return wRuntime.currentState() == QStringLiteral("idle");
+                }, 1500),
+                "runtime should idle after cleanFinish and pacerEmpty are both ready");
     }
 
     // --- Phase 2.3.1: old pacer chunks must not leak into a later reply ---

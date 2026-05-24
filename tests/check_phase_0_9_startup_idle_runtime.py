@@ -28,6 +28,11 @@ def action_loop_mode(actions: dict, action_id: str) -> str:
     return action.get("loopMode", "")
 
 
+def action_phase_loop_mode(actions: dict, action_id: str, phase_id: str) -> str:
+    action = actions.get(action_id, {})
+    return action.get("phases", {}).get(phase_id, {}).get("loopMode", "")
+
+
 def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     actions = manifest.get("actions", {})
@@ -51,7 +56,7 @@ def main() -> int:
     require(action_loop_mode(actions, "briefcase_stop") == "once", "briefcase_stop 应播放一次后进入站立")
     require(action_loop_mode(actions, "turn_around") == "onceThenIdle", "turn_around 应播放一次后回 idle")
     require(action_loop_mode(actions, "idle_thinking_once") == "onceThenIdle", "随机 idle 的思考动作必须是一次性版本")
-    require(action_loop_mode(actions, "thinking") == "loop", "agent thinking 仍应保留循环版本")
+    require(action_phase_loop_mode(actions, "thinking", "loop") == "loop", "agent thinking 仍应保留循环 phase")
 
     turn = actions["turn_around"]
     require(turn.get("facingAfter", {}).get("right") == "left", "右朝向转身后应变为 left")

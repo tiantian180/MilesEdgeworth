@@ -71,6 +71,12 @@ int main(int argc, char **argv)
 {
   "defaultFacing": "right",
   "states": { "idle": { "action": "idle_stand" } },
+  "clips": {
+    "thinking_enter_right": {
+      "file": "skin:assets/body/idle/stand.gif",
+      "frameRange": [1, 4]
+    }
+  },
   "actions": {
     "idle_stand": {
       "variants": {
@@ -78,6 +84,24 @@ int main(int argc, char **argv)
           "animation": "skin:assets/body/idle/stand.gif"
         }
       }
+    },
+    "objecting": {
+      "loopMode": "onceThenHold",
+      "variants": {
+        "right": {
+          "clip": "thinking_enter_right"
+        }
+      }
+    }
+  },
+  "recipes": {
+    "thinking.holdUntilCancelled": {
+      "scope": "agent",
+      "steps": [
+        { "action": "objecting", "phase": "enter" },
+        { "action": "objecting", "phase": "loop", "duration": "runtime" },
+        { "action": "objecting", "phase": "exit" }
+      ]
     }
   }
 }
@@ -94,9 +118,22 @@ int main(int argc, char **argv)
         skinDir.filePath(QStringLiteral("assets/body/idle/stand.gif"))
     ).toString();
     require(
-        manifest.actions.value(QStringLiteral("idle_stand")).variants.value(QStringLiteral("right")).toString() == expectedAnimationUrl,
+        manifest.actions.value(QStringLiteral("idle_stand")).variants.value(QStringLiteral("right")).url.toString() == expectedAnimationUrl,
         "skin: action URL should resolve under the selected skin root"
     );
+    const ActionDefinition objecting = manifest.actions.value(QStringLiteral("objecting"));
+    require(objecting.loopMode == QStringLiteral("onceThenHold"),
+            "loader should preserve onceThenHold loopMode");
+    const AnimationVariant objectingVariant = objecting.variants.value(QStringLiteral("right"));
+    require(objectingVariant.url.toString() == expectedAnimationUrl,
+            "clip variant should resolve to the clip file URL");
+    require(objectingVariant.frameStart == 0 && objectingVariant.frameEnd == 3,
+            "loader should convert 1-based manifest frameRange to 0-based inclusive runtime frame range");
+    const RecipeDefinition thinkingRecipe = manifest.recipes.value(QStringLiteral("thinking.holdUntilCancelled"));
+    require(thinkingRecipe.steps.size() == 3,
+            "loader should parse runtime-controlled recipe steps");
+    require(thinkingRecipe.steps.at(1).durationMode == QStringLiteral("runtime"),
+            "loader should preserve duration runtime on recipe step");
     require(manifest.personaPrompt == filesystemPersona, "filesystem skin persona.md should load into manifest");
 
     QTemporaryDir personaDataDir;

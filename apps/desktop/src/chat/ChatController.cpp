@@ -24,6 +24,8 @@
 #include <csignal>
 #endif
 
+#include <utility>
+
 namespace {
 Q_LOGGING_CATEGORY(chatLog, "miles.chat", QtInfoMsg)
 
@@ -31,19 +33,11 @@ constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kConversationsUrl = "http://127.0.0.1:39710/v1/conversations";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
 constexpr auto kExpressionRequestedEvent = "miles.pet.expression.requested";
+constexpr auto kLifecycleEvent = "miles.pet.lifecycle";
 constexpr auto kMemorySummarizingEvent = "miles.chat.memory.summarizing";
 constexpr int kSidecarRestartDelayMs = 150;
 constexpr int kSidecarRestartRetryDelayMs = 300;
 constexpr int kSidecarRestartMaxAttempts = 3;
-
-InterruptHint interruptHintFromValue(const QVariantMap &value)
-{
-    if (value.value(QStringLiteral("interruptHint")).toString() == QStringLiteral("afterCurrent")) {
-        return InterruptHint::AfterCurrent;
-    }
-
-    return InterruptHint::Immediate;
-}
 
 QString logBool(bool value)
 {
@@ -117,6 +111,10 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
     m_pacer = new ChatTextPacer(this);
     connect(m_pacer, &ChatTextPacer::chunkReady,
             this, &ChatController::appendChunkToCurrentMessage);
+    connect(m_pacer, &ChatTextPacer::segmentDrained,
+            this, &ChatController::handleSegmentDrained);
+    connect(m_pacer, &ChatTextPacer::pacerEmpty,
+            this, &ChatController::handlePacerEmpty);
     if (m_settings != nullptr) {
         m_pacer->setMsPerChar(m_settings->msPerChar());
         updateProviderConfiguredFromSettings();
@@ -125,7 +123,9 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
     m_gateTimeout.setSingleShot(true);
     connect(&m_gateTimeout, &QTimer::timeout,
             this, &ChatController::handleGateTimeout);
-
+    m_startTimeout.setSingleShot(true);
+    connect(&m_startTimeout, &QTimer::timeout,
+            this, &ChatController::handleStartTimeout);
     if (m_runtime != nullptr) {
         connect(m_runtime, &PetRuntime::activeSkinChanged, this, [this]() {
             setConversationSkinState(m_currentConversationSkinId);
@@ -731,22 +731,19 @@ void ChatController::cancelCurrentReply()
     m_cancelled = true;
     ++m_asyncGeneration;
     abortPendingConversationCreate();
-    m_gateTimeout.stop();
-    m_pendingExpression.clear();
-    m_pendingState.clear();
-    m_finishPendingAfterStart = false;
-    if (!m_holdBuffer.isEmpty()
-            && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
-        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
-        m_assistantMessageIndex = m_messages.size() - 1;
-    }
-    drainHoldBufferToPacer();
+    clearDeferredCleanFinishRequest();
+    m_activeRunId.clear();
+    drainQueuedSegmentsToPacer();
+    resetReplySessionState();
     transitionTo(ChatPhase::IDLE);
     if (m_currentReply) {
         QNetworkReply *reply = m_currentReply;
         m_currentReply.clear();
         reply->abort();
         reply->deleteLater();
+    }
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(false);
     }
 
     if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
@@ -773,8 +770,20 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("RUN_STARTED")) {
+        const bool duplicateRunStarted = m_sending
+            && m_phase == ChatPhase::BUFFERING_FOR_START
+            && ((!event.runId.isEmpty() && event.runId == m_activeRunId)
+                || (event.runId.isEmpty() && m_activeRunId.isEmpty()));
+        if (duplicateRunStarted) {
+            setSending(true);
+            setStatusText(QStringLiteral("正在回复"));
+            return;
+        }
+
         ++m_currentStreamId;
         ++m_asyncGeneration;
+        clearDeferredCleanFinishRequest();
+        m_activeRunId = event.runId;
         if (m_pacer != nullptr) {
             m_pacer->discardBeforeStream(m_currentStreamId);
         }
@@ -784,12 +793,14 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         }
         setSending(true);
         setStatusText(QStringLiteral("正在回复"));
-        m_holdBuffer.clear();
-        m_pendingExpression.clear();
-        m_pendingState.clear();
-        m_finishPendingAfterStart = false;
+        resetReplySessionState();
+        m_streamFinished = false;
         transitionTo(ChatPhase::BUFFERING_FOR_START);
+        if (m_runtime != nullptr) {
+            m_runtime->setSuppressAutoIdle(true);
+        }
         requestCleanFinishForCurrentStream();
+        m_startTimeout.start(kStartTimeoutMs);
         return;
     }
 
@@ -804,21 +815,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("TEXT_MESSAGE_CONTENT")) {
-        if (m_phase == ChatPhase::STREAMING) {
-            if (m_pacer != nullptr) {
-                m_pacer->append(event.delta, m_currentStreamId);
-            } else {
-                appendChunkToCurrentMessage(event.delta, m_currentStreamId);
-            }
-        } else if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
-            if (m_pacer != nullptr) {
-                m_pacer->append(event.delta, m_currentStreamId);
-            } else {
-                appendChunkToCurrentMessage(event.delta, m_currentStreamId);
-            }
-        } else {
-            m_holdBuffer.append(event.delta);
-        }
+        appendTextToCurrentTarget(event.delta);
         return;
     }
 
@@ -842,28 +839,32 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         }
 
         m_currentReply.clear();
-        if (m_phase == ChatPhase::BUFFERING_FOR_START) {
-            m_finishPendingAfterStart = true;
-            setSending(false);
-            setStatusText(idleStatusText());
-            return;
-        }
-
-        m_pendingExpression.clear();
-        m_pendingState.clear();
-        m_finishPendingAfterStart = false;
+        m_activeRunId.clear();
+        m_streamFinished = true;
         setSending(false);
         setStatusText(idleStatusText());
-        drainHoldBufferToPacer();
 
         if (m_runtime == nullptr) {
+            drainQueuedSegmentsToPacer();
             transitionTo(ChatPhase::IDLE);
-            m_assistantMessageIndex = -1;
             return;
         }
 
-        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
-        requestBoundaryForCurrentStream();
+        if (m_phase == ChatPhase::STREAMING && m_segmentQueue.isEmpty()) {
+            transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+            m_animationReady = false;
+            m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
+            requestCleanFinishForCurrentStream();
+            maybeFinishWaitingForAnimationEnd();
+        } else if (m_phase == ChatPhase::GATED) {
+            maybeAdvanceGate();
+        } else if (m_phase == ChatPhase::IDLE) {
+            transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+            m_animationReady = false;
+            m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
+            requestCleanFinishForCurrentStream();
+            maybeFinishWaitingForAnimationEnd();
+        }
         return;
     }
 
@@ -877,6 +878,26 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         return;
     }
 
+    if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kLifecycleEvent)) {
+        const QString state = event.value.value(QStringLiteral("state")).toString();
+        qCDebug(chatLog).noquote() << "chat lifecycle event"
+                                    << QStringLiteral("phase=%1").arg(static_cast<int>(m_phase))
+                                    << QStringLiteral("state=%1").arg(state);
+
+        if (state == QStringLiteral("thinking")) {
+            if (m_phase == ChatPhase::BUFFERING_FOR_START) {
+                m_pendingThinkingState = QStringLiteral("thinking");
+                m_pendingThinkingExpression = QStringLiteral("neutral");
+                return;
+            }
+            if (m_phase == ChatPhase::STREAMING && m_activeSegmentId == -1) {
+                requestPetExpression(QStringLiteral("thinking"), QStringLiteral("neutral"));
+                return;
+            }
+        }
+        return;
+    }
+
     if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kExpressionRequestedEvent)) {
         const QString state = event.value.value(QStringLiteral("state")).toString();
         const QString expression = event.value.value(QStringLiteral("expression")).toString();
@@ -886,24 +907,19 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
                                     << QStringLiteral("expression=%1").arg(expression)
                                     << QStringLiteral("interruptHint=%1").arg(event.value.value(QStringLiteral("interruptHint")).toString());
 
-        if (m_phase == ChatPhase::BUFFERING_FOR_START || m_phase == ChatPhase::GATED) {
-            m_pendingState = state;
-            m_pendingExpression = expression;
-            return;
-        }
+        enqueueExpressionSegment(state, expression);
 
         if (m_phase == ChatPhase::STREAMING) {
-            m_pendingState = state;
-            m_pendingExpression = expression;
-            transitionTo(ChatPhase::GATED);
-            m_gateTimeout.start(kGateTimeoutMs);
-            if (m_runtime != nullptr) {
-                requestBoundaryForCurrentStream();
-            }
+            enterGateForNextSegment();
             return;
         }
 
-        requestPetExpression(state, expression, interruptHintFromValue(event.value));
+        if (m_phase == ChatPhase::IDLE) {
+            activateNextSegment();
+            transitionTo(ChatPhase::STREAMING);
+            return;
+        }
+        return;
     }
 }
 
@@ -933,28 +949,59 @@ void ChatController::transitionTo(ChatPhase next)
 
 void ChatController::handleCleanFinishReady()
 {
-    if (m_phase != ChatPhase::BUFFERING_FOR_START) {
-        return;
-    }
-
-    if (!m_pendingExpression.isEmpty()) {
-        requestPetExpression(m_pendingState, m_pendingExpression);
-        m_pendingExpression.clear();
-        m_pendingState.clear();
-    }
-    transitionTo(ChatPhase::STREAMING);
-    drainHoldBufferToPacer();
-
-    if (m_finishPendingAfterStart) {
-        m_finishPendingAfterStart = false;
-        if (m_runtime == nullptr) {
-            transitionTo(ChatPhase::IDLE);
-            m_assistantMessageIndex = -1;
+    if (m_phase == ChatPhase::BUFFERING_FOR_START) {
+        m_startTimeout.stop();
+        if (!m_segmentQueue.isEmpty()) {
+            m_pendingThinkingExpression.clear();
+            m_pendingThinkingState.clear();
+            activateNextSegment();
+            if (!m_segmentQueue.isEmpty()) {
+                enterGateForNextSegment();
+            } else if (m_streamFinished) {
+                transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+                m_animationReady = false;
+                m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
+                requestCleanFinishForCurrentStream();
+                maybeFinishWaitingForAnimationEnd();
+            } else {
+                transitionTo(ChatPhase::STREAMING);
+            }
             return;
         }
 
-        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
-        requestBoundaryForCurrentStream();
+        bool appliedPendingThinking = false;
+        if (!m_pendingThinkingState.isEmpty()) {
+            requestPetExpression(m_pendingThinkingState, m_pendingThinkingExpression);
+            m_pendingThinkingState.clear();
+            m_pendingThinkingExpression.clear();
+            appliedPendingThinking = true;
+        }
+        drainQueuedSegmentsToPacer();
+
+        if (m_streamFinished) {
+            transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+            m_animationReady = !appliedPendingThinking;
+            m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
+            if (appliedPendingThinking) {
+                requestCleanFinishForCurrentStream();
+            }
+            maybeFinishWaitingForAnimationEnd();
+            return;
+        }
+
+        transitionTo(ChatPhase::STREAMING);
+        return;
+    }
+
+    if (m_phase == ChatPhase::GATED) {
+        m_animationReady = true;
+        maybeAdvanceGate();
+        return;
+    }
+
+    if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
+        m_animationReady = true;
+        maybeFinishWaitingForAnimationEnd();
     }
 }
 
@@ -964,33 +1011,68 @@ void ChatController::requestCleanFinishForCurrentStream()
         handleCleanFinishReady();
         return;
     }
-
-    const quint64 streamId = m_currentStreamId;
-    const quint64 generation = m_asyncGeneration;
-    QPointer<ChatController> self(this);
-    m_runtime->requestCleanFinishAndNotify([self, streamId, generation]() {
-        if (self != nullptr && self->runtimeCallbackStillCurrent(streamId, generation)) {
-            self->handleCleanFinishReady();
-        }
-    });
-}
-
-void ChatController::requestBoundaryForCurrentStream()
-{
-    if (m_runtime == nullptr) {
-        handleBoundaryReached();
+    const quint64 cleanFinishId = ++m_cleanFinishRequestId;
+    if (m_cleanFinishRequestPending) {
+        deferCleanFinishRequest(m_currentStreamId, m_asyncGeneration, cleanFinishId);
         return;
     }
 
-    const quint64 streamId = m_currentStreamId;
-    const quint64 generation = m_asyncGeneration;
-    const quint64 boundaryId = ++m_boundaryRequestId;
+    requestCleanFinishForStream(m_currentStreamId, m_asyncGeneration, cleanFinishId);
+}
+
+void ChatController::requestCleanFinishForStream(quint64 streamId, quint64 generation, quint64 cleanFinishId)
+{
     QPointer<ChatController> self(this);
-    m_runtime->requestBoundaryAndNotify([self, streamId, generation, boundaryId]() {
-        if (self != nullptr && self->boundaryCallbackStillCurrent(streamId, generation, boundaryId)) {
-            self->handleBoundaryReached();
+    m_cleanFinishRequestPending = true;
+    m_runtime->requestCleanFinishAndNotify([self, streamId, generation, cleanFinishId]() {
+        if (self == nullptr) {
+            return;
         }
+        self->m_cleanFinishRequestPending = false;
+        if (self->runtimeCallbackStillCurrent(streamId, generation)
+                && cleanFinishId == self->m_cleanFinishRequestId) {
+            self->handleCleanFinishReady();
+        }
+        self->requestDeferredCleanFinishIfPossible();
     });
+}
+
+void ChatController::deferCleanFinishRequest(quint64 streamId, quint64 generation, quint64 cleanFinishId)
+{
+    m_deferredCleanFinishStreamId = streamId;
+    m_deferredCleanFinishGeneration = generation;
+    m_deferredCleanFinishRequestId = cleanFinishId;
+}
+
+void ChatController::requestDeferredCleanFinishIfPossible()
+{
+    if (m_cleanFinishRequestPending
+            || m_runtime == nullptr
+            || m_deferredCleanFinishStreamId == 0) {
+        return;
+    }
+
+    const quint64 streamId = m_deferredCleanFinishStreamId;
+    const quint64 generation = m_deferredCleanFinishGeneration;
+    const quint64 cleanFinishId = m_deferredCleanFinishRequestId;
+    clearDeferredCleanFinishRequest();
+
+    if (!runtimeCallbackStillCurrent(streamId, generation)) {
+        return;
+    }
+    if (cleanFinishId == m_cleanFinishRequestId
+            && (m_phase == ChatPhase::BUFFERING_FOR_START
+                || m_phase == ChatPhase::GATED
+                || m_phase == ChatPhase::WAITING_FOR_ANIMATION_END)) {
+        requestCleanFinishForStream(streamId, generation, cleanFinishId);
+    }
+}
+
+void ChatController::clearDeferredCleanFinishRequest()
+{
+    m_deferredCleanFinishStreamId = 0;
+    m_deferredCleanFinishGeneration = 0;
+    m_deferredCleanFinishRequestId = 0;
 }
 
 bool ChatController::runtimeCallbackStillCurrent(quint64 streamId, quint64 generation) const
@@ -1000,33 +1082,125 @@ bool ChatController::runtimeCallbackStillCurrent(quint64 streamId, quint64 gener
         && !m_cancelled;
 }
 
-bool ChatController::boundaryCallbackStillCurrent(quint64 streamId, quint64 generation, quint64 boundaryId) const
+void ChatController::enqueueExpressionSegment(const QString &state, const QString &expression)
 {
-    return runtimeCallbackStillCurrent(streamId, generation)
-        && boundaryId == m_boundaryRequestId;
+    ExpressionSegment segment;
+    segment.segmentId = m_nextSegmentId++;
+    segment.state = state.trimmed().isEmpty() ? QStringLiteral("speaking") : state.trimmed();
+    segment.expression = expression.trimmed().isEmpty() ? QStringLiteral("neutral") : expression.trimmed();
+    if (!m_preExpressionBuffer.isEmpty()) {
+        segment.textBuffer = m_preExpressionBuffer;
+        m_preExpressionBuffer.clear();
+    }
+    m_segmentQueue.append(segment);
 }
 
-void ChatController::handleBoundaryReached()
+void ChatController::appendTextToCurrentTarget(const QString &text)
 {
-    ++m_boundaryRequestId;
-    m_gateTimeout.stop();
-    if (m_phase == ChatPhase::GATED) {
-        if (!m_pendingExpression.isEmpty()) {
-            requestPetExpression(m_pendingState, m_pendingExpression);
-            m_pendingExpression.clear();
-            m_pendingState.clear();
-        }
-        transitionTo(ChatPhase::STREAMING);
-        drainHoldBufferToPacer();
+    if (text.isEmpty()) {
         return;
     }
 
-    if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
-        if (m_runtime != nullptr) {
-            m_runtime->returnToIdle();
-        }
-        transitionTo(ChatPhase::IDLE);
+    if (!m_segmentQueue.isEmpty()) {
+        m_segmentQueue.last().textBuffer.append(text);
+        return;
     }
+
+    if (m_phase == ChatPhase::STREAMING || m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
+        if (m_pacer != nullptr) {
+            m_pacer->append(text, m_currentStreamId, m_activeSegmentId);
+            m_pacerEmpty = false;
+        } else {
+            appendChunkToCurrentMessage(text, m_currentStreamId);
+        }
+        return;
+    }
+
+    m_preExpressionBuffer.append(text);
+}
+
+void ChatController::activateNextSegment()
+{
+    if (m_segmentQueue.isEmpty()) {
+        return;
+    }
+
+    const ExpressionSegment segment = m_segmentQueue.takeFirst();
+    m_activeSegmentId = segment.segmentId;
+    m_activeState = segment.state;
+    m_activeExpression = segment.expression;
+    requestPetExpression(segment.state, segment.expression);
+
+    if (!segment.textBuffer.isEmpty()) {
+        if (m_pacer != nullptr) {
+            m_pacer->append(segment.textBuffer, m_currentStreamId, segment.segmentId);
+            m_pacerEmpty = false;
+        } else {
+            appendChunkToCurrentMessage(segment.textBuffer, m_currentStreamId);
+        }
+    }
+}
+
+void ChatController::enterGateForNextSegment()
+{
+    transitionTo(ChatPhase::GATED);
+    m_animationReady = false;
+    if (m_pacer == nullptr) {
+        m_textDrained = true;
+    } else if (m_activeSegmentId >= 0) {
+        m_textDrained = m_pacer->pendingCountForSegment(m_activeSegmentId) == 0;
+    } else {
+        m_textDrained = m_pacer->pendingCount() == 0;
+    }
+    m_gateTimeout.start(kGateTimeoutMs);
+    requestCleanFinishForCurrentStream();
+    maybeAdvanceGate();
+}
+
+void ChatController::maybeAdvanceGate()
+{
+    if (m_phase != ChatPhase::GATED || !m_animationReady || !m_textDrained) {
+        return;
+    }
+
+    m_gateTimeout.stop();
+    activateNextSegment();
+
+    if (!m_segmentQueue.isEmpty()) {
+        m_animationReady = false;
+        m_textDrained = (m_pacer != nullptr)
+            ? m_pacer->pendingCountForSegment(m_activeSegmentId) == 0
+            : true;
+        m_gateTimeout.start(kGateTimeoutMs);
+        requestCleanFinishForCurrentStream();
+        maybeAdvanceGate();
+        return;
+    }
+
+    if (m_streamFinished) {
+        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+        m_animationReady = false;
+        m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
+        requestCleanFinishForCurrentStream();
+        maybeFinishWaitingForAnimationEnd();
+        return;
+    }
+
+    transitionTo(ChatPhase::STREAMING);
+}
+
+void ChatController::maybeFinishWaitingForAnimationEnd()
+{
+    if (m_phase != ChatPhase::WAITING_FOR_ANIMATION_END || !m_animationReady || !m_pacerEmpty) {
+        return;
+    }
+
+    if (m_runtime != nullptr) {
+        m_runtime->returnToIdle();
+        m_runtime->setSuppressAutoIdle(false);
+    }
+    transitionTo(ChatPhase::IDLE);
+    m_assistantMessageIndex = -1;
 }
 
 void ChatController::handleGateTimeout()
@@ -1035,28 +1209,101 @@ void ChatController::handleGateTimeout()
         return;
     }
 
-    ++m_boundaryRequestId;
-    if (!m_pendingExpression.isEmpty()) {
-        requestPetExpression(m_pendingState, m_pendingExpression);
-        m_pendingExpression.clear();
-        m_pendingState.clear();
+    qCWarning(chatLog).noquote() << "gate cleanFinish timeout";
+    if (m_runtime != nullptr) {
+        m_runtime->cancelCleanFinishNotification();
     }
-    transitionTo(ChatPhase::STREAMING);
-    drainHoldBufferToPacer();
+    m_cleanFinishRequestPending = false;
+    clearDeferredCleanFinishRequest();
+    ++m_cleanFinishRequestId;
+    m_animationReady = true;
+    maybeAdvanceGate();
 }
 
-void ChatController::drainHoldBufferToPacer()
+void ChatController::handleSegmentDrained(int segmentId)
 {
-    if (m_holdBuffer.isEmpty()) {
+    if (m_phase == ChatPhase::GATED && segmentId == m_activeSegmentId) {
+        m_textDrained = true;
+        maybeAdvanceGate();
+    }
+}
+
+void ChatController::handlePacerEmpty()
+{
+    m_pacerEmpty = true;
+    if (m_phase == ChatPhase::GATED && m_activeSegmentId < 0) {
+        m_textDrained = true;
+        maybeAdvanceGate();
+    }
+    maybeFinishWaitingForAnimationEnd();
+}
+
+void ChatController::handleStartTimeout()
+{
+    if (m_phase != ChatPhase::BUFFERING_FOR_START) {
         return;
     }
 
-    if (m_pacer != nullptr) {
-        m_pacer->append(m_holdBuffer, m_currentStreamId);
-    } else {
-        appendChunkToCurrentMessage(m_holdBuffer, m_currentStreamId);
+    qCWarning(chatLog).noquote() << "start cleanFinish timeout";
+    if (m_runtime != nullptr) {
+        m_runtime->cancelCleanFinishNotification();
     }
-    m_holdBuffer.clear();
+    m_cleanFinishRequestPending = false;
+    clearDeferredCleanFinishRequest();
+    ++m_cleanFinishRequestId;
+    handleCleanFinishReady();
+}
+
+void ChatController::drainQueuedSegmentsToPacer()
+{
+    bool hasQueuedText = !m_preExpressionBuffer.isEmpty();
+    for (const ExpressionSegment &segment : std::as_const(m_segmentQueue)) {
+        hasQueuedText = hasQueuedText || !segment.textBuffer.isEmpty();
+    }
+    if (hasQueuedText
+            && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
+        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
+        m_assistantMessageIndex = m_messages.size() - 1;
+    }
+
+    if (!m_preExpressionBuffer.isEmpty()) {
+        if (m_pacer != nullptr) {
+            m_pacer->append(m_preExpressionBuffer, m_currentStreamId, m_activeSegmentId);
+        } else {
+            appendChunkToCurrentMessage(m_preExpressionBuffer, m_currentStreamId);
+        }
+        m_preExpressionBuffer.clear();
+    }
+
+    while (!m_segmentQueue.isEmpty()) {
+        const ExpressionSegment segment = m_segmentQueue.takeFirst();
+        if (segment.textBuffer.isEmpty()) {
+            continue;
+        }
+        if (m_pacer != nullptr) {
+            m_pacer->append(segment.textBuffer, m_currentStreamId, segment.segmentId);
+        } else {
+            appendChunkToCurrentMessage(segment.textBuffer, m_currentStreamId);
+        }
+    }
+    m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
+}
+
+void ChatController::resetReplySessionState()
+{
+    m_startTimeout.stop();
+    m_gateTimeout.stop();
+    m_preExpressionBuffer.clear();
+    m_segmentQueue.clear();
+    m_activeSegmentId = -1;
+    m_activeState.clear();
+    m_activeExpression.clear();
+    m_streamFinished = false;
+    m_animationReady = false;
+    m_textDrained = false;
+    m_pacerEmpty = true;
+    m_pendingThinkingState.clear();
+    m_pendingThinkingExpression.clear();
 }
 
 void ChatController::appendChunkToCurrentMessage(const QString &chunk, quint64 streamId)
@@ -1268,10 +1515,14 @@ void ChatController::finishCurrentReply()
         emit messagesChanged();
     }
 
-    m_assistantMessageIndex = -1;
-    m_holdBuffer.clear();
+    drainQueuedSegmentsToPacer();
+    resetReplySessionState();
     m_currentReply.clear();
-    m_finishPendingAfterStart = false;
+    m_activeRunId.clear();
+    clearDeferredCleanFinishRequest();
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(false);
+    }
     setSending(false);
     setStatusText(idleStatusText());
     if (!m_currentConversationId.isEmpty()) {
@@ -1282,19 +1533,15 @@ void ChatController::finishCurrentReply()
 void ChatController::failCurrentReply(const QString &message)
 {
     const QString text = message.trimmed().isEmpty() ? QStringLiteral("请求失败") : message.trimmed();
-    const bool hasBufferedText = !m_holdBuffer.isEmpty();
+    bool hasBufferedText = !m_preExpressionBuffer.isEmpty();
+    for (const ExpressionSegment &segment : std::as_const(m_segmentQueue)) {
+        hasBufferedText = hasBufferedText || !segment.textBuffer.isEmpty();
+    }
 
     ++m_asyncGeneration;
-    m_gateTimeout.stop();
-    m_pendingExpression.clear();
-    m_pendingState.clear();
-    m_finishPendingAfterStart = false;
-    if (hasBufferedText
-            && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
-        appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
-        m_assistantMessageIndex = m_messages.size() - 1;
-    }
-    drainHoldBufferToPacer();
+    clearDeferredCleanFinishRequest();
+    drainQueuedSegmentsToPacer();
+    resetReplySessionState();
     transitionTo(ChatPhase::IDLE);
 
     if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
@@ -1311,6 +1558,10 @@ void ChatController::failCurrentReply(const QString &message)
     }
 
     m_currentReply.clear();
+    m_activeRunId.clear();
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(false);
+    }
     setSending(false);
     setStatusText(QStringLiteral("错误"));
     requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"));
@@ -1344,12 +1595,13 @@ void ChatController::isolateConversationAsyncState()
     ++m_messageLoadRequestId;
     abortPendingConversationCreate();
 
-    m_gateTimeout.stop();
-    m_pendingExpression.clear();
-    m_pendingState.clear();
-    m_finishPendingAfterStart = false;
-    m_holdBuffer.clear();
+    clearDeferredCleanFinishRequest();
+    resetReplySessionState();
+    m_activeRunId.clear();
     transitionTo(ChatPhase::IDLE);
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(false);
+    }
 
     ++m_currentStreamId;
     if (m_pacer != nullptr) {

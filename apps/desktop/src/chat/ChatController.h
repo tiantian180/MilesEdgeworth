@@ -85,17 +85,36 @@ signals:
     void openWindowRequested();
 
 private:
+    struct ExpressionSegment
+    {
+        int segmentId = -1;
+        QString state;
+        QString expression;
+        QString textBuffer;
+    };
+
     QVariantMap messageObject(const QString &role, const QString &text, bool pending, bool error) const;
     void appendMessage(const QVariantMap &message);
     void transitionTo(ChatPhase next);
     void handleCleanFinishReady();
-    void handleBoundaryReached();
     void requestCleanFinishForCurrentStream();
-    void requestBoundaryForCurrentStream();
+    void requestCleanFinishForStream(quint64 streamId, quint64 generation, quint64 cleanFinishId);
+    void deferCleanFinishRequest(quint64 streamId, quint64 generation, quint64 cleanFinishId);
+    void requestDeferredCleanFinishIfPossible();
+    void clearDeferredCleanFinishRequest();
     bool runtimeCallbackStillCurrent(quint64 streamId, quint64 generation) const;
-    bool boundaryCallbackStillCurrent(quint64 streamId, quint64 generation, quint64 boundaryId) const;
+    void enqueueExpressionSegment(const QString &state, const QString &expression);
+    void appendTextToCurrentTarget(const QString &text);
+    void activateNextSegment();
+    void enterGateForNextSegment();
+    void maybeAdvanceGate();
+    void maybeFinishWaitingForAnimationEnd();
     void handleGateTimeout();
-    void drainHoldBufferToPacer();
+    void handleSegmentDrained(int segmentId);
+    void handlePacerEmpty();
+    void handleStartTimeout();
+    void drainQueuedSegmentsToPacer();
+    void resetReplySessionState();
     void appendChunkToCurrentMessage(const QString &chunk, quint64 streamId);
     void setSidecarReady(bool ready);
     void setProviderConfigured(bool configured);
@@ -132,16 +151,20 @@ private:
     ChatStreamEventParser m_parser;
     QVariantList m_messages;
     QVariantList m_conversations;
-    // Phase 2.3.1: while m_phase is BUFFERING_FOR_START or GATED, streamed
-    // text accumulates here. On transition to STREAMING, it drains into the
-    // pacer. See docs/v2/设计方案/AI 聊天动画编排设计.md §5.
-    QString m_holdBuffer;
+    QString m_preExpressionBuffer;
+    QList<ExpressionSegment> m_segmentQueue;
     ChatPhase m_phase = ChatPhase::IDLE;
-    QString m_pendingState;
-    QString m_pendingExpression;
+    QString m_pendingThinkingState;
+    QString m_pendingThinkingExpression;
+    int m_nextSegmentId = 0;
+    int m_activeSegmentId = -1;
+    QString m_activeState;
+    QString m_activeExpression;
     ChatTextPacer *m_pacer = nullptr;
     QTimer m_gateTimeout;
-    static constexpr int kGateTimeoutMs = 800;
+    QTimer m_startTimeout;
+    static constexpr int kGateTimeoutMs = 2000;
+    static constexpr int kStartTimeoutMs = 3000;
     bool m_sidecarReady = false;
     bool m_providerConfigured = false;
     bool m_sending = false;
@@ -149,18 +172,26 @@ private:
     bool m_sidecarStoppingForRestart = false;
     bool m_foreignSidecarCleanupAttempted = false;
     int m_sidecarRestartAttempts = 0;
-    bool m_finishPendingAfterStart = false;
+    bool m_streamFinished = false;
+    bool m_animationReady = false;
+    bool m_textDrained = false;
+    bool m_pacerEmpty = true;
+    bool m_cleanFinishRequestPending = false;
+    quint64 m_deferredCleanFinishStreamId = 0;
+    quint64 m_deferredCleanFinishGeneration = 0;
+    quint64 m_deferredCleanFinishRequestId = 0;
     // 用户取消后，剩余 SSE chunks 必须被丢弃，否则会拼到新建的 assistant 消息里产生"幽灵回复"。
     // 每次 sendMessage 复位 false。
     bool m_cancelled = false;
     QString m_statusText = QStringLiteral("未连接");
+    QString m_activeRunId;
     QString m_currentConversationId;
     QString m_currentConversationSkinId;
     QString m_conversationSkinHint;
     int m_assistantMessageIndex = -1;
     quint64 m_currentStreamId = 1;
     quint64 m_asyncGeneration = 1;
-    quint64 m_boundaryRequestId = 1;
+    quint64 m_cleanFinishRequestId = 1;
     quint64 m_chatRequestId = 0;
     quint64 m_pendingCreateRequestId = 0;
     quint64 m_listRequestId = 0;

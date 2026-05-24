@@ -23,6 +23,13 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def require_action_variants(action: dict, action_id: str) -> None:
+    variants = action.get("variants", {})
+    require("right" in variants and "left" in variants, f"{action_id} 缺少左右朝向 variant")
+    require("animation" in variants["right"], f"{action_id}.right 缺少 animation")
+    require("animation" in variants["left"], f"{action_id}.left 缺少 animation")
+
+
 def main() -> int:
     manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -53,16 +60,20 @@ def main() -> int:
     for action_id in ["idle_stand", "thinking", "objecting", "bow"]:
         require(action_id in actions, f"manifest 缺少 action: {action_id}")
         action = actions[action_id]
-        require("loopMode" in action, f"{action_id} 缺少 loopMode")
-        require("priority" in action, f"{action_id} 缺少 priority")
-        require("tags" in action, f"{action_id} 缺少 tags")
-        variants = action.get("variants", {})
-        require("right" in variants and "left" in variants, f"{action_id} 缺少左右朝向 variant")
-        require("animation" in variants["right"], f"{action_id}.right 缺少 animation")
-        require("animation" in variants["left"], f"{action_id}.left 缺少 animation")
+        require("label" in action, f"{action_id} 缺少 label")
+        if action_id == "thinking":
+            phases = action.get("phases", {})
+            require(set(phases.keys()) >= {"enter", "loop", "exit"}, "thinking 应声明 enter/loop/exit phases")
+            for phase_id in ["enter", "loop", "exit"]:
+                phase = phases[phase_id]
+                require("loopMode" in phase, f"thinking.{phase_id} 缺少 loopMode")
+                require_action_variants(phase, f"thinking.{phase_id}")
+        else:
+            require("loopMode" in action, f"{action_id} 缺少 loopMode")
+            require_action_variants(action, action_id)
 
-    require(actions["objecting"]["loopMode"] == "onceThenIdle", "objecting 应是一次性动作并回到 idle")
-    require(actions["bow"]["loopMode"] == "onceThenIdle", "bow 应是一次性动作并回到 idle")
+    require(actions["objecting"]["loopMode"] == "onceThenHold", "objecting 应播放一次后定帧")
+    require(actions["bow"]["loopMode"] == "onceThenHold", "bow 应播放一次后定帧")
 
     for alias in ["bow-right.gif", "bow-left.gif", "tea-right.gif", "tea-left.gif"]:
         require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")

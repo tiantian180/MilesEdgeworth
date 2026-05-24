@@ -12,10 +12,11 @@ PetEventBridge::PetEventBridge(PetRuntime *runtime, QObject *parent)
 {
     Q_ASSERT(m_runtime != nullptr);
 
-    // 皮肤命令可用性目前只受当前动作和 rest phase 影响。
+    // 皮肤命令可用性受当前动作、rest phase 和 manifest 命令声明影响。
     // 后续菜单能力迁入 manifest 后，这个信号可以由 MenuController 统一发出。
     connect(m_runtime, &PetRuntime::currentActionChanged, this, &PetEventBridge::skinCommandAvailabilityChanged);
     connect(m_runtime, &PetRuntime::currentPhaseChanged, this, &PetEventBridge::skinCommandAvailabilityChanged);
+    connect(m_runtime, &PetRuntime::skinManifestReloaded, this, &PetEventBridge::skinCommandAvailabilityChanged);
 }
 
 QVariantList PetEventBridge::enabledSkinCommands() const

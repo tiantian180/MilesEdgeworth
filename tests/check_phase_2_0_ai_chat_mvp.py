@@ -130,7 +130,8 @@ def main() -> int:
     require("loadFromModule(\"MilesEdgeworth\", \"ChatWindow\")" in main_cpp, "main must load ChatWindow QML")
     require("聊天" in menu_cpp, "native pet context menu must include chat entry")
     require('"error"' in manifest, "Miles manifest must expose error state for chat failures")
-    require('"action": "thinking", "allowedStates": ["thinking"]' in manifest, "neutral thinking must map to thinking action")
+    require('"recipe": "thinking.holdUntilCancelled", "allowedStates": ["thinking"]' in manifest,
+            "neutral thinking must map to phased thinking recipe")
     require("miles.pet.expression.requested" in parser_smoke, "parser smoke must cover custom expression events")
     require("controller.applyStreamEvent" in controller_smoke, "controller smoke must cover event application")
     require("Phase 2.0" in phase_record, "phase record must document Phase 2.0")

@@ -61,6 +61,35 @@ int main(int argc, char *argv[])
 
     {
         ChatTextPacer pacer;
+        pacer.setMsPerChar(10);
+        QSignalSpy chunks(&pacer, &ChatTextPacer::chunkReady);
+        QSignalSpy segmentDrained(&pacer, &ChatTextPacer::segmentDrained);
+        QSignalSpy pacerEmpty(&pacer, &ChatTextPacer::pacerEmpty);
+
+        pacer.append(QStringLiteral("甲乙"), 7, 100);
+        pacer.append(QStringLiteral("丙"), 7, 101);
+
+        require(pacer.pendingCountForSegment(100) == 2,
+                "segment 100 should track its own pending characters");
+        require(pacer.pendingCountForSegment(101) == 1,
+                "segment 101 should track its own pending characters");
+
+        const bool drained = waitFor(app, 1000, [&]() { return pacer.pendingCount() == 0; });
+        require(drained, "segmented stream should drain");
+        require(segmentDrained.size() == 2,
+                "pacer should emit one segmentDrained signal per segment");
+        require(segmentDrained.at(0).at(0).toInt() == 100,
+                "segment 100 should drain before segment 101");
+        require(segmentDrained.at(1).at(0).toInt() == 101,
+                "segment 101 should drain second");
+        require(pacerEmpty.size() == 1,
+                "pacer should emit pacerEmpty when all text drains");
+        require(assembleChunks(chunks) == QStringLiteral("甲乙丙"),
+                "segmented chunks should preserve order");
+    }
+
+    {
+        ChatTextPacer pacer;
         pacer.setMsPerChar(15);
         QSignalSpy chunks(&pacer, &ChatTextPacer::chunkReady);
 

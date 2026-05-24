@@ -62,6 +62,8 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)
     Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
+    Q_PROPERTY(int currentFrameStart READ currentFrameStart NOTIFY currentAnimationUrlChanged)
+    Q_PROPERTY(int currentFrameEnd READ currentFrameEnd NOTIFY currentAnimationUrlChanged)
     Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
     Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
     Q_PROPERTY(QString currentPropId READ currentPropId NOTIFY currentPropChanged)
@@ -106,6 +108,8 @@ public:
     bool sleeping() const;
     bool sleepTransitioning() const;
     QUrl currentAnimationUrl() const { return m_currentAnimationUrl; }
+    int currentFrameStart() const { return m_currentFrameStart; }
+    int currentFrameEnd() const { return m_currentFrameEnd; }
     QUrl currentSoundUrl() const { return m_audioController.currentSoundUrl(); }
     bool currentPropVisible() const { return m_propController.current().visible; }
     QString currentPropId() const { return m_propController.current().id; }
@@ -130,6 +134,11 @@ public:
     RuntimeSnapshot snapshot() const;
 
     // ---- 设置类接口：菜单或 QML 直接调用，不走事件管线 ----
+    enum class SkinReloadMode {
+        PlayStartup,
+        PreservePlayback,
+    };
+
     Q_INVOKABLE void setState(const QString &state);
     Q_INVOKABLE void setFacing(const QString &facing);
     Q_INVOKABLE void toggleFacing();
@@ -139,6 +148,7 @@ public:
     Q_INVOKABLE void setPetSize(const QString &sizeId);
     Q_INVOKABLE bool setActiveSkin(const QString &skinId);
     Q_INVOKABLE bool reloadActiveSkin();
+    Q_INVOKABLE bool reloadActiveSkinPreservingPlayback();
 
     // ---- 底层播放入口：高层应优先用 submitActionRequest，这些方法供 RecipeRunner / 测试使用 ----
     Q_INVOKABLE void playAction(const QString &actionId);
@@ -167,6 +177,8 @@ public:
     );
     void requestBoundaryAndNotify(std::function<void()> callback);
     void requestCleanFinishAndNotify(std::function<void()> callback);
+    void cancelCleanFinishNotification();
+    void setSuppressAutoIdle(bool suppress);
 
 signals:
     void currentStateChanged();
@@ -197,8 +209,8 @@ signals:
 
 private:
     QString actionForState(const QString &state) const;
-    QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
-    QUrl variantForAction(const ActionDefinition &action) const;
+    AnimationVariant variantForFacing(const QHash<QString, AnimationVariant> &variants, const QString &facing) const;
+    AnimationVariant variantForAction(const ActionDefinition &action) const;
     bool acceptsPointerInteraction() const;
     void playSoundForRecipe(const RecipeDefinition &recipe);
     void hideCurrentProp();
@@ -206,6 +218,9 @@ private:
     void playActionInternal(const QString &actionId, bool resetRecipe);
     void playNextRecipeStep();
     void playRecipeStep(const RecipeStep &step);
+    bool currentRecipeStepRuntimeControlled() const;
+    bool currentRecipeHasNextStep() const;
+    bool advanceRuntimeControlledRecipeStepForCleanFinish();
     QString resolveRecipeMovementDirection(const QString &movementDirection) const;
     QString resolveRecipeFacing(const QString &facing) const;
     double movementScaleFactor() const;
@@ -219,22 +234,17 @@ private:
     void playPhase(const QString &actionId, const QString &phaseId);
     void setCurrentAction(const QString &actionId, const ActionDefinition &action);
     void setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase);
-    bool atAnimationBoundary() const;
-    void enqueueBoundaryNotification(std::function<void()> callback);
-    bool drainPendingNotifications();
-    bool triggerPendingNotification(quint64 notificationId);
-    void applyManifestState();
+    bool cleanFinishBoundaryReached() const;
+    bool continueCleanFinishIfPossible();
+    void triggerCleanFinishCallback();
+    void clearCleanFinishCallback();
+    void stopAutoIdleTimer();
+    void applyManifestState(bool preserveRuntimeState = false);
     bool activateSkin(const QString &skinId, bool persistSelection);
-    bool loadSkinDescriptor(const SkinDescriptor &descriptor);
+    bool reloadActiveSkin(SkinReloadMode mode);
+    bool loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReloadMode mode);
     SkinDescriptor descriptorForSkinId(const QString &skinId) const;
     void refreshAvailableSkins();
-
-    struct PendingNotification
-    {
-        quint64 id = 0;
-        std::function<void()> callback;
-        QTimer *timer = nullptr;
-    };
 
     SkinManifest m_manifest;
     QList<SkinDescriptor> m_availableSkinDescriptors;
@@ -243,6 +253,7 @@ private:
     QString m_currentActionId;
     QString m_currentRecipeId;
     int m_currentRecipeStepIndex = -1;
+    bool m_currentRecipeStepRuntimeControlled = false;
     QString m_currentPhaseId;
     QString m_currentFacing;
     QString m_currentMovementDirection;
@@ -253,11 +264,20 @@ private:
     QString m_petSizeId;
     double m_petScale = 0.0;
     QUrl m_currentAnimationUrl;
+    int m_currentFrameStart = -1;
+    int m_currentFrameEnd = -1;
+    bool m_currentPlaybackAtBoundary = false;
     PropController m_propController;
     int m_playbackSerial = 0;
     ActionRequest m_pendingRequest;
-    QList<PendingNotification> m_pendingNotifications;
-    quint64 m_nextPendingNotificationId = 0;
+    std::function<void()> m_cleanFinishCallback;
+    QTimer *m_cleanFinishSafetyTimer = nullptr;
+    QTimer *m_autoIdleTimer = nullptr;
+    bool m_cleanFinishExitInProgress = false;
+    bool m_suppressAutoIdle = false;
+
+    static constexpr int kCleanFinishSafetyMs = 2000;
+    static constexpr int kAutoIdleAfterCleanFinishMs = 3000;
 };
 
 // 与 DesktopShellControllerForeign 一样，这个 wrapper 让 QML 看到一个名为

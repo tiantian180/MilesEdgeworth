@@ -284,7 +284,141 @@ int main(int argc, char *argv[])
     require(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"), "built-in Miles should be active by default");
     require(!runtime.availableSkins().isEmpty(), "runtime should expose available skins");
     require(runtime.reloadActiveSkin(), "runtime should reload active skin");
+    runtime.setAudioLanguage("zh");
+    runtime.setPetSize("mini");
+    runtime.setFacing("left");
+    runtime.playRecipe("walk.north");
+    require(runtime.currentMovementDirection() == "north", "preserve reload setup should use a non-default movement direction");
+    int audioLanguageChangesDuringPreserveReload = 0;
+    int petScaleChangesDuringPreserveReload = 0;
+    int facingChangesDuringPreserveReload = 0;
+    int movementChangesDuringPreserveReload = 0;
+    QObject::connect(&runtime, &PetRuntime::currentAudioLanguageChanged, [&audioLanguageChangesDuringPreserveReload]() {
+        ++audioLanguageChangesDuringPreserveReload;
+    });
+    QObject::connect(&runtime, &PetRuntime::petScaleChanged, [&petScaleChangesDuringPreserveReload]() {
+        ++petScaleChangesDuringPreserveReload;
+    });
+    QObject::connect(&runtime, &PetRuntime::currentFacingChanged, [&facingChangesDuringPreserveReload]() {
+        ++facingChangesDuringPreserveReload;
+    });
+    QObject::connect(&runtime, &PetRuntime::currentMovementDirectionChanged, [&movementChangesDuringPreserveReload]() {
+        ++movementChangesDuringPreserveReload;
+    });
+    runtime.playAction("objecting");
+    const int preserveReloadSerial = runtime.playbackSerial();
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should reload the active skin manifest");
+    require(runtime.currentActionId() == "objecting",
+            "preserve reload must keep the current action instead of replaying startup");
+    require(runtime.currentRecipeId().isEmpty(),
+            "preserve reload must not start startup.briefcase");
+    require(runtime.currentAudioLanguageId() == "zh",
+            "preserve reload must keep the current audio language when still supported");
+    require(runtime.petSizeId() == "mini",
+            "preserve reload must keep the current pet size when still supported");
+    require(runtime.currentFacing() == "left",
+            "preserve reload must keep the current facing when still supported");
+    require(runtime.currentMovementDirection() == "north",
+            "preserve reload must keep the current movement direction when still supported");
+    require(audioLanguageChangesDuringPreserveReload == 0,
+            "preserve reload must not emit a temporary audio language change");
+    require(petScaleChangesDuringPreserveReload == 0,
+            "preserve reload must not emit a temporary pet size change");
+    require(facingChangesDuringPreserveReload == 0,
+            "preserve reload must not emit a temporary facing change");
+    require(movementChangesDuringPreserveReload == 0,
+            "preserve reload must not emit a temporary movement direction change");
+    require(runtime.playbackSerial() == preserveReloadSerial,
+            "preserve reload must not restart the current animation");
+
+    SkinManifest &runtimeDurationManifest = const_cast<SkinManifest &>(runtime.manifest());
+    RecipeDefinition nonRuntimeThinkingRecipe = runtimeDurationManifest.recipes.value(QStringLiteral("thinking.holdUntilCancelled"));
+    require(nonRuntimeThinkingRecipe.steps.size() == 3,
+            "preserve reload runtime duration setup should find the thinking recipe");
+    nonRuntimeThinkingRecipe.steps[1].durationMode.clear();
+    nonRuntimeThinkingRecipe.steps[1].runtimeControlled = false;
+    runtimeDurationManifest.recipes.insert(QStringLiteral("thinking.holdUntilCancelled"), nonRuntimeThinkingRecipe);
+    runtime.playRecipe("thinking.holdUntilCancelled");
+    runtime.handleAnimationFinished();
+    require(runtime.currentRecipeId() == "thinking.holdUntilCancelled",
+            "preserve reload runtime duration setup should keep the synthetic recipe active");
+    require(runtime.currentPhaseId() == "loop",
+            "preserve reload runtime duration setup should reach the synthetic loop step");
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should succeed when runtime duration semantics changed");
+    require(runtime.currentRecipeId().isEmpty(),
+            "preserve reload should not keep playback when recipe step runtime duration semantics changed");
+    require(runtime.currentActionId() == runtime.manifest().stateToAction.value(QStringLiteral("idle")),
+            "runtime duration semantic changes should fall back to the manifest idle action");
+
+    SkinManifest &editableManifest = const_cast<SkinManifest &>(runtime.manifest());
+    ActionDefinition editedObjecting = editableManifest.actions.value(QStringLiteral("objecting"));
+    PhaseDefinition removedPhase;
+    removedPhase.loopMode = QStringLiteral("once");
+    removedPhase.variants = editedObjecting.variants;
+    editedObjecting.initialPhase = QStringLiteral("review_removed");
+    editedObjecting.phases.insert(QStringLiteral("review_removed"), removedPhase);
+    editableManifest.actions.insert(QStringLiteral("objecting"), editedObjecting);
+    editableManifest.stateToAction.insert(QStringLiteral("review_state"), QStringLiteral("objecting"));
+    RecipeDefinition removedRecipe;
+    RecipeStep removedStep;
+    removedStep.actionId = QStringLiteral("objecting");
+    removedStep.phaseId = QStringLiteral("review_removed");
+    removedRecipe.steps.append(removedStep);
+    editableManifest.recipes.insert(QStringLiteral("review.removed"), removedRecipe);
+    runtime.setState("review_state");
+    runtime.playRecipe("review.removed");
+    const int invalidPreserveReloadSerial = runtime.playbackSerial();
+    require(runtime.currentActionId() == "objecting",
+            "invalid preserve setup should keep an action that still exists after reload");
+    require(runtime.currentPhaseId() == "review_removed",
+            "invalid preserve setup should use a phase that will disappear after reload");
+    require(runtime.currentRecipeId() == "review.removed",
+            "invalid preserve setup should use a recipe that will disappear after reload");
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should still succeed when current playback cannot be restored");
+    require(runtime.currentState() == "idle",
+            "invalid preserved state mapping should fall back to idle state");
+    require(runtime.currentActionId() == runtime.manifest().stateToAction.value(QStringLiteral("idle")),
+            "invalid preserved playback should fall back to the manifest idle action");
+    require(runtime.currentRecipeId().isEmpty(),
+            "invalid preserved recipe should be cleared during fallback");
+    require(runtime.playbackSerial() != invalidPreserveReloadSerial,
+            "invalid preserved playback fallback should restart with a safe animation");
+
+    SkinManifest &blockingManifest = const_cast<SkinManifest &>(runtime.manifest());
+    ActionDefinition reviewBlockingAction = blockingManifest.actions.value(QStringLiteral("objecting"));
+    reviewBlockingAction.blocksPointerInteraction = true;
+    blockingManifest.actions.insert(QStringLiteral("review_blocking"), reviewBlockingAction);
+    blockingManifest.stateToAction.insert(QStringLiteral("review_blocking_state"), QStringLiteral("review_blocking"));
+    runtime.setState("review_blocking_state");
+    require(!runtime.pointerInteractionEnabled(),
+            "invalid fallback signal setup should start from a pointer-blocking synthetic action");
+    int pointerInteractionChangesDuringInvalidFallback = 0;
+    QObject::connect(&runtime, &PetRuntime::pointerInteractionEnabledChanged, [&pointerInteractionChangesDuringInvalidFallback]() {
+        ++pointerInteractionChangesDuringInvalidFallback;
+    });
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should fall back from a removed pointer-blocking action");
+    require(runtime.currentState() == "idle",
+            "removed pointer-blocking action should fall back to idle state");
+    require(runtime.pointerInteractionEnabled(),
+            "invalid fallback should finish in pointer-enabled idle state");
+    require(pointerInteractionChangesDuringInvalidFallback > 0,
+            "invalid fallback must notify pointer interaction availability when final state changes");
+
+    runtime.returnToIdle();
+    require(runtime.reloadActiveSkin(), "runtime should reload active skin before startup assertions");
     PetEventBridge bridge(&runtime);
+    int skinCommandAvailabilityChanges = 0;
+    QObject::connect(&bridge, &PetEventBridge::skinCommandAvailabilityChanged, [&skinCommandAvailabilityChanges]() {
+        ++skinCommandAvailabilityChanges;
+    });
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should notify menu command availability after manifest reload");
+    require(skinCommandAvailabilityChanges > 0,
+            "skin manifest reload should refresh enabled skin commands");
 
     // 启动时应进入旧版公文包入场序列，而不是直接静止站立。
     require(runtime.currentRecipeId() == "startup.briefcase", "启动时应播放 startup.briefcase recipe");
@@ -649,56 +783,190 @@ int main(int argc, char *argv[])
     runtime.submitExpressionRequest("speaking", "objection", 0.0);
     require(runtime.currentActionId() == "objecting", "speaking + objection 应映射到异议动作");
     runtime.submitExpressionRequest("speaking", "neutral", 0.0);
-    require(runtime.currentActionId() == "crossed", "speaking + neutral 应映射到可见说话动作，而不是站立待机");
+    require(runtime.currentActionId() == "talking", "speaking + neutral 应映射到 talking 分段说话动作，而不是站立待机");
+    require(runtime.currentPhaseId() == "enter" && runtime.currentFrameStart() == 0 && runtime.currentFrameEnd() == 3,
+            "talking enter 应使用 crossed 1-4 帧");
+    runtime.handleAnimationFinished();
+    require(runtime.currentPhaseId() == "loop" && runtime.currentFrameStart() == 4 && runtime.currentFrameEnd() == 7,
+            "talking enter 播完后应进入 5-8 帧说话循环");
     runtime.submitExpressionRequest("idle", "polite", 0.0);
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
+    runtime.playAction("objecting");
+    require(runtime.currentLoopMode() == "onceThenHold",
+            "objecting should use onceThenHold for entry-only chat animation");
+    require(!runtime.currentAutoReturnToIdle(),
+            "onceThenHold must not auto-return to idle");
+    int objectingCleanFinishCallbacks = 0;
+    runtime.requestCleanFinishAndNotify([&objectingCleanFinishCallbacks]() {
+        ++objectingCleanFinishCallbacks;
+    });
+    require(objectingCleanFinishCallbacks == 0,
+            "onceThenHold should not clean-finish before the first playback reaches its last frame");
+    runtime.handleAnimationFinished();
+    require(objectingCleanFinishCallbacks == 1,
+            "onceThenHold should clean-finish after it reaches the held last frame");
+    require(runtime.currentActionId() == "objecting",
+            "onceThenHold should stay on the entry-only action after clean finish");
+
+    SkinManifest &frameRangeManifest = const_cast<SkinManifest &>(runtime.manifest());
+    ActionDefinition rangedObjecting = frameRangeManifest.actions.value(QStringLiteral("objecting"));
+    AnimationVariant rangedObjectingRight = rangedObjecting.variants.value(QStringLiteral("right"));
+    rangedObjectingRight.frameStart = 2;
+    rangedObjectingRight.frameEnd = 4;
+    rangedObjecting.variants.insert(QStringLiteral("right"), rangedObjectingRight);
+    frameRangeManifest.actions.insert(QStringLiteral("objecting"), rangedObjecting);
+    runtime.setFacing("right");
+    runtime.playAction("objecting");
+    require(runtime.currentFrameStart() == 2 && runtime.currentFrameEnd() == 4,
+            "test setup should use a temporary objecting frame range");
+    const int rangedObjectingSerial = runtime.playbackSerial();
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should keep current objecting action while refreshing manifest metadata");
+    require(runtime.currentActionId() == "objecting",
+            "preserve reload should keep the current action when it still exists");
+    require(runtime.currentFrameStart() == -1 && runtime.currentFrameEnd() == -1,
+            "preserve reload should recompute frame range from the reloaded manifest");
+    require(runtime.playbackSerial() != rangedObjectingSerial,
+            "preserve reload should restart playback when animation frame range changes");
+
     runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
-    require(runtime.currentActionId() == "crossed", "未知 expression 应降级到 speaking neutral 的可见说话动作");
+    require(runtime.currentActionId() == "talking", "未知 expression 应降级到 speaking neutral 的 talking 动作");
     runtime.playAction("bow");
     runtime.submitExpressionRequest("unknown-state", "neutral", 0.0);
-    require(runtime.currentActionId() == "crossed", "未知 expression state 应回退到当前 PetState 的 neutral 映射");
+    require(runtime.currentActionId() == "talking", "未知 expression state 应回退到当前 PetState 的 neutral 映射");
 
     {
-        int boundaryCallbacks = 0;
         runtime.playAction("bow");
-        runtime.requestBoundaryAndNotify([&boundaryCallbacks]() {
-            ++boundaryCallbacks;
-        });
-        require(boundaryCallbacks == 0, "requestBoundaryAndNotify 不应在动作边界前回调");
-        runtime.handleAnimationFinished();
-        require(boundaryCallbacks == 1, "requestBoundaryAndNotify 应在 handleAnimationFinished 自然边界回调");
-
         int cleanFinishCallbacks = 0;
-        runtime.playAction("idle_thinking_once");
         runtime.requestCleanFinishAndNotify([&cleanFinishCallbacks]() {
             ++cleanFinishCallbacks;
         });
-        require(cleanFinishCallbacks == 0, "requestCleanFinishAndNotify 不应在动作边界前回调");
+        require(cleanFinishCallbacks == 0,
+                "cleanFinish should wait for onceThenHold action to reach its held frame");
         runtime.handleAnimationFinished();
-        require(cleanFinishCallbacks == 1, "requestCleanFinishAndNotify 应在 handleAnimationFinished 自然边界回调");
+        require(cleanFinishCallbacks == 1,
+                "cleanFinish should callback after onceThenHold reaches its boundary");
+        require(runtime.currentActionId() == "bow",
+                "cleanFinish callback postcondition should keep action finished instead of auto-idling");
+
+        runtime.playRecipe("sleep.enterLoopExit");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "sleep setup should enter loop before cleanFinish");
+        int sleepCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&sleepCleanFinishCallbacks]() {
+            ++sleepCleanFinishCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "exit",
+                "cleanFinish from a loop phase should play the exit phase first");
+        require(sleepCleanFinishCallbacks == 0,
+                "cleanFinish should wait until exit finishes");
+        runtime.handleAnimationFinished();
+        require(sleepCleanFinishCallbacks == 1,
+                "cleanFinish should callback after exit finishes");
+
+        runtime.playRecipe("thinking.holdUntilCancelled");
+        require(runtime.currentRecipeId() == "thinking.holdUntilCancelled",
+                "thinking recipe should become the active recipe");
+        require(runtime.currentActionId() == "thinking",
+                "thinking recipe should play the thinking action");
+        require(runtime.currentPhaseId() == "enter",
+                "thinking recipe should start at enter phase");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "thinking enter step should advance to loop step");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "runtime-controlled thinking loop should not auto-advance to exit without cleanFinish");
+        require(runtime.currentRecipeId() == "thinking.holdUntilCancelled",
+                "runtime-controlled thinking recipe should remain active while loop is held by runtime");
+
+        int thinkingCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&thinkingCleanFinishCallbacks]() {
+            ++thinkingCleanFinishCallbacks;
+        });
+        require(runtime.currentPhaseId() == "exit",
+                "cleanFinish requested at a held runtime loop boundary should advance to exit step");
+        require(thinkingCleanFinishCallbacks == 0,
+                "thinking cleanFinish should wait for exit step completion");
+        runtime.handleAnimationFinished();
+        require(thinkingCleanFinishCallbacks == 1,
+                "thinking cleanFinish should callback after exit step completes");
+
+        runtime.playRecipe("thinking.holdUntilCancelled");
+        int thinkingEnterCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&thinkingEnterCleanFinishCallbacks]() {
+            ++thinkingEnterCleanFinishCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "cleanFinish requested during thinking enter should advance to the runtime loop step first");
+        require(thinkingEnterCleanFinishCallbacks == 0,
+                "thinking enter cleanFinish should not callback before runtime loop exits");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "exit",
+                "thinking enter cleanFinish should advance runtime loop to exit");
+        runtime.handleAnimationFinished();
+        require(thinkingEnterCleanFinishCallbacks == 1,
+                "thinking enter cleanFinish should callback after exit step completes");
+
+        runtime.playRecipe("sleep.enterLoopExit");
+        int sleepEnterCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&sleepEnterCleanFinishCallbacks]() {
+            ++sleepEnterCleanFinishCallbacks;
+        });
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "cleanFinish requested during enter should allow internal nextPhase to reach loop first");
+        require(sleepEnterCleanFinishCallbacks == 0,
+                "cleanFinish requested during enter should not callback before loop boundary");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "exit",
+                "cleanFinish from loop after enter should play exit");
+        runtime.handleAnimationFinished();
+        require(sleepEnterCleanFinishCallbacks == 1,
+                "cleanFinish requested during enter should callback after exit finishes");
 
         runtime.setFacing("right");
-        runtime.playRecipe("turn.once");
-        int turnBoundaryCallbacks = 0;
-        runtime.requestBoundaryAndNotify([&turnBoundaryCallbacks]() {
-            ++turnBoundaryCallbacks;
+        runtime.playAction("turn_around");
+        int turnCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&turnCleanFinishCallbacks]() {
+            ++turnCleanFinishCallbacks;
         });
         runtime.handleAnimationFinished();
-        require(turnBoundaryCallbacks == 1, "边界通知不应吞掉 handleAnimationFinished 的原有流程");
-        require(runtime.currentFacing() == "left", "边界通知后仍应应用转身动作的 facingAfter");
-        require(runtime.currentActionId() == "idle_stand", "边界通知后 onceThenIdle 动作仍应回到 idle_stand");
+        require(turnCleanFinishCallbacks == 1,
+                "cleanFinish should callback at turn action boundary");
+        require(runtime.currentFacing() == "left",
+                "cleanFinish should preserve facingAfter side effect before callback");
 
-        int replacedBoundaryCallbacks = 0;
-        runtime.playAction("bow");
-        runtime.requestBoundaryAndNotify([&replacedBoundaryCallbacks]() {
-            ++replacedBoundaryCallbacks;
+        runtime.playAction("thinking");
+        int replacedCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&replacedCleanFinishCallbacks]() {
+            ++replacedCleanFinishCallbacks;
         });
-        runtime.returnToIdle();
-        require(replacedBoundaryCallbacks == 1,
-                "替换当前动画时应释放旧 boundary callback，避免悬挂到下一段动画");
+        runtime.playAction("bow");
+        waitForMilliseconds(100);
+        require(replacedCleanFinishCallbacks == 0,
+                "replacing playback should not synchronously fire pending cleanFinish callback");
+        waitForMilliseconds(2100);
+        require(replacedCleanFinishCallbacks == 1,
+                "replacing playback should preserve pending cleanFinish until safety timeout");
+
+        runtime.playAction("bow");
+        int suppressedCallbacks = 0;
+        runtime.setSuppressAutoIdle(true);
+        runtime.requestCleanFinishAndNotify([&suppressedCallbacks]() {
+            ++suppressedCallbacks;
+        });
         runtime.handleAnimationFinished();
-        require(replacedBoundaryCallbacks == 1,
-                "旧 boundary callback 不应在后续无关动画结束时重复触发");
+        require(suppressedCallbacks == 1,
+                "suppressed cleanFinish callback should still fire");
+        waitForMilliseconds(3100);
+        require(runtime.currentActionId() == "bow",
+                "suppressAutoIdle should prevent the 3000ms fallback idle during reply sessions");
+        runtime.setSuppressAutoIdle(false);
+        runtime.returnToIdle();
     }
 
     runtime.playRecipe("doubleClick.holdIt");
@@ -844,7 +1112,7 @@ int main(int argc, char *argv[])
     require(!runtime.currentPropVisible(), "点击徽章后应隐藏 Prop");
     require(runtime.currentActionId() == "bow", "点击徽章后应触发鞠躬");
     runtime.handleAnimationFinished();
-    require(runtime.currentActionId() == "idle_stand", "鞠躬播完后应回到 idle_stand");
+    require(runtime.currentActionId() == "bow", "Phase 2.4 后鞠躬播完应定帧停留");
 
     runtime.returnToIdle();
     runtime.playRecipe("doubleClick.takeThat");

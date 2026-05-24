@@ -37,6 +37,7 @@ type StreamEvent struct {
 	MessageID string         `json:"messageId,omitempty"`
 	Role      string         `json:"role,omitempty"`
 	Delta     string         `json:"delta,omitempty"`
+	RawDelta  string         `json:"-"`
 	Value     map[string]any `json:"value,omitempty"`
 	Error     string         `json:"error,omitempty"`
 }

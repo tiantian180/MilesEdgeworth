@@ -388,9 +388,20 @@ int main(int argc, char *argv[])
         controller.openWindow();
         const QString savedPersona = QStringLiteral("Settings saved persona\n御剑怜侍保持正式中文语气。\n");
         controller.setPersonaPrompt(savedPersona);
+        runtime.setAudioLanguage("zh");
+        runtime.setPetSize("mini");
+        runtime.setFacing("left");
+        runtime.playAction("objecting");
+        const int playbackSerialBeforePersonaSave = runtime.playbackSerial();
         controller.save();
 
         assert(controller.personaError().isEmpty());
+        assert(runtime.currentActionId() == QStringLiteral("objecting"));
+        assert(runtime.playbackSerial() == playbackSerialBeforePersonaSave);
+        assert(runtime.currentRecipeId().isEmpty());
+        assert(runtime.currentAudioLanguageId() == QStringLiteral("zh"));
+        assert(runtime.petSizeId() == QStringLiteral("mini"));
+        assert(runtime.currentFacing() == QStringLiteral("left"));
         assert(runtime.manifest().personaPrompt == savedPersona);
         assert(runtime.reloadActiveSkin());
         assert(runtime.manifest().personaPrompt == savedPersona);

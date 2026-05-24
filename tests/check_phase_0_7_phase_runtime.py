@@ -37,6 +37,7 @@ def main() -> int:
     require(phases["enter"].get("nextPhase") == "loop", "sleep.enter 播完应进入 loop")
     require(phases["loop"].get("loopMode") == "loop", "sleep.loop 应循环")
     require(phases["exit"].get("loopMode") == "onceThenIdle", "sleep.exit 播完应回 idle")
+    require(actions["objecting"]["loopMode"] == "onceThenHold", "Phase 2.4 后 objecting 应是 entry-only 定帧动作")
 
     for phase_id in ["enter", "loop", "exit"]:
         variants = phases[phase_id].get("variants", {})
