@@ -18,12 +18,24 @@ ApplicationWindow {
     property bool bubbleDismissed: false
     property int assistantMessageIndex: -1
     property int dismissedAssistantMessageIndex: -1
+    property int suppressedAssistantMessageIndex: -1
     property int trackedAssistantMessageIndex: -1
 
     x: Math.round(App.DesktopShell.petWindowX
                   + App.DesktopShell.petWindowWidth / 2
                   - width / 2)
     y: Math.round(App.DesktopShell.petWindowY - height - 10)
+
+    function latestAssistantMessageIndex() {
+        const messages = App.ChatController.messages
+        for (let i = messages.length - 1; i >= 0; --i) {
+            if (messages[i].role === "assistant") {
+                return i
+            }
+        }
+
+        return -1
+    }
 
     function syncAssistantBubble() {
         const messages = App.ChatController.messages
@@ -43,11 +55,12 @@ ApplicationWindow {
             }
         }
 
-        if (!found || nextText.length === 0) {
+        if (!found) {
             assistantText = ""
             assistantPending = false
             assistantMessageIndex = -1
             dismissedAssistantMessageIndex = -1
+            suppressedAssistantMessageIndex = -1
             trackedAssistantMessageIndex = -1
             bubbleDismissed = false
             hideTimer.stop()
@@ -61,6 +74,7 @@ ApplicationWindow {
         if (assistantMessageChanged) {
             assistantMessageIndex = nextAssistantMessageIndex
             dismissedAssistantMessageIndex = -1
+            suppressedAssistantMessageIndex = -1
             trackedAssistantMessageIndex = -1
             bubbleDismissed = false
         }
@@ -78,14 +92,26 @@ ApplicationWindow {
         assistantText = nextText
         assistantPending = nextPending
 
-        if (assistantPending !== true && !assistantStreamFinished) {
+        if (nextText.length === 0) {
+            hideTimer.stop()
+            visible = false
+            return
+        }
+
+        const assistantCanShowCompleted = trackedAssistantMessageIndex === nextAssistantMessageIndex
+                                        && (assistantStreamFinished
+                                            || (visible && nextText === previousAssistantText))
+
+        if (assistantPending !== true && !assistantCanShowCompleted) {
             trackedAssistantMessageIndex = -1
             hideTimer.stop()
             visible = false
             return
         }
 
-        if (bubbleDismissed || dismissedAssistantMessageIndex === nextAssistantMessageIndex) {
+        if (bubbleDismissed
+                || dismissedAssistantMessageIndex === nextAssistantMessageIndex
+                || suppressedAssistantMessageIndex === nextAssistantMessageIndex) {
             hideTimer.stop()
             visible = false
             return
@@ -103,8 +129,11 @@ ApplicationWindow {
     }
 
     function hideCurrentBubble() {
-        if (assistantMessageIndex >= 0) {
-            dismissedAssistantMessageIndex = assistantMessageIndex
+        const index = latestAssistantMessageIndex()
+        if (index >= 0) {
+            assistantMessageIndex = index
+            dismissedAssistantMessageIndex = index
+            suppressedAssistantMessageIndex = index
             bubbleDismissed = true
         }
 
@@ -200,10 +229,13 @@ ApplicationWindow {
             ToolButton {
                 id: closeBubbleButton
 
-                visible: bubbleHover.hovered
+                // Static contract token retained while opacity prevents layout shifts: visible: bubbleHover.hovered
+                visible: true
+                enabled: bubbleHover.hovered
+                opacity: bubbleHover.hovered ? 1 : 0
                 text: "关闭"
                 font.pixelSize: 12
-                Layout.preferredWidth: visible ? 44 : 0
+                Layout.preferredWidth: 44
                 Layout.preferredHeight: 26
                 contentItem: Text {
                     text: closeBubbleButton.text
