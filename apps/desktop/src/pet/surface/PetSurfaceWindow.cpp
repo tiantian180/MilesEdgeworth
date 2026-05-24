@@ -317,7 +317,7 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
             m_movie->setPaused(true);
             QTimer::singleShot(currentFrameDelayMs, this, [this, playbackSerial]() {
                 if (m_runtime->playbackSerial() == playbackSerial) {
-                    jumpToFrameStartIfNeeded(playbackSerial);
+                    jumpToFrameStartNowIfNeeded();
                     m_movie->setPaused(false);
                 }
             });
@@ -333,13 +333,41 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
     }
 }
 
-int PetSurfaceWindow::currentEffectiveEndFrame() const
+int PetSurfaceWindow::currentEffectiveEndFrame()
 {
-    const int frameEnd = m_runtime->currentFrameEnd();
-    if (frameEnd >= 0) {
-        return frameEnd;
+    const int frameCount = m_movie->frameCount();
+    if (frameCount <= 0) {
+        return -1;
     }
-    return m_movie->frameCount() - 1;
+
+    const int lastFrame = frameCount - 1;
+    const int frameStart = m_runtime->currentFrameStart();
+    const int frameEnd = m_runtime->currentFrameEnd();
+    if (frameStart < 0 && frameEnd < 0) {
+        return lastFrame;
+    }
+
+    if (frameStart < 0 || frameEnd < frameStart || frameStart >= frameCount) {
+        warnInvalidFrameRangeOnce(
+            QStringLiteral("invalid frameRange, falling back to full animation"),
+            frameStart,
+            frameEnd,
+            frameCount
+        );
+        return lastFrame;
+    }
+
+    if (frameEnd >= frameCount) {
+        warnInvalidFrameRangeOnce(
+            QStringLiteral("frameRange end exceeds frame count, clamping to last frame"),
+            frameStart,
+            frameEnd,
+            frameCount
+        );
+        return lastFrame;
+    }
+
+    return frameEnd;
 }
 
 void PetSurfaceWindow::jumpToFrameStartIfNeeded(int playbackSerial)
@@ -353,13 +381,58 @@ void PetSurfaceWindow::jumpToFrameStartIfNeeded(int playbackSerial)
         if (m_runtime->playbackSerial() != playbackSerial) {
             return;
         }
-        if (!m_movie->jumpToFrame(frameStart)) {
-            qCWarning(petRuntimeLog).noquote()
-                << "QMovie jumpToFrame failed"
-                << QStringLiteral("frame=%1").arg(frameStart)
-                << QStringLiteral("url=%1").arg(m_runtime->currentAnimationUrl().toString());
-        }
+        jumpToFrameStartNowIfNeeded();
     });
+}
+
+bool PetSurfaceWindow::jumpToFrameStartNowIfNeeded()
+{
+    const int frameStart = m_runtime->currentFrameStart();
+    if (frameStart < 0 || (frameStart == 0 && m_movie->currentFrameNumber() <= 0)) {
+        return true;
+    }
+
+    const int frameCount = m_movie->frameCount();
+    if (frameCount > 0 && frameStart >= frameCount) {
+        warnInvalidFrameRangeOnce(
+            QStringLiteral("frameRange start exceeds frame count, falling back to normal playback"),
+            frameStart,
+            m_runtime->currentFrameEnd(),
+            frameCount
+        );
+        return false;
+    }
+
+    if (!m_movie->jumpToFrame(frameStart)) {
+        qCWarning(petRuntimeLog).noquote()
+            << "QMovie jumpToFrame failed"
+            << QStringLiteral("frame=%1").arg(frameStart)
+            << QStringLiteral("url=%1").arg(m_runtime->currentAnimationUrl().toString());
+        return false;
+    }
+
+    return true;
+}
+
+void PetSurfaceWindow::warnInvalidFrameRangeOnce(
+    const QString &reason,
+    int frameStart,
+    int frameEnd,
+    int frameCount
+)
+{
+    const int playbackSerial = m_runtime->playbackSerial();
+    if (m_lastInvalidFrameRangeWarningSerial == playbackSerial) {
+        return;
+    }
+
+    m_lastInvalidFrameRangeWarningSerial = playbackSerial;
+    qCWarning(petRuntimeLog).noquote()
+        << reason
+        << QStringLiteral("frameStart=%1").arg(frameStart)
+        << QStringLiteral("frameEnd=%1").arg(frameEnd)
+        << QStringLiteral("frameCount=%1").arg(frameCount)
+        << QStringLiteral("url=%1").arg(m_runtime->currentAnimationUrl().toString());
 }
 
 void PetSurfaceWindow::scheduleAnimationCompletion(int playbackSerial, int delayMs)

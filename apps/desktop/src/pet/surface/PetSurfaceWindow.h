@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QPoint>
+#include <QString>
 #include <QTimer>
 #include <QWidget>
 
@@ -49,8 +50,10 @@ private:
     void syncSizeFromRuntime();
     void restartMovieFromRuntime();
     void handleMovieFrameChanged(int frame);
-    int currentEffectiveEndFrame() const;
+    int currentEffectiveEndFrame();
     void jumpToFrameStartIfNeeded(int playbackSerial);
+    bool jumpToFrameStartNowIfNeeded();
+    void warnInvalidFrameRangeOnce(const QString &reason, int frameStart, int frameEnd, int frameCount);
     void scheduleAnimationCompletion(int playbackSerial, int delayMs);
     void completeAnimationIfStillCurrent(int playbackSerial);
     void scheduleIdleLoopFinished(int playbackSerial, int delayMs);
@@ -79,4 +82,5 @@ private:
     bool m_dragMoved = false;
     bool m_doubleClickPending = false;
     bool m_contextMenuPending = false;
+    int m_lastInvalidFrameRangeWarningSerial = -1;
 };

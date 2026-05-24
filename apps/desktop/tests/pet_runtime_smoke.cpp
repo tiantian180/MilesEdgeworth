@@ -782,6 +782,28 @@ int main(int argc, char *argv[])
             "onceThenHold should clean-finish after it reaches the held last frame");
     require(runtime.currentActionId() == "objecting",
             "onceThenHold should stay on the entry-only action after clean finish");
+
+    SkinManifest &frameRangeManifest = const_cast<SkinManifest &>(runtime.manifest());
+    ActionDefinition rangedObjecting = frameRangeManifest.actions.value(QStringLiteral("objecting"));
+    AnimationVariant rangedObjectingRight = rangedObjecting.variants.value(QStringLiteral("right"));
+    rangedObjectingRight.frameStart = 2;
+    rangedObjectingRight.frameEnd = 4;
+    rangedObjecting.variants.insert(QStringLiteral("right"), rangedObjectingRight);
+    frameRangeManifest.actions.insert(QStringLiteral("objecting"), rangedObjecting);
+    runtime.setFacing("right");
+    runtime.playAction("objecting");
+    require(runtime.currentFrameStart() == 2 && runtime.currentFrameEnd() == 4,
+            "test setup should use a temporary objecting frame range");
+    const int rangedObjectingSerial = runtime.playbackSerial();
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should keep current objecting action while refreshing manifest metadata");
+    require(runtime.currentActionId() == "objecting",
+            "preserve reload should keep the current action when it still exists");
+    require(runtime.currentFrameStart() == -1 && runtime.currentFrameEnd() == -1,
+            "preserve reload should recompute frame range from the reloaded manifest");
+    require(runtime.playbackSerial() != rangedObjectingSerial,
+            "preserve reload should restart playback when animation frame range changes");
+
     runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
     require(runtime.currentActionId() == "crossed", "未知 expression 应降级到 speaking neutral 的可见说话动作");
     runtime.playAction("bow");

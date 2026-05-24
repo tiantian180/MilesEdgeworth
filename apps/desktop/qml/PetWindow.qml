@@ -258,6 +258,24 @@ Window {
         width: App.PetRuntime.petImageSize
         height: App.PetRuntime.petImageSize
 
+        function effectiveEndFrame() {
+            if (frameCount <= 0) {
+                return -1
+            }
+
+            const lastFrame = frameCount - 1
+            const frameEnd = App.PetRuntime.currentFrameEnd
+            if (frameEnd < 0) {
+                return lastFrame
+            }
+            return Math.min(frameEnd, lastFrame)
+        }
+
+        function atEffectiveEndFrame() {
+            const endFrame = effectiveEndFrame()
+            return endFrame >= 0 && currentFrame >= endFrame
+        }
+
         onCurrentFrameChanged: {
             const movementDelta = App.PetRuntime.consumeFrameMovementDelta()
             if (movementDelta.dx !== 0 || movementDelta.dy !== 0) {
@@ -265,31 +283,27 @@ Window {
             }
 
             if (App.PetRuntime.currentLoopMode === "hold"
-                    && frameCount > 0
-                    && currentFrame >= frameCount - 1) {
+                    && atEffectiveEndFrame()) {
                 App.PetEventBridge.submitHoldAnimationReachedEnd()
                 pet.playing = false
             }
 
             if (App.PetRuntime.currentLoopMode === "onceThenHold"
-                    && frameCount > 0
-                    && currentFrame >= frameCount - 1) {
+                    && atEffectiveEndFrame()) {
                 pet.playing = false
                 App.PetRuntime.handleAnimationFinished()
             }
 
             if ((App.PetRuntime.currentAutoReturnToIdle
                     || App.PetRuntime.currentLoopMode === "once")
-                    && frameCount > 0
-                    && currentFrame >= frameCount - 1) {
+                    && atEffectiveEndFrame()) {
                 App.PetRuntime.handleAnimationFinished()
             }
 
             if (App.PetRuntime.currentActionId === "idle_stand"
                     && App.PetRuntime.currentLoopMode === "loop"
                     && App.PetRuntime.currentRecipeId === ""
-                    && frameCount > 0
-                    && currentFrame >= frameCount - 1) {
+                    && atEffectiveEndFrame()) {
                 App.PetEventBridge.submitIdleLoopFinished()
             }
         }

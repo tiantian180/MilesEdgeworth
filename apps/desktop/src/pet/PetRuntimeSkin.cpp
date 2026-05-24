@@ -429,15 +429,51 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
         if (m_manifest.movementDirections.contains(preservedMovementDirection)) {
             m_currentMovementDirection = preservedMovementDirection;
         }
-        m_currentLoopMode = preservedLoopMode;
-        m_currentAutoReturnToIdle = preservedAutoReturnToIdle;
-        m_currentAnimationUrl = preservedAnimationUrl;
-        m_currentFrameStart = preservedFrameStart;
-        m_currentFrameEnd = preservedFrameEnd;
-        m_currentPlaybackAtBoundary = preservedPlaybackAtBoundary;
+        const ActionDefinition currentAction = m_manifest.actions.value(m_currentActionId);
+        AnimationVariant currentVariant;
+        QString currentLoopMode = preservedLoopMode;
+        if (!currentAction.phases.isEmpty() && currentAction.phases.contains(m_currentPhaseId)) {
+            const PhaseDefinition currentPhase = currentAction.phases.value(m_currentPhaseId);
+            currentLoopMode = currentPhase.loopMode.isEmpty() ? QStringLiteral("loop") : currentPhase.loopMode;
+            currentVariant = variantForFacing(currentPhase.variants, m_currentFacing);
+        } else {
+            currentLoopMode = currentAction.loopMode.isEmpty() ? QStringLiteral("loop") : currentAction.loopMode;
+            currentVariant = variantForAction(currentAction);
+        }
+
+        const bool currentAutoReturnToIdle = (currentLoopMode == QStringLiteral("onceThenIdle"));
+        const bool loopModeChangedDuringPreserve = (preservedLoopMode != currentLoopMode);
+        const bool autoReturnChangedDuringPreserve = (preservedAutoReturnToIdle != currentAutoReturnToIdle);
+        const bool playbackMetadataChanged = (preservedAnimationUrl != currentVariant.url)
+            || (preservedFrameStart != currentVariant.frameStart)
+            || (preservedFrameEnd != currentVariant.frameEnd);
+
+        m_currentLoopMode = currentLoopMode;
+        m_currentAutoReturnToIdle = currentAutoReturnToIdle;
+        m_currentAnimationUrl = currentVariant.url;
+        m_currentFrameStart = currentVariant.frameStart;
+        m_currentFrameEnd = currentVariant.frameEnd;
+        m_currentPlaybackAtBoundary = (playbackMetadataChanged
+                || loopModeChangedDuringPreserve
+                || autoReturnChangedDuringPreserve)
+            ? false
+            : preservedPlaybackAtBoundary;
         m_playbackSerial = preservedPlaybackSerial;
+        if (playbackMetadataChanged) {
+            ++m_playbackSerial;
+        }
 
         emitDerivedStateChanges();
+        if (loopModeChangedDuringPreserve) {
+            emit currentLoopModeChanged();
+        }
+        if (autoReturnChangedDuringPreserve) {
+            emit currentAutoReturnToIdleChanged();
+        }
+        if (playbackMetadataChanged) {
+            emit currentAnimationUrlChanged();
+            emit playbackSerialChanged();
+        }
 
         emit activeSkinChanged();
         emit skinManifestReloaded();
