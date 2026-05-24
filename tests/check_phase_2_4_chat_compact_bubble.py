@@ -82,10 +82,15 @@ def main() -> int:
 
     for token in [
         "ApplicationWindow",
+        "import QtQuick.Window",
         "App.ChatController.messages",
         "role === \"assistant\"",
         "pending === true",
         "function syncAssistantBubble()",
+        "function clampedBubbleX()",
+        "function clampedBubbleY()",
+        "Screen.desktopAvailableWidth",
+        "Screen.desktopAvailableHeight",
         "hideTimer.interval = Math.max(4000, Math.min(12000, 3000 + assistantText.length * 80))",
         "App.DesktopShell.petWindowX",
         "App.DesktopShell.petWindowY",

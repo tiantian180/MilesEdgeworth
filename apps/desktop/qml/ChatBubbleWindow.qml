@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 import MilesEdgeworth as App
 
 ApplicationWindow {
@@ -21,11 +22,30 @@ ApplicationWindow {
     property int dismissedAssistantMessageIndex: -1
     property int suppressedAssistantMessageIndex: -1
     property int trackedAssistantMessageIndex: -1
+    readonly property int screenMargin: 10
 
-    x: Math.round(App.DesktopShell.petWindowX
-                  + App.DesktopShell.petWindowWidth / 2
-                  - width / 2)
-    y: Math.round(App.DesktopShell.petWindowY - height - 10)
+    x: clampedBubbleX()
+    y: clampedBubbleY()
+
+    function clamp(value, minimum, maximum) {
+        return maximum >= minimum ? Math.min(Math.max(value, minimum), maximum) : minimum
+    }
+
+    function clampedBubbleX() {
+        const preferredX = App.DesktopShell.petWindowX
+                + App.DesktopShell.petWindowWidth / 2
+                - width / 2
+        return Math.round(clamp(preferredX,
+                                Screen.virtualX + screenMargin,
+                                Screen.virtualX + Screen.desktopAvailableWidth - width - screenMargin))
+    }
+
+    function clampedBubbleY() {
+        const preferredY = App.DesktopShell.petWindowY - height - screenMargin
+        return Math.round(clamp(preferredY,
+                                Screen.virtualY + screenMargin,
+                                Screen.virtualY + Screen.desktopAvailableHeight - height - screenMargin))
+    }
 
     function latestAssistantMessageIndex() {
         const messages = App.ChatController.messages
