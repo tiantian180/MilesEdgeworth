@@ -92,6 +92,11 @@ private:
     void handleBoundaryReached();
     void requestCleanFinishForCurrentStream();
     void requestBoundaryForCurrentStream();
+    void requestCleanFinishForStream(quint64 streamId, quint64 generation);
+    void requestBoundaryForStream(quint64 streamId, quint64 generation, quint64 boundaryId);
+    void deferCleanFinishRequest(quint64 streamId, quint64 generation, quint64 boundaryId);
+    void requestDeferredCleanFinishIfPossible();
+    void clearDeferredCleanFinishRequest();
     bool runtimeCallbackStillCurrent(quint64 streamId, quint64 generation) const;
     bool boundaryCallbackStillCurrent(quint64 streamId, quint64 generation, quint64 boundaryId) const;
     void handleGateTimeout();
@@ -152,6 +157,9 @@ private:
     bool m_finishPendingAfterStart = false;
     bool m_finishPendingAfterGate = false;
     bool m_cleanFinishRequestPending = false;
+    quint64 m_deferredCleanFinishStreamId = 0;
+    quint64 m_deferredCleanFinishGeneration = 0;
+    quint64 m_deferredCleanFinishBoundaryId = 0;
     // 用户取消后，剩余 SSE chunks 必须被丢弃，否则会拼到新建的 assistant 消息里产生"幽灵回复"。
     // 每次 sendMessage 复位 false。
     bool m_cancelled = false;
