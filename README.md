@@ -36,6 +36,7 @@ Intel Mac 的 Homebrew 默认路径通常是 `/usr/local`，对应把 `CMAKE_PRE
 常用验证命令：
 
 ```bash
+python3 -m pip install -r tools/requirements.txt
 python3 tests/test_split_manifest_clips.py
 python3 tests/check_phase_2_4_2_precut_clips.py
 ctest --test-dir build --output-on-failure

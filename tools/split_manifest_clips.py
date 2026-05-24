@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import html
 import json
 import re
@@ -80,7 +82,7 @@ def load_clip_frames(source_path: Path, start: int, end: int, clip_name: str) ->
             durations = []
             for index, frame in enumerate(ImageSequence.Iterator(image), start=1):
                 if start <= index <= end:
-                    frames.append(frame.copy())
+                    frames.append(frame.copy().convert("RGBA"))
                     durations.append(frame.info.get("duration", 0))
     except OSError:
         fail(f"clip {clip_name}: unable to read source GIF: {source_path}")
@@ -91,16 +93,56 @@ def load_clip_frames(source_path: Path, start: int, end: int, clip_name: str) ->
     return frames, durations
 
 
-def write_clip(path: Path, frames: list[Image.Image], durations: list[int]) -> None:
+def images_equal(left: Image.Image, right: Image.Image) -> bool:
+    return left.mode == right.mode and left.size == right.size and left.tobytes() == right.tobytes()
+
+
+def transparent_pixel(image: Image.Image) -> tuple[int, int] | None:
+    pixels = image.load()
+    for y in range(image.height):
+        for x in range(image.width):
+            if pixels[x, y][3] == 0:
+                return x, y
+    return None
+
+
+def preserve_duplicate_frames(frames: list[Image.Image], clip_name: str) -> list[Image.Image]:
+    prepared = []
+    previous = None
+    for index, frame in enumerate(frames):
+        image = frame.copy()
+        is_duplicate = previous is not None and images_equal(image, previous)
+        sentinel = transparent_pixel(image)
+        if sentinel is None and is_duplicate:
+            fail(f"clip {clip_name}: duplicate opaque frames cannot be preserved without changing pixels")
+        if sentinel is not None:
+            # GIF encoders may merge identical adjacent frames. Vary RGB under a fully
+            # transparent pixel so the encoded frames differ without changing output.
+            image.putpixel(sentinel, ((index * 73) % 256, (index * 151) % 256, (index * 199) % 256, 0))
+        prepared.append(image)
+        previous = frame
+    return prepared
+
+
+def generated_durations(path: Path) -> list[int]:
+    with Image.open(path) as image:
+        return [frame.info.get("duration", 0) for frame in ImageSequence.Iterator(image)]
+
+
+def write_clip(path: Path, clip_name: str, frames: list[Image.Image], durations: list[int]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    frames[0].save(
+    prepared = preserve_duplicate_frames(frames, clip_name)
+    prepared[0].save(
         path,
         save_all=True,
-        append_images=frames[1:],
+        append_images=prepared[1:],
         duration=durations,
         loop=0,
         disposal=2,
+        optimize=False,
     )
+    if generated_durations(path) != durations:
+        fail(f"clip {clip_name}: generated GIF did not preserve frame count or durations")
 
 
 def write_qrc(path: Path, skin_name: str, clip_names: list[str]) -> None:
@@ -143,7 +185,7 @@ def generate_clips(skin_root: Path) -> tuple[int, Path]:
     clips_root.mkdir(parents=True, exist_ok=True)
 
     for clip_name, frames, durations in prepared:
-        write_clip(clips_root / f"{clip_name}.gif", frames, durations)
+        write_clip(clips_root / f"{clip_name}.gif", clip_name, frames, durations)
 
     qrc_path = generated_root / "clips.qrc"
     write_qrc(qrc_path, skin_root.name, [clip_name for clip_name, _, _ in prepared])

@@ -14,6 +14,7 @@ except ImportError as exc:
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "split_manifest_clips.py"
 TMP = ROOT / ".tmp_phase_2_4_2_clip_test"
+MILES_THINKING_LEFT = ROOT / "apps/desktop/resources/skins/miles-edgeworth/assets/body/gestures/thinking-left.gif"
 
 
 def require(condition: bool, message: str) -> None:
@@ -107,6 +108,26 @@ def main() -> None:
         qrc_text = qrc.read_text(encoding="utf-8")
         require('<qresource prefix="/skins/test-skin/generated/clips">' in qrc_text, qrc_text)
         require('<file alias="talking.loop.right.gif">clips/talking.loop.right.gif</file>' in qrc_text, qrc_text)
+
+        duplicate_skin = TMP / "duplicate-frame-skin"
+        duplicate_source = duplicate_skin / "assets" / "body" / "gestures" / "thinking-left.gif"
+        duplicate_source.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(MILES_THINKING_LEFT, duplicate_source)
+        write_manifest(duplicate_skin, {
+            "thinking.enter.left": valid_clip("file:assets/body/gestures/thinking-left.gif", [1, 4]),
+        })
+        result = run_tool(duplicate_skin)
+        require(result.returncode == 0, result.stderr)
+        duplicate_output = duplicate_skin / "generated" / "clips" / "thinking.enter.left.gif"
+        expected_duplicate_durations = frame_durations(duplicate_source)[0:4]
+        require(
+            frame_count(duplicate_output) == 4,
+            "generated clip should preserve duplicate source frames instead of merging durations",
+        )
+        require(
+            frame_durations(duplicate_output) == expected_duplicate_durations,
+            "generated duplicate-frame clip should preserve per-frame durations",
+        )
 
         (skin / "manifest.json").unlink()
         require_failure(skin, "manifest not found")

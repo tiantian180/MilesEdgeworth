@@ -11,6 +11,10 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+try:
+    from PIL import Image, ImageSequence
+except ImportError as exc:
+    raise SystemExit("Pillow is required. Run: python3 -m pip install -r tools/requirements.txt") from exc
 
 ROOT = Path(__file__).resolve().parents[1]
 SKIN_ROOT = ROOT / "apps/desktop/resources/skins/miles-edgeworth"
@@ -70,6 +74,23 @@ def diff_message(label: str, expected: set[str], actual: set[str]) -> str:
     if extra:
         parts.append("extra=" + ",".join(extra))
     return "; ".join(parts)
+
+
+def gif_frame_durations(path: Path) -> list[int]:
+    with Image.open(path) as image:
+        return [frame.info.get("duration", 0) for frame in ImageSequence.Iterator(image)]
+
+
+def resolve_skin_file(source: str) -> Path:
+    relative = Path(source[len("file:"):])
+    require(not relative.is_absolute(), f"clip source must be relative: {source}")
+    root = SKIN_ROOT.resolve()
+    resolved = (SKIN_ROOT / relative).resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError:
+        raise AssertionError(f"clip source escapes skin root: {source}") from None
+    return resolved
 
 
 def walk_json(value: Any, path: list[str]):
@@ -224,6 +245,20 @@ def assert_generated_clips(clips: dict[str, Any]) -> None:
 
     missing = [clip_id for clip_id in clips if not (CLIPS_ROOT / f"{clip_id}.gif").is_file()]
     require(not missing, "missing generated clip files: " + ", ".join(sorted(missing)))
+
+    for clip_id, clip in clips.items():
+        source_path = resolve_skin_file(clip["source"])
+        start, end = clip["frameRange"]
+        expected_durations = gif_frame_durations(source_path)[start - 1:end]
+        actual_durations = gif_frame_durations(CLIPS_ROOT / f"{clip_id}.gif")
+        require(
+            len(actual_durations) == end - start + 1,
+            f"{clip_id} generated frame count must equal closed frameRange length",
+        )
+        require(
+            actual_durations == expected_durations,
+            f"{clip_id} generated frame durations must match source frameRange",
+        )
 
     tree = ET.parse(CLIPS_QRC)
     resource = None
