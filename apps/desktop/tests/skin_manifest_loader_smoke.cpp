@@ -45,6 +45,11 @@ int main(int argc, char **argv)
         "file: URL should resolve under file root"
     );
     require(
+        SkinManifestLoader::resolveSkinUrl(QStringLiteral("skin:assets/body/idle.gif"), rootUrl).toString()
+            == QStringLiteral("file:///tmp/example-skin/assets/body/idle.gif"),
+        "legacy skin: URL should resolve under file root"
+    );
+    require(
         SkinManifestLoader::resolveSkinUrl(QStringLiteral("qrc:/pet/stand-right.gif"), rootUrl).toString()
             == QStringLiteral("qrc:/pet/stand-right.gif"),
         "absolute qrc URL should stay unchanged"
@@ -146,6 +151,109 @@ int main(int argc, char **argv)
             "loader should preserve duration runtime on recipe step");
     require(manifest.personaPrompt == filesystemPersona, "filesystem skin persona.md should load into manifest");
 
+    require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "schemaVersion": 4,
+  "clips": {
+    "../bad": {
+      "source": "file:assets/body/idle/stand.gif",
+      "frameRange": [1, 1]
+    }
+  },
+  "actions": {
+    "bad": { "variants": { "right": { "clip": "../bad" } } }
+  }
+}
+)JSON")), "invalid clip name manifest should be written");
+    require(SkinManifestLoader::loadFromDirectory(dir.path()).actions.isEmpty(),
+            "loader should reject invalid clip names");
+
+    require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "schemaVersion": 4,
+  "clips": {
+    "bad.source": {
+      "source": "https://example.invalid/source.gif",
+      "frameRange": [1, 1]
+    }
+  },
+  "actions": {
+    "bad": { "variants": { "right": { "clip": "bad.source" } } }
+  }
+}
+)JSON")), "non-file clip source manifest should be written");
+    require(SkinManifestLoader::loadFromDirectory(dir.path()).actions.isEmpty(),
+            "loader should reject non-file clip sources");
+
+    require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "schemaVersion": 4,
+  "clips": {
+    "bad.range": {
+      "source": "file:assets/body/idle/stand.gif",
+      "frameRange": [4, 1]
+    }
+  },
+  "actions": {
+    "bad": { "variants": { "right": { "clip": "bad.range" } } }
+  }
+}
+)JSON")), "invalid frameRange manifest should be written");
+    require(SkinManifestLoader::loadFromDirectory(dir.path()).actions.isEmpty(),
+            "loader should reject invalid clip frameRange");
+
+    require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "schemaVersion": 4,
+  "actions": {
+    "bad": { "variants": { "right": { "clip": " missing.clip " } } }
+  }
+}
+)JSON")), "unknown clip ref manifest should be written");
+    require(SkinManifestLoader::loadFromDirectory(dir.path()).actions.isEmpty(),
+            "loader should reject unknown bare clip refs");
+
+    require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "schemaVersion": 4,
+  "defaultFacing": "right",
+  "states": { "idle": { "action": "idle_stand" } },
+  "clips": {
+    "thinking.enter.right": {
+      "source": "file:assets/body/idle/stand.gif",
+      "frameRange": [1, 4]
+    }
+  },
+  "actions": {
+    "idle_stand": {
+      "variants": {
+        "right": {
+          "clip": "file:assets/body/idle/stand.gif"
+        }
+      }
+    },
+    "objecting": {
+      "loopMode": "onceThenHold",
+      "variants": {
+        "right": {
+          "clip": "thinking.enter.right"
+        }
+      }
+    }
+  },
+  "recipes": {
+    "thinking.holdUntilCancelled": {
+      "scope": "agent",
+      "steps": [
+        { "action": "objecting", "phase": "enter" },
+        { "action": "objecting", "phase": "loop", "duration": "runtime" },
+        { "action": "objecting", "phase": "exit" }
+      ]
+    }
+  }
+}
+)JSON")), "valid manifest should be restored");
+
     QFile::remove(skinDir.filePath(QStringLiteral("generated/clips/thinking.enter.right.gif")));
     SkinManifest missingGeneratedClip = SkinManifestLoader::loadFromDirectory(dir.path());
     require(missingGeneratedClip.actions.isEmpty(),
@@ -156,6 +264,19 @@ int main(int argc, char **argv)
     qputenv("MILES_DATA_DIR", personaDataDir.path().toUtf8());
 
     SkinManifest builtInMiles = SkinManifestLoader::loadFromResource(QStringLiteral(":/skins/miles-edgeworth/manifest.json"));
+    require(
+        builtInMiles.actions.value(QStringLiteral("idle_stand")).variants.value(QStringLiteral("right")).url.toString()
+            == QStringLiteral("qrc:/skins/miles-edgeworth/assets/body/idle/stand-right.gif"),
+        "built-in Miles idle_stand should resolve legacy skin: URL to qrc"
+    );
+    const AnimationVariant thinkingEnterRight = builtInMiles
+        .actions.value(QStringLiteral("thinking"))
+        .phases.value(QStringLiteral("enter"))
+        .variants.value(QStringLiteral("right"));
+    require(
+        thinkingEnterRight.frameStart == 0 && thinkingEnterRight.frameEnd == 3,
+        "built-in Miles legacy animation frameRange should populate runtime frame range"
+    );
     require(
         builtInMiles.personaPrompt.contains(QStringLiteral("Miles Edgeworth"))
             || builtInMiles.personaPrompt.contains(QStringLiteral("御剑怜侍")),
