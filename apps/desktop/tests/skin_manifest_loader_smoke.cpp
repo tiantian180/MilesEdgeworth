@@ -53,6 +53,10 @@ int main(int argc, char **argv)
         !SkinManifestLoader::resolveSkinUrl(QStringLiteral("file:../escape.gif"), rootUrl).isValid(),
         "file: URL must reject parent traversal"
     );
+    require(
+        !SkinManifestLoader::resolveSkinUrl(QStringLiteral("file:///tmp/escape.gif"), rootUrl).isValid(),
+        "absolute file URL must not bypass the skin root"
+    );
 
     QTemporaryDir dir;
     require(dir.isValid(), "temporary skin directory should be valid");

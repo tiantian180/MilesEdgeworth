@@ -729,22 +729,6 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
 
 void resolveManifestUrls(SkinManifest &manifest, const QUrl &rootUrl)
 {
-    for (ClipDefinition &clip : manifest.clips) {
-        clip.sourceUrl = SkinManifestLoader::resolveSkinUrl(clip.sourceUrl.toString(), rootUrl);
-        clip.generatedUrl = SkinManifestLoader::resolveSkinUrl(clip.generatedUrl.toString(), rootUrl);
-    }
-
-    for (ActionDefinition &action : manifest.actions) {
-        for (AnimationVariant &variant : action.variants) {
-            variant.url = SkinManifestLoader::resolveSkinUrl(variant.url.toString(), rootUrl);
-        }
-        for (PhaseDefinition &phase : action.phases) {
-            for (AnimationVariant &variant : phase.variants) {
-                variant.url = SkinManifestLoader::resolveSkinUrl(variant.url.toString(), rootUrl);
-            }
-        }
-    }
-
     for (PropDefinition &prop : manifest.props) {
         prop.assetUrl = SkinManifestLoader::resolveSkinUrl(prop.assetUrl.toString(), rootUrl);
     }
@@ -996,7 +980,7 @@ QUrl SkinManifestLoader::resolveSkinUrl(const QString &rawUrl, const QUrl &rootU
         return url;
     }
     if (trimmed.startsWith(QStringLiteral("file://"))) {
-        return url;
+        return {};
     }
 
     QString relativePath = trimmed.mid(QStringLiteral("file:").size());
