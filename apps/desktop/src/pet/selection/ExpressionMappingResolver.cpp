@@ -20,8 +20,8 @@ bool requestExists(const SkinManifest &manifest, const ActionRequest &request)
     switch (request.kind) {
     case ActionRequestKind::None:
         return false;
-    case ActionRequestKind::ActionPool:
-        return manifest.actionPools.contains(request.targetId);
+    case ActionRequestKind::AnimationPool:
+        return manifest.animationPools.contains(request.targetId);
     case ActionRequestKind::Recipe:
         return manifest.recipes.contains(request.targetId);
     case ActionRequestKind::Action:

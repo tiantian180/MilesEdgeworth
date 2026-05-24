@@ -154,7 +154,7 @@ public:
     Q_INVOKABLE void playAction(const QString &actionId);
     Q_INVOKABLE void playLocomotion(const QString &actionId, const QString &movementDirection);
     Q_INVOKABLE void playRecipe(const QString &recipeId);
-    Q_INVOKABLE void playActionFromPool(const QString &poolId);
+    Q_INVOKABLE void playAnimationFromPool(const QString &poolId);
     // 取走当前帧累积的位移增量（walk/run 等需要驱动窗口移动的动作）。
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void startStartupSequence();

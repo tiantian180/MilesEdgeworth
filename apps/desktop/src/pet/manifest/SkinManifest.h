@@ -74,6 +74,7 @@ struct ActionDefinition
 // 临时朝向 / 移动方向，以及播放重复次数 / 时长。
 struct RecipeStep
 {
+    ActionRequest request;
     QString actionId;
     QString phaseId;
     QString recipeId;
@@ -123,10 +124,10 @@ struct PropDefinition
     QHash<QString, QPointF> travelPerScaleDeltas;
 };
 
-// ActionPoolEntry 是动作池里的一个候选。
+// AnimationPoolEntry 是动画池里的一个候选。
 // request 形式优先（支持 returnToIdle 等通用请求）；
 // recipeId / actionId 是简化写法，向后兼容旧 manifest。
-struct ActionPoolEntry
+struct AnimationPoolEntry
 {
     ActionRequest request;
     QString recipeId;
@@ -134,12 +135,12 @@ struct ActionPoolEntry
     int weight = 1;
 };
 
-// ActionPoolDefinition 是一组带权重的候选动作，运行时按权重随机抽取。
+// AnimationPoolDefinition 是一组带权重的候选动画，运行时按权重随机抽取。
 // 用于随机 idle、单击分区、双击随机语音动作等场景。
-struct ActionPoolDefinition
+struct AnimationPoolDefinition
 {
     QString label;
-    QList<ActionPoolEntry> entries;
+    QList<AnimationPoolEntry> entries;
 };
 
 // BehaviorRuleCondition 是 behavior 规则的“仅当”过滤条件。
@@ -328,7 +329,7 @@ struct SkinManifest
     QHash<QString, ActionDefinition> actions;
     QHash<QString, ClipDefinition> clips;
     QHash<QString, RecipeDefinition> recipes;
-    QHash<QString, ActionPoolDefinition> actionPools;
+    QHash<QString, AnimationPoolDefinition> animationPools;
     QHash<QString, ExpressionDefinition> expressions;
     QHash<QString, ExpressionMappingDefinition> expressionMappings;
     QHash<QString, BehaviorTriggerDefinition> behaviorTriggers;

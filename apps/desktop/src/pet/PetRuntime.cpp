@@ -3,7 +3,7 @@
 #include "pet/interaction/InteractionPipeline.h"
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/PetLogging.h"
-#include "pet/selection/ActionPoolSelector.h"
+#include "pet/selection/AnimationPoolSelector.h"
 
 #include <QRandomGenerator>
 #include <QSettings>
@@ -192,14 +192,18 @@ void PetRuntime::playRecipe(const QString &recipeId)
     playNextRecipeStep();
 }
 
-void PetRuntime::playActionFromPool(const QString &poolId)
+void PetRuntime::playAnimationFromPool(const QString &poolId)
 {
-    const QString normalizedPoolId = ActionPoolSelector::resolvePoolId(m_manifest.actionPools, poolId, m_audioController.currentLanguageId());
-    if (!m_manifest.actionPools.contains(normalizedPoolId)) {
+    const QString normalizedPoolId = AnimationPoolSelector::resolvePoolId(
+        m_manifest.animationPools,
+        poolId,
+        m_audioController.currentLanguageId()
+    );
+    if (!m_manifest.animationPools.contains(normalizedPoolId)) {
         return;
     }
 
-    const ActionPoolEntry entry = ActionPoolSelector::selectEntry(m_manifest.actionPools.value(normalizedPoolId));
+    const AnimationPoolEntry entry = AnimationPoolSelector::selectEntry(m_manifest.animationPools.value(normalizedPoolId));
     if (entry.request.kind != ActionRequestKind::None) {
         submitActionRequest(entry.request);
         return;
@@ -258,8 +262,8 @@ void PetRuntime::executeActionRequest(const ActionRequest &request)
     switch (request.kind) {
     case ActionRequestKind::None:
         return;
-    case ActionRequestKind::ActionPool:
-        playActionFromPool(request.targetId);
+    case ActionRequestKind::AnimationPool:
+        playAnimationFromPool(request.targetId);
         return;
     case ActionRequestKind::Recipe:
         playRecipe(request.targetId);
@@ -681,6 +685,11 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
 
     if (!step.recipeId.isEmpty() && m_manifest.recipes.contains(step.recipeId)) {
         playRecipe(step.recipeId);
+        return;
+    }
+
+    if (step.request.kind != ActionRequestKind::None) {
+        submitActionRequest(step.request);
         return;
     }
 

@@ -116,6 +116,28 @@ int main(int argc, char **argv)
         { "action": "objecting", "phase": "loop", "duration": "runtime" },
         { "action": "objecting", "phase": "exit" }
       ]
+    },
+    "pool.recipeStep": {
+      "steps": [
+        { "pool": "click.fallback" }
+      ]
+    },
+    "command.returnToIdle": {
+      "steps": [
+        { "command": "returnToIdle" }
+      ]
+    },
+    "command.toggleFacing": {
+      "steps": [
+        { "command": "toggleFacing" }
+      ]
+    }
+  },
+  "animationPools": {
+    "click.fallback": {
+      "entries": [
+        { "command": "returnToIdle" }
+      ]
     }
   }
 }
@@ -149,6 +171,33 @@ int main(int argc, char **argv)
             "loader should parse runtime-controlled recipe steps");
     require(thinkingRecipe.steps.at(1).durationMode == QStringLiteral("runtime"),
             "loader should preserve duration runtime on recipe step");
+    require(manifest.animationPools.contains(QStringLiteral("click.fallback")),
+            "loader should parse top-level animationPools");
+    require(
+        manifest.animationPools.value(QStringLiteral("click.fallback")).entries.first().request.kind
+            == ActionRequestKind::ReturnToIdle,
+        "animationPools entries should parse command requests"
+    );
+    require(
+        manifest.recipes.value(QStringLiteral("pool.recipeStep")).steps.first().request.kind
+            == ActionRequestKind::AnimationPool,
+        "recipe step pool key should route to AnimationPool request"
+    );
+    require(
+        manifest.recipes.value(QStringLiteral("pool.recipeStep")).steps.first().request.targetId
+            == QStringLiteral("click.fallback"),
+        "recipe step pool key should preserve pool id"
+    );
+    require(
+        manifest.recipes.value(QStringLiteral("command.returnToIdle")).steps.first().request.kind
+            == ActionRequestKind::ReturnToIdle,
+        "recipe step command returnToIdle should parse"
+    );
+    require(
+        manifest.recipes.value(QStringLiteral("command.toggleFacing")).steps.first().request.kind
+            == ActionRequestKind::ToggleFacing,
+        "recipe step command toggleFacing should parse"
+    );
     require(manifest.personaPrompt == filesystemPersona, "filesystem skin persona.md should load into manifest");
 
     require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(

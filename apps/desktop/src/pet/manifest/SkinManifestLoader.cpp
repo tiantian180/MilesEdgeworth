@@ -72,7 +72,7 @@ QList<QPointF> polygonFromJsonArray(const QJsonArray &array)
 ActionRequest requestFromJsonObject(const QJsonObject &object)
 {
     if (object.contains("pool")) {
-        return ActionRequest::actionPool(object.value("pool").toString());
+        return ActionRequest::animationPool(object.value("pool").toString());
     }
     if (object.contains("recipe")) {
         return ActionRequest::recipe(object.value("recipe").toString());
@@ -80,10 +80,19 @@ ActionRequest requestFromJsonObject(const QJsonObject &object)
     if (object.contains("action")) {
         return ActionRequest::action(object.value("action").toString());
     }
+    if (object.contains("command")) {
+        const QString command = object.value("command").toString();
+        if (command == "returnToIdle") {
+            return ActionRequest::returnToIdle();
+        }
+        if (command == "toggleFacing") {
+            return ActionRequest::toggleFacing();
+        }
+    }
 
     const QString type = object.value("type").toString();
     if (type == "pool") {
-        return ActionRequest::actionPool(object.value("pool").toString());
+        return ActionRequest::animationPool(object.value("pool").toString());
     }
     if (type == "recipe") {
         return ActionRequest::recipe(object.value("recipe").toString());
@@ -686,6 +695,14 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
             const QJsonObject stepObject = stepValue.toObject();
 
             RecipeStep step;
+            const QString stepType = stepObject.value("type").toString();
+            if (stepObject.contains("pool")
+                    || stepObject.contains("command")
+                    || stepType == QStringLiteral("pool")
+                    || stepType == QStringLiteral("returnToIdle")
+                    || stepType == QStringLiteral("toggleFacing")) {
+                step.request = requestFromJsonObject(stepObject);
+            }
             step.actionId = stepObject.value("action").toString(recipe.actionId);
             step.phaseId = stepObject.value("phase").toString();
             step.recipeId = stepObject.value("recipe").toString();
@@ -703,7 +720,10 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
                 step.durationMode = QStringLiteral("param");
             }
 
-            if (!step.actionId.isEmpty() || !step.phaseId.isEmpty() || !step.recipeId.isEmpty()) {
+            if (step.request.kind != ActionRequestKind::None
+                    || !step.actionId.isEmpty()
+                    || !step.phaseId.isEmpty()
+                    || !step.recipeId.isEmpty()) {
                 recipe.steps.append(step);
             }
         }
@@ -722,18 +742,21 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
         }
     }
 
-    const QJsonObject actionPools = root.value("actionPools").toObject();
-    for (auto it = actionPools.constBegin(); it != actionPools.constEnd(); ++it) {
+    QJsonObject animationPools = root.value("animationPools").toObject();
+    if (animationPools.isEmpty()) {
+        animationPools = root.value("actionPools").toObject();
+    }
+    for (auto it = animationPools.constBegin(); it != animationPools.constEnd(); ++it) {
         const QJsonObject poolObject = it.value().toObject();
 
-        ActionPoolDefinition pool;
+        AnimationPoolDefinition pool;
         pool.label = poolObject.value("label").toString(it.key());
 
         const QJsonArray entries = poolObject.value("entries").toArray();
         for (const QJsonValue &entryValue : entries) {
             const QJsonObject entryObject = entryValue.toObject();
 
-            ActionPoolEntry entry;
+            AnimationPoolEntry entry;
             entry.request = requestFromJsonObject(entryObject);
             entry.recipeId = entryObject.value("recipe").toString();
             entry.actionId = entryObject.value("action").toString();
@@ -750,7 +773,7 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
         }
 
         if (!pool.entries.isEmpty()) {
-            manifest.actionPools.insert(it.key(), pool);
+            manifest.animationPools.insert(it.key(), pool);
         }
     }
 

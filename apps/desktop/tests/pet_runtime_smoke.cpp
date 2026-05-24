@@ -1062,7 +1062,7 @@ int main(int argc, char *argv[])
 
     runtime.returnToIdle();
     runtime.setFacing("right");
-    require(runtime.manifest().actionPools.contains("click.fallback"), "manifest 应加载 click.fallback 动作池");
+    require(runtime.manifest().animationPools.contains("click.fallback"), "manifest 应加载 click.fallback 动画池");
     const int playbackSerialBeforeFallback = runtime.playbackSerial();
     bridge.submitPrimaryClick(10, 10, 240, 240);
     require(runtime.currentActionId() == "idle_stand", "fallback 点击应保持待机动作");

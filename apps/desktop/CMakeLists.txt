@@ -70,8 +70,8 @@ set(DESKTOP_SOURCES
     src/pet/PetRuntimeSkin.cpp
     src/pet/requests/ActionRequest.h
     src/pet/runtime/RuntimeSnapshot.h
-    src/pet/selection/ActionPoolSelector.cpp
-    src/pet/selection/ActionPoolSelector.h
+    src/pet/selection/AnimationPoolSelector.cpp
+    src/pet/selection/AnimationPoolSelector.h
     src/pet/selection/ExpressionMappingResolver.cpp
     src/pet/selection/ExpressionMappingResolver.h
     src/pet/surface/PetContextMenu.cpp
@@ -281,8 +281,8 @@ if(BUILD_TESTING)
         src/pet/PetRuntimeSkin.cpp
         src/pet/requests/ActionRequest.h
         src/pet/runtime/RuntimeSnapshot.h
-        src/pet/selection/ActionPoolSelector.cpp
-        src/pet/selection/ActionPoolSelector.h
+        src/pet/selection/AnimationPoolSelector.cpp
+        src/pet/selection/AnimationPoolSelector.h
         src/pet/selection/ExpressionMappingResolver.cpp
         src/pet/selection/ExpressionMappingResolver.h
         src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
@@ -357,8 +357,8 @@ if(BUILD_TESTING)
         src/pet/PetRuntimeSkin.cpp
         src/pet/requests/ActionRequest.h
         src/pet/runtime/RuntimeSnapshot.h
-        src/pet/selection/ActionPoolSelector.cpp
-        src/pet/selection/ActionPoolSelector.h
+        src/pet/selection/AnimationPoolSelector.cpp
+        src/pet/selection/AnimationPoolSelector.h
         src/pet/selection/ExpressionMappingResolver.cpp
         src/pet/selection/ExpressionMappingResolver.h
         src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
@@ -419,8 +419,8 @@ if(BUILD_TESTING)
         src/pet/PetRuntimeSkin.cpp
         src/pet/requests/ActionRequest.h
         src/pet/runtime/RuntimeSnapshot.h
-        src/pet/selection/ActionPoolSelector.cpp
-        src/pet/selection/ActionPoolSelector.h
+        src/pet/selection/AnimationPoolSelector.cpp
+        src/pet/selection/AnimationPoolSelector.h
         src/pet/selection/ExpressionMappingResolver.cpp
         src/pet/selection/ExpressionMappingResolver.h
         src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
