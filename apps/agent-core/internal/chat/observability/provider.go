@@ -47,7 +47,7 @@ func WrapProvider(next chat.Provider, opts Options) chat.Provider {
 }
 
 func (p *tracedProvider) StreamChat(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
-	ctx, span := p.startGenerationSpan(ctx, "miles.chat.stream", params)
+	ctx, span := p.startGenerationSpan(ctx, "miles.chat.stream", params, true)
 	events, err := p.next.StreamChat(ctx, params)
 	if err != nil {
 		recordSpanError(span, err)
@@ -61,8 +61,12 @@ func (p *tracedProvider) StreamChat(ctx context.Context, params chat.ChatParams)
 		defer span.End()
 
 		var output strings.Builder
+		var rawOutput strings.Builder
 		var providerError string
 		for event := range events {
+			if event.RawDelta != "" {
+				rawOutput.WriteString(event.RawDelta)
+			}
 			if event.Type == "TEXT_MESSAGE_CONTENT" {
 				output.WriteString(event.Delta)
 			}
@@ -77,7 +81,11 @@ func (p *tracedProvider) StreamChat(ctx context.Context, params chat.ChatParams)
 			out <- event
 		}
 
-		p.finishGenerationSpan(span, params, output.String())
+		recordedOutput := output.String()
+		if rawOutput.Len() > 0 {
+			recordedOutput = rawOutput.String()
+		}
+		p.finishGenerationSpan(span, params, recordedOutput)
 		if providerError == "" {
 			span.SetStatus(codes.Ok, "")
 		}
@@ -86,7 +94,7 @@ func (p *tracedProvider) StreamChat(ctx context.Context, params chat.ChatParams)
 }
 
 func (p *tracedProvider) Complete(ctx context.Context, params chat.ChatParams) (string, error) {
-	ctx, span := p.startGenerationSpan(ctx, "miles.chat.complete", params)
+	ctx, span := p.startGenerationSpan(ctx, "miles.chat.complete", params, false)
 	output, err := p.next.Complete(ctx, params)
 	if err != nil {
 		recordSpanError(span, err)
@@ -99,7 +107,7 @@ func (p *tracedProvider) Complete(ctx context.Context, params chat.ChatParams) (
 	return output, nil
 }
 
-func (p *tracedProvider) startGenerationSpan(ctx context.Context, name string, params chat.ChatParams) (context.Context, trace.Span) {
+func (p *tracedProvider) startGenerationSpan(ctx context.Context, name string, params chat.ChatParams, stream bool) (context.Context, trace.Span) {
 	ctx, span := p.tracer.Start(ctx, name, trace.WithSpanKind(trace.SpanKindClient))
 	attrs := []attribute.KeyValue{
 		attribute.String("langfuse.trace.name", name),
@@ -120,9 +128,10 @@ func (p *tracedProvider) startGenerationSpan(ctx context.Context, name string, p
 		attrs = append(attrs, attribute.String("deployment.environment.name", strings.TrimSpace(p.opts.Environment)))
 	}
 	if p.opts.CaptureContent {
+		input := jsonString(requestPayloadForTrace(p.opts, params.Messages, stream))
 		attrs = append(attrs,
-			attribute.String("langfuse.trace.input", lastUserMessage(params.Messages)),
-			attribute.String("langfuse.observation.input", jsonString(messagesForTrace(params.Messages))),
+			attribute.String("langfuse.trace.input", input),
+			attribute.String("langfuse.observation.input", input),
 		)
 	}
 	span.SetAttributes(attrs...)
@@ -165,6 +174,21 @@ func modelParameters(opts Options) map[string]any {
 		params["max_tokens"] = *opts.MaxTokens
 	}
 	return params
+}
+
+func requestPayloadForTrace(opts Options, messages []chat.Message, stream bool) map[string]any {
+	payload := map[string]any{
+		"messages": messagesForTrace(messages),
+		"model":    opts.Model,
+		"stream":   stream,
+	}
+	if opts.Temperature != nil {
+		payload["temperature"] = *opts.Temperature
+	}
+	if opts.MaxTokens != nil {
+		payload["max_tokens"] = *opts.MaxTokens
+	}
+	return payload
 }
 
 func messagesForTrace(messages []chat.Message) []map[string]string {
@@ -223,15 +247,6 @@ func operationName(operation string) string {
 		return "chat"
 	}
 	return trimmed
-}
-
-func lastUserMessage(messages []chat.Message) string {
-	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == "user" {
-			return messages[i].Content
-		}
-	}
-	return ""
 }
 
 func systemPromptHash(messages []chat.Message) string {
