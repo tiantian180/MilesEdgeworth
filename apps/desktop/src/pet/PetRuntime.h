@@ -229,7 +229,7 @@ private:
     void enqueueBoundaryNotification(std::function<void()> callback);
     bool drainPendingNotifications();
     bool triggerPendingNotification(quint64 notificationId);
-    void applyManifestState();
+    void applyManifestState(bool preserveRuntimeState = false);
     bool activateSkin(const QString &skinId, bool persistSelection);
     bool reloadActiveSkin(SkinReloadMode mode);
     bool loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReloadMode mode);

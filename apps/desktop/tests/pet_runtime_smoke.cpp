@@ -284,6 +284,27 @@ int main(int argc, char *argv[])
     require(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"), "built-in Miles should be active by default");
     require(!runtime.availableSkins().isEmpty(), "runtime should expose available skins");
     require(runtime.reloadActiveSkin(), "runtime should reload active skin");
+    runtime.setAudioLanguage("zh");
+    runtime.setPetSize("mini");
+    runtime.setFacing("left");
+    runtime.playRecipe("walk.north");
+    require(runtime.currentMovementDirection() == "north", "preserve reload setup should use a non-default movement direction");
+    int audioLanguageChangesDuringPreserveReload = 0;
+    int petScaleChangesDuringPreserveReload = 0;
+    int facingChangesDuringPreserveReload = 0;
+    int movementChangesDuringPreserveReload = 0;
+    QObject::connect(&runtime, &PetRuntime::currentAudioLanguageChanged, [&audioLanguageChangesDuringPreserveReload]() {
+        ++audioLanguageChangesDuringPreserveReload;
+    });
+    QObject::connect(&runtime, &PetRuntime::petScaleChanged, [&petScaleChangesDuringPreserveReload]() {
+        ++petScaleChangesDuringPreserveReload;
+    });
+    QObject::connect(&runtime, &PetRuntime::currentFacingChanged, [&facingChangesDuringPreserveReload]() {
+        ++facingChangesDuringPreserveReload;
+    });
+    QObject::connect(&runtime, &PetRuntime::currentMovementDirectionChanged, [&movementChangesDuringPreserveReload]() {
+        ++movementChangesDuringPreserveReload;
+    });
     runtime.playAction("objecting");
     const int preserveReloadSerial = runtime.playbackSerial();
     require(runtime.reloadActiveSkinPreservingPlayback(),
@@ -292,11 +313,71 @@ int main(int argc, char *argv[])
             "preserve reload must keep the current action instead of replaying startup");
     require(runtime.currentRecipeId().isEmpty(),
             "preserve reload must not start startup.briefcase");
+    require(runtime.currentAudioLanguageId() == "zh",
+            "preserve reload must keep the current audio language when still supported");
+    require(runtime.petSizeId() == "mini",
+            "preserve reload must keep the current pet size when still supported");
+    require(runtime.currentFacing() == "left",
+            "preserve reload must keep the current facing when still supported");
+    require(runtime.currentMovementDirection() == "north",
+            "preserve reload must keep the current movement direction when still supported");
+    require(audioLanguageChangesDuringPreserveReload == 0,
+            "preserve reload must not emit a temporary audio language change");
+    require(petScaleChangesDuringPreserveReload == 0,
+            "preserve reload must not emit a temporary pet size change");
+    require(facingChangesDuringPreserveReload == 0,
+            "preserve reload must not emit a temporary facing change");
+    require(movementChangesDuringPreserveReload == 0,
+            "preserve reload must not emit a temporary movement direction change");
     require(runtime.playbackSerial() == preserveReloadSerial,
             "preserve reload must not restart the current animation");
+
+    SkinManifest &editableManifest = const_cast<SkinManifest &>(runtime.manifest());
+    ActionDefinition editedObjecting = editableManifest.actions.value(QStringLiteral("objecting"));
+    PhaseDefinition removedPhase;
+    removedPhase.loopMode = QStringLiteral("once");
+    removedPhase.variants = editedObjecting.variants;
+    editedObjecting.initialPhase = QStringLiteral("review_removed");
+    editedObjecting.phases.insert(QStringLiteral("review_removed"), removedPhase);
+    editableManifest.actions.insert(QStringLiteral("objecting"), editedObjecting);
+    editableManifest.stateToAction.insert(QStringLiteral("review_state"), QStringLiteral("objecting"));
+    RecipeDefinition removedRecipe;
+    RecipeStep removedStep;
+    removedStep.actionId = QStringLiteral("objecting");
+    removedStep.phaseId = QStringLiteral("review_removed");
+    removedRecipe.steps.append(removedStep);
+    editableManifest.recipes.insert(QStringLiteral("review.removed"), removedRecipe);
+    runtime.setState("review_state");
+    runtime.playRecipe("review.removed");
+    const int invalidPreserveReloadSerial = runtime.playbackSerial();
+    require(runtime.currentActionId() == "objecting",
+            "invalid preserve setup should keep an action that still exists after reload");
+    require(runtime.currentPhaseId() == "review_removed",
+            "invalid preserve setup should use a phase that will disappear after reload");
+    require(runtime.currentRecipeId() == "review.removed",
+            "invalid preserve setup should use a recipe that will disappear after reload");
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should still succeed when current playback cannot be restored");
+    require(runtime.currentState() == "idle",
+            "invalid preserved state mapping should fall back to idle state");
+    require(runtime.currentActionId() == runtime.manifest().stateToAction.value(QStringLiteral("idle")),
+            "invalid preserved playback should fall back to the manifest idle action");
+    require(runtime.currentRecipeId().isEmpty(),
+            "invalid preserved recipe should be cleared during fallback");
+    require(runtime.playbackSerial() != invalidPreserveReloadSerial,
+            "invalid preserved playback fallback should restart with a safe animation");
+
     runtime.returnToIdle();
     require(runtime.reloadActiveSkin(), "runtime should reload active skin before startup assertions");
     PetEventBridge bridge(&runtime);
+    int skinCommandAvailabilityChanges = 0;
+    QObject::connect(&bridge, &PetEventBridge::skinCommandAvailabilityChanged, [&skinCommandAvailabilityChanges]() {
+        ++skinCommandAvailabilityChanges;
+    });
+    require(runtime.reloadActiveSkinPreservingPlayback(),
+            "preserve reload should notify menu command availability after manifest reload");
+    require(skinCommandAvailabilityChanges > 0,
+            "skin manifest reload should refresh enabled skin commands");
 
     // 启动时应进入旧版公文包入场序列，而不是直接静止站立。
     require(runtime.currentRecipeId() == "startup.briefcase", "启动时应播放 startup.briefcase recipe");

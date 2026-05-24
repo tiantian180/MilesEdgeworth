@@ -5,6 +5,156 @@
 #include <QSettings>
 #include <QVariantMap>
 
+namespace {
+
+bool petSizeScaleForId(const SkinManifest &manifest, const QString &sizeId, double *scale)
+{
+    const QString normalizedSizeId = sizeId.trimmed();
+    if (normalizedSizeId.isEmpty()) {
+        return false;
+    }
+
+    for (const PetSizeDefinition &size : manifest.sizes) {
+        if (size.id == normalizedSizeId && size.scale > 0.0) {
+            if (scale != nullptr) {
+                *scale = size.scale;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+QString defaultFacingForManifest(const SkinManifest &manifest)
+{
+    if (!manifest.defaultFacing.isEmpty() && manifest.facings.contains(manifest.defaultFacing)) {
+        return manifest.defaultFacing;
+    }
+    if (!manifest.facings.isEmpty()) {
+        return manifest.facings.constFirst();
+    }
+    return QStringLiteral("right");
+}
+
+QString defaultMovementDirectionForManifest(const SkinManifest &manifest)
+{
+    if (manifest.movementDirections.isEmpty()) {
+        return {};
+    }
+    return manifest.movementDirections.constFirst();
+}
+
+bool recipeStepsEquivalent(const RecipeStep &left, const RecipeStep &right)
+{
+    return left.actionId == right.actionId
+        && left.phaseId == right.phaseId
+        && left.recipeId == right.recipeId
+        && left.movementDirection == right.movementDirection
+        && left.facing == right.facing
+        && left.repeat == right.repeat
+        && left.durationMs == right.durationMs;
+}
+
+bool actionPhaseValid(const SkinManifest &manifest, const QString &actionId, const QString &phaseId)
+{
+    if (actionId.isEmpty() || !manifest.actions.contains(actionId)) {
+        return false;
+    }
+
+    const ActionDefinition action = manifest.actions.value(actionId);
+    if (action.phases.isEmpty()) {
+        return phaseId == QStringLiteral("single");
+    }
+
+    return !phaseId.isEmpty() && action.phases.contains(phaseId);
+}
+
+bool stateMappingStillValid(
+    const SkinManifest &previousManifest,
+    const SkinManifest &nextManifest,
+    const QString &state
+)
+{
+    if (state.isEmpty()) {
+        return false;
+    }
+
+    const QString previousAction = previousManifest.stateToAction.value(state);
+    const QString nextAction = nextManifest.stateToAction.value(state);
+    return !previousAction.isEmpty()
+        && previousAction == nextAction
+        && nextManifest.actions.contains(nextAction);
+}
+
+bool recipePlaybackStillValid(
+    const SkinManifest &previousManifest,
+    const SkinManifest &nextManifest,
+    const QString &recipeId,
+    int recipeStepIndex,
+    const QString &actionId,
+    const QString &phaseId
+)
+{
+    if (recipeId.isEmpty()) {
+        return recipeStepIndex == -1;
+    }
+    if (!previousManifest.recipes.contains(recipeId) || !nextManifest.recipes.contains(recipeId)) {
+        return false;
+    }
+
+    const RecipeDefinition previousRecipe = previousManifest.recipes.value(recipeId);
+    const RecipeDefinition nextRecipe = nextManifest.recipes.value(recipeId);
+    if (recipeStepIndex < 0
+        || recipeStepIndex >= previousRecipe.steps.size()
+        || recipeStepIndex >= nextRecipe.steps.size()) {
+        return false;
+    }
+
+    const RecipeStep previousStep = previousRecipe.steps.at(recipeStepIndex);
+    const RecipeStep nextStep = nextRecipe.steps.at(recipeStepIndex);
+    if (!recipeStepsEquivalent(previousStep, nextStep)) {
+        return false;
+    }
+    if (!nextStep.actionId.isEmpty() && nextStep.actionId != actionId) {
+        return false;
+    }
+    if (!nextStep.phaseId.isEmpty() && nextStep.phaseId != phaseId) {
+        return false;
+    }
+    if (!nextStep.recipeId.isEmpty() && !nextManifest.recipes.contains(nextStep.recipeId)) {
+        return false;
+    }
+    if (!nextStep.actionId.isEmpty() && !actionPhaseValid(nextManifest, nextStep.actionId, phaseId)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool playbackStateStillValid(
+    const SkinManifest &previousManifest,
+    const SkinManifest &nextManifest,
+    const QString &state,
+    const QString &actionId,
+    const QString &phaseId,
+    const QString &recipeId,
+    int recipeStepIndex
+)
+{
+    return stateMappingStillValid(previousManifest, nextManifest, state)
+        && actionPhaseValid(nextManifest, actionId, phaseId)
+        && recipePlaybackStillValid(
+            previousManifest,
+            nextManifest,
+            recipeId,
+            recipeStepIndex,
+            actionId,
+            phaseId
+        );
+}
+
+} // namespace
+
 QVariantList PetRuntime::availableSkins() const
 {
     QVariantList skins;
@@ -76,7 +226,7 @@ bool PetRuntime::reloadActiveSkin(SkinReloadMode mode)
     return loadSkinDescriptor(descriptorForSkinId(m_activeSkinId), mode);
 }
 
-void PetRuntime::applyManifestState()
+void PetRuntime::applyManifestState(bool preserveRuntimeState)
 {
     const QString previousAudioLanguageId = m_audioController.currentLanguageId();
     const QString previousFacing = m_currentFacing;
@@ -85,41 +235,55 @@ void PetRuntime::applyManifestState()
     const double previousPetScale = m_petScale;
 
     m_audioController.setAudioDefinition(m_manifest.audio);
+    if (preserveRuntimeState && !previousAudioLanguageId.isEmpty()) {
+        m_audioController.setLanguage(previousAudioLanguageId);
+    }
     emit availableAudioLanguagesChanged();
     if (previousAudioLanguageId != m_audioController.currentLanguageId()) {
         emit currentAudioLanguageChanged();
     }
 
-    m_currentFacing = m_manifest.defaultFacing.isEmpty()
-        ? QStringLiteral("right")
-        : m_manifest.defaultFacing;
+    QString nextFacing = defaultFacingForManifest(m_manifest);
+    if (preserveRuntimeState && m_manifest.facings.contains(previousFacing)) {
+        nextFacing = previousFacing;
+    }
+    m_currentFacing = nextFacing;
     if (previousFacing != m_currentFacing) {
         emit currentFacingChanged();
     }
 
-    m_currentMovementDirection = m_manifest.movementDirections.isEmpty()
-        ? QString()
-        : m_manifest.movementDirections.constFirst();
+    QString nextMovementDirection = defaultMovementDirectionForManifest(m_manifest);
+    if (preserveRuntimeState && m_manifest.movementDirections.contains(previousMovementDirection)) {
+        nextMovementDirection = previousMovementDirection;
+    }
+    m_currentMovementDirection = nextMovementDirection;
     if (previousMovementDirection != m_currentMovementDirection) {
         emit currentMovementDirectionChanged();
     }
 
     emit availablePetSizesChanged();
     QString nextSizeId = m_manifest.defaultSizeId.trimmed();
-    bool hasNextSize = false;
-    for (const PetSizeDefinition &size : m_manifest.sizes) {
-        if (nextSizeId == size.id) {
+    double nextScale = 0.0;
+    bool hasNextSize = petSizeScaleForId(m_manifest, nextSizeId, &nextScale);
+    if (preserveRuntimeState) {
+        double preservedScale = 0.0;
+        if (petSizeScaleForId(m_manifest, previousPetSizeId, &preservedScale)) {
+            nextSizeId = previousPetSizeId;
+            nextScale = preservedScale;
             hasNextSize = true;
-            break;
         }
     }
     if (!hasNextSize && !m_manifest.sizes.isEmpty()) {
         nextSizeId = m_manifest.sizes.constFirst().id;
-        hasNextSize = !nextSizeId.isEmpty();
+        hasNextSize = petSizeScaleForId(m_manifest, nextSizeId, &nextScale);
     }
 
     if (hasNextSize) {
-        setPetSize(nextSizeId);
+        m_petSizeId = nextSizeId;
+        m_petScale = nextScale;
+        if (previousPetSizeId != m_petSizeId || previousPetScale != m_petScale) {
+            emit petScaleChanged();
+        }
         return;
     }
 
@@ -165,6 +329,16 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
     const bool autoReturnChanged = m_currentAutoReturnToIdle;
     const bool hadAnimation = !m_currentAnimationUrl.isEmpty();
     const bool hadSound = !m_audioController.currentSoundUrl().isEmpty();
+    const bool canPreservePlayback = preservePlayback
+        && playbackStateStillValid(
+            m_manifest,
+            nextManifest,
+            preservedState,
+            preservedActionId,
+            preservedPhaseId,
+            preservedRecipeId,
+            preservedRecipeStepIndex
+        );
 
     if (!preservePlayback) {
         hideCurrentProp();
@@ -213,8 +387,21 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
     m_manifest = nextManifest;
     m_activeSkinId = descriptor.id;
 
-    applyManifestState();
+    applyManifestState(preservePlayback);
     if (preservePlayback) {
+        if (!canPreservePlayback) {
+            hideCurrentProp();
+            const bool soundCleared = m_audioController.clearCurrentSound();
+            setState(QStringLiteral("idle"));
+            if (soundCleared) {
+                emit currentSoundUrlChanged();
+                emit soundPlaybackSerialChanged();
+            }
+            emit activeSkinChanged();
+            emit skinManifestReloaded();
+            return true;
+        }
+
         m_currentState = preservedState;
         m_currentActionId = preservedActionId;
         m_currentRecipeId = preservedRecipeId;
@@ -231,8 +418,12 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
         m_currentAnimationUrl = preservedAnimationUrl;
         m_playbackSerial = preservedPlaybackSerial;
 
-        if (!m_currentActionId.isEmpty() && !m_manifest.actions.contains(m_currentActionId)) {
-            setState(QStringLiteral("idle"));
+        if (wasPointerInteractionEnabled != pointerInteractionEnabled()) {
+            emit pointerInteractionEnabledChanged();
+        }
+        if (wasSleeping != sleeping()
+                || wasSleepTransitioning != sleepTransitioning()) {
+            emit sleepStateChanged();
         }
 
         emit activeSkinChanged();
