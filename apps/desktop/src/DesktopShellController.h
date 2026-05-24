@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QList>
+#include <QMetaObject>
 #include <QObject>
 #include <QPointF>
 #include <QRect>
@@ -22,6 +24,14 @@ class DesktopShellController : public QObject
     Q_PROPERTY(bool alwaysOnTop READ alwaysOnTop WRITE setAlwaysOnTop NOTIFY alwaysOnTopChanged)
     Q_PROPERTY(QString screenLayoutMode READ screenLayoutMode WRITE setScreenLayoutMode NOTIFY screenLayoutModeChanged)
     Q_PROPERTY(int screenCount READ screenCount NOTIFY screenCountChanged)
+    Q_PROPERTY(int petWindowX READ petWindowX NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petWindowY READ petWindowY NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petWindowWidth READ petWindowWidth NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petWindowHeight READ petWindowHeight NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petScreenAvailableX READ petScreenAvailableX NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petScreenAvailableY READ petScreenAvailableY NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petScreenAvailableWidth READ petScreenAvailableWidth NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(int petScreenAvailableHeight READ petScreenAvailableHeight NOTIFY petWindowGeometryChanged)
 
 public:
     explicit DesktopShellController(QObject *parent = nullptr);
@@ -30,6 +40,14 @@ public:
     bool alwaysOnTop() const;
     QString screenLayoutMode() const;
     int screenCount() const;
+    int petWindowX() const;
+    int petWindowY() const;
+    int petWindowWidth() const;
+    int petWindowHeight() const;
+    int petScreenAvailableX() const;
+    int petScreenAvailableY() const;
+    int petScreenAvailableWidth() const;
+    int petScreenAvailableHeight() const;
     void setPetWindow(QWindow *window);
 
 public slots:
@@ -49,15 +67,18 @@ signals:
     void alwaysOnTopChanged();
     void screenLayoutModeChanged();
     void screenCountChanged();
+    void petWindowGeometryChanged();
 
 private:
     void createTrayIcon();
     void applyCurrentLayerMode();
     QPointF legacyStartupPosition(double petScale) const;
+    QRect petScreenAvailableGeometry() const;
     QRect virtualDesktopGeometry() const;
     QPointF clampedPetWindowPosition(const QPointF &candidatePosition) const;
 
     QWindow *m_petWindow = nullptr;
+    QList<QMetaObject::Connection> m_petWindowGeometryConnections;
     QSystemTrayIcon *m_trayIcon = nullptr;
     QMenu *m_trayMenu = nullptr;
     QAction *m_exitAction = nullptr;

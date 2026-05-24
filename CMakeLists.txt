@@ -617,6 +617,14 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_4_phased_animation.py
         )
 
+        # Compact chat bubble check: keeps the compact composer and pet-head
+        # assistant bubble as a UI mirror over ChatController.messages.
+        add_test(
+            NAME check_phase_2_4_chat_compact_bubble
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_4_chat_compact_bubble.py
+        )
+
         # Logging standard check: keeps Qt + Go logging categories, env vars,
         # payload safety, and sidecar stderr forwarding aligned with docs/v2/设计方案/日志规范设计.md.
         add_test(

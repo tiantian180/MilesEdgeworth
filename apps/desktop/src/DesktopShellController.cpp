@@ -7,6 +7,7 @@
 #include <QGuiApplication>
 #include <QIcon>
 #include <QMenu>
+#include <QPoint>
 #include <QRect>
 #include <QScreen>
 #include <QString>
@@ -26,8 +27,12 @@ DesktopShellController::DesktopShellController(QObject *parent)
 
     // 旧版双屏选项是用户手动设置；v2 仍保留这个入口，
     // 同时监听屏幕变化，让菜单可用状态跟真实显示器数量同步。
-    connect(qGuiApp, &QGuiApplication::screenAdded, this, &DesktopShellController::screenCountChanged);
-    connect(qGuiApp, &QGuiApplication::screenRemoved, this, &DesktopShellController::screenCountChanged);
+    auto notifyScreenChanged = [this]() {
+        emit screenCountChanged();
+        emit petWindowGeometryChanged();
+    };
+    connect(qGuiApp, &QGuiApplication::screenAdded, this, notifyScreenChanged);
+    connect(qGuiApp, &QGuiApplication::screenRemoved, this, notifyScreenChanged);
 }
 
 DesktopShellController::~DesktopShellController()
@@ -50,13 +55,79 @@ int DesktopShellController::screenCount() const
     return QGuiApplication::screens().size();
 }
 
+int DesktopShellController::petWindowX() const
+{
+    return m_petWindow != nullptr ? m_petWindow->x() : 0;
+}
+
+int DesktopShellController::petWindowY() const
+{
+    return m_petWindow != nullptr ? m_petWindow->y() : 0;
+}
+
+int DesktopShellController::petWindowWidth() const
+{
+    return m_petWindow != nullptr ? m_petWindow->width() : 0;
+}
+
+int DesktopShellController::petWindowHeight() const
+{
+    return m_petWindow != nullptr ? m_petWindow->height() : 0;
+}
+
+int DesktopShellController::petScreenAvailableX() const
+{
+    return petScreenAvailableGeometry().x();
+}
+
+int DesktopShellController::petScreenAvailableY() const
+{
+    return petScreenAvailableGeometry().y();
+}
+
+int DesktopShellController::petScreenAvailableWidth() const
+{
+    return petScreenAvailableGeometry().width();
+}
+
+int DesktopShellController::petScreenAvailableHeight() const
+{
+    return petScreenAvailableGeometry().height();
+}
+
 void DesktopShellController::setPetWindow(QWindow *window)
 {
     if (m_petWindow == window) {
         return;
     }
 
+    for (const QMetaObject::Connection &connection : m_petWindowGeometryConnections) {
+        disconnect(connection);
+    }
+    m_petWindowGeometryConnections.clear();
+
     m_petWindow = window;
+
+    if (m_petWindow != nullptr) {
+        auto notifyGeometryChanged = [this]() {
+            emit petWindowGeometryChanged();
+        };
+        m_petWindowGeometryConnections.append(
+            connect(m_petWindow, &QWindow::xChanged, this, notifyGeometryChanged)
+        );
+        m_petWindowGeometryConnections.append(
+            connect(m_petWindow, &QWindow::yChanged, this, notifyGeometryChanged)
+        );
+        m_petWindowGeometryConnections.append(
+            connect(m_petWindow, &QWindow::widthChanged, this, notifyGeometryChanged)
+        );
+        m_petWindowGeometryConnections.append(
+            connect(m_petWindow, &QWindow::heightChanged, this, notifyGeometryChanged)
+        );
+        m_petWindowGeometryConnections.append(
+            connect(m_petWindow, &QWindow::screenChanged, this, notifyGeometryChanged)
+        );
+    }
 
 #ifdef Q_OS_MACOS
     // 基础行为只负责“像桌宠窗口”：不因失焦隐藏、透明、禁用普通窗口动画。
@@ -65,6 +136,7 @@ void DesktopShellController::setPetWindow(QWindow *window)
 #endif
 
     applyCurrentLayerMode();
+    emit petWindowGeometryChanged();
 }
 
 void DesktopShellController::setAlwaysOnTop(bool alwaysOnTop)
@@ -144,6 +216,7 @@ void DesktopShellController::placePetWindowForStartup(double petScale)
     // 这里直接设置窗口位置，刻意绕过普通移动用的 clampedPetWindowPosition()。
     const QPointF startupPosition = legacyStartupPosition(petScale);
     m_petWindow->setPosition(startupPosition.toPoint());
+    emit petWindowGeometryChanged();
 }
 
 void DesktopShellController::movePetWindowBy(double dx, double dy)
@@ -164,6 +237,7 @@ void DesktopShellController::movePetWindowTo(double x, double y)
 
     const QPointF clampedPosition = clampedPetWindowPosition(QPointF(x, y));
     m_petWindow->setPosition(clampedPosition.toPoint());
+    emit petWindowGeometryChanged();
 }
 
 void DesktopShellController::setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize)
@@ -242,6 +316,26 @@ QPointF DesktopShellController::legacyStartupPosition(double petScale) const
         availableGeometry.x() - 45.0 * safeScale,
         availableGeometry.y() + availableGeometry.height() - 90.0 * safeScale
     );
+}
+
+QRect DesktopShellController::petScreenAvailableGeometry() const
+{
+    QScreen *targetScreen = nullptr;
+    if (m_petWindow != nullptr) {
+        const QPoint petCenter(
+            m_petWindow->x() + m_petWindow->width() / 2,
+            m_petWindow->y() + m_petWindow->height() / 2
+        );
+        targetScreen = QGuiApplication::screenAt(petCenter);
+        if (targetScreen == nullptr) {
+            targetScreen = m_petWindow->screen();
+        }
+    }
+
+    if (targetScreen == nullptr) {
+        targetScreen = QGuiApplication::primaryScreen();
+    }
+    return targetScreen != nullptr ? targetScreen->availableGeometry() : QRect();
 }
 
 QRect DesktopShellController::virtualDesktopGeometry() const

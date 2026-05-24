@@ -64,7 +64,8 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine chatEngine;
     chatEngine.loadFromModule("MilesEdgeworth", "ChatWindow");
     chatEngine.loadFromModule("MilesEdgeworth", "SettingsWindow");
-    if (chatEngine.rootObjects().size() < 2) {
+    chatEngine.loadFromModule("MilesEdgeworth", "ChatBubbleWindow");
+    if (chatEngine.rootObjects().size() < 3) {
         return 1;
     }
     chatController.startSidecar();

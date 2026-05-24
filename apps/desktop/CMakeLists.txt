@@ -104,6 +104,7 @@ qt_add_qml_module(MilesEdgeworthDesktop
     URI MilesEdgeworth
     VERSION 1.0
     QML_FILES
+        qml/ChatBubbleWindow.qml
         qml/ChatWindow.qml
         qml/PetWindow.qml
         qml/SettingsWindow.qml
