@@ -624,6 +624,11 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE}
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_4_2_precut_clips.py
         )
+        add_test(
+            NAME test_split_manifest_clips
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_split_manifest_clips.py
+        )
 
         # Compact chat bubble check: keeps the compact composer and pet-head
         # assistant bubble as a UI mirror over ChatController.messages.
