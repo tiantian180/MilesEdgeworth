@@ -841,6 +841,19 @@ int main(int argc, char *argv[])
         require(sleepCleanFinishCallbacks == 1,
                 "cleanFinish should callback after exit finishes");
 
+        runtime.playAction("thinking");
+        int replacedCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&replacedCleanFinishCallbacks]() {
+            ++replacedCleanFinishCallbacks;
+        });
+        runtime.playAction("bow");
+        waitForMilliseconds(100);
+        require(replacedCleanFinishCallbacks == 0,
+                "replacing playback should not synchronously fire pending cleanFinish callback");
+        waitForMilliseconds(2100);
+        require(replacedCleanFinishCallbacks == 1,
+                "replacing playback should preserve pending cleanFinish until safety timeout");
+
         runtime.playAction("bow");
         int suppressedCallbacks = 0;
         runtime.setSuppressAutoIdle(true);

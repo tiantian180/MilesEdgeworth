@@ -478,6 +478,8 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
 
 void PetRuntime::returnToIdle()
 {
+    clearCleanFinishCallback();
+
     const QString idleAction = actionForState(QStringLiteral("idle"));
     if (m_currentRecipeId.isEmpty()
             && m_currentState == QStringLiteral("idle")
@@ -510,6 +512,10 @@ void PetRuntime::handleAnimationFinished()
     const PhaseDefinition phase = action.phases.value(m_currentPhaseId);
     if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
         playPhase(m_currentActionId, phase.nextPhase);
+        return;
+    }
+
+    if (m_playbackSerial != finishingPlaybackSerial) {
         return;
     }
 
@@ -891,9 +897,6 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     }
     emit playbackSerialChanged();
 
-    if (replacingActiveAnimation && !m_cleanFinishExitInProgress) {
-        clearCleanFinishCallback();
-    }
 }
 
 bool PetRuntime::cleanFinishBoundaryReached() const

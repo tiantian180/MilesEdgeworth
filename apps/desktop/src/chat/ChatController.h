@@ -141,7 +141,7 @@ private:
     QString m_pendingExpression;
     ChatTextPacer *m_pacer = nullptr;
     QTimer m_gateTimeout;
-    static constexpr int kGateTimeoutMs = 800;
+    static constexpr int kGateTimeoutMs = 2000;
     bool m_sidecarReady = false;
     bool m_providerConfigured = false;
     bool m_sending = false;

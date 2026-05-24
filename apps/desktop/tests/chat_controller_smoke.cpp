@@ -582,7 +582,7 @@ int main(int argc, char *argv[])
         require(waitFor([&timeoutController]() {
                     return timeoutController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("一二");
-                }, 1200),
+                }, 2600),
                 "gate timeout should release the first gated text");
 
         ChatStreamEvent timeoutExpr3;
@@ -604,7 +604,7 @@ int main(int argc, char *argv[])
         require(waitFor([&timeoutController]() {
                     return timeoutController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("一二三");
-                }, 1000),
+                }, 2600),
                 "the current gate timeout should still release its own buffered text");
     }
 

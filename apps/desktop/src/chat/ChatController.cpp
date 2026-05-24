@@ -925,10 +925,10 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
             m_pendingState = state;
             m_pendingExpression = expression;
             transitionTo(ChatPhase::GATED);
-            m_gateTimeout.start(kGateTimeoutMs);
             if (m_runtime != nullptr) {
                 requestBoundaryForCurrentStream();
             }
+            m_gateTimeout.start(kGateTimeoutMs);
             return;
         }
 
