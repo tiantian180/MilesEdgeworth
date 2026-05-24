@@ -40,9 +40,9 @@ int main(int argc, char **argv)
 
     const QUrl rootUrl(QStringLiteral("file:///tmp/example-skin/"));
     require(
-        SkinManifestLoader::resolveSkinUrl(QStringLiteral("skin:assets/body/idle.gif"), rootUrl).toString()
+        SkinManifestLoader::resolveSkinUrl(QStringLiteral("file:assets/body/idle.gif"), rootUrl).toString()
             == QStringLiteral("file:///tmp/example-skin/assets/body/idle.gif"),
-        "skin: URL should resolve under file root"
+        "file: URL should resolve under file root"
     );
     require(
         SkinManifestLoader::resolveSkinUrl(QStringLiteral("qrc:/pet/stand-right.gif"), rootUrl).toString()
@@ -50,14 +50,18 @@ int main(int argc, char **argv)
         "absolute qrc URL should stay unchanged"
     );
     require(
-        !SkinManifestLoader::resolveSkinUrl(QStringLiteral("skin:../escape.gif"), rootUrl).isValid(),
-        "skin: URL must reject parent traversal"
+        !SkinManifestLoader::resolveSkinUrl(QStringLiteral("file:../escape.gif"), rootUrl).isValid(),
+        "file: URL must reject parent traversal"
     );
 
     QTemporaryDir dir;
     require(dir.isValid(), "temporary skin directory should be valid");
     QDir skinDir(dir.path());
     require(skinDir.mkpath(QStringLiteral("assets/body/idle")), "assets directory should be created");
+    require(skinDir.mkpath(QStringLiteral("generated/clips")), "generated clips directory should be created");
+    require(writeFile(skinDir.filePath(QStringLiteral("generated/clips/thinking.enter.right.gif")),
+                      QStringLiteral("fake gif placeholder")),
+            "generated clip should be written");
     require(writeFile(skinDir.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
 {
   "id": "test-skin",
@@ -69,11 +73,12 @@ int main(int argc, char **argv)
 )JSON")), "skin.json should be written");
     require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
 {
+  "schemaVersion": 4,
   "defaultFacing": "right",
   "states": { "idle": { "action": "idle_stand" } },
   "clips": {
-    "thinking_enter_right": {
-      "file": "skin:assets/body/idle/stand.gif",
+    "thinking.enter.right": {
+      "source": "file:assets/body/idle/stand.gif",
       "frameRange": [1, 4]
     }
   },
@@ -81,7 +86,7 @@ int main(int argc, char **argv)
     "idle_stand": {
       "variants": {
         "right": {
-          "animation": "skin:assets/body/idle/stand.gif"
+          "clip": "file:assets/body/idle/stand.gif"
         }
       }
     },
@@ -89,7 +94,7 @@ int main(int argc, char **argv)
       "loopMode": "onceThenHold",
       "variants": {
         "right": {
-          "clip": "thinking_enter_right"
+          "clip": "thinking.enter.right"
         }
       }
     }
@@ -125,16 +130,22 @@ int main(int argc, char **argv)
     require(objecting.loopMode == QStringLiteral("onceThenHold"),
             "loader should preserve onceThenHold loopMode");
     const AnimationVariant objectingVariant = objecting.variants.value(QStringLiteral("right"));
-    require(objectingVariant.url.toString() == expectedAnimationUrl,
-            "clip variant should resolve to the clip file URL");
-    require(objectingVariant.frameStart == 0 && objectingVariant.frameEnd == 3,
-            "loader should convert 1-based manifest frameRange to 0-based inclusive runtime frame range");
+    const QString expectedGeneratedClipUrl = QUrl::fromLocalFile(
+        skinDir.filePath(QStringLiteral("generated/clips/thinking.enter.right.gif"))
+    ).toString();
+    require(objectingVariant.url.toString() == expectedGeneratedClipUrl,
+            "bare clip variant should resolve to generated/clips/{clip}.gif");
     const RecipeDefinition thinkingRecipe = manifest.recipes.value(QStringLiteral("thinking.holdUntilCancelled"));
     require(thinkingRecipe.steps.size() == 3,
             "loader should parse runtime-controlled recipe steps");
     require(thinkingRecipe.steps.at(1).durationMode == QStringLiteral("runtime"),
             "loader should preserve duration runtime on recipe step");
     require(manifest.personaPrompt == filesystemPersona, "filesystem skin persona.md should load into manifest");
+
+    QFile::remove(skinDir.filePath(QStringLiteral("generated/clips/thinking.enter.right.gif")));
+    SkinManifest missingGeneratedClip = SkinManifestLoader::loadFromDirectory(dir.path());
+    require(missingGeneratedClip.actions.isEmpty(),
+            "loader should reject manifests whose generated clip files are missing");
 
     QTemporaryDir personaDataDir;
     require(personaDataDir.isValid(), "persona override data dir should be valid");

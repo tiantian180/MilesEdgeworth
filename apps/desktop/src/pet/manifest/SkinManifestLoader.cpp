@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -150,6 +151,35 @@ QPair<int, int> frameRangeFromJson(const QJsonArray &range)
     return {startOneBased - 1, endOneBased - 1};
 }
 
+bool resolvedUrlExists(const QUrl &url)
+{
+    if (url.isEmpty()) {
+        return false;
+    }
+    if (url.scheme() == QStringLiteral("qrc")) {
+        return QFile::exists(QLatin1Char(':') + url.path());
+    }
+    if (url.isLocalFile()) {
+        return QFileInfo::exists(url.toLocalFile());
+    }
+    return !url.scheme().isEmpty();
+}
+
+QUrl generatedClipUrlForId(const QString &clipId, const QUrl &skinRootUrl)
+{
+    if (clipId.isEmpty()
+        || clipId.contains(QLatin1Char('/'))
+        || clipId.contains(QLatin1Char('\\'))
+        || clipId.contains(QStringLiteral(".."))) {
+        return {};
+    }
+
+    return SkinManifestLoader::resolveSkinUrl(
+        QStringLiteral("file:generated/clips/%1.gif").arg(clipId),
+        skinRootUrl
+    );
+}
+
 AnimationVariant parseAnimationVariant(
     const QJsonObject &object,
     const SkinManifest &manifest,
@@ -158,23 +188,19 @@ AnimationVariant parseAnimationVariant(
 {
     AnimationVariant variant;
 
-    const QString clipId = object.value(QStringLiteral("clip")).toString();
-    if (!clipId.isEmpty() && manifest.clips.contains(clipId)) {
-        const ClipDefinition clip = manifest.clips.value(clipId);
-        variant.url = clip.fileUrl;
-        variant.frameStart = clip.frameStart;
-        variant.frameEnd = clip.frameEnd;
+    const QString clipRef = object.value(QStringLiteral("clip")).toString();
+    if (clipRef.startsWith(QStringLiteral("file:"))) {
+        variant.url = SkinManifestLoader::resolveSkinUrl(clipRef, skinRootUrl);
+        return variant;
+    }
+    if (!clipRef.isEmpty() && manifest.clips.contains(clipRef)) {
+        variant.url = manifest.clips.value(clipRef).generatedUrl;
+        return variant;
     }
 
     const QString animation = object.value(QStringLiteral("animation")).toString();
     if (!animation.isEmpty()) {
         variant.url = SkinManifestLoader::resolveSkinUrl(animation, skinRootUrl);
-    }
-
-    const auto localFrames = frameRangeFromJson(object.value(QStringLiteral("frameRange")).toArray());
-    if (localFrames.first >= 0) {
-        variant.frameStart = localFrames.first;
-        variant.frameEnd = localFrames.second;
     }
 
     return variant;
@@ -191,6 +217,7 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
     manifest.builtin = context.builtin;
 
     const QJsonObject root = document.object();
+    manifest.schemaVersion = root.value("schemaVersion").toInt(4);
     manifest.fallbackAction = root.value("fallbackAction").toString(kFallbackActionId);
     manifest.defaultFacing = root.value("defaultFacing").toString("right");
     manifest.defaultSizeId = root.value("defaultSize").toString();
@@ -474,16 +501,21 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
     for (auto it = clips.constBegin(); it != clips.constEnd(); ++it) {
         const QJsonObject clipObject = it.value().toObject();
         ClipDefinition clip;
-        clip.fileUrl = SkinManifestLoader::resolveSkinUrl(
-            clipObject.value(QStringLiteral("file")).toString(),
+        clip.sourceUrl = SkinManifestLoader::resolveSkinUrl(
+            clipObject.value(QStringLiteral("source")).toString(),
             manifest.skinRootUrl
         );
+        clip.generatedUrl = generatedClipUrlForId(it.key(), manifest.skinRootUrl);
         const auto frames = frameRangeFromJson(clipObject.value(QStringLiteral("frameRange")).toArray());
-        clip.frameStart = frames.first;
-        clip.frameEnd = frames.second;
-        if (!clip.fileUrl.isEmpty()) {
-            manifest.clips.insert(it.key(), clip);
+        clip.sourceFrameStart = frames.first;
+        clip.sourceFrameEnd = frames.second;
+        if (clip.sourceUrl.isEmpty()
+            || clip.generatedUrl.isEmpty()
+            || clip.sourceFrameStart < 0
+            || !resolvedUrlExists(clip.generatedUrl)) {
+            return {};
         }
+        manifest.clips.insert(it.key(), clip);
     }
 
     const QJsonObject actions = root.value("actions").toObject();
@@ -529,7 +561,7 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
         if (!legacyAnimation.isEmpty()) {
             action.variants.insert(
                 manifest.defaultFacing,
-                AnimationVariant {SkinManifestLoader::resolveSkinUrl(legacyAnimation, manifest.skinRootUrl), -1, -1}
+                AnimationVariant {SkinManifestLoader::resolveSkinUrl(legacyAnimation, manifest.skinRootUrl)}
             );
         }
 
@@ -698,7 +730,8 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
 void resolveManifestUrls(SkinManifest &manifest, const QUrl &rootUrl)
 {
     for (ClipDefinition &clip : manifest.clips) {
-        clip.fileUrl = SkinManifestLoader::resolveSkinUrl(clip.fileUrl.toString(), rootUrl);
+        clip.sourceUrl = SkinManifestLoader::resolveSkinUrl(clip.sourceUrl.toString(), rootUrl);
+        clip.generatedUrl = SkinManifestLoader::resolveSkinUrl(clip.generatedUrl.toString(), rootUrl);
     }
 
     for (ActionDefinition &action : manifest.actions) {
@@ -959,11 +992,14 @@ QUrl SkinManifestLoader::resolveSkinUrl(const QString &rawUrl, const QUrl &rootU
     }
 
     const QUrl url(trimmed);
-    if (url.scheme() != QStringLiteral("skin")) {
+    if (url.scheme() != QStringLiteral("file")) {
+        return url;
+    }
+    if (trimmed.startsWith(QStringLiteral("file://"))) {
         return url;
     }
 
-    QString relativePath = trimmed.mid(QStringLiteral("skin:").size());
+    QString relativePath = trimmed.mid(QStringLiteral("file:").size());
     while (relativePath.startsWith(QLatin1Char('/'))) {
         relativePath.remove(0, 1);
     }

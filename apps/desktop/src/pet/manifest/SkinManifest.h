@@ -21,9 +21,10 @@
 struct AnimationVariant
 {
     QUrl url;
+
+    // Kept until Task 4 removes runtime frame-range playback.
     int frameStart = -1;
     int frameEnd = -1;
-
     bool hasFrameRange() const
     {
         return frameStart >= 0 && frameEnd >= frameStart;
@@ -32,9 +33,10 @@ struct AnimationVariant
 
 struct ClipDefinition
 {
-    QUrl fileUrl;
-    int frameStart = -1;
-    int frameEnd = -1;
+    QUrl sourceUrl;
+    QUrl generatedUrl;
+    int sourceFrameStart = -1;
+    int sourceFrameEnd = -1;
 };
 
 // PhaseDefinition 描述一个 Action 内部的一段独立播放阶段。
@@ -310,6 +312,7 @@ struct ClickBehaviorDefinition
 struct SkinManifest
 {
     // 当前加载的皮肤元信息。Runtime 和菜单只读这些字段，不直接读取 skin.json。
+    int schemaVersion = 4;
     QString skinId;
     QString skinName;
     QUrl skinRootUrl;
