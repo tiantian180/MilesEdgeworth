@@ -417,6 +417,11 @@ void PetRuntime::requestCleanFinishAndNotify(std::function<void()> callback)
     continueCleanFinishIfPossible();
 }
 
+void PetRuntime::cancelCleanFinishNotification()
+{
+    clearCleanFinishCallback();
+}
+
 void PetRuntime::setSuppressAutoIdle(bool suppress)
 {
     if (m_suppressAutoIdle == suppress) {

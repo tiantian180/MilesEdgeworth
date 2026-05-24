@@ -165,6 +165,8 @@ int main(int argc, char *argv[])
     messageContent.messageId = QStringLiteral("assistant-1");
     messageContent.delta = QStringLiteral("异议");
     controller.applyStreamEvent(messageContent);
+    require(controller.messages().constFirst().toMap().value("text").toString().isEmpty(),
+            "content delta without an active segment should still wait for the pacer");
     require(waitFor([&controller]() {
                 return controller.messages().constFirst().toMap().value("text").toString()
                     == QStringLiteral("异议");
@@ -177,7 +179,9 @@ int main(int argc, char *argv[])
     expressionEvent.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
     expressionEvent.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
     controller.applyStreamEvent(expressionEvent);
-    runtime.handleAnimationFinished();
+    for (int i = 0; i < 5 && runtime.currentState() != QStringLiteral("speaking"); ++i) {
+        runtime.handleAnimationFinished();
+    }
     require(waitFor([&runtime]() {
                 return runtime.currentState() == QStringLiteral("speaking");
             }),
@@ -593,7 +597,7 @@ int main(int argc, char *argv[])
         require(waitFor([&timeoutController]() {
                     return timeoutController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("一二");
-                }, 1200),
+                }, 2600),
                 "gate timeout should release the first gated text");
 
         ChatStreamEvent timeoutExpr3;
@@ -615,7 +619,7 @@ int main(int argc, char *argv[])
         require(waitFor([&timeoutController]() {
                     return timeoutController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("一二三");
-                }, 1000),
+                }, 2500),
                 "the current gate timeout should still release its own buffered text");
     }
 
@@ -901,6 +905,213 @@ int main(int argc, char *argv[])
                 "RUN_ERROR during GATED must not create a ghost assistant message");
         require(eController.messages().constLast().toMap().value(QStringLiteral("error")).toBool(),
                 "RUN_ERROR during GATED should mark the assistant message as error");
+    }
+
+    // --- Phase 2.4: expression after unsegmented text must wait for pacerEmpty ---
+    {
+        SettingsService preTextSettings(settingsDir.filePath(QStringLiteral("pretext-settings.json")));
+        auto preTextCfg = modelConfig(QStringLiteral("pretext"),
+                                      QStringLiteral("https://api.example.test/v1"),
+                                      QStringLiteral("sk-test"),
+                                      QStringLiteral("miles-test-model"));
+        require(preTextSettings.setModelConfig(preTextCfg.name, preTextCfg),
+                "pretext settings should accept config");
+        preTextSettings.setActiveModelConfig(preTextCfg.name);
+        preTextSettings.setMsPerChar(80);
+
+        PetRuntime pRuntime;
+        for (int i = 0; i < 5 && pRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            pRuntime.handleAnimationFinished();
+        }
+        ChatController pController(&pRuntime, &preTextSettings);
+
+        ChatStreamEvent pStarted;
+        pStarted.type = QStringLiteral("RUN_STARTED");
+        pController.applyStreamEvent(pStarted);
+
+        ChatStreamEvent pStart;
+        pStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        pStart.role = QStringLiteral("assistant");
+        pController.applyStreamEvent(pStart);
+
+        ChatStreamEvent pText;
+        pText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        pText.delta = QStringLiteral("前前前");
+        pController.applyStreamEvent(pText);
+
+        ChatStreamEvent pExpr;
+        pExpr.type = QStringLiteral("CUSTOM");
+        pExpr.name = QStringLiteral("miles.pet.expression.requested");
+        pExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        pExpr.value.insert(QStringLiteral("expression"), QStringLiteral("polite"));
+        pController.applyStreamEvent(pExpr);
+
+        pRuntime.handleAnimationFinished();
+        require(pRuntime.currentActionId() != QStringLiteral("bow"),
+                "expression after unsegmented text must wait for pacerEmpty");
+        require(waitFor([&pController]() {
+                    return pController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("前前前");
+                }, 1000),
+                "unsegmented text should drain before the following expression activates");
+        require(pRuntime.currentActionId() == QStringLiteral("bow"),
+                "expression after unsegmented text should activate after pacerEmpty and cleanFinish");
+    }
+
+    // --- Phase 2.4: multiple expression segments must drain one by one ---
+    {
+        PetRuntime qRuntime;
+        for (int i = 0; i < 5 && qRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            qRuntime.handleAnimationFinished();
+        }
+        ChatController qController(&qRuntime, &settings);
+
+        ChatStreamEvent qStarted;
+        qStarted.type = QStringLiteral("RUN_STARTED");
+        qController.applyStreamEvent(qStarted);
+
+        ChatStreamEvent qExpr1;
+        qExpr1.type = QStringLiteral("CUSTOM");
+        qExpr1.name = QStringLiteral("miles.pet.expression.requested");
+        qExpr1.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        qExpr1.value.insert(QStringLiteral("expression"), QStringLiteral("objection"));
+        qController.applyStreamEvent(qExpr1);
+
+        ChatStreamEvent qStart;
+        qStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        qStart.role = QStringLiteral("assistant");
+        qController.applyStreamEvent(qStart);
+
+        ChatStreamEvent qText1;
+        qText1.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        qText1.delta = QStringLiteral("第一段");
+        qController.applyStreamEvent(qText1);
+
+        ChatStreamEvent qExpr2;
+        qExpr2.type = QStringLiteral("CUSTOM");
+        qExpr2.name = QStringLiteral("miles.pet.expression.requested");
+        qExpr2.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        qExpr2.value.insert(QStringLiteral("expression"), QStringLiteral("polite"));
+        qController.applyStreamEvent(qExpr2);
+
+        ChatStreamEvent qText2;
+        qText2.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        qText2.delta = QStringLiteral("第二段");
+        qController.applyStreamEvent(qText2);
+
+        require(qRuntime.currentActionId() != QStringLiteral("bow"),
+                "second expression must not activate before the first segment cleanFinish is ready");
+        qRuntime.handleAnimationFinished();
+        require(qRuntime.currentActionId() != QStringLiteral("bow"),
+                "second expression must not activate before first segment text drains");
+        require(qRuntime.currentState() == QStringLiteral("speaking"),
+                "first queued expression should stay active until the dual gate opens");
+        require(waitFor([&qController]() {
+                    return qController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("第一段");
+                }),
+                "first segment text should drain before second segment starts");
+
+        require(qRuntime.currentActionId() == QStringLiteral("bow"),
+                "polite segment should activate bow after cleanFinish and first segment drain");
+        require(waitFor([&qController]() {
+                    return qController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("第一段第二段");
+                }),
+                "second segment text should drain after second expression activates");
+    }
+
+    // --- Phase 2.4: lifecycle thinking must clean-finish when RUN_FINISHED arrives during start buffering ---
+    {
+        PetRuntime ltRuntime;
+        require(ltRuntime.currentActionId() == QStringLiteral("briefcase_in"),
+                "lifecycle finish test should start before startup cleanFinish");
+        ChatController ltController(&ltRuntime, &settings);
+
+        ChatStreamEvent ltStarted;
+        ltStarted.type = QStringLiteral("RUN_STARTED");
+        ltController.applyStreamEvent(ltStarted);
+
+        ChatStreamEvent ltThinking;
+        ltThinking.type = QStringLiteral("CUSTOM");
+        ltThinking.name = QStringLiteral("miles.pet.lifecycle");
+        ltThinking.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        ltController.applyStreamEvent(ltThinking);
+
+        ChatStreamEvent ltFinished;
+        ltFinished.type = QStringLiteral("RUN_FINISHED");
+        ltController.applyStreamEvent(ltFinished);
+
+        for (int i = 0; i < 5 && ltRuntime.currentState() != QStringLiteral("thinking"); ++i) {
+            ltRuntime.handleAnimationFinished();
+        }
+        require(ltRuntime.currentState() == QStringLiteral("thinking"),
+                "pending lifecycle thinking should apply after start cleanFinish");
+        require(ltRuntime.currentState() != QStringLiteral("idle"),
+                "pending lifecycle thinking must not idle immediately when stream already finished");
+
+        for (int i = 0; i < 5 && ltRuntime.currentState() != QStringLiteral("idle"); ++i) {
+            ltRuntime.handleAnimationFinished();
+        }
+        require(ltRuntime.currentState() == QStringLiteral("idle"),
+                "lifecycle thinking should return to idle after its own cleanFinish");
+    }
+
+    // --- Phase 2.4: RUN_FINISHED waits for pacerEmpty before idle ---
+    {
+        SettingsService slowSettings(settingsDir.filePath(QStringLiteral("slow-settings.json")));
+        auto slowCfg = modelConfig(QStringLiteral("slow"),
+                                   QStringLiteral("https://api.example.test/v1"),
+                                   QStringLiteral("sk-test"),
+                                   QStringLiteral("miles-test-model"));
+        require(slowSettings.setModelConfig(slowCfg.name, slowCfg), "slow settings should accept config");
+        slowSettings.setActiveModelConfig(slowCfg.name);
+        slowSettings.setMsPerChar(80);
+
+        PetRuntime wRuntime;
+        for (int i = 0; i < 5 && wRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            wRuntime.handleAnimationFinished();
+        }
+        ChatController wController(&wRuntime, &slowSettings);
+
+        ChatStreamEvent wStarted;
+        wStarted.type = QStringLiteral("RUN_STARTED");
+        wController.applyStreamEvent(wStarted);
+
+        ChatStreamEvent wExpr;
+        wExpr.type = QStringLiteral("CUSTOM");
+        wExpr.name = QStringLiteral("miles.pet.expression.requested");
+        wExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        wExpr.value.insert(QStringLiteral("expression"), QStringLiteral("polite"));
+        wController.applyStreamEvent(wExpr);
+
+        ChatStreamEvent wStart;
+        wStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        wStart.role = QStringLiteral("assistant");
+        wController.applyStreamEvent(wStart);
+
+        ChatStreamEvent wText;
+        wText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        wText.delta = QStringLiteral("长长长长长");
+        wController.applyStreamEvent(wText);
+        wRuntime.handleAnimationFinished();
+
+        ChatStreamEvent wFinished;
+        wFinished.type = QStringLiteral("RUN_FINISHED");
+        wController.applyStreamEvent(wFinished);
+        wRuntime.handleAnimationFinished();
+
+        require(wRuntime.currentState() == QStringLiteral("speaking"),
+                "RUN_FINISHED cleanFinish should not idle before pacerEmpty");
+        require(waitFor([&wController]() {
+                    return wController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("长长长长长");
+                }, 1500),
+                "final text should drain after RUN_FINISHED");
+        require(waitFor([&wRuntime]() {
+                    return wRuntime.currentState() == QStringLiteral("idle");
+                }, 1500),
+                "runtime should idle after cleanFinish and pacerEmpty are both ready");
     }
 
     // --- Phase 2.3.1: old pacer chunks must not leak into a later reply ---

@@ -177,6 +177,7 @@ public:
     );
     void requestBoundaryAndNotify(std::function<void()> callback);
     void requestCleanFinishAndNotify(std::function<void()> callback);
+    void cancelCleanFinishNotification();
     void setSuppressAutoIdle(bool suppress);
 
 signals:
