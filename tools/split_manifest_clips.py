@@ -25,6 +25,18 @@ def require_object(value: object, message: str) -> dict:
     return value
 
 
+def load_manifest(manifest_path: Path) -> dict:
+    if not manifest_path.is_file():
+        fail("manifest not found")
+
+    try:
+        return require_object(json.loads(manifest_path.read_text(encoding="utf-8")), "manifest must be an object")
+    except json.JSONDecodeError:
+        fail("manifest is invalid JSON")
+    except UnicodeDecodeError:
+        fail("manifest is invalid JSON")
+
+
 def resolve_skin_file(skin_root: Path, source: object, clip_name: str) -> Path:
     if not isinstance(source, str) or not source.startswith("file:"):
         fail(f"clip {clip_name}: source must use file: URL")
@@ -59,13 +71,19 @@ def load_clip_frames(source_path: Path, start: int, end: int, clip_name: str) ->
     if not source_path.is_file():
         fail(f"clip {clip_name}: source file not found: {source_path}")
 
-    with Image.open(source_path) as image:
-        frames = []
-        durations = []
-        for index, frame in enumerate(ImageSequence.Iterator(image), start=1):
-            if start <= index <= end:
-                frames.append(frame.copy())
-                durations.append(frame.info.get("duration", 0))
+    try:
+        with Image.open(source_path) as image:
+            if image.format != "GIF":
+                fail(f"clip {clip_name}: unable to read source GIF: {source_path}")
+
+            frames = []
+            durations = []
+            for index, frame in enumerate(ImageSequence.Iterator(image), start=1):
+                if start <= index <= end:
+                    frames.append(frame.copy())
+                    durations.append(frame.info.get("duration", 0))
+    except OSError:
+        fail(f"clip {clip_name}: unable to read source GIF: {source_path}")
 
     expected = end - start + 1
     if len(frames) != expected:
@@ -104,7 +122,7 @@ def write_qrc(path: Path, skin_name: str, clip_names: list[str]) -> None:
 
 def generate_clips(skin_root: Path) -> tuple[int, Path]:
     manifest_path = skin_root / "manifest.json"
-    manifest = require_object(json.loads(manifest_path.read_text(encoding="utf-8")), "manifest must be an object")
+    manifest = load_manifest(manifest_path)
     clips = require_object(manifest.get("clips"), "manifest must contain top-level clips object")
 
     prepared = []

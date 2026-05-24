@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 try:
     from PIL import Image, ImageSequence
@@ -45,70 +46,109 @@ def frame_durations(path: Path) -> list[int]:
         return [frame.info.get("duration", 0) for frame in ImageSequence.Iterator(image)]
 
 
+def write_manifest(skin: Path, clips: dict) -> None:
+    (skin / "manifest.json").write_text(json.dumps({"clips": clips}), encoding="utf-8")
+
+
+def run_tool(skin: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), str(skin)],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
+def require_failure(skin: Path, expected_message: str) -> None:
+    result = run_tool(skin)
+    require(result.returncode != 0, f"expected failure containing {expected_message!r}")
+    require(expected_message in result.stderr, result.stderr)
+    require("Traceback" not in result.stderr, result.stderr)
+
+
+def valid_clip(source: str = "file:assets/body/raw/source.gif", frame_range: Optional[list[int]] = None) -> dict:
+    return {
+        "source": source,
+        "frameRange": frame_range or [2, 4],
+    }
+
+
 def main() -> None:
     if TMP.exists():
         shutil.rmtree(TMP)
-    skin = TMP / "test-skin"
-    source = skin / "assets" / "body" / "raw" / "source.gif"
-    make_source_gif(source)
+    try:
+        skin = TMP / "test-skin"
+        source = skin / "assets" / "body" / "raw" / "source.gif"
+        make_source_gif(source)
 
-    (skin / "manifest.json").write_text(json.dumps({
-        "clips": {
-            "talking.loop.right": {
-                "source": "file:assets/body/raw/source.gif",
-                "frameRange": [2, 4],
-            }
-        }
-    }), encoding="utf-8")
+        write_manifest(skin, {
+            "talking.loop.right": valid_clip(),
+        })
 
-    stale = skin / "generated" / "clips" / "stale.gif"
-    stale.parent.mkdir(parents=True, exist_ok=True)
-    stale.write_bytes(b"stale")
+        stale = skin / "generated" / "clips" / "stale.gif"
+        stale.parent.mkdir(parents=True, exist_ok=True)
+        stale.write_bytes(b"stale")
 
-    result = subprocess.run(
-        [sys.executable, str(SCRIPT), str(skin)],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    require(result.returncode == 0, result.stderr)
+        result = run_tool(skin)
+        require(result.returncode == 0, result.stderr)
 
-    output = skin / "generated" / "clips" / "talking.loop.right.gif"
-    qrc = skin / "generated" / "clips.qrc"
-    require(output.is_file(), "generated clip should be written")
-    require(qrc.is_file(), "generated qrc should be written")
-    require(not stale.exists(), "script should clean stale generated clips before writing")
-    require(frame_count(output) == 3, "1-based inclusive [2, 4] should generate 3 frames")
-    expected_durations = frame_durations(source)[1:4]
-    require(
-        frame_durations(output) == expected_durations,
-        "generated clip should preserve source frame durations",
-    )
-    qrc_text = qrc.read_text(encoding="utf-8")
-    require('<qresource prefix="/skins/test-skin/generated/clips">' in qrc_text, qrc_text)
-    require('<file alias="talking.loop.right.gif">clips/talking.loop.right.gif</file>' in qrc_text, qrc_text)
+        output = skin / "generated" / "clips" / "talking.loop.right.gif"
+        qrc = skin / "generated" / "clips.qrc"
+        require(output.is_file(), "generated clip should be written")
+        require(qrc.is_file(), "generated qrc should be written")
+        require(not stale.exists(), "script should clean stale generated clips before writing")
+        require(frame_count(output) == 3, "1-based inclusive [2, 4] should generate 3 frames")
+        expected_durations = frame_durations(source)[1:4]
+        require(
+            frame_durations(output) == expected_durations,
+            "generated clip should preserve source frame durations",
+        )
+        qrc_text = qrc.read_text(encoding="utf-8")
+        require('<qresource prefix="/skins/test-skin/generated/clips">' in qrc_text, qrc_text)
+        require('<file alias="talking.loop.right.gif">clips/talking.loop.right.gif</file>' in qrc_text, qrc_text)
 
-    bad_manifest = skin / "manifest.json"
-    bad_manifest.write_text(json.dumps({
-        "clips": {
-            "../escape": {
-                "source": "file:assets/body/raw/source.gif",
-                "frameRange": [1, 1],
-            }
-        }
-    }), encoding="utf-8")
-    bad = subprocess.run(
-        [sys.executable, str(SCRIPT), str(skin)],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    require(bad.returncode != 0, "unsafe clip name should fail")
-    require("invalid clip name" in bad.stderr, bad.stderr)
+        (skin / "manifest.json").unlink()
+        require_failure(skin, "manifest not found")
 
-    shutil.rmtree(TMP)
+        (skin / "manifest.json").write_text("{", encoding="utf-8")
+        require_failure(skin, "manifest is invalid JSON")
+
+        write_manifest(skin, {
+            "talking.loop.right": valid_clip("file:assets/body/raw/missing.gif"),
+        })
+        require_failure(skin, "source file not found")
+
+        write_manifest(skin, {
+            "talking.loop.right": valid_clip("file:../outside.gif"),
+        })
+        require_failure(skin, "source escapes skin root")
+
+        write_manifest(skin, {
+            "talking.loop.right": valid_clip(frame_range=[0, 1]),
+        })
+        require_failure(skin, "frameRange must be 1-based inclusive")
+
+        write_manifest(skin, {
+            "talking.loop.right": valid_clip(frame_range=[2, 8]),
+        })
+        require_failure(skin, "frameRange exceeds source frame count")
+
+        corrupt = skin / "assets" / "body" / "raw" / "corrupt.gif"
+        corrupt.write_bytes(b"not a gif")
+        write_manifest(skin, {
+            "talking.loop.right": valid_clip("file:assets/body/raw/corrupt.gif"),
+        })
+        require_failure(skin, "unable to read source GIF")
+
+        write_manifest(skin, {
+            "../escape": valid_clip(frame_range=[1, 1]),
+        })
+        require_failure(skin, "invalid clip name")
+    finally:
+        if TMP.exists():
+            shutil.rmtree(TMP)
+
     print("phase 2.4.2 clip slicing tool ok")
 
 
