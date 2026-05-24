@@ -1636,7 +1636,7 @@ ctest --test-dir build --output-on-failure -R chat_text_pacer_smoke
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/desktop/src/chat/ChatTextPacer.h apps/desktop/src/chat/ChatTextPacer.cpp apps/desktop/tests/chat_text_pacer_smoke.cpp
@@ -2396,7 +2396,7 @@ ctest --test-dir build --output-on-failure -R check_phase_2_4_phased_animation
 
 Expected: PASS with `phase 2.4 phased animation contract ok`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tests/check_phase_2_4_phased_animation.py CMakeLists.txt docs/v2/参考资料/技术债务与评审待办.md README.md
@@ -2405,7 +2405,7 @@ git commit -m "test: 增加 phase 2.4 动画编排验收"
 
 ## Final Verification
 
-- [ ] **Step 1: Run full Qt build**
+- [x] **Step 1: Run full Qt build**
 
 ```bash
 cmake --build build
@@ -2413,7 +2413,7 @@ cmake --build build
 
 Expected: build completes without compiler errors.
 
-- [ ] **Step 2: Run full CTest**
+- [x] **Step 2: Run full CTest**
 
 ```bash
 ctest --test-dir build --output-on-failure
@@ -2421,7 +2421,7 @@ ctest --test-dir build --output-on-failure
 
 Expected: all registered tests pass.
 
-- [ ] **Step 3: Run Go sidecar tests**
+- [x] **Step 3: Run Go sidecar tests**
 
 ```bash
 cd apps/agent-core && go test ./...
@@ -2429,7 +2429,7 @@ cd apps/agent-core && go test ./...
 
 Expected: all Go tests pass.
 
-- [ ] **Step 4: Run diff hygiene**
+- [x] **Step 4: Run diff hygiene**
 
 ```bash
 git diff --check
@@ -2454,6 +2454,8 @@ Check these behaviors:
 - Cancel drains already arrived local text and clean-finishes animation.
 - Saving settings/persona does not replay `startup.briefcase`.
 - Right-click skin reload still performs full reload behavior.
+
+状态：本轮自动化验证未执行；需要带 provider 配置的交互式桌面烟测，或受控本地 provider stub。
 
 ## Self-Review
 

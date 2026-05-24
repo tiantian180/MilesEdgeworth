@@ -63,18 +63,20 @@ def main() -> int:
     require("transitionTo" in controller_h, "ChatController must expose a transitionTo helper")
     require("handleCleanFinishReady" in controller_h,
             "ChatController must handle PetRuntime cleanFinishReady callback")
-    require("handleBoundaryReached" in controller_h,
-            "ChatController must handle PetRuntime boundaryReached callback")
+    require("handleSegmentDrained" in controller_h and "handlePacerEmpty" in controller_h,
+            "ChatController must handle pacer drain callbacks for expression gates")
     require("handleGateTimeout" in controller_h,
             "ChatController must handle GATED safety timeout")
-    require("m_finishPendingAfterStart" in controller_h and "m_finishPendingAfterStart = true" in controller_cpp,
-            "ChatController must preserve start expression when RUN_FINISHED arrives during BUFFERING_FOR_START")
-    require("drainHoldBufferToPacer" in controller_h,
-            "ChatController must drain its hold buffer through the pacer")
+    require("m_streamFinished = true" in controller_cpp
+            and "if (!m_segmentQueue.isEmpty())" in controller_cpp
+            and "activateNextSegment();" in controller_cpp,
+            "ChatController must preserve queued start expression when RUN_FINISHED arrives during BUFFERING_FOR_START")
+    require("drainQueuedSegmentsToPacer" in controller_h,
+            "ChatController must drain queued expression segments through the pacer")
     require("appendChunkToCurrentMessage" in controller_h,
             "ChatController must append pacer chunks via a dedicated method")
-    require("requestBoundaryAndNotify" in controller_cpp,
-            "ChatController must call requestBoundaryAndNotify on PetRuntime")
+    require("requestCleanFinishForCurrentStream" in controller_cpp,
+            "ChatController must request clean finish before gated expression switches")
     require("requestCleanFinishAndNotify" in controller_cpp,
             "ChatController must call requestCleanFinishAndNotify on PetRuntime")
     require("Q_LOGGING_CATEGORY" in controller_cpp and "miles.chat" in controller_cpp
@@ -97,8 +99,8 @@ def main() -> int:
             "PetRuntime must declare requestCleanFinishAndNotify")
     require("std::function" in runtime_h,
             "PetRuntime notify API must take std::function callbacks")
-    require("drainPendingNotifications" in runtime_cpp,
-            "PetRuntime must drain pending notifications at animation boundaries")
+    require("continueCleanFinishIfPossible" in runtime_cpp and "triggerCleanFinishCallback" in runtime_cpp,
+            "PetRuntime must complete cleanFinish callbacks at animation boundaries")
     require("finishingPlaybackSerial" in runtime_cpp,
             "PetRuntime must stop stale animation-finished flow when a boundary callback replaces the animation")
     require("Q_DECLARE_LOGGING_CATEGORY(petExpressionLog)" in pet_logging_h,
@@ -123,8 +125,8 @@ def main() -> int:
     require("GATED" in controller_smoke
             or "expression switch" in controller_smoke.lower(),
             "controller smoke test must exercise mid-run expression gating")
-    require("requestBoundaryAndNotify" in runtime_smoke,
-            "runtime smoke test must exercise requestBoundaryAndNotify")
+    require("requestCleanFinishAndNotify" in runtime_smoke,
+            "runtime smoke test must exercise requestCleanFinishAndNotify")
 
     # CMake
     require("ChatTextPacer.cpp" in desktop_cmake,

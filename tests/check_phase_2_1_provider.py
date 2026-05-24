@@ -79,14 +79,15 @@ def main() -> int:
     require('json:"expressions,omitempty"' in provider_go, "Request must carry expressions list")
     require("type ExpressionInfo struct" in provider_go, "ExpressionInfo struct must exist")
 
-    require("m_holdBuffer" in controller_h, "ChatController must declare a hold buffer member")
-    require("flushHoldBuffer" in controller_h or "drainHoldBufferToPacer" in controller_h,
-            "ChatController must declare a hold-buffer drain path")
-    require("m_holdBuffer" in controller_cpp, "ChatController.cpp must use the hold buffer")
+    require("ExpressionSegment" in controller_h and "m_segmentQueue" in controller_h,
+            "ChatController must declare a segment queue for expression-gated text")
+    require("drainQueuedSegmentsToPacer" in controller_h,
+            "ChatController must declare a segment queue drain path")
+    require("m_segmentQueue" in controller_cpp, "ChatController.cpp must use the segment queue")
     require('"expressions"' in controller_cpp, "ChatController must include expressions field in request body")
 
-    require("hold buffer" in controller_smoke.lower() or "m_holdBuffer" in controller_smoke,
-            "smoke test must cover the hold buffer path")
+    require("segment" in controller_smoke.lower() and "drain" in controller_smoke.lower(),
+            "smoke test must cover the segment queue drain path")
 
     require("check_phase_2_1_provider" in root_cmake, "root CMake must register Phase 2.1 contract check")
     require("Phase 2.1" in phase_record, "phase 2.1 record must exist")
