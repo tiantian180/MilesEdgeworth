@@ -271,6 +271,13 @@ Window {
                 pet.playing = false
             }
 
+            if (App.PetRuntime.currentLoopMode === "onceThenHold"
+                    && frameCount > 0
+                    && currentFrame >= frameCount - 1) {
+                pet.playing = false
+                App.PetRuntime.handleAnimationFinished()
+            }
+
             if ((App.PetRuntime.currentAutoReturnToIdle
                     || App.PetRuntime.currentLoopMode === "once")
                     && frameCount > 0

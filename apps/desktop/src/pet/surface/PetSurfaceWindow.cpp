@@ -2,6 +2,7 @@
 
 #include "DesktopShellController.h"
 #include "chat/ChatController.h"
+#include "pet/PetLogging.h"
 #include "pet/PetRuntime.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/surface/PetContextMenu.h"
@@ -264,6 +265,7 @@ void PetSurfaceWindow::restartMovieFromRuntime()
     // 随后 start() 立刻进入 frame 1，walk/run 的首帧就没有正常显示时长。
     // 直接 start() 可让 QMovie 以正常节奏从首帧开始。
     m_movie->start();
+    jumpToFrameStartIfNeeded(m_runtime->playbackSerial());
     applyCurrentFrameMask();
 }
 
@@ -279,7 +281,8 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
     }
 
     const int frameCount = m_movie->frameCount();
-    if (frameCount <= 0 || frame < frameCount - 1) {
+    const int endFrame = currentEffectiveEndFrame();
+    if (frameCount <= 0 || endFrame < 0 || frame < endFrame) {
         return;
     }
 
@@ -289,6 +292,12 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
     if (m_runtime->currentLoopMode() == QStringLiteral("hold")) {
         m_eventBridge->submitHoldAnimationReachedEnd();
         m_movie->setPaused(true);
+        return;
+    }
+
+    if (m_runtime->currentLoopMode() == QStringLiteral("onceThenHold")) {
+        m_movie->setPaused(true);
+        scheduleAnimationCompletion(playbackSerial, currentFrameDelayMs);
         return;
     }
 
@@ -302,9 +311,55 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
         return;
     }
 
+    if (m_runtime->currentLoopMode() == QStringLiteral("loop")) {
+        scheduleAnimationCompletion(playbackSerial, currentFrameDelayMs);
+        if (m_runtime->currentFrameStart() >= 0) {
+            m_movie->setPaused(true);
+            QTimer::singleShot(currentFrameDelayMs, this, [this, playbackSerial]() {
+                if (m_runtime->playbackSerial() == playbackSerial) {
+                    jumpToFrameStartIfNeeded(playbackSerial);
+                    m_movie->setPaused(false);
+                }
+            });
+        }
+        if (m_runtime->currentActionAcceptsIdleLoopFinished()) {
+            scheduleIdleLoopFinished(playbackSerial, currentFrameDelayMs);
+        }
+        return;
+    }
+
     if (m_runtime->currentActionAcceptsIdleLoopFinished()) {
         scheduleIdleLoopFinished(playbackSerial, currentFrameDelayMs);
     }
+}
+
+int PetSurfaceWindow::currentEffectiveEndFrame() const
+{
+    const int frameEnd = m_runtime->currentFrameEnd();
+    if (frameEnd >= 0) {
+        return frameEnd;
+    }
+    return m_movie->frameCount() - 1;
+}
+
+void PetSurfaceWindow::jumpToFrameStartIfNeeded(int playbackSerial)
+{
+    const int frameStart = m_runtime->currentFrameStart();
+    if (frameStart < 0 || (frameStart == 0 && m_movie->currentFrameNumber() <= 0)) {
+        return;
+    }
+
+    QTimer::singleShot(0, this, [this, playbackSerial, frameStart]() {
+        if (m_runtime->playbackSerial() != playbackSerial) {
+            return;
+        }
+        if (!m_movie->jumpToFrame(frameStart)) {
+            qCWarning(petRuntimeLog).noquote()
+                << "QMovie jumpToFrame failed"
+                << QStringLiteral("frame=%1").arg(frameStart)
+                << QStringLiteral("url=%1").arg(m_runtime->currentAnimationUrl().toString());
+        }
+    });
 }
 
 void PetSurfaceWindow::scheduleAnimationCompletion(int playbackSerial, int delayMs)

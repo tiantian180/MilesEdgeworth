@@ -766,6 +766,22 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "crossed", "speaking + neutral 应映射到可见说话动作，而不是站立待机");
     runtime.submitExpressionRequest("idle", "polite", 0.0);
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
+    runtime.playAction("objecting");
+    require(runtime.currentLoopMode() == "onceThenHold",
+            "objecting should use onceThenHold for entry-only chat animation");
+    require(!runtime.currentAutoReturnToIdle(),
+            "onceThenHold must not auto-return to idle");
+    int objectingCleanFinishCallbacks = 0;
+    runtime.requestCleanFinishAndNotify([&objectingCleanFinishCallbacks]() {
+        ++objectingCleanFinishCallbacks;
+    });
+    require(objectingCleanFinishCallbacks == 0,
+            "onceThenHold should not clean-finish before the first playback reaches its last frame");
+    runtime.handleAnimationFinished();
+    require(objectingCleanFinishCallbacks == 1,
+            "onceThenHold should clean-finish after it reaches the held last frame");
+    require(runtime.currentActionId() == "objecting",
+            "onceThenHold should stay on the entry-only action after clean finish");
     runtime.submitExpressionRequest("speaking", "unknown-expression", 0.0);
     require(runtime.currentActionId() == "crossed", "未知 expression 应降级到 speaking neutral 的可见说话动作");
     runtime.playAction("bow");
@@ -958,7 +974,7 @@ int main(int argc, char *argv[])
     require(!runtime.currentPropVisible(), "点击徽章后应隐藏 Prop");
     require(runtime.currentActionId() == "bow", "点击徽章后应触发鞠躬");
     runtime.handleAnimationFinished();
-    require(runtime.currentActionId() == "idle_stand", "鞠躬播完后应回到 idle_stand");
+    require(runtime.currentActionId() == "bow", "Phase 2.4 后鞠躬播完应定帧停留");
 
     runtime.returnToIdle();
     runtime.playRecipe("doubleClick.takeThat");

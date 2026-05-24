@@ -61,8 +61,8 @@ def main() -> int:
         require("animation" in variants["right"], f"{action_id}.right 缺少 animation")
         require("animation" in variants["left"], f"{action_id}.left 缺少 animation")
 
-    require(actions["objecting"]["loopMode"] == "onceThenIdle", "objecting 应是一次性动作并回到 idle")
-    require(actions["bow"]["loopMode"] == "onceThenIdle", "bow 应是一次性动作并回到 idle")
+    require(actions["objecting"]["loopMode"] == "onceThenHold", "objecting 应播放一次后定帧")
+    require(actions["bow"]["loopMode"] == "onceThenHold", "bow 应播放一次后定帧")
 
     for alias in ["bow-right.gif", "bow-left.gif", "tea-right.gif", "tea-left.gif"]:
         require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")

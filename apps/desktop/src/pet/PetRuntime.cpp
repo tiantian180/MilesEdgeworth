@@ -473,6 +473,10 @@ void PetRuntime::handleAnimationFinished()
         return;
     }
 
+    if (m_currentLoopMode == QStringLiteral("onceThenHold")) {
+        m_currentPlaybackAtBoundary = true;
+    }
+
     if (drainPendingNotifications() && m_playbackSerial != finishingPlaybackSerial) {
         return;
     }
@@ -508,7 +512,10 @@ QString PetRuntime::actionForState(const QString &state) const
     return m_manifest.stateToAction.value(state);
 }
 
-QUrl PetRuntime::variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const
+AnimationVariant PetRuntime::variantForFacing(
+    const QHash<QString, AnimationVariant> &variants,
+    const QString &facing
+) const
 {
     if (variants.contains(facing)) {
         return variants.value(facing);
@@ -522,10 +529,12 @@ QUrl PetRuntime::variantForFacing(const QHash<QString, QUrl> &variants, const QS
         return variants.constBegin().value();
     }
 
-    return QUrl(QString::fromUtf8(kFallbackAnimationUrl));
+    AnimationVariant fallback;
+    fallback.url = QUrl(QString::fromUtf8(kFallbackAnimationUrl));
+    return fallback;
 }
 
-QUrl PetRuntime::variantForAction(const ActionDefinition &action) const
+AnimationVariant PetRuntime::variantForAction(const ActionDefinition &action) const
 {
     if (action.category == "locomotion") {
         return variantForFacing(action.variants, m_currentMovementDirection);
@@ -792,7 +801,10 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     const bool wasSleeping = sleeping();
     const bool wasSleepTransitioning = sleepTransitioning();
 
-    const QUrl nextAnimationUrl = variantForFacing(phase.variants, m_currentFacing);
+    const AnimationVariant nextVariant = variantForFacing(phase.variants, m_currentFacing);
+    const QUrl nextAnimationUrl = nextVariant.url;
+    const int nextFrameStart = nextVariant.frameStart;
+    const int nextFrameEnd = nextVariant.frameEnd;
     const QString nextLoopMode = phase.loopMode.isEmpty() ? "loop" : phase.loopMode;
     const QString nextPhaseId = phaseId.isEmpty() ? "single" : phaseId;
     const bool nextAutoReturnToIdle = (nextLoopMode == "onceThenIdle");
@@ -801,13 +813,18 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     const bool phaseChanged = (m_currentPhaseId != nextPhaseId);
     const bool loopModeChanged = (m_currentLoopMode != nextLoopMode);
     const bool autoReturnChanged = (m_currentAutoReturnToIdle != nextAutoReturnToIdle);
-    const bool animationChanged = (m_currentAnimationUrl != nextAnimationUrl);
+    const bool animationChanged = (m_currentAnimationUrl != nextAnimationUrl)
+        || (m_currentFrameStart != nextFrameStart)
+        || (m_currentFrameEnd != nextFrameEnd);
 
     m_currentActionId = actionId;
     m_currentPhaseId = nextPhaseId;
     m_currentLoopMode = nextLoopMode;
     m_currentAutoReturnToIdle = nextAutoReturnToIdle;
     m_currentAnimationUrl = nextAnimationUrl;
+    m_currentFrameStart = nextFrameStart;
+    m_currentFrameEnd = nextFrameEnd;
+    m_currentPlaybackAtBoundary = false;
     ++m_playbackSerial;
     qCDebug(petRuntimeLog).noquote() << "set current phase"
                                       << QStringLiteral("action=%1").arg(actionId)
@@ -860,8 +877,11 @@ bool PetRuntime::atAnimationBoundary() const
         return true;
     }
 
-    return m_currentLoopMode == QStringLiteral("hold")
-        || m_currentLoopMode == QStringLiteral("onceThenHold");
+    if (m_currentLoopMode == QStringLiteral("onceThenHold")) {
+        return m_currentPlaybackAtBoundary;
+    }
+
+    return m_currentLoopMode == QStringLiteral("hold");
 }
 
 void PetRuntime::enqueueBoundaryNotification(std::function<void()> callback)

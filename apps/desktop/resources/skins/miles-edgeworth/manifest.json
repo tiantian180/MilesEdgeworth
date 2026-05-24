@@ -785,7 +785,7 @@
     "objecting": {
       "label": "异议",
       "category": "gesture",
-      "loopMode": "onceThenIdle",
+      "loopMode": "onceThenHold",
       "priority": 40,
       "tags": ["objecting", "speaking", "emphasis"],
       "variants": {
@@ -800,7 +800,7 @@
     "bow": {
       "label": "鞠躬",
       "category": "gesture",
-      "loopMode": "onceThenIdle",
+      "loopMode": "onceThenHold",
       "priority": 30,
       "tags": ["bow", "polite"],
       "variants": {

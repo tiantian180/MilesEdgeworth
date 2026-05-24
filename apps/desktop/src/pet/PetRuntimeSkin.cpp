@@ -318,6 +318,9 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
     const QString preservedLoopMode = m_currentLoopMode;
     const bool preservedAutoReturnToIdle = m_currentAutoReturnToIdle;
     const QUrl preservedAnimationUrl = m_currentAnimationUrl;
+    const int preservedFrameStart = m_currentFrameStart;
+    const int preservedFrameEnd = m_currentFrameEnd;
+    const bool preservedPlaybackAtBoundary = m_currentPlaybackAtBoundary;
     const int preservedPlaybackSerial = m_playbackSerial;
     const bool wasPointerInteractionEnabled = pointerInteractionEnabled();
     const bool wasSleeping = sleeping();
@@ -359,6 +362,9 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
         m_currentLoopMode = QStringLiteral("loop");
         m_currentAutoReturnToIdle = false;
         m_currentAnimationUrl.clear();
+        m_currentFrameStart = -1;
+        m_currentFrameEnd = -1;
+        m_currentPlaybackAtBoundary = false;
         ++m_playbackSerial;
 
         if (hadAction) {
@@ -426,6 +432,9 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
         m_currentLoopMode = preservedLoopMode;
         m_currentAutoReturnToIdle = preservedAutoReturnToIdle;
         m_currentAnimationUrl = preservedAnimationUrl;
+        m_currentFrameStart = preservedFrameStart;
+        m_currentFrameEnd = preservedFrameEnd;
+        m_currentPlaybackAtBoundary = preservedPlaybackAtBoundary;
         m_playbackSerial = preservedPlaybackSerial;
 
         emitDerivedStateChanges();

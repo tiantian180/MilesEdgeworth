@@ -18,6 +18,25 @@
 // 有哪些动作、动作如何映射到资源、哪些候选池可随机抽取，以及哪些区域能响应点击。
 // 运行时后续会围绕这个数据对象继续拆出 Loader、Selector 和调度器。
 
+struct AnimationVariant
+{
+    QUrl url;
+    int frameStart = -1;
+    int frameEnd = -1;
+
+    bool hasFrameRange() const
+    {
+        return frameStart >= 0 && frameEnd >= frameStart;
+    }
+};
+
+struct ClipDefinition
+{
+    QUrl fileUrl;
+    int frameStart = -1;
+    int frameEnd = -1;
+};
+
 // PhaseDefinition 描述一个 Action 内部的一段独立播放阶段。
 // 例如 thinking 动作可以拆成 enter / loop / exit 三个 phase，
 // 各自有不同的 GIF 资源、循环模式以及播完后跳转的下一段。
@@ -25,7 +44,7 @@ struct PhaseDefinition
 {
     QString loopMode = "loop";
     QString nextPhase;
-    QHash<QString, QUrl> variants;
+    QHash<QString, AnimationVariant> variants;
 };
 
 // ActionDefinition 是一个有语义的动作单元，例如 idle_stand、thinking、walk。
@@ -42,7 +61,7 @@ struct ActionDefinition
     int priority = 0;
     bool blocksPointerInteraction = false;
     QStringList tags;
-    QHash<QString, QUrl> variants;
+    QHash<QString, AnimationVariant> variants;
     QHash<QString, QPointF> movementDeltas;
     QHash<QString, QString> facingAfter;
     QString initialPhase;
@@ -305,6 +324,7 @@ struct SkinManifest
     QString defaultSizeId;
     QHash<QString, QString> stateToAction;
     QHash<QString, ActionDefinition> actions;
+    QHash<QString, ClipDefinition> clips;
     QHash<QString, RecipeDefinition> recipes;
     QHash<QString, ActionPoolDefinition> actionPools;
     QHash<QString, ExpressionDefinition> expressions;

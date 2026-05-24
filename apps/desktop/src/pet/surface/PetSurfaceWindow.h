@@ -49,6 +49,8 @@ private:
     void syncSizeFromRuntime();
     void restartMovieFromRuntime();
     void handleMovieFrameChanged(int frame);
+    int currentEffectiveEndFrame() const;
+    void jumpToFrameStartIfNeeded(int playbackSerial);
     void scheduleAnimationCompletion(int playbackSerial, int delayMs);
     void completeAnimationIfStillCurrent(int playbackSerial);
     void scheduleIdleLoopFinished(int playbackSerial, int delayMs);

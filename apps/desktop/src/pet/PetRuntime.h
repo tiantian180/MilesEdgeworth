@@ -62,6 +62,8 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)
     Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
+    Q_PROPERTY(int currentFrameStart READ currentFrameStart NOTIFY currentAnimationUrlChanged)
+    Q_PROPERTY(int currentFrameEnd READ currentFrameEnd NOTIFY currentAnimationUrlChanged)
     Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
     Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
     Q_PROPERTY(QString currentPropId READ currentPropId NOTIFY currentPropChanged)
@@ -106,6 +108,8 @@ public:
     bool sleeping() const;
     bool sleepTransitioning() const;
     QUrl currentAnimationUrl() const { return m_currentAnimationUrl; }
+    int currentFrameStart() const { return m_currentFrameStart; }
+    int currentFrameEnd() const { return m_currentFrameEnd; }
     QUrl currentSoundUrl() const { return m_audioController.currentSoundUrl(); }
     bool currentPropVisible() const { return m_propController.current().visible; }
     QString currentPropId() const { return m_propController.current().id; }
@@ -203,8 +207,8 @@ signals:
 
 private:
     QString actionForState(const QString &state) const;
-    QUrl variantForFacing(const QHash<QString, QUrl> &variants, const QString &facing) const;
-    QUrl variantForAction(const ActionDefinition &action) const;
+    AnimationVariant variantForFacing(const QHash<QString, AnimationVariant> &variants, const QString &facing) const;
+    AnimationVariant variantForAction(const ActionDefinition &action) const;
     bool acceptsPointerInteraction() const;
     void playSoundForRecipe(const RecipeDefinition &recipe);
     void hideCurrentProp();
@@ -260,6 +264,9 @@ private:
     QString m_petSizeId;
     double m_petScale = 0.0;
     QUrl m_currentAnimationUrl;
+    int m_currentFrameStart = -1;
+    int m_currentFrameEnd = -1;
+    bool m_currentPlaybackAtBoundary = false;
     PropController m_propController;
     int m_playbackSerial = 0;
     ActionRequest m_pendingRequest;
