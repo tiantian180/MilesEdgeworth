@@ -811,46 +811,50 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "crossed", "未知 expression state 应回退到当前 PetState 的 neutral 映射");
 
     {
-        int boundaryCallbacks = 0;
         runtime.playAction("bow");
-        runtime.requestBoundaryAndNotify([&boundaryCallbacks]() {
-            ++boundaryCallbacks;
-        });
-        require(boundaryCallbacks == 0, "requestBoundaryAndNotify 不应在动作边界前回调");
-        runtime.handleAnimationFinished();
-        require(boundaryCallbacks == 1, "requestBoundaryAndNotify 应在 handleAnimationFinished 自然边界回调");
-
         int cleanFinishCallbacks = 0;
-        runtime.playAction("idle_thinking_once");
         runtime.requestCleanFinishAndNotify([&cleanFinishCallbacks]() {
             ++cleanFinishCallbacks;
         });
-        require(cleanFinishCallbacks == 0, "requestCleanFinishAndNotify 不应在动作边界前回调");
+        require(cleanFinishCallbacks == 0,
+                "cleanFinish should wait for onceThenHold action to reach its held frame");
         runtime.handleAnimationFinished();
-        require(cleanFinishCallbacks == 1, "requestCleanFinishAndNotify 应在 handleAnimationFinished 自然边界回调");
+        require(cleanFinishCallbacks == 1,
+                "cleanFinish should callback after onceThenHold reaches its boundary");
+        require(runtime.currentActionId() == "bow",
+                "cleanFinish callback postcondition should keep action finished instead of auto-idling");
 
-        runtime.setFacing("right");
-        runtime.playRecipe("turn.once");
-        int turnBoundaryCallbacks = 0;
-        runtime.requestBoundaryAndNotify([&turnBoundaryCallbacks]() {
-            ++turnBoundaryCallbacks;
+        runtime.playRecipe("sleep.enterLoopExit");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "sleep setup should enter loop before cleanFinish");
+        int sleepCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&sleepCleanFinishCallbacks]() {
+            ++sleepCleanFinishCallbacks;
         });
         runtime.handleAnimationFinished();
-        require(turnBoundaryCallbacks == 1, "边界通知不应吞掉 handleAnimationFinished 的原有流程");
-        require(runtime.currentFacing() == "left", "边界通知后仍应应用转身动作的 facingAfter");
-        require(runtime.currentActionId() == "idle_stand", "边界通知后 onceThenIdle 动作仍应回到 idle_stand");
+        require(runtime.currentPhaseId() == "exit",
+                "cleanFinish from a loop phase should play the exit phase first");
+        require(sleepCleanFinishCallbacks == 0,
+                "cleanFinish should wait until exit finishes");
+        runtime.handleAnimationFinished();
+        require(sleepCleanFinishCallbacks == 1,
+                "cleanFinish should callback after exit finishes");
 
-        int replacedBoundaryCallbacks = 0;
         runtime.playAction("bow");
-        runtime.requestBoundaryAndNotify([&replacedBoundaryCallbacks]() {
-            ++replacedBoundaryCallbacks;
+        int suppressedCallbacks = 0;
+        runtime.setSuppressAutoIdle(true);
+        runtime.requestCleanFinishAndNotify([&suppressedCallbacks]() {
+            ++suppressedCallbacks;
         });
-        runtime.returnToIdle();
-        require(replacedBoundaryCallbacks == 1,
-                "替换当前动画时应释放旧 boundary callback，避免悬挂到下一段动画");
         runtime.handleAnimationFinished();
-        require(replacedBoundaryCallbacks == 1,
-                "旧 boundary callback 不应在后续无关动画结束时重复触发");
+        require(suppressedCallbacks == 1,
+                "suppressed cleanFinish callback should still fire");
+        waitForMilliseconds(3100);
+        require(runtime.currentActionId() == "bow",
+                "suppressAutoIdle should prevent the 3000ms fallback idle during reply sessions");
+        runtime.setSuppressAutoIdle(false);
+        runtime.returnToIdle();
     }
 
     runtime.playRecipe("doubleClick.holdIt");

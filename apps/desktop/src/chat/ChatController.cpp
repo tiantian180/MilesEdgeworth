@@ -735,6 +735,8 @@ void ChatController::cancelCurrentReply()
     m_pendingExpression.clear();
     m_pendingState.clear();
     m_finishPendingAfterStart = false;
+    m_finishPendingAfterGate = false;
+    m_activeRunId.clear();
     if (!m_holdBuffer.isEmpty()
             && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
         appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
@@ -747,6 +749,9 @@ void ChatController::cancelCurrentReply()
         m_currentReply.clear();
         reply->abort();
         reply->deleteLater();
+    }
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(false);
     }
 
     if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
@@ -773,8 +778,19 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
     }
 
     if (event.type == QStringLiteral("RUN_STARTED")) {
+        const bool duplicateRunStarted = m_sending
+            && m_phase == ChatPhase::BUFFERING_FOR_START
+            && ((!event.runId.isEmpty() && event.runId == m_activeRunId)
+                || (event.runId.isEmpty() && m_activeRunId.isEmpty()));
+        if (duplicateRunStarted) {
+            setSending(true);
+            setStatusText(QStringLiteral("正在回复"));
+            return;
+        }
+
         ++m_currentStreamId;
         ++m_asyncGeneration;
+        m_activeRunId = event.runId;
         if (m_pacer != nullptr) {
             m_pacer->discardBeforeStream(m_currentStreamId);
         }
@@ -788,7 +804,11 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         m_pendingExpression.clear();
         m_pendingState.clear();
         m_finishPendingAfterStart = false;
+        m_finishPendingAfterGate = false;
         transitionTo(ChatPhase::BUFFERING_FOR_START);
+        if (m_runtime != nullptr) {
+            m_runtime->setSuppressAutoIdle(true);
+        }
         requestCleanFinishForCurrentStream();
         return;
     }
@@ -842,8 +862,16 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         }
 
         m_currentReply.clear();
+        m_activeRunId.clear();
         if (m_phase == ChatPhase::BUFFERING_FOR_START) {
             m_finishPendingAfterStart = true;
+            setSending(false);
+            setStatusText(idleStatusText());
+            return;
+        }
+
+        if (m_phase == ChatPhase::GATED) {
+            m_finishPendingAfterGate = true;
             setSending(false);
             setStatusText(idleStatusText());
             return;
@@ -852,6 +880,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         m_pendingExpression.clear();
         m_pendingState.clear();
         m_finishPendingAfterStart = false;
+        m_finishPendingAfterGate = false;
         setSending(false);
         setStatusText(idleStatusText());
         drainHoldBufferToPacer();
@@ -986,7 +1015,7 @@ void ChatController::requestBoundaryForCurrentStream()
     const quint64 generation = m_asyncGeneration;
     const quint64 boundaryId = ++m_boundaryRequestId;
     QPointer<ChatController> self(this);
-    m_runtime->requestBoundaryAndNotify([self, streamId, generation, boundaryId]() {
+    m_runtime->requestCleanFinishAndNotify([self, streamId, generation, boundaryId]() {
         if (self != nullptr && self->boundaryCallbackStillCurrent(streamId, generation, boundaryId)) {
             self->handleBoundaryReached();
         }
@@ -1016,6 +1045,14 @@ void ChatController::handleBoundaryReached()
             m_pendingExpression.clear();
             m_pendingState.clear();
         }
+        if (m_finishPendingAfterGate) {
+            m_finishPendingAfterGate = false;
+            if (m_runtime != nullptr) {
+                m_runtime->setSuppressAutoIdle(false);
+            }
+            transitionTo(ChatPhase::IDLE);
+            return;
+        }
         transitionTo(ChatPhase::STREAMING);
         drainHoldBufferToPacer();
         return;
@@ -1024,6 +1061,7 @@ void ChatController::handleBoundaryReached()
     if (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
         if (m_runtime != nullptr) {
             m_runtime->returnToIdle();
+            m_runtime->setSuppressAutoIdle(false);
         }
         transitionTo(ChatPhase::IDLE);
     }
@@ -1040,6 +1078,14 @@ void ChatController::handleGateTimeout()
         requestPetExpression(m_pendingState, m_pendingExpression);
         m_pendingExpression.clear();
         m_pendingState.clear();
+    }
+    if (m_finishPendingAfterGate) {
+        m_finishPendingAfterGate = false;
+        if (m_runtime != nullptr) {
+            m_runtime->setSuppressAutoIdle(false);
+        }
+        transitionTo(ChatPhase::IDLE);
+        return;
     }
     transitionTo(ChatPhase::STREAMING);
     drainHoldBufferToPacer();
@@ -1271,7 +1317,12 @@ void ChatController::finishCurrentReply()
     m_assistantMessageIndex = -1;
     m_holdBuffer.clear();
     m_currentReply.clear();
+    m_activeRunId.clear();
     m_finishPendingAfterStart = false;
+    m_finishPendingAfterGate = false;
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(false);
+    }
     setSending(false);
     setStatusText(idleStatusText());
     if (!m_currentConversationId.isEmpty()) {
@@ -1289,6 +1340,7 @@ void ChatController::failCurrentReply(const QString &message)
     m_pendingExpression.clear();
     m_pendingState.clear();
     m_finishPendingAfterStart = false;
+    m_finishPendingAfterGate = false;
     if (hasBufferedText
             && (m_assistantMessageIndex < 0 || m_assistantMessageIndex >= m_messages.size())) {
         appendMessage(messageObject(QStringLiteral("assistant"), QString(), true, false));
@@ -1311,6 +1363,10 @@ void ChatController::failCurrentReply(const QString &message)
     }
 
     m_currentReply.clear();
+    m_activeRunId.clear();
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(false);
+    }
     setSending(false);
     setStatusText(QStringLiteral("错误"));
     requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"));
@@ -1348,8 +1404,13 @@ void ChatController::isolateConversationAsyncState()
     m_pendingExpression.clear();
     m_pendingState.clear();
     m_finishPendingAfterStart = false;
+    m_finishPendingAfterGate = false;
     m_holdBuffer.clear();
+    m_activeRunId.clear();
     transitionTo(ChatPhase::IDLE);
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(false);
+    }
 
     ++m_currentStreamId;
     if (m_pacer != nullptr) {

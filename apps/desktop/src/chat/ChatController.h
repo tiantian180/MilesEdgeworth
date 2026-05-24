@@ -150,10 +150,12 @@ private:
     bool m_foreignSidecarCleanupAttempted = false;
     int m_sidecarRestartAttempts = 0;
     bool m_finishPendingAfterStart = false;
+    bool m_finishPendingAfterGate = false;
     // 用户取消后，剩余 SSE chunks 必须被丢弃，否则会拼到新建的 assistant 消息里产生"幽灵回复"。
     // 每次 sendMessage 复位 false。
     bool m_cancelled = false;
     QString m_statusText = QStringLiteral("未连接");
+    QString m_activeRunId;
     QString m_currentConversationId;
     QString m_currentConversationSkinId;
     QString m_conversationSkinHint;

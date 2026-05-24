@@ -15,7 +15,6 @@
 
 namespace {
 constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
-constexpr int kBoundarySafetyMs = 1500;
 
 QString logBool(bool value)
 {
@@ -387,12 +386,47 @@ void PetRuntime::submitExpressionRequest(
 
 void PetRuntime::requestBoundaryAndNotify(std::function<void()> callback)
 {
-    enqueueBoundaryNotification(std::move(callback));
+    requestCleanFinishAndNotify(std::move(callback));
 }
 
 void PetRuntime::requestCleanFinishAndNotify(std::function<void()> callback)
 {
-    enqueueBoundaryNotification(std::move(callback));
+    if (!callback) {
+        return;
+    }
+
+    Q_ASSERT(!m_cleanFinishCallback);
+    if (m_cleanFinishCallback) {
+        qCWarning(petRuntimeLog).noquote() << "replace pending cleanFinish callback";
+        clearCleanFinishCallback();
+    }
+
+    m_cleanFinishCallback = std::move(callback);
+    m_cleanFinishExitInProgress = false;
+
+    if (m_cleanFinishSafetyTimer == nullptr) {
+        m_cleanFinishSafetyTimer = new QTimer(this);
+        m_cleanFinishSafetyTimer->setSingleShot(true);
+        connect(m_cleanFinishSafetyTimer, &QTimer::timeout, this, [this]() {
+            qCWarning(petRuntimeLog).noquote() << "cleanFinish safety timeout";
+            triggerCleanFinishCallback();
+        });
+    }
+
+    m_cleanFinishSafetyTimer->start(kCleanFinishSafetyMs);
+    continueCleanFinishIfPossible();
+}
+
+void PetRuntime::setSuppressAutoIdle(bool suppress)
+{
+    if (m_suppressAutoIdle == suppress) {
+        return;
+    }
+
+    m_suppressAutoIdle = suppress;
+    if (m_suppressAutoIdle) {
+        stopAutoIdleTimer();
+    }
 }
 
 QVariantMap PetRuntime::consumeFrameMovementDelta() const
@@ -466,18 +500,16 @@ void PetRuntime::returnToIdle()
 void PetRuntime::handleAnimationFinished()
 {
     const int finishingPlaybackSerial = m_playbackSerial;
+    m_currentPlaybackAtBoundary = true;
+
+    if (continueCleanFinishIfPossible()) {
+        return;
+    }
+
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
     const PhaseDefinition phase = action.phases.value(m_currentPhaseId);
     if (!phase.nextPhase.isEmpty() && action.phases.contains(phase.nextPhase)) {
         playPhase(m_currentActionId, phase.nextPhase);
-        return;
-    }
-
-    if (m_currentLoopMode == QStringLiteral("onceThenHold")) {
-        m_currentPlaybackAtBoundary = true;
-    }
-
-    if (drainPendingNotifications() && m_playbackSerial != finishingPlaybackSerial) {
         return;
     }
 
@@ -824,6 +856,7 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     m_currentAnimationUrl = nextAnimationUrl;
     m_currentFrameStart = nextFrameStart;
     m_currentFrameEnd = nextFrameEnd;
+    stopAutoIdleTimer();
     m_currentPlaybackAtBoundary = false;
     ++m_playbackSerial;
     qCDebug(petRuntimeLog).noquote() << "set current phase"
@@ -858,12 +891,12 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     }
     emit playbackSerialChanged();
 
-    if (replacingActiveAnimation) {
-        drainPendingNotifications();
+    if (replacingActiveAnimation && !m_cleanFinishExitInProgress) {
+        clearCleanFinishCallback();
     }
 }
 
-bool PetRuntime::atAnimationBoundary() const
+bool PetRuntime::cleanFinishBoundaryReached() const
 {
     if (m_currentActionId.isEmpty()) {
         return true;
@@ -881,80 +914,74 @@ bool PetRuntime::atAnimationBoundary() const
         return m_currentPlaybackAtBoundary;
     }
 
-    return m_currentLoopMode == QStringLiteral("hold");
-}
-
-void PetRuntime::enqueueBoundaryNotification(std::function<void()> callback)
-{
-    if (!callback) {
-        return;
-    }
-
-    if (atAnimationBoundary()) {
-        callback();
-        return;
-    }
-
-    PendingNotification notification;
-    notification.id = ++m_nextPendingNotificationId;
-    notification.callback = std::move(callback);
-    notification.timer = new QTimer(this);
-    notification.timer->setSingleShot(true);
-
-    const quint64 notificationId = notification.id;
-    connect(notification.timer, &QTimer::timeout, this, [this, notificationId]() {
-        triggerPendingNotification(notificationId);
-    });
-
-    notification.timer->start(kBoundarySafetyMs);
-    m_pendingNotifications.append(std::move(notification));
-}
-
-bool PetRuntime::drainPendingNotifications()
-{
-    if (m_pendingNotifications.isEmpty()) {
-        return false;
-    }
-
-    QList<PendingNotification> notifications = std::move(m_pendingNotifications);
-    m_pendingNotifications.clear();
-
-    for (PendingNotification &notification : notifications) {
-        if (notification.timer != nullptr) {
-            notification.timer->stop();
-            notification.timer->deleteLater();
-            notification.timer = nullptr;
-        }
-    }
-
-    for (PendingNotification &notification : notifications) {
-        if (notification.callback) {
-            notification.callback();
-        }
-    }
-
-    return true;
-}
-
-bool PetRuntime::triggerPendingNotification(quint64 notificationId)
-{
-    for (qsizetype index = 0; index < m_pendingNotifications.size(); ++index) {
-        if (m_pendingNotifications.at(index).id != notificationId) {
-            continue;
-        }
-
-        PendingNotification notification = std::move(m_pendingNotifications[index]);
-        m_pendingNotifications.removeAt(index);
-        if (notification.timer != nullptr) {
-            notification.timer->stop();
-            notification.timer->deleteLater();
-            notification.timer = nullptr;
-        }
-        if (notification.callback) {
-            notification.callback();
-        }
+    if (m_currentLoopMode == QStringLiteral("hold")) {
         return true;
     }
 
-    return false;
+    return m_currentPlaybackAtBoundary;
+}
+
+bool PetRuntime::continueCleanFinishIfPossible()
+{
+    if (!m_cleanFinishCallback || !cleanFinishBoundaryReached()) {
+        return false;
+    }
+
+    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
+    if (!m_cleanFinishExitInProgress
+            && !action.exitPhase.isEmpty()
+            && m_currentPhaseId != action.exitPhase
+            && action.phases.contains(action.exitPhase)) {
+        m_cleanFinishExitInProgress = true;
+        playPhase(m_currentActionId, action.exitPhase);
+        return true;
+    }
+
+    triggerCleanFinishCallback();
+    return true;
+}
+
+void PetRuntime::triggerCleanFinishCallback()
+{
+    if (!m_cleanFinishCallback) {
+        return;
+    }
+
+    if (m_cleanFinishSafetyTimer != nullptr) {
+        m_cleanFinishSafetyTimer->stop();
+    }
+
+    std::function<void()> callback = std::move(m_cleanFinishCallback);
+    m_cleanFinishCallback = nullptr;
+    m_cleanFinishExitInProgress = false;
+
+    const int serialBeforeCallback = m_playbackSerial;
+    callback();
+
+    if (m_playbackSerial == serialBeforeCallback && !m_suppressAutoIdle) {
+        if (m_autoIdleTimer == nullptr) {
+            m_autoIdleTimer = new QTimer(this);
+            m_autoIdleTimer->setSingleShot(true);
+            connect(m_autoIdleTimer, &QTimer::timeout, this, [this]() {
+                returnToIdle();
+            });
+        }
+        m_autoIdleTimer->start(kAutoIdleAfterCleanFinishMs);
+    }
+}
+
+void PetRuntime::clearCleanFinishCallback()
+{
+    if (m_cleanFinishSafetyTimer != nullptr) {
+        m_cleanFinishSafetyTimer->stop();
+    }
+    m_cleanFinishCallback = nullptr;
+    m_cleanFinishExitInProgress = false;
+}
+
+void PetRuntime::stopAutoIdleTimer()
+{
+    if (m_autoIdleTimer != nullptr) {
+        m_autoIdleTimer->stop();
+    }
 }
