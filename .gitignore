@@ -20,3 +20,6 @@ apps/desktop/.qmlls.ini
 
 # Local debug log files
 miles-debug*.log
+
+# Generated skin clip assets
+apps/desktop/resources/skins/*/generated/
