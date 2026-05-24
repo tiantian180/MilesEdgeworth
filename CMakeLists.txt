@@ -617,6 +617,14 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_4_phased_animation.py
         )
 
+        # Phase 2.4.2 的预切片检查：守住 schema v4、顶层 clips
+        # 构建期帧段输入、generated/clips 产物和运行时不再截帧的边界。
+        add_test(
+            NAME check_phase_2_4_2_precut_clips
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_4_2_precut_clips.py
+        )
+
         # Compact chat bubble check: keeps the compact composer and pet-head
         # assistant bubble as a UI mirror over ChatController.messages.
         add_test(

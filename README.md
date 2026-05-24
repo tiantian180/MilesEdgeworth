@@ -36,6 +36,8 @@ Intel Mac 的 Homebrew 默认路径通常是 `/usr/local`，对应把 `CMAKE_PRE
 常用验证命令：
 
 ```bash
+python3 tests/test_split_manifest_clips.py
+python3 tests/check_phase_2_4_2_precut_clips.py
 ctest --test-dir build --output-on-failure
 git diff --check
 ```
@@ -104,7 +106,7 @@ Phase 1 框架主干和收尾体验修复已经完成，当前主线进入 Phase
 - 旧版 clickTimer 风格的单双击判定，避免双击后补触发单击反应。
 - 旧版静音音量语义，静音时正在播放的语音也会立即降到 0。
 - 站立循环后的随机待机触发概率已迁入皮肤 manifest，不再写死在运行时。
-- Miles GIF、语音和检察官徽章图片已迁入皮肤包 `assets/`；manifest 使用 `skin:assets/...`，运行时按内置或文件系统皮肤根路径解析。
+- Miles GIF、语音和检察官徽章图片已迁入皮肤包 `assets/`；manifest 已升级到 schema v4，资源使用 `file:assets/...`，thinking/talking 局部循环通过顶层 `clips` 在构建期预切片到 `generated/clips/`，运行时只播放完整 GIF。
 - 右键菜单已移除开发测试入口；Miles 红茶从皮肤定制命令进入，睡觉/唤醒继续作为通用 sleep/rest 能力保留。
 - `PetRuntime` 已开始拆分：manifest 数据结构、JSON 加载、候选池选择、behavior trigger 选择、单击 hit zone 命中逻辑、皮肤命令解析、Prop 状态管理，以及 QML 事件到 ActionRequest 的主干已移出单体运行时。
 - Custom Interaction Host API 已接入，Miles 旧版双击概率“看招”丢检察官徽章已作为皮肤侧高级交互回归。
