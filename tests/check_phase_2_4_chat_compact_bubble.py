@@ -52,6 +52,10 @@ def main() -> int:
         "Q_PROPERTY(int petWindowY READ petWindowY NOTIFY petWindowGeometryChanged)",
         "Q_PROPERTY(int petWindowWidth READ petWindowWidth NOTIFY petWindowGeometryChanged)",
         "Q_PROPERTY(int petWindowHeight READ petWindowHeight NOTIFY petWindowGeometryChanged)",
+        "Q_PROPERTY(int petScreenAvailableX READ petScreenAvailableX NOTIFY petWindowGeometryChanged)",
+        "Q_PROPERTY(int petScreenAvailableY READ petScreenAvailableY NOTIFY petWindowGeometryChanged)",
+        "Q_PROPERTY(int petScreenAvailableWidth READ petScreenAvailableWidth NOTIFY petWindowGeometryChanged)",
+        "Q_PROPERTY(int petScreenAvailableHeight READ petScreenAvailableHeight NOTIFY petWindowGeometryChanged)",
         "void petWindowGeometryChanged();",
     ]:
         require(token in shell_h, f"DesktopShellController.h missing {token}")
@@ -60,6 +64,8 @@ def main() -> int:
         "QWindow::yChanged",
         "QWindow::widthChanged",
         "QWindow::heightChanged",
+        "QWindow::screenChanged",
+        "availableGeometry()",
         "emit petWindowGeometryChanged();",
     ]:
         require(token in shell_cpp, f"DesktopShellController.cpp missing {token}")
@@ -82,15 +88,18 @@ def main() -> int:
 
     for token in [
         "ApplicationWindow",
-        "import QtQuick.Window",
         "App.ChatController.messages",
         "role === \"assistant\"",
         "pending === true",
         "function syncAssistantBubble()",
         "function clampedBubbleX()",
         "function clampedBubbleY()",
-        "Screen.desktopAvailableWidth",
-        "Screen.desktopAvailableHeight",
+        "App.DesktopShell.petScreenAvailableX",
+        "App.DesktopShell.petScreenAvailableY",
+        "App.DesktopShell.petScreenAvailableWidth",
+        "App.DesktopShell.petScreenAvailableHeight",
+        "function onSendingChanged()",
+        "bubbleWindow.suppressNextAssistantBubble = false",
         "hideTimer.interval = Math.max(4000, Math.min(12000, 3000 + assistantText.length * 80))",
         "App.DesktopShell.petWindowX",
         "App.DesktopShell.petWindowY",
@@ -98,7 +107,8 @@ def main() -> int:
         "HoverHandler",
         "App.ChatController.openWindow()",
         "bubbleDismissed = true",
-        "visible: bubbleHover.hovered",
+        "enabled: bubbleHover.hovered",
+        "opacity: bubbleHover.hovered ? 1 : 0",
     ]:
         require(token in bubble_qml, f"ChatBubbleWindow.qml missing {token}")
 

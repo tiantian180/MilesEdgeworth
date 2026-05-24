@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Window
 import MilesEdgeworth as App
 
 ApplicationWindow {
@@ -36,15 +35,21 @@ ApplicationWindow {
                 + App.DesktopShell.petWindowWidth / 2
                 - width / 2
         return Math.round(clamp(preferredX,
-                                Screen.virtualX + screenMargin,
-                                Screen.virtualX + Screen.desktopAvailableWidth - width - screenMargin))
+                                App.DesktopShell.petScreenAvailableX + screenMargin,
+                                App.DesktopShell.petScreenAvailableX
+                                + App.DesktopShell.petScreenAvailableWidth
+                                - width
+                                - screenMargin))
     }
 
     function clampedBubbleY() {
         const preferredY = App.DesktopShell.petWindowY - height - screenMargin
         return Math.round(clamp(preferredY,
-                                Screen.virtualY + screenMargin,
-                                Screen.virtualY + Screen.desktopAvailableHeight - height - screenMargin))
+                                App.DesktopShell.petScreenAvailableY + screenMargin,
+                                App.DesktopShell.petScreenAvailableY
+                                + App.DesktopShell.petScreenAvailableHeight
+                                - height
+                                - screenMargin))
     }
 
     function latestAssistantMessageIndex() {
@@ -178,6 +183,13 @@ ApplicationWindow {
         function onOpenWindowRequested() {
             bubbleWindow.hideCurrentBubble()
         }
+
+        function onSendingChanged() {
+            if (App.ChatController.sending !== true) {
+                bubbleWindow.suppressNextAssistantBubble = false
+            }
+            bubbleWindow.syncAssistantBubble()
+        }
     }
 
     Component.onCompleted: syncAssistantBubble()
@@ -250,7 +262,6 @@ ApplicationWindow {
             ToolButton {
                 id: closeBubbleButton
 
-                // Static contract token retained while opacity prevents layout shifts: visible: bubbleHover.hovered
                 visible: true
                 enabled: bubbleHover.hovered
                 opacity: bubbleHover.hovered ? 1 : 0
