@@ -1,9 +1,9 @@
-#include "pet/selection/ActionPoolSelector.h"
+#include "pet/selection/AnimationPoolSelector.h"
 
 #include <QRandomGenerator>
 
-QString ActionPoolSelector::resolvePoolId(
-    const QHash<QString, ActionPoolDefinition> &actionPools,
+QString AnimationPoolSelector::resolvePoolId(
+    const QHash<QString, AnimationPoolDefinition> &animationPools,
     const QString &poolId,
     const QString &languageId
 )
@@ -17,22 +17,22 @@ QString ActionPoolSelector::resolvePoolId(
     // 例如中文没有 eureka2.wav，manifest 可以用 doubleClick.random.zh
     // 覆盖默认 doubleClick.random。
     const QString languagePoolId = normalizedPoolId + "." + languageId;
-    if (actionPools.contains(languagePoolId)) {
+    if (animationPools.contains(languagePoolId)) {
         return languagePoolId;
     }
 
     return normalizedPoolId;
 }
 
-ActionPoolEntry ActionPoolSelector::selectEntry(const ActionPoolDefinition &pool)
+AnimationPoolEntry AnimationPoolSelector::selectEntry(const AnimationPoolDefinition &pool)
 {
-    ActionPoolEntry fallbackEntry;
+    AnimationPoolEntry fallbackEntry;
     if (pool.entries.isEmpty()) {
         return fallbackEntry;
     }
 
     int totalWeight = 0;
-    for (const ActionPoolEntry &entry : pool.entries) {
+    for (const AnimationPoolEntry &entry : pool.entries) {
         totalWeight += entry.weight;
     }
 
@@ -41,7 +41,7 @@ ActionPoolEntry ActionPoolSelector::selectEntry(const ActionPoolDefinition &pool
     }
 
     int cursor = QRandomGenerator::global()->bounded(totalWeight);
-    for (const ActionPoolEntry &entry : pool.entries) {
+    for (const AnimationPoolEntry &entry : pool.entries) {
         cursor -= entry.weight;
         if (cursor < 0) {
             return entry;

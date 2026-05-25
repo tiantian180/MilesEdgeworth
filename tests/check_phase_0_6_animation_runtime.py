@@ -26,8 +26,8 @@ def require(condition: bool, message: str) -> None:
 def require_action_variants(action: dict, action_id: str) -> None:
     variants = action.get("variants", {})
     require("right" in variants and "left" in variants, f"{action_id} 缺少左右朝向 variant")
-    require("animation" in variants["right"], f"{action_id}.right 缺少 animation")
-    require("animation" in variants["left"], f"{action_id}.left 缺少 animation")
+    require("clip" in variants["right"], f"{action_id}.right 缺少 clip")
+    require("clip" in variants["left"], f"{action_id}.left 缺少 clip")
 
 
 def main() -> int:

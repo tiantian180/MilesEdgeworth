@@ -52,7 +52,7 @@ def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
-    action_pools = manifest.get("actionPools", {})
+    action_pools = manifest.get("animationPools", {})
     hit_zones = manifest.get("hitZones", {})
     click_behaviors = manifest.get("clickBehaviors", {})
 
@@ -73,11 +73,11 @@ def main() -> int:
     require([entry.get("zone") for entry in single_click] == HIT_ZONES, "singleClick 应显式声明 zone 到 pool 的配对")
 
     for pool_id in CLICK_POOLS:
-        require(pool_id in action_pools, f"actionPools 缺少 {pool_id}")
+        require(pool_id in action_pools, f"animationPools 缺少 {pool_id}")
         entries = action_pools[pool_id].get("entries", [])
         require(entries, f"{pool_id} 至少需要一个候选动作")
         if pool_id == "click.fallback":
-            require(entries == [{"type": "returnToIdle", "weight": 1}], "click.fallback 应只请求 returnToIdle")
+            require(entries == [{"command": "returnToIdle", "weight": 1}], "click.fallback 应只请求 returnToIdle")
         else:
             require(all("recipe" in entry for entry in entries), f"{pool_id} 候选应引用 recipe")
 

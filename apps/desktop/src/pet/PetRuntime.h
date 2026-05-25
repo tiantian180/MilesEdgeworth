@@ -62,8 +62,6 @@ class PetRuntime : public QObject
     Q_PROPERTY(bool sleeping READ sleeping NOTIFY sleepStateChanged)
     Q_PROPERTY(bool sleepTransitioning READ sleepTransitioning NOTIFY sleepStateChanged)
     Q_PROPERTY(QUrl currentAnimationUrl READ currentAnimationUrl NOTIFY currentAnimationUrlChanged)
-    Q_PROPERTY(int currentFrameStart READ currentFrameStart NOTIFY currentAnimationUrlChanged)
-    Q_PROPERTY(int currentFrameEnd READ currentFrameEnd NOTIFY currentAnimationUrlChanged)
     Q_PROPERTY(QUrl currentSoundUrl READ currentSoundUrl NOTIFY currentSoundUrlChanged)
     Q_PROPERTY(bool currentPropVisible READ currentPropVisible NOTIFY currentPropChanged)
     Q_PROPERTY(QString currentPropId READ currentPropId NOTIFY currentPropChanged)
@@ -93,6 +91,7 @@ public:
     QString currentMovementDirection() const { return m_currentMovementDirection; }
     QString currentLoopMode() const { return m_currentLoopMode; }
     bool currentAutoReturnToIdle() const { return m_currentAutoReturnToIdle; }
+    bool currentPhaseWillReachSustainedLoop() const;
     bool audioMuted() const { return m_audioController.muted(); }
     QString currentAudioLanguageId() const { return m_audioController.currentLanguageId(); }
     QVariantList availableAudioLanguages() const { return m_audioController.availableLanguages(); }
@@ -108,8 +107,6 @@ public:
     bool sleeping() const;
     bool sleepTransitioning() const;
     QUrl currentAnimationUrl() const { return m_currentAnimationUrl; }
-    int currentFrameStart() const { return m_currentFrameStart; }
-    int currentFrameEnd() const { return m_currentFrameEnd; }
     QUrl currentSoundUrl() const { return m_audioController.currentSoundUrl(); }
     bool currentPropVisible() const { return m_propController.current().visible; }
     QString currentPropId() const { return m_propController.current().id; }
@@ -154,7 +151,7 @@ public:
     Q_INVOKABLE void playAction(const QString &actionId);
     Q_INVOKABLE void playLocomotion(const QString &actionId, const QString &movementDirection);
     Q_INVOKABLE void playRecipe(const QString &recipeId);
-    Q_INVOKABLE void playActionFromPool(const QString &poolId);
+    Q_INVOKABLE void playAnimationFromPool(const QString &poolId);
     // 取走当前帧累积的位移增量（walk/run 等需要驱动窗口移动的动作）。
     Q_INVOKABLE QVariantMap consumeFrameMovementDelta() const;
     Q_INVOKABLE void startStartupSequence();
@@ -264,8 +261,6 @@ private:
     QString m_petSizeId;
     double m_petScale = 0.0;
     QUrl m_currentAnimationUrl;
-    int m_currentFrameStart = -1;
-    int m_currentFrameEnd = -1;
     bool m_currentPlaybackAtBoundary = false;
     PropController m_propController;
     int m_playbackSerial = 0;
@@ -274,6 +269,7 @@ private:
     QTimer *m_cleanFinishSafetyTimer = nullptr;
     QTimer *m_autoIdleTimer = nullptr;
     bool m_cleanFinishExitInProgress = false;
+    bool m_returnToIdleAfterExit = false;
     bool m_suppressAutoIdle = false;
 
     static constexpr int kCleanFinishSafetyMs = 2000;

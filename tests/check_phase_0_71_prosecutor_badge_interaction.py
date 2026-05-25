@@ -61,7 +61,7 @@ def main() -> int:
 
     default_pool_recipes = {
         entry.get("recipe")
-        for entry in manifest.get("actionPools", {}).get("doubleClick.random", {}).get("entries", [])
+        for entry in manifest.get("animationPools", {}).get("doubleClick.random", {}).get("entries", [])
     }
     require("doubleClick.takeThat" not in default_pool_recipes, "默认双击池不应再随机触发丢徽章")
     require("doubleClick.takeThat" in manifest.get("recipes", {}), "takeThat recipe 应保留，供直接播放和兼容测试使用")

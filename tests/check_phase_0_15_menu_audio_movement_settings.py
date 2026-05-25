@@ -30,26 +30,26 @@ def main() -> None:
 
     expected_sounds = {
         "doubleClick.holdIt": {
-            "jp": "skin:assets/audio/voice/holdit0.wav",
-            "en": "skin:assets/audio/voice/holdit1.wav",
-            "zh": "skin:assets/audio/voice/holdit2.wav",
+            "jp": "file:assets/audio/voice/holdit0.wav",
+            "en": "file:assets/audio/voice/holdit1.wav",
+            "zh": "file:assets/audio/voice/holdit2.wav",
         },
         "doubleClick.takeThat": {
-            "jp": "skin:assets/audio/voice/takethat0.wav",
-            "en": "skin:assets/audio/voice/takethat1.wav",
-            "zh": "skin:assets/audio/voice/takethat2.wav",
+            "jp": "file:assets/audio/voice/takethat0.wav",
+            "en": "file:assets/audio/voice/takethat1.wav",
+            "zh": "file:assets/audio/voice/takethat2.wav",
         },
         "doubleClick.objection": {
-            "jp": "skin:assets/audio/voice/objection0.wav",
-            "en": "skin:assets/audio/voice/objection1.wav",
-            "zh": "skin:assets/audio/voice/objection2.wav",
+            "jp": "file:assets/audio/voice/objection0.wav",
+            "en": "file:assets/audio/voice/objection1.wav",
+            "zh": "file:assets/audio/voice/objection2.wav",
         },
         "doubleClick.eureka": {
-            "jp": "skin:assets/audio/voice/eureka0.wav",
-            "en": "skin:assets/audio/voice/eureka1.wav",
+            "jp": "file:assets/audio/voice/eureka0.wav",
+            "en": "file:assets/audio/voice/eureka1.wav",
             # 旧版没有 eureka2，中文语音下不会进入 Eureka 分支；
             # v2 暂时用中文 objection 作为 fallback，避免出现日语兜底。
-            "zh": "skin:assets/audio/voice/objection2.wav",
+            "zh": "file:assets/audio/voice/objection2.wav",
         },
     }
 

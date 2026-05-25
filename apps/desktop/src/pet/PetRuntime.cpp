@@ -3,7 +3,7 @@
 #include "pet/interaction/InteractionPipeline.h"
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/PetLogging.h"
-#include "pet/selection/ActionPoolSelector.h"
+#include "pet/selection/AnimationPoolSelector.h"
 
 #include <QRandomGenerator>
 #include <QSettings>
@@ -179,7 +179,12 @@ void PetRuntime::playRecipe(const QString &recipeId)
         return;
     }
 
+    if (m_currentRecipeId == nextRecipeId && m_currentRecipeStepRuntimeControlled) {
+        return;
+    }
+
     const bool recipeChanged = (m_currentRecipeId != nextRecipeId);
+    m_returnToIdleAfterExit = false;
     m_currentRecipeId = nextRecipeId;
     m_currentRecipeStepIndex = -1;
 
@@ -192,14 +197,18 @@ void PetRuntime::playRecipe(const QString &recipeId)
     playNextRecipeStep();
 }
 
-void PetRuntime::playActionFromPool(const QString &poolId)
+void PetRuntime::playAnimationFromPool(const QString &poolId)
 {
-    const QString normalizedPoolId = ActionPoolSelector::resolvePoolId(m_manifest.actionPools, poolId, m_audioController.currentLanguageId());
-    if (!m_manifest.actionPools.contains(normalizedPoolId)) {
+    const QString normalizedPoolId = AnimationPoolSelector::resolvePoolId(
+        m_manifest.animationPools,
+        poolId,
+        m_audioController.currentLanguageId()
+    );
+    if (!m_manifest.animationPools.contains(normalizedPoolId)) {
         return;
     }
 
-    const ActionPoolEntry entry = ActionPoolSelector::selectEntry(m_manifest.actionPools.value(normalizedPoolId));
+    const AnimationPoolEntry entry = AnimationPoolSelector::selectEntry(m_manifest.animationPools.value(normalizedPoolId));
     if (entry.request.kind != ActionRequestKind::None) {
         submitActionRequest(entry.request);
         return;
@@ -258,8 +267,8 @@ void PetRuntime::executeActionRequest(const ActionRequest &request)
     switch (request.kind) {
     case ActionRequestKind::None:
         return;
-    case ActionRequestKind::ActionPool:
-        playActionFromPool(request.targetId);
+    case ActionRequestKind::AnimationPool:
+        playAnimationFromPool(request.targetId);
         return;
     case ActionRequestKind::Recipe:
         playRecipe(request.targetId);
@@ -478,11 +487,14 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
                                       << QStringLiteral("requested=%1").arg(actionId)
                                       << QStringLiteral("resolved=%1").arg(nextActionId)
                                       << QStringLiteral("resetRecipe=%1").arg(logBool(resetRecipe));
+    m_returnToIdleAfterExit = false;
     setCurrentAction(nextActionId, m_manifest.actions.value(nextActionId));
 }
 
 void PetRuntime::returnToIdle()
 {
+    m_pendingRequest = ActionRequest::none();
+
     const QString idleAction = actionForState(QStringLiteral("idle"));
     if (m_currentRecipeId.isEmpty()
             && m_currentState == QStringLiteral("idle")
@@ -495,11 +507,15 @@ void PetRuntime::returnToIdle()
     clearActiveRecipe();
 
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
-    if (!action.exitPhase.isEmpty() && m_currentPhaseId != action.exitPhase) {
+    if (!action.exitPhase.isEmpty()
+            && m_currentPhaseId != action.exitPhase
+            && action.phases.contains(action.exitPhase)) {
+        m_returnToIdleAfterExit = true;
         playPhase(m_currentActionId, action.exitPhase);
         return;
     }
 
+    m_returnToIdleAfterExit = false;
     setState("idle");
     continueCleanFinishIfPossible();
 }
@@ -527,7 +543,20 @@ void PetRuntime::handleAnimationFinished()
         return;
     }
 
+    const int cleanFinishPlaybackSerial = m_playbackSerial;
     if (continueCleanFinishIfPossible()) {
+        if (m_returnToIdleAfterExit && m_playbackSerial == cleanFinishPlaybackSerial) {
+            m_returnToIdleAfterExit = false;
+            setState(QStringLiteral("idle"));
+            continueCleanFinishIfPossible();
+        }
+        return;
+    }
+
+    if (m_returnToIdleAfterExit) {
+        m_returnToIdleAfterExit = false;
+        setState(QStringLiteral("idle"));
+        continueCleanFinishIfPossible();
         return;
     }
 
@@ -681,6 +710,11 @@ void PetRuntime::playRecipeStep(const RecipeStep &step)
 
     if (!step.recipeId.isEmpty() && m_manifest.recipes.contains(step.recipeId)) {
         playRecipe(step.recipeId);
+        return;
+    }
+
+    if (step.request.kind != ActionRequestKind::None) {
+        submitActionRequest(step.request);
         return;
     }
 
@@ -889,8 +923,6 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
 
     const AnimationVariant nextVariant = variantForFacing(phase.variants, m_currentFacing);
     const QUrl nextAnimationUrl = nextVariant.url;
-    const int nextFrameStart = nextVariant.frameStart;
-    const int nextFrameEnd = nextVariant.frameEnd;
     const QString nextLoopMode = phase.loopMode.isEmpty() ? "loop" : phase.loopMode;
     const QString nextPhaseId = phaseId.isEmpty() ? "single" : phaseId;
     const bool nextAutoReturnToIdle = (nextLoopMode == "onceThenIdle");
@@ -899,17 +931,13 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     const bool phaseChanged = (m_currentPhaseId != nextPhaseId);
     const bool loopModeChanged = (m_currentLoopMode != nextLoopMode);
     const bool autoReturnChanged = (m_currentAutoReturnToIdle != nextAutoReturnToIdle);
-    const bool animationChanged = (m_currentAnimationUrl != nextAnimationUrl)
-        || (m_currentFrameStart != nextFrameStart)
-        || (m_currentFrameEnd != nextFrameEnd);
+    const bool animationChanged = (m_currentAnimationUrl != nextAnimationUrl);
 
     m_currentActionId = actionId;
     m_currentPhaseId = nextPhaseId;
     m_currentLoopMode = nextLoopMode;
     m_currentAutoReturnToIdle = nextAutoReturnToIdle;
     m_currentAnimationUrl = nextAnimationUrl;
-    m_currentFrameStart = nextFrameStart;
-    m_currentFrameEnd = nextFrameEnd;
     stopAutoIdleTimer();
     m_currentPlaybackAtBoundary = false;
     ++m_playbackSerial;
@@ -945,6 +973,29 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
     }
     emit playbackSerialChanged();
 
+}
+
+bool PetRuntime::currentPhaseWillReachSustainedLoop() const
+{
+    if (m_currentActionId.isEmpty() || m_currentPhaseId.isEmpty()) {
+        return false;
+    }
+    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
+    QString phaseId = m_currentPhaseId;
+    QSet<QString> visited;
+    while (!phaseId.isEmpty() && !visited.contains(phaseId)) {
+        if (!action.phases.contains(phaseId)) {
+            return false;
+        }
+        visited.insert(phaseId);
+        const PhaseDefinition phase = action.phases.value(phaseId);
+        const QString loopMode = phase.loopMode.isEmpty() ? QStringLiteral("loop") : phase.loopMode;
+        if (loopMode == QStringLiteral("loop")) {
+            return true;
+        }
+        phaseId = phase.nextPhase;
+    }
+    return false;
 }
 
 bool PetRuntime::cleanFinishBoundaryReached() const

@@ -25,5 +25,6 @@ public:
     static QString userSkinDirectoryPath();
     static QString portableSkinDirectoryPath();
 
+    // Schema v4: file: paths are skin-root relative; other URL schemes are already absolute.
     static QUrl resolveSkinUrl(const QString &rawUrl, const QUrl &rootUrl);
 };

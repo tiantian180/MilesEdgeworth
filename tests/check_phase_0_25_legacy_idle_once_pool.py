@@ -23,15 +23,15 @@ def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
-    idle_entries = manifest.get("actionPools", {}).get("idle.random", {}).get("entries", [])
+    idle_entries = manifest.get("animationPools", {}).get("idle.random", {}).get("entries", [])
     idle_recipes = {entry.get("recipe") for entry in idle_entries}
 
     expected_actions = {
-        "idle_sitting_tea": ["skin:assets/body/gestures/sitting-tea-right.gif", "skin:assets/body/gestures/sitting-tea-left.gif"],
-        "idle_phone_call": ["skin:assets/body/gestures/phone-call-right.gif", "skin:assets/body/gestures/phone-call-left.gif"],
-        "idle_look_back": ["skin:assets/body/gestures/look-back-right.gif", "skin:assets/body/gestures/look-back-left.gif"],
-        "idle_look_down": ["skin:assets/body/gestures/look-down-right.gif", "skin:assets/body/gestures/look-down-left.gif"],
-        "idle_look_up": ["skin:assets/body/gestures/look-up-right.gif", "skin:assets/body/gestures/look-up-left.gif"],
+        "idle_sitting_tea": ["file:assets/body/gestures/sitting-tea-right.gif", "file:assets/body/gestures/sitting-tea-left.gif"],
+        "idle_phone_call": ["file:assets/body/gestures/phone-call-right.gif", "file:assets/body/gestures/phone-call-left.gif"],
+        "idle_look_back": ["file:assets/body/gestures/look-back-right.gif", "file:assets/body/gestures/look-back-left.gif"],
+        "idle_look_down": ["file:assets/body/gestures/look-down-right.gif", "file:assets/body/gestures/look-down-left.gif"],
+        "idle_look_up": ["file:assets/body/gestures/look-up-right.gif", "file:assets/body/gestures/look-up-left.gif"],
     }
 
     for action_id, urls in expected_actions.items():
@@ -40,8 +40,8 @@ def main() -> int:
         require(action.get("category") == "idle", f"{action_id} 应归类为 idle")
         require(action.get("loopMode") == "onceThenIdle", f"{action_id} 应播放一次后回到待机")
         variants = action.get("variants", {})
-        require(variants.get("right", {}).get("animation") == urls[0], f"{action_id}.right 动画别名不正确")
-        require(variants.get("left", {}).get("animation") == urls[1], f"{action_id}.left 动画别名不正确")
+        require(variants.get("right", {}).get("clip") == urls[0], f"{action_id}.right 动画别名不正确")
+        require(variants.get("left", {}).get("clip") == urls[1], f"{action_id}.left 动画别名不正确")
 
     expected_recipes = {
         "idle.sittingTea": "idle_sitting_tea",

@@ -118,7 +118,7 @@ void CustomInteractionHostApi::emitRecipe(const QString &recipeId)
 
 void CustomInteractionHostApi::emitPool(const QString &poolId)
 {
-    m_result.requests.append(ActionRequest::actionPool(poolId));
+    m_result.requests.append(ActionRequest::animationPool(poolId));
 }
 
 void CustomInteractionHostApi::emitReturnToIdle()

@@ -22,7 +22,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     recipes = manifest.get("recipes", {})
-    action_pools = manifest.get("actionPools", {})
+    action_pools = manifest.get("animationPools", {})
     behavior_triggers = manifest.get("behaviorTriggers", {})
 
     # 旧版 walk / run 播完后不会总是立刻站住，而是有概率继续移动。

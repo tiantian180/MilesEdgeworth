@@ -55,11 +55,11 @@ def main() -> int:
 
     entries = idle_trigger.get("entries", [])
     require(
-        {"type": "pool", "pool": "idle.random", "weight": 70} in entries,
+        {"pool": "idle.random", "weight": 70} in entries,
         "idle.loopFinished 应通过 manifest 配置 70 权重进入 idle.random",
     )
     require(
-        {"type": "none", "weight": 30} in entries,
+        {"weight": 30} in entries,
         "idle.loopFinished 应通过 manifest 配置 30 权重保持站立",
     )
 

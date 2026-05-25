@@ -20,7 +20,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def action_pool_recipes(manifest: dict, pool_id: str) -> list[str]:
-    pool = manifest.get("actionPools", {}).get(pool_id, {})
+    pool = manifest.get("animationPools", {}).get(pool_id, {})
     return [entry.get("recipe") for entry in pool.get("entries", [])]
 
 

@@ -22,7 +22,7 @@ enum class InterruptHint
 enum class ActionRequestKind
 {
     None,           // 空请求，pipeline 会忽略它
-    ActionPool,     // 从指定 pool 按权重抽一项执行（targetId = poolId）
+    AnimationPool,  // 从指定 pool 按权重抽一项执行（targetId = poolId）
     Recipe,         // 播放一个 recipe 时间线（targetId = recipeId）
     Action,         // 播放一个 action（targetId = actionId）
     ReturnToIdle,   // 返回 idle 状态；当前已在 idle 时是 no-op，避免重启动画
@@ -47,10 +47,10 @@ struct ActionRequest
         return {};
     }
 
-    static ActionRequest actionPool(const QString &poolId)
+    static ActionRequest animationPool(const QString &poolId)
     {
         ActionRequest request;
-        request.kind = ActionRequestKind::ActionPool;
+        request.kind = ActionRequestKind::AnimationPool;
         request.targetId = poolId.trimmed();
         return request;
     }

@@ -42,8 +42,8 @@ def main() -> int:
     for phase_id in ["enter", "loop", "exit"]:
         variants = phases[phase_id].get("variants", {})
         require("right" in variants and "left" in variants, f"sleep.{phase_id} 缺少左右朝向")
-        require("animation" in variants["right"], f"sleep.{phase_id}.right 缺少 animation")
-        require("animation" in variants["left"], f"sleep.{phase_id}.left 缺少 animation")
+        require("clip" in variants["right"], f"sleep.{phase_id}.right 缺少 clip")
+        require("clip" in variants["left"], f"sleep.{phase_id}.left 缺少 clip")
 
     qrc = read("apps/desktop/resources/pet_assets.qrc")
     for alias in ["sleep-right.gif", "sleep-left.gif", "sleeping-right.gif", "sleeping-left.gif", "wake-right.gif", "wake-left.gif"]:

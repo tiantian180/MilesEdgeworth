@@ -21,20 +21,14 @@
 struct AnimationVariant
 {
     QUrl url;
-    int frameStart = -1;
-    int frameEnd = -1;
-
-    bool hasFrameRange() const
-    {
-        return frameStart >= 0 && frameEnd >= frameStart;
-    }
 };
 
 struct ClipDefinition
 {
-    QUrl fileUrl;
-    int frameStart = -1;
-    int frameEnd = -1;
+    QUrl sourceUrl;
+    QUrl generatedUrl;
+    int sourceFrameStart = -1;
+    int sourceFrameEnd = -1;
 };
 
 // PhaseDefinition 描述一个 Action 内部的一段独立播放阶段。
@@ -72,6 +66,7 @@ struct ActionDefinition
 // 临时朝向 / 移动方向，以及播放重复次数 / 时长。
 struct RecipeStep
 {
+    ActionRequest request;
     QString actionId;
     QString phaseId;
     QString recipeId;
@@ -121,10 +116,10 @@ struct PropDefinition
     QHash<QString, QPointF> travelPerScaleDeltas;
 };
 
-// ActionPoolEntry 是动作池里的一个候选。
+// AnimationPoolEntry 是动画池里的一个候选。
 // request 形式优先（支持 returnToIdle 等通用请求）；
 // recipeId / actionId 是简化写法，向后兼容旧 manifest。
-struct ActionPoolEntry
+struct AnimationPoolEntry
 {
     ActionRequest request;
     QString recipeId;
@@ -132,12 +127,12 @@ struct ActionPoolEntry
     int weight = 1;
 };
 
-// ActionPoolDefinition 是一组带权重的候选动作，运行时按权重随机抽取。
+// AnimationPoolDefinition 是一组带权重的候选动画，运行时按权重随机抽取。
 // 用于随机 idle、单击分区、双击随机语音动作等场景。
-struct ActionPoolDefinition
+struct AnimationPoolDefinition
 {
     QString label;
-    QList<ActionPoolEntry> entries;
+    QList<AnimationPoolEntry> entries;
 };
 
 // BehaviorRuleCondition 是 behavior 规则的“仅当”过滤条件。
@@ -150,9 +145,11 @@ struct BehaviorRuleCondition
 };
 
 // BehaviorTriggerEntry 是 BehaviorTriggerDefinition 里的单个候选。
-// type 指明这条候选指向 pool / recipe / action，by weight 随机抽取。
+// request 是 v4 键名派发后的统一请求；空 request 表示 weighted no-op。
 struct BehaviorTriggerEntry
 {
+    ActionRequest request;
+    // legacy 字段仅保留给旧 schema 兼容和历史静态检查；运行时不再依赖 type 派发。
     QString type;
     BehaviorRuleCondition when;
     QString poolId;
@@ -310,6 +307,7 @@ struct ClickBehaviorDefinition
 struct SkinManifest
 {
     // 当前加载的皮肤元信息。Runtime 和菜单只读这些字段，不直接读取 skin.json。
+    int schemaVersion = 4;
     QString skinId;
     QString skinName;
     QUrl skinRootUrl;
@@ -325,7 +323,7 @@ struct SkinManifest
     QHash<QString, ActionDefinition> actions;
     QHash<QString, ClipDefinition> clips;
     QHash<QString, RecipeDefinition> recipes;
-    QHash<QString, ActionPoolDefinition> actionPools;
+    QHash<QString, AnimationPoolDefinition> animationPools;
     QHash<QString, ExpressionDefinition> expressions;
     QHash<QString, ExpressionMappingDefinition> expressionMappings;
     QHash<QString, BehaviorTriggerDefinition> behaviorTriggers;

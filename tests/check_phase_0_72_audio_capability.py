@@ -41,7 +41,7 @@ def main() -> int:
     audio_cpp = read("apps/desktop/src/pet/effects/AudioController.cpp")
     runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
-    selector_cpp = read("apps/desktop/src/pet/selection/ActionPoolSelector.cpp")
+    selector_cpp = read("apps/desktop/src/pet/selection/AnimationPoolSelector.cpp")
     menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
@@ -100,8 +100,10 @@ def main() -> int:
     ]:
         require(forbidden not in runtime_h + runtime_cpp, f"PetRuntime 不应保留音频状态或语言硬编码：{forbidden}")
 
-    require("resolvePoolId(m_manifest.actionPools, poolId, m_audioController.currentLanguageId())" in runtime_cpp, "候选池语言覆盖应读取 AudioController 当前语言")
-    require("normalizedPoolId + \".\" + languageId" in selector_cpp, "ActionPoolSelector 应继续支持语言后缀池")
+    require("AnimationPoolSelector::resolvePoolId(" in runtime_cpp, "候选池语言覆盖应委托 AnimationPoolSelector")
+    require("m_manifest.animationPools" in runtime_cpp and "m_audioController.currentLanguageId()" in runtime_cpp,
+            "候选池语言覆盖应读取 AudioController 当前语言")
+    require("normalizedPoolId + \".\" + languageId" in selector_cpp, "AnimationPoolSelector 应继续支持语言后缀池")
 
     for token in [
         "availableAudioLanguages",

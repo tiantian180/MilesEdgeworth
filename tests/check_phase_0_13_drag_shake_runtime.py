@@ -31,9 +31,9 @@ def main() -> None:
     behavior_rules = manifest.get("behaviorRules", [])
 
     expected_actions = {
-        "drag_crouch": ("hold", ["skin:assets/body/interaction/crouch-right.gif", "skin:assets/body/interaction/crouch-left.gif"]),
-        "drag_stand_up_full": ("onceThenIdle", ["skin:assets/body/interaction/stand-up-full-right.gif", "skin:assets/body/interaction/stand-up-full-left.gif"]),
-        "drag_stand_up_quick": ("onceThenIdle", ["skin:assets/body/interaction/stand-up-quick-right.gif", "skin:assets/body/interaction/stand-up-quick-left.gif"]),
+        "drag_crouch": ("hold", ["file:assets/body/interaction/crouch-right.gif", "file:assets/body/interaction/crouch-left.gif"]),
+        "drag_stand_up_full": ("onceThenIdle", ["file:assets/body/interaction/stand-up-full-right.gif", "file:assets/body/interaction/stand-up-full-left.gif"]),
+        "drag_stand_up_quick": ("onceThenIdle", ["file:assets/body/interaction/stand-up-quick-right.gif", "file:assets/body/interaction/stand-up-quick-left.gif"]),
     }
 
     for action_id, (loop_mode, urls) in expected_actions.items():
@@ -42,7 +42,7 @@ def main() -> None:
         require(action.get("category") == "interaction", f"{action_id} 应属于 interaction")
         require(action.get("loopMode") == loop_mode, f"{action_id} loopMode 应为 {loop_mode}")
         variants = action.get("variants", {})
-        actual_urls = {variant.get("animation") for variant in variants.values()}
+        actual_urls = {variant.get("clip") for variant in variants.values()}
         for url in urls:
             require(url in actual_urls, f"{action_id} 缺少动画 {url}")
 

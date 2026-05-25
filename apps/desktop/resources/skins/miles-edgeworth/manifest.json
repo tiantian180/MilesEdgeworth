@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "miles-edgeworth",
   "name": "Miles Edgeworth",
   "defaultFacing": "right",
@@ -346,14 +346,13 @@
         "notAction": "sleep"
       },
       "request": {
-        "type": "pool",
         "pool": "menu.tea"
       }
     }
   },
   "props": {
     "prosecutor_badge": {
-      "asset": "skin:assets/props/prosecutor_badge/prosecutor-badge.png",
+      "asset": "file:assets/props/prosecutor_badge/prosecutor-badge.png",
       "width": 94,
       "height": 94,
       "visualWidth": 24,
@@ -376,6 +375,20 @@
       }
     }
   },
+  "clips": {
+    "thinking.enter.right": { "source": "file:assets/body/gestures/thinking-right.gif", "frameRange": [1, 4] },
+    "thinking.enter.left": { "source": "file:assets/body/gestures/thinking-left.gif", "frameRange": [1, 4] },
+    "thinking.loop.right": { "source": "file:assets/body/gestures/thinking-right.gif", "frameRange": [5, 8] },
+    "thinking.loop.left": { "source": "file:assets/body/gestures/thinking-left.gif", "frameRange": [5, 8] },
+    "thinking.exit.right": { "source": "file:assets/body/gestures/thinking-right.gif", "frameRange": [44, 47] },
+    "thinking.exit.left": { "source": "file:assets/body/gestures/thinking-left.gif", "frameRange": [44, 47] },
+    "talking.enter.right": { "source": "file:assets/body/interaction/crossed-right.gif", "frameRange": [1, 4] },
+    "talking.enter.left": { "source": "file:assets/body/interaction/crossed-left.gif", "frameRange": [1, 4] },
+    "talking.loop.right": { "source": "file:assets/body/interaction/crossed-right.gif", "frameRange": [5, 8] },
+    "talking.loop.left": { "source": "file:assets/body/interaction/crossed-left.gif", "frameRange": [5, 8] },
+    "talking.exit.right": { "source": "file:assets/body/interaction/crossed-right.gif", "frameRange": [9, 11] },
+    "talking.exit.left": { "source": "file:assets/body/interaction/crossed-left.gif", "frameRange": [9, 11] }
+  },
   "actions": {
     "idle_stand": {
       "label": "站立",
@@ -383,10 +396,10 @@
       "loopMode": "loop",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/idle/stand-right.gif"
+          "clip": "file:assets/body/idle/stand-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/idle/stand-left.gif"
+          "clip": "file:assets/body/idle/stand-left.gif"
         }
       }
     },
@@ -397,7 +410,7 @@
       "blocksPointerInteraction": true,
       "variants": {
         "right": {
-          "animation": "skin:assets/body/startup/briefcase-in-right.gif",
+          "clip": "file:assets/body/startup/briefcase-in-right.gif",
           "movement": { "dx": 11.2, "dy": 0 }
         }
       }
@@ -408,7 +421,7 @@
       "loopMode": "once",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/startup/briefcase-stop-right.gif"
+          "clip": "file:assets/body/startup/briefcase-stop-right.gif"
         }
       }
     },
@@ -422,10 +435,10 @@
       },
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/turn-right-to-left.gif"
+          "clip": "file:assets/body/interaction/turn-right-to-left.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/turn-left-to-right.gif"
+          "clip": "file:assets/body/interaction/turn-left-to-right.gif"
         }
       }
     },
@@ -435,35 +448,35 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "east": {
-          "animation": "skin:assets/body/locomotion/walk-east.gif",
+          "clip": "file:assets/body/locomotion/walk-east.gif",
           "movement": { "dx": 8.4, "dy": 0 }
         },
         "west": {
-          "animation": "skin:assets/body/locomotion/walk-west.gif",
+          "clip": "file:assets/body/locomotion/walk-west.gif",
           "movement": { "dx": -8.4, "dy": 0 }
         },
         "northEast": {
-          "animation": "skin:assets/body/locomotion/walk-north-east.gif",
+          "clip": "file:assets/body/locomotion/walk-north-east.gif",
           "movement": { "dx": 6, "dy": -6 }
         },
         "northWest": {
-          "animation": "skin:assets/body/locomotion/walk-north-west.gif",
+          "clip": "file:assets/body/locomotion/walk-north-west.gif",
           "movement": { "dx": -6, "dy": -6 }
         },
         "southEast": {
-          "animation": "skin:assets/body/locomotion/walk-south-east.gif",
+          "clip": "file:assets/body/locomotion/walk-south-east.gif",
           "movement": { "dx": 6, "dy": 6 }
         },
         "southWest": {
-          "animation": "skin:assets/body/locomotion/walk-south-west.gif",
+          "clip": "file:assets/body/locomotion/walk-south-west.gif",
           "movement": { "dx": -6, "dy": 6 }
         },
         "north": {
-          "animation": "skin:assets/body/locomotion/walk-north.gif",
+          "clip": "file:assets/body/locomotion/walk-north.gif",
           "movement": { "dx": 0, "dy": -6 }
         },
         "south": {
-          "animation": "skin:assets/body/locomotion/walk-south.gif",
+          "clip": "file:assets/body/locomotion/walk-south.gif",
           "movement": { "dx": 0, "dy": 6 }
         }
       }
@@ -474,35 +487,35 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "east": {
-          "animation": "skin:assets/body/locomotion/run-east.gif",
+          "clip": "file:assets/body/locomotion/run-east.gif",
           "movement": { "dx": 11.2, "dy": 0 }
         },
         "west": {
-          "animation": "skin:assets/body/locomotion/run-west.gif",
+          "clip": "file:assets/body/locomotion/run-west.gif",
           "movement": { "dx": -11.2, "dy": 0 }
         },
         "northEast": {
-          "animation": "skin:assets/body/locomotion/run-north-east.gif",
+          "clip": "file:assets/body/locomotion/run-north-east.gif",
           "movement": { "dx": 8, "dy": -8 }
         },
         "northWest": {
-          "animation": "skin:assets/body/locomotion/run-north-west.gif",
+          "clip": "file:assets/body/locomotion/run-north-west.gif",
           "movement": { "dx": -8, "dy": -8 }
         },
         "southEast": {
-          "animation": "skin:assets/body/locomotion/run-south-east.gif",
+          "clip": "file:assets/body/locomotion/run-south-east.gif",
           "movement": { "dx": 8, "dy": 8 }
         },
         "southWest": {
-          "animation": "skin:assets/body/locomotion/run-south-west.gif",
+          "clip": "file:assets/body/locomotion/run-south-west.gif",
           "movement": { "dx": -8, "dy": 8 }
         },
         "north": {
-          "animation": "skin:assets/body/locomotion/run-north.gif",
+          "clip": "file:assets/body/locomotion/run-north.gif",
           "movement": { "dx": 0, "dy": -8 }
         },
         "south": {
-          "animation": "skin:assets/body/locomotion/run-south.gif",
+          "clip": "file:assets/body/locomotion/run-south.gif",
           "movement": { "dx": 0, "dy": 8 }
         }
       }
@@ -516,22 +529,22 @@
         "enter": {
           "loopMode": "once",
           "variants": {
-            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [1, 4] },
-            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [1, 4] }
+            "right": { "clip": "thinking.enter.right" },
+            "left": { "clip": "thinking.enter.left" }
           }
         },
         "loop": {
           "loopMode": "loop",
           "variants": {
-            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [5, 8] },
-            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [5, 8] }
+            "right": { "clip": "thinking.loop.right" },
+            "left": { "clip": "thinking.loop.left" }
           }
         },
         "exit": {
           "loopMode": "onceThenHold",
           "variants": {
-            "right": { "animation": "skin:assets/body/gestures/thinking-right.gif", "frameRange": [44, 47] },
-            "left": { "animation": "skin:assets/body/gestures/thinking-left.gif", "frameRange": [44, 47] }
+            "right": { "clip": "thinking.exit.right" },
+            "left": { "clip": "thinking.exit.left" }
           }
         }
       }
@@ -542,10 +555,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/thinking-right.gif"
+          "clip": "file:assets/body/gestures/thinking-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/thinking-left.gif"
+          "clip": "file:assets/body/gestures/thinking-left.gif"
         }
       }
     },
@@ -555,10 +568,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/tapping-head-right.gif"
+          "clip": "file:assets/body/gestures/tapping-head-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/tapping-head-left.gif"
+          "clip": "file:assets/body/gestures/tapping-head-left.gif"
         }
       }
     },
@@ -568,10 +581,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/shrug-right.gif"
+          "clip": "file:assets/body/gestures/shrug-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/shrug-left.gif"
+          "clip": "file:assets/body/gestures/shrug-left.gif"
         }
       }
     },
@@ -581,10 +594,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/check-watch-right.gif"
+          "clip": "file:assets/body/gestures/check-watch-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/check-watch-left.gif"
+          "clip": "file:assets/body/gestures/check-watch-left.gif"
         }
       }
     },
@@ -594,10 +607,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/pointing-right.gif"
+          "clip": "file:assets/body/gestures/pointing-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/pointing-left.gif"
+          "clip": "file:assets/body/gestures/pointing-left.gif"
         }
       }
     },
@@ -607,10 +620,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/sitting-tea-right.gif"
+          "clip": "file:assets/body/gestures/sitting-tea-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/sitting-tea-left.gif"
+          "clip": "file:assets/body/gestures/sitting-tea-left.gif"
         }
       }
     },
@@ -620,10 +633,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/phone-call-right.gif"
+          "clip": "file:assets/body/gestures/phone-call-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/phone-call-left.gif"
+          "clip": "file:assets/body/gestures/phone-call-left.gif"
         }
       }
     },
@@ -633,10 +646,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/look-back-right.gif"
+          "clip": "file:assets/body/gestures/look-back-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/look-back-left.gif"
+          "clip": "file:assets/body/gestures/look-back-left.gif"
         }
       }
     },
@@ -646,10 +659,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/look-up-right.gif"
+          "clip": "file:assets/body/gestures/look-up-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/look-up-left.gif"
+          "clip": "file:assets/body/gestures/look-up-left.gif"
         }
       }
     },
@@ -659,10 +672,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/gestures/look-down-right.gif"
+          "clip": "file:assets/body/gestures/look-down-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/gestures/look-down-left.gif"
+          "clip": "file:assets/body/gestures/look-down-left.gif"
         }
       }
     },
@@ -672,10 +685,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/scared-right.gif"
+          "clip": "file:assets/body/interaction/scared-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/scared-left.gif"
+          "clip": "file:assets/body/interaction/scared-left.gif"
         }
       }
     },
@@ -685,10 +698,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/back-right.gif"
+          "clip": "file:assets/body/interaction/back-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/back-left.gif"
+          "clip": "file:assets/body/interaction/back-left.gif"
         }
       }
     },
@@ -698,10 +711,10 @@
       "loopMode": "hold",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/crouch-right.gif"
+          "clip": "file:assets/body/interaction/crouch-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/crouch-left.gif"
+          "clip": "file:assets/body/interaction/crouch-left.gif"
         }
       }
     },
@@ -711,10 +724,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/stand-up-full-right.gif"
+          "clip": "file:assets/body/interaction/stand-up-full-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/stand-up-full-left.gif"
+          "clip": "file:assets/body/interaction/stand-up-full-left.gif"
         }
       }
     },
@@ -724,10 +737,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/stand-up-quick-right.gif"
+          "clip": "file:assets/body/interaction/stand-up-quick-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/stand-up-quick-left.gif"
+          "clip": "file:assets/body/interaction/stand-up-quick-left.gif"
         }
       }
     },
@@ -737,10 +750,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/crossed-right.gif"
+          "clip": "file:assets/body/interaction/crossed-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/crossed-left.gif"
+          "clip": "file:assets/body/interaction/crossed-left.gif"
         }
       }
     },
@@ -754,22 +767,22 @@
           "loopMode": "once",
           "nextPhase": "loop",
           "variants": {
-            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [1, 4] },
-            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [1, 4] }
+            "right": { "clip": "talking.enter.right" },
+            "left": { "clip": "talking.enter.left" }
           }
         },
         "loop": {
           "loopMode": "loop",
           "variants": {
-            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [5, 8] },
-            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [5, 8] }
+            "right": { "clip": "talking.loop.right" },
+            "left": { "clip": "talking.loop.left" }
           }
         },
         "exit": {
           "loopMode": "onceThenHold",
           "variants": {
-            "right": { "animation": "skin:assets/body/interaction/crossed-right.gif", "frameRange": [9, 11] },
-            "left": { "animation": "skin:assets/body/interaction/crossed-left.gif", "frameRange": [9, 11] }
+            "right": { "clip": "talking.exit.right" },
+            "left": { "clip": "talking.exit.left" }
           }
         }
       }
@@ -780,10 +793,10 @@
       "loopMode": "onceThenHold",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/objecting-right.gif"
+          "clip": "file:assets/body/interaction/objecting-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/objecting-left.gif"
+          "clip": "file:assets/body/interaction/objecting-left.gif"
         }
       }
     },
@@ -793,10 +806,10 @@
       "loopMode": "onceThenHold",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/bow-right.gif"
+          "clip": "file:assets/body/interaction/bow-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/bow-left.gif"
+          "clip": "file:assets/body/interaction/bow-left.gif"
         }
       }
     },
@@ -806,10 +819,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/interaction/pickup-right.gif"
+          "clip": "file:assets/body/interaction/pickup-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/interaction/pickup-left.gif"
+          "clip": "file:assets/body/interaction/pickup-left.gif"
         }
       }
     },
@@ -819,10 +832,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/menu/tea-right.gif"
+          "clip": "file:assets/body/menu/tea-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/menu/tea-left.gif"
+          "clip": "file:assets/body/menu/tea-left.gif"
         }
       }
     },
@@ -832,10 +845,10 @@
       "loopMode": "onceThenIdle",
       "variants": {
         "right": {
-          "animation": "skin:assets/body/menu/tea-alt-right.gif"
+          "clip": "file:assets/body/menu/tea-alt-right.gif"
         },
         "left": {
-          "animation": "skin:assets/body/menu/tea-alt-left.gif"
+          "clip": "file:assets/body/menu/tea-alt-left.gif"
         }
       }
     },
@@ -850,10 +863,10 @@
           "nextPhase": "loop",
           "variants": {
             "right": {
-              "animation": "skin:assets/body/rest/sleep-right.gif"
+              "clip": "file:assets/body/rest/sleep-right.gif"
             },
             "left": {
-              "animation": "skin:assets/body/rest/sleep-left.gif"
+              "clip": "file:assets/body/rest/sleep-left.gif"
             }
           }
         },
@@ -861,10 +874,10 @@
           "loopMode": "loop",
           "variants": {
             "right": {
-              "animation": "skin:assets/body/rest/sleeping-right.gif"
+              "clip": "file:assets/body/rest/sleeping-right.gif"
             },
             "left": {
-              "animation": "skin:assets/body/rest/sleeping-left.gif"
+              "clip": "file:assets/body/rest/sleeping-left.gif"
             }
           }
         },
@@ -872,10 +885,10 @@
           "loopMode": "onceThenIdle",
           "variants": {
             "right": {
-              "animation": "skin:assets/body/rest/wake-right.gif"
+              "clip": "file:assets/body/rest/wake-right.gif"
             },
             "left": {
-              "animation": "skin:assets/body/rest/wake-left.gif"
+              "clip": "file:assets/body/rest/wake-left.gif"
             }
           }
         }
@@ -1130,22 +1143,22 @@
       "label": "等等",
       "scope": "doubleClick",
       "action": "crossed",
-      "sound": "skin:assets/audio/voice/holdit0.wav",
+      "sound": "file:assets/audio/voice/holdit0.wav",
       "sounds": {
-        "jp": "skin:assets/audio/voice/holdit0.wav",
-        "en": "skin:assets/audio/voice/holdit1.wav",
-        "zh": "skin:assets/audio/voice/holdit2.wav"
+        "jp": "file:assets/audio/voice/holdit0.wav",
+        "en": "file:assets/audio/voice/holdit1.wav",
+        "zh": "file:assets/audio/voice/holdit2.wav"
       }
     },
     "doubleClick.takeThat": {
       "label": "看招",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "skin:assets/audio/voice/takethat0.wav",
+      "sound": "file:assets/audio/voice/takethat0.wav",
       "sounds": {
-        "jp": "skin:assets/audio/voice/takethat0.wav",
-        "en": "skin:assets/audio/voice/takethat1.wav",
-        "zh": "skin:assets/audio/voice/takethat2.wav"
+        "jp": "file:assets/audio/voice/takethat0.wav",
+        "en": "file:assets/audio/voice/takethat1.wav",
+        "zh": "file:assets/audio/voice/takethat2.wav"
       },
       "prop": "prosecutor_badge"
     },
@@ -1153,22 +1166,22 @@
       "label": "异议",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "skin:assets/audio/voice/objection0.wav",
+      "sound": "file:assets/audio/voice/objection0.wav",
       "sounds": {
-        "jp": "skin:assets/audio/voice/objection0.wav",
-        "en": "skin:assets/audio/voice/objection1.wav",
-        "zh": "skin:assets/audio/voice/objection2.wav"
+        "jp": "file:assets/audio/voice/objection0.wav",
+        "en": "file:assets/audio/voice/objection1.wav",
+        "zh": "file:assets/audio/voice/objection2.wav"
       }
     },
     "doubleClick.eureka": {
       "label": "就是这个",
       "scope": "doubleClick",
       "action": "objecting",
-      "sound": "skin:assets/audio/voice/eureka0.wav",
+      "sound": "file:assets/audio/voice/eureka0.wav",
       "sounds": {
-        "jp": "skin:assets/audio/voice/eureka0.wav",
-        "en": "skin:assets/audio/voice/eureka1.wav",
-        "zh": "skin:assets/audio/voice/objection2.wav"
+        "jp": "file:assets/audio/voice/eureka0.wav",
+        "en": "file:assets/audio/voice/eureka1.wav",
+        "zh": "file:assets/audio/voice/objection2.wav"
       }
     },
     "objecting.once": {
@@ -1207,7 +1220,6 @@
       "label": "运行时启动后的入场动作",
       "entries": [
         {
-          "type": "recipe",
           "recipe": "startup.briefcase",
           "weight": 1
         }
@@ -1222,12 +1234,10 @@
       },
       "entries": [
         {
-          "type": "pool",
           "pool": "idle.random",
           "weight": 70
         },
         {
-          "type": "none",
           "weight": 30
         }
       ]
@@ -1239,7 +1249,6 @@
           "when": {
             "action": "walk"
           },
-          "type": "pool",
           "pool": "walk.finished",
           "weight": 1
         },
@@ -1247,7 +1256,6 @@
           "when": {
             "action": "run"
           },
-          "type": "pool",
           "pool": "run.finished",
           "weight": 1
         }
@@ -1276,7 +1284,7 @@
       "action": "drag_stand_up_quick"
     }
   ],
-  "actionPools": {
+  "animationPools": {
     "idle.random": {
       "label": "随机待机动作",
       "entries": [
@@ -1585,7 +1593,7 @@
       "label": "无特定区域",
       "entries": [
         {
-          "type": "returnToIdle",
+          "command": "returnToIdle",
           "weight": 1
         }
       ]

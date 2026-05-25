@@ -27,16 +27,16 @@ def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
-    action_pools = manifest.get("actionPools", {})
+    action_pools = manifest.get("animationPools", {})
 
     require("crossed" in actions, "manifest actions 缺少 crossed")
     require(actions["crossed"].get("loopMode") == "onceThenIdle", "crossed 应播放一次后回 idle")
 
     expected_recipes = {
-        "doubleClick.holdIt": ("crossed", "skin:assets/audio/voice/holdit0.wav"),
-        "doubleClick.takeThat": ("objecting", "skin:assets/audio/voice/takethat0.wav"),
-        "doubleClick.objection": ("objecting", "skin:assets/audio/voice/objection0.wav"),
-        "doubleClick.eureka": ("objecting", "skin:assets/audio/voice/eureka0.wav"),
+        "doubleClick.holdIt": ("crossed", "file:assets/audio/voice/holdit0.wav"),
+        "doubleClick.takeThat": ("objecting", "file:assets/audio/voice/takethat0.wav"),
+        "doubleClick.objection": ("objecting", "file:assets/audio/voice/objection0.wav"),
+        "doubleClick.eureka": ("objecting", "file:assets/audio/voice/eureka0.wav"),
     }
     for recipe_id, (action_id, sound_url) in expected_recipes.items():
         recipe = recipes.get(recipe_id, {})
@@ -45,7 +45,7 @@ def main() -> int:
         require(recipe.get("sound") == sound_url, f"{recipe_id} 应播放 {sound_url}")
 
     double_click_pool = action_pools.get("doubleClick.random", {})
-    require(double_click_pool, "actionPools 缺少 doubleClick.random")
+    require(double_click_pool, "animationPools 缺少 doubleClick.random")
     double_click_recipe_ids = {entry.get("recipe") for entry in double_click_pool.get("entries", [])}
     require({"doubleClick.holdIt", "doubleClick.objection", "doubleClick.eureka"} <= double_click_recipe_ids, "doubleClick.random 应包含默认双击语音动作")
     require("doubleClick.takeThat" not in double_click_recipe_ids, "Take that 丢徽章应由 Custom Interaction 概率触发")

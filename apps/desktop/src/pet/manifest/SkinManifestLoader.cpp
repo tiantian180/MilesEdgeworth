@@ -5,6 +5,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -71,7 +72,7 @@ QList<QPointF> polygonFromJsonArray(const QJsonArray &array)
 ActionRequest requestFromJsonObject(const QJsonObject &object)
 {
     if (object.contains("pool")) {
-        return ActionRequest::actionPool(object.value("pool").toString());
+        return ActionRequest::animationPool(object.value("pool").toString());
     }
     if (object.contains("recipe")) {
         return ActionRequest::recipe(object.value("recipe").toString());
@@ -79,10 +80,19 @@ ActionRequest requestFromJsonObject(const QJsonObject &object)
     if (object.contains("action")) {
         return ActionRequest::action(object.value("action").toString());
     }
+    if (object.contains("command")) {
+        const QString command = object.value("command").toString();
+        if (command == "returnToIdle") {
+            return ActionRequest::returnToIdle();
+        }
+        if (command == "toggleFacing") {
+            return ActionRequest::toggleFacing();
+        }
+    }
 
     const QString type = object.value("type").toString();
     if (type == "pool") {
-        return ActionRequest::actionPool(object.value("pool").toString());
+        return ActionRequest::animationPool(object.value("pool").toString());
     }
     if (type == "recipe") {
         return ActionRequest::recipe(object.value("recipe").toString());
@@ -150,31 +160,92 @@ QPair<int, int> frameRangeFromJson(const QJsonArray &range)
     return {startOneBased - 1, endOneBased - 1};
 }
 
+bool resolvedUrlExists(const QUrl &url)
+{
+    if (url.isEmpty()) {
+        return false;
+    }
+    if (url.scheme() == QStringLiteral("qrc")) {
+        return QFile::exists(QLatin1Char(':') + url.path());
+    }
+    if (url.isLocalFile()) {
+        return QFileInfo::exists(url.toLocalFile());
+    }
+    return !url.scheme().isEmpty();
+}
+
+bool isValidClipId(const QString &clipId)
+{
+    if (clipId.isEmpty()) {
+        return false;
+    }
+
+    for (const QChar ch : clipId) {
+        const ushort code = ch.unicode();
+        const bool asciiLetter = (code >= 'A' && code <= 'Z') || (code >= 'a' && code <= 'z');
+        const bool asciiDigit = code >= '0' && code <= '9';
+        const bool allowedSymbol = ch == QLatin1Char('_')
+            || ch == QLatin1Char('.')
+            || ch == QLatin1Char('-');
+        if (!asciiLetter && !asciiDigit && !allowedSymbol) {
+            return false;
+        }
+    }
+    return true;
+}
+
+QUrl generatedClipUrlForId(const QString &clipId, const QUrl &skinRootUrl)
+{
+    if (!isValidClipId(clipId)) {
+        return {};
+    }
+
+    return SkinManifestLoader::resolveSkinUrl(
+        QStringLiteral("file:generated/clips/%1.gif").arg(clipId),
+        skinRootUrl
+    );
+}
+
 AnimationVariant parseAnimationVariant(
     const QJsonObject &object,
     const SkinManifest &manifest,
-    const QUrl &skinRootUrl
+    const QUrl &skinRootUrl,
+    bool *ok
 )
 {
+    if (ok) {
+        *ok = true;
+    }
     AnimationVariant variant;
 
-    const QString clipId = object.value(QStringLiteral("clip")).toString();
-    if (!clipId.isEmpty() && manifest.clips.contains(clipId)) {
-        const ClipDefinition clip = manifest.clips.value(clipId);
-        variant.url = clip.fileUrl;
-        variant.frameStart = clip.frameStart;
-        variant.frameEnd = clip.frameEnd;
+    const QString clipRef = object.value(QStringLiteral("clip")).toString().trimmed();
+    if (clipRef.startsWith(QStringLiteral("file:"))) {
+        variant.url = SkinManifestLoader::resolveSkinUrl(clipRef, skinRootUrl);
+        if (variant.url.isEmpty() && ok) {
+            *ok = false;
+        }
+        return variant;
+    }
+    if (!clipRef.isEmpty()) {
+        if (!manifest.clips.contains(clipRef) && ok) {
+            *ok = false;
+            return variant;
+        }
+        variant.url = manifest.clips.value(clipRef).generatedUrl;
+        if (variant.url.isEmpty() && ok) {
+            *ok = false;
+        }
+        return variant;
     }
 
-    const QString animation = object.value(QStringLiteral("animation")).toString();
+    const QString animation = object.value(QStringLiteral("animation")).toString().trimmed();
     if (!animation.isEmpty()) {
         variant.url = SkinManifestLoader::resolveSkinUrl(animation, skinRootUrl);
-    }
+        if (variant.url.isEmpty() && ok) {
+            *ok = false;
+            return variant;
+        }
 
-    const auto localFrames = frameRangeFromJson(object.value(QStringLiteral("frameRange")).toArray());
-    if (localFrames.first >= 0) {
-        variant.frameStart = localFrames.first;
-        variant.frameEnd = localFrames.second;
     }
 
     return variant;
@@ -191,6 +262,7 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
     manifest.builtin = context.builtin;
 
     const QJsonObject root = document.object();
+    manifest.schemaVersion = root.value("schemaVersion").toInt(4);
     manifest.fallbackAction = root.value("fallbackAction").toString(kFallbackActionId);
     manifest.defaultFacing = root.value("defaultFacing").toString("right");
     manifest.defaultSizeId = root.value("defaultSize").toString();
@@ -473,17 +545,29 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
     const QJsonObject clips = root.value(QStringLiteral("clips")).toObject();
     for (auto it = clips.constBegin(); it != clips.constEnd(); ++it) {
         const QJsonObject clipObject = it.value().toObject();
+        const QString source = clipObject.value(QStringLiteral("source")).toString().trimmed();
+        if (!isValidClipId(it.key())
+            || !source.startsWith(QStringLiteral("file:"))
+            || source.startsWith(QStringLiteral("file://"))) {
+            return {};
+        }
+
         ClipDefinition clip;
-        clip.fileUrl = SkinManifestLoader::resolveSkinUrl(
-            clipObject.value(QStringLiteral("file")).toString(),
+        clip.sourceUrl = SkinManifestLoader::resolveSkinUrl(
+            source,
             manifest.skinRootUrl
         );
+        clip.generatedUrl = generatedClipUrlForId(it.key(), manifest.skinRootUrl);
         const auto frames = frameRangeFromJson(clipObject.value(QStringLiteral("frameRange")).toArray());
-        clip.frameStart = frames.first;
-        clip.frameEnd = frames.second;
-        if (!clip.fileUrl.isEmpty()) {
-            manifest.clips.insert(it.key(), clip);
+        clip.sourceFrameStart = frames.first;
+        clip.sourceFrameEnd = frames.second;
+        if (clip.sourceUrl.isEmpty()
+            || clip.generatedUrl.isEmpty()
+            || clip.sourceFrameStart < 0
+            || !resolvedUrlExists(clip.generatedUrl)) {
+            return {};
         }
+        manifest.clips.insert(it.key(), clip);
     }
 
     const QJsonObject actions = root.value("actions").toObject();
@@ -501,7 +585,11 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
         const QJsonObject variants = actionObject.value("variants").toObject();
         for (auto variantIt = variants.constBegin(); variantIt != variants.constEnd(); ++variantIt) {
             const QJsonObject variantObject = variantIt.value().toObject();
-            const AnimationVariant variant = parseAnimationVariant(variantObject, manifest, manifest.skinRootUrl);
+            bool variantOk = true;
+            const AnimationVariant variant = parseAnimationVariant(variantObject, manifest, manifest.skinRootUrl, &variantOk);
+            if (!variantOk) {
+                return {};
+            }
             if (!variant.url.isEmpty()) {
                 action.variants.insert(variantIt.key(), variant);
             }
@@ -527,9 +615,14 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
         // 就把它当成默认朝向的 variant。
         const QString legacyAnimation = actionObject.value("animation").toString();
         if (!legacyAnimation.isEmpty()) {
+            bool variantOk = true;
+            const AnimationVariant variant = parseAnimationVariant(actionObject, manifest, manifest.skinRootUrl, &variantOk);
+            if (!variantOk) {
+                return {};
+            }
             action.variants.insert(
                 manifest.defaultFacing,
-                AnimationVariant {SkinManifestLoader::resolveSkinUrl(legacyAnimation, manifest.skinRootUrl), -1, -1}
+                variant
             );
         }
 
@@ -542,11 +635,16 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
 
             const QJsonObject phaseVariants = phaseObject.value("variants").toObject();
             for (auto variantIt = phaseVariants.constBegin(); variantIt != phaseVariants.constEnd(); ++variantIt) {
+                bool variantOk = true;
                 const AnimationVariant variant = parseAnimationVariant(
                     variantIt.value().toObject(),
                     manifest,
-                    manifest.skinRootUrl
+                    manifest.skinRootUrl,
+                    &variantOk
                 );
+                if (!variantOk) {
+                    return {};
+                }
                 if (!variant.url.isEmpty()) {
                     phase.variants.insert(variantIt.key(), variant);
                 }
@@ -586,6 +684,14 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
             const QJsonObject stepObject = stepValue.toObject();
 
             RecipeStep step;
+            const QString stepType = stepObject.value("type").toString();
+            if (stepObject.contains("pool")
+                    || stepObject.contains("command")
+                    || stepType == QStringLiteral("pool")
+                    || stepType == QStringLiteral("returnToIdle")
+                    || stepType == QStringLiteral("toggleFacing")) {
+                step.request = requestFromJsonObject(stepObject);
+            }
             step.actionId = stepObject.value("action").toString(recipe.actionId);
             step.phaseId = stepObject.value("phase").toString();
             step.recipeId = stepObject.value("recipe").toString();
@@ -603,7 +709,10 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
                 step.durationMode = QStringLiteral("param");
             }
 
-            if (!step.actionId.isEmpty() || !step.phaseId.isEmpty() || !step.recipeId.isEmpty()) {
+            if (step.request.kind != ActionRequestKind::None
+                    || !step.actionId.isEmpty()
+                    || !step.phaseId.isEmpty()
+                    || !step.recipeId.isEmpty()) {
                 recipe.steps.append(step);
             }
         }
@@ -622,18 +731,21 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
         }
     }
 
-    const QJsonObject actionPools = root.value("actionPools").toObject();
-    for (auto it = actionPools.constBegin(); it != actionPools.constEnd(); ++it) {
+    QJsonObject animationPools = root.value("animationPools").toObject();
+    if (animationPools.isEmpty()) {
+        animationPools = root.value("actionPools").toObject();
+    }
+    for (auto it = animationPools.constBegin(); it != animationPools.constEnd(); ++it) {
         const QJsonObject poolObject = it.value().toObject();
 
-        ActionPoolDefinition pool;
+        AnimationPoolDefinition pool;
         pool.label = poolObject.value("label").toString(it.key());
 
         const QJsonArray entries = poolObject.value("entries").toArray();
         for (const QJsonValue &entryValue : entries) {
             const QJsonObject entryObject = entryValue.toObject();
 
-            ActionPoolEntry entry;
+            AnimationPoolEntry entry;
             entry.request = requestFromJsonObject(entryObject);
             entry.recipeId = entryObject.value("recipe").toString();
             entry.actionId = entryObject.value("action").toString();
@@ -644,13 +756,15 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
 
             if (entry.request.kind != ActionRequestKind::None
                     || !entry.recipeId.isEmpty()
-                    || !entry.actionId.isEmpty()) {
+                    || !entry.actionId.isEmpty()
+                    || entryObject.contains(QStringLiteral("weight"))
+                    || entryObject.value(QStringLiteral("type")).toString() == QStringLiteral("none")) {
                 pool.entries.append(entry);
             }
         }
 
         if (!pool.entries.isEmpty()) {
-            manifest.actionPools.insert(it.key(), pool);
+            manifest.animationPools.insert(it.key(), pool);
         }
     }
 
@@ -671,6 +785,7 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
             const QJsonObject entryObject = entryValue.toObject();
 
             BehaviorTriggerEntry entry;
+            entry.request = requestFromJsonObject(entryObject);
             entry.type = entryObject.value("type").toString();
             entry.when = behaviorRuleConditionFromJsonObject(entryObject.value("when").toObject());
             entry.poolId = entryObject.value("pool").toString();
@@ -681,7 +796,9 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
                 entry.weight = 1;
             }
 
-            if (!entry.type.isEmpty()) {
+            if (entry.request.kind != ActionRequestKind::None
+                    || !entry.type.isEmpty()
+                    || entryObject.contains(QStringLiteral("weight"))) {
                 trigger.entries.append(entry);
             }
         }
@@ -697,21 +814,6 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
 
 void resolveManifestUrls(SkinManifest &manifest, const QUrl &rootUrl)
 {
-    for (ClipDefinition &clip : manifest.clips) {
-        clip.fileUrl = SkinManifestLoader::resolveSkinUrl(clip.fileUrl.toString(), rootUrl);
-    }
-
-    for (ActionDefinition &action : manifest.actions) {
-        for (AnimationVariant &variant : action.variants) {
-            variant.url = SkinManifestLoader::resolveSkinUrl(variant.url.toString(), rootUrl);
-        }
-        for (PhaseDefinition &phase : action.phases) {
-            for (AnimationVariant &variant : phase.variants) {
-                variant.url = SkinManifestLoader::resolveSkinUrl(variant.url.toString(), rootUrl);
-            }
-        }
-    }
-
     for (PropDefinition &prop : manifest.props) {
         prop.assetUrl = SkinManifestLoader::resolveSkinUrl(prop.assetUrl.toString(), rootUrl);
     }
@@ -850,7 +952,7 @@ SkinManifest SkinManifestLoader::fallbackManifest()
 
     ActionDefinition fallbackAction;
     fallbackAction.loopMode = "loop";
-    fallbackAction.variants.insert("right", AnimationVariant {QUrl(QString::fromUtf8(kFallbackAnimationUrl)), -1, -1});
+    fallbackAction.variants.insert("right", AnimationVariant {QUrl(QString::fromUtf8(kFallbackAnimationUrl))});
     manifest.actions.insert(kFallbackActionId, fallbackAction);
 
     RecipeDefinition idleRecipe;
@@ -959,11 +1061,15 @@ QUrl SkinManifestLoader::resolveSkinUrl(const QString &rawUrl, const QUrl &rootU
     }
 
     const QUrl url(trimmed);
-    if (url.scheme() != QStringLiteral("skin")) {
+    const QString scheme = url.scheme();
+    if (scheme != QStringLiteral("file") && scheme != QStringLiteral("skin")) {
         return url;
     }
+    if (trimmed.startsWith(scheme + QStringLiteral("://"))) {
+        return {};
+    }
 
-    QString relativePath = trimmed.mid(QStringLiteral("skin:").size());
+    QString relativePath = trimmed.mid(scheme.size() + 1);
     while (relativePath.startsWith(QLatin1Char('/'))) {
         relativePath.remove(0, 1);
     }

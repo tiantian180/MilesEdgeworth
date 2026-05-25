@@ -9,7 +9,7 @@ qrc_path = ROOT / "apps/desktop/resources/pet_assets.qrc"
 raw = manifest_path.read_text(encoding="utf-8")
 
 if "qrc:/pet/" in raw or "qrc:/audio/" in raw:
-    raise AssertionError("built-in Miles manifest should use skin: URLs, not qrc:/pet or qrc:/audio")
+    raise AssertionError("built-in Miles manifest should use file: URLs, not qrc:/pet or qrc:/audio")
 
 manifest = json.loads(raw)
 
@@ -25,20 +25,20 @@ def walk(value):
         yield value
 
 
-skin_urls = [value for value in walk(manifest) if value.startswith("skin:")]
-if not skin_urls:
-    raise AssertionError("manifest should contain skin: URLs")
+file_urls = [value for value in walk(manifest) if value.startswith("file:")]
+if not file_urls:
+    raise AssertionError("manifest should contain file: URLs")
 
 required = [
-    "skin:assets/body/idle/stand-right.gif",
-    "skin:assets/body/locomotion/walk-east.gif",
-    "skin:assets/body/locomotion/run-east.gif",
-    "skin:assets/props/prosecutor_badge/prosecutor-badge.png",
-    "skin:assets/audio/voice/holdit0.wav",
+    "file:assets/body/idle/stand-right.gif",
+    "file:assets/body/locomotion/walk-east.gif",
+    "file:assets/body/locomotion/run-east.gif",
+    "file:assets/props/prosecutor_badge/prosecutor-badge.png",
+    "file:assets/audio/voice/holdit0.wav",
 ]
-missing = [url for url in required if url not in skin_urls]
+missing = [url for url in required if url not in file_urls]
 if missing:
-    raise AssertionError(f"missing required skin URLs: {missing}")
+    raise AssertionError(f"missing required file URLs: {missing}")
 
 qrc_text = qrc_path.read_text(encoding="utf-8")
 skin_section = re.search(
@@ -52,14 +52,14 @@ if skin_section is None:
 aliases = set(re.findall(r'alias="([^"]+)"', skin_section.group(1)))
 
 unknown = []
-for url in skin_urls:
-    relative = url[len("skin:"):].lstrip("/")
+for url in file_urls:
+    relative = url[len("file:"):].lstrip("/")
     if relative not in aliases:
         unknown.append(url)
 
 if unknown:
     raise AssertionError(
-        "skin: URLs not present in /skins/miles-edgeworth qrc aliases:\n  "
+        "file: URLs not present in /skins/miles-edgeworth qrc aliases:\n  "
         + "\n  ".join(sorted(unknown))
     )
 

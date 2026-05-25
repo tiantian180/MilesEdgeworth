@@ -22,7 +22,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
     recipes = manifest.get("recipes", {})
-    idle_entries = manifest.get("actionPools", {}).get("idle.random", {}).get("entries", [])
+    idle_entries = manifest.get("animationPools", {}).get("idle.random", {}).get("entries", [])
     idle_recipes = {entry.get("recipe") for entry in idle_entries}
 
     flip_recipe = recipes.get("idle.flipStand")
