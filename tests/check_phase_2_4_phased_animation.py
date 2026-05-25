@@ -141,9 +141,12 @@ def main() -> int:
         "canDelayCleanFinishForCurrentAnimation",
     ]:
         require(token in controller_h + controller_cpp, f"ChatController missing {token}")
-    require('currentLoopMode() == QStringLiteral("loop")' in controller_cpp,
+    can_delay_start = controller_cpp.index("bool ChatController::canDelayCleanFinishForCurrentAnimation() const")
+    can_delay_end = controller_cpp.index("void ChatController::requestGateCleanFinishIfTextDrained")
+    can_delay_body = controller_cpp[can_delay_start:can_delay_end]
+    require('currentLoopMode() == QStringLiteral("loop")' in can_delay_body,
             "ChatController must recognize loop-safe animations for delayed cleanFinish")
-    require("currentAutoReturnToIdle()" in controller_cpp,
+    require("!m_runtime->currentAutoReturnToIdle()" in can_delay_body,
             "ChatController must not delay cleanFinish for auto-return-to-idle animations")
     send_message_start = controller_cpp.index("void ChatController::sendMessageInConversation")
     send_message_end = controller_cpp.index("void ChatController::cancelCurrentReply")

@@ -138,7 +138,7 @@ flowchart LR
 | **enter-loop-exit** | enter + loop + exit | thinking、pointing、crossed | loop 播完一轮 | 播 exit → 切 |
 | **loop-only** | 单段 loop | idle_stand | 循环播完一轮 | 直接切（无 exit） |
 
-*\* `onceThenHold` 是本方案新增的 loopMode。当前 manifest 中 objecting、bow 使用 `onceThenIdle`（播完后自动回 idle）。实现 entry-only 行为需要：在 schema 中新增 `onceThenHold` 值、在 `PetSurfaceWindow` 中增加定帧处理、迁移相关 action 的 manifest 声明。*
+*\* `onceThenHold` 表示播放一次后停在最后一帧，不自动回 idle；entry-only 聊天动作使用该模式保持画面，直到 ChatController 发出下一次 expression 或 `returnToIdle`。*
 
 **干净收尾（clean finish）** 是统一的过渡机制：等动画到达安全点 → 播 exit（如果有）→ 回调。无论是 expression 切换、回复开始还是回复结束，都走同一条路径。这确保所有过渡都平滑自然。
 
