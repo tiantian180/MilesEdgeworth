@@ -144,10 +144,13 @@ def main() -> int:
     can_delay_start = controller_cpp.index("bool ChatController::canDelayCleanFinishForCurrentAnimation() const")
     can_delay_end = controller_cpp.index("void ChatController::requestGateCleanFinishIfTextDrained")
     can_delay_body = controller_cpp[can_delay_start:can_delay_end]
-    require('currentLoopMode() == QStringLiteral("loop")' in can_delay_body,
-            "ChatController must recognize loop-safe animations for delayed cleanFinish")
-    require("!m_runtime->currentAutoReturnToIdle()" in can_delay_body,
-            "ChatController must not delay cleanFinish for auto-return-to-idle animations")
+    require(re.search(
+        r"return\s+m_runtime\s*==\s*nullptr\s*\|\|\s*\(\s*"
+        r"m_runtime->currentLoopMode\(\)\s*==\s*QStringLiteral\(\"loop\"\)\s*"
+        r"&&\s*!m_runtime->currentAutoReturnToIdle\(\)\s*\)\s*;",
+        can_delay_body,
+        re.S,
+    ), "ChatController must delay cleanFinish only for missing runtime or loop-safe animations")
     gate_finish_start = controller_cpp.index("void ChatController::requestGateCleanFinishIfTextDrained")
     gate_finish_end = controller_cpp.index("void ChatController::requestFinishCleanFinishIfPacerEmpty")
     gate_finish_body = controller_cpp[gate_finish_start:gate_finish_end]
