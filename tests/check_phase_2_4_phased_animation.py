@@ -201,10 +201,20 @@ def main() -> int:
     fail_reply_start = controller_cpp.index("void ChatController::failCurrentReply")
     fail_reply_end = controller_cpp.index("void ChatController::abortPendingConversationCreate")
     fail_reply_body = controller_cpp[fail_reply_start:fail_reply_end]
-    require("m_cancelled = true" in fail_reply_body,
-            "failCurrentReply must mark the stream cancelled so stale events are ignored")
-    require("m_runtime->returnToIdle()" in fail_reply_body,
-            "failCurrentReply must abort animation by returning to idle")
+    for token, message in [
+        ("m_cancelled = true", "failCurrentReply must mark the stream cancelled so stale events are ignored"),
+        ("++m_asyncGeneration", "failCurrentReply must invalidate stale async callbacks"),
+        ("clearDeferredCleanFinishRequest()", "failCurrentReply must clear deferred cleanFinish requests"),
+        ("drainQueuedSegmentsToPacer()", "failCurrentReply must preserve locally buffered text"),
+        ("resetReplySessionState()", "failCurrentReply must reset reply session state"),
+        ("transitionTo(ChatPhase::IDLE)", "failCurrentReply must leave the chat state machine idle"),
+        ('assistantMessage.insert(QStringLiteral("pending"), false)', "failCurrentReply must clear assistant pending state"),
+        ('assistantMessage.insert(QStringLiteral("error"), true)', "failCurrentReply must mark the assistant message as error"),
+        ("setSending(false)", "failCurrentReply must clear sending"),
+        ('setStatusText(QStringLiteral("错误"))', "failCurrentReply must keep the user-visible error status"),
+        ("m_runtime->returnToIdle()", "failCurrentReply must abort animation by returning to idle"),
+    ]:
+        require(token in fail_reply_body, message)
     require('requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"))' not in fail_reply_body,
             "failCurrentReply must not request an error expression after aborting")
 
