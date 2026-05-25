@@ -98,6 +98,7 @@ private:
     void transitionTo(ChatPhase next);
     void handleCleanFinishReady();
     void requestCleanFinishForCurrentStream();
+    bool canDelayCleanFinishForCurrentAnimation() const;
     void requestGateCleanFinishIfTextDrained();
     void requestFinishCleanFinishIfPacerEmpty();
     void requestCleanFinishForStream(quint64 streamId, quint64 generation, quint64 cleanFinishId);

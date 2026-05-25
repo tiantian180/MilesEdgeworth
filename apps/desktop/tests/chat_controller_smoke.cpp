@@ -1123,6 +1123,59 @@ int main(int argc, char *argv[])
                 "runtime should idle after cleanFinish and pacerEmpty are both ready");
     }
 
+    // --- Phase 2.4: finite animations still need immediate cleanFinish protection ---
+    {
+        SettingsService finiteSettings(settingsDir.filePath(QStringLiteral("finite-settings.json")));
+        auto finiteCfg = modelConfig(QStringLiteral("finite"),
+                                     QStringLiteral("https://api.example.test/v1"),
+                                     QStringLiteral("sk-test"),
+                                     QStringLiteral("miles-test-model"));
+        require(finiteSettings.setModelConfig(finiteCfg.name, finiteCfg),
+                "finite settings should accept config");
+        finiteSettings.setActiveModelConfig(finiteCfg.name);
+        finiteSettings.setMsPerChar(120);
+
+        PetRuntime finiteRuntime;
+        for (int i = 0; i < 5 && finiteRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            finiteRuntime.handleAnimationFinished();
+        }
+        ChatController finiteController(&finiteRuntime, &finiteSettings);
+
+        ChatStreamEvent finiteStarted;
+        finiteStarted.type = QStringLiteral("RUN_STARTED");
+        finiteController.applyStreamEvent(finiteStarted);
+
+        finiteRuntime.playAction(QStringLiteral("turn_around"));
+        require(finiteRuntime.currentLoopMode() == QStringLiteral("onceThenIdle"),
+                "finite cleanFinish test should use a naturally idling action");
+
+        ChatStreamEvent finiteStart;
+        finiteStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        finiteStart.role = QStringLiteral("assistant");
+        finiteController.applyStreamEvent(finiteStart);
+
+        ChatStreamEvent finiteText;
+        finiteText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        finiteText.delta = QStringLiteral("慢慢慢慢慢");
+        finiteController.applyStreamEvent(finiteText);
+
+        ChatStreamEvent finiteFinished;
+        finiteFinished.type = QStringLiteral("RUN_FINISHED");
+        finiteController.applyStreamEvent(finiteFinished);
+
+        finiteRuntime.handleAnimationFinished();
+        require(finiteRuntime.currentActionId() == QStringLiteral("turn_around"),
+                "finite animation cleanFinish should be requested before pacerEmpty to block natural idle");
+
+        require(waitFor([&finiteController]() {
+                    return finiteController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("慢慢慢慢慢");
+                }, 2000),
+                "finite animation final text should drain before returning idle");
+        require(finiteRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "finite animation should return idle after cleanFinish and pacerEmpty are both ready");
+    }
+
     // --- Phase 2.4: RUN_FINISHED must not cleanFinish talking before pacerEmpty ---
     {
         SettingsService talkingSettings(settingsDir.filePath(QStringLiteral("talking-settings.json")));
