@@ -148,6 +148,32 @@ def main() -> int:
             "ChatController must recognize loop-safe animations for delayed cleanFinish")
     require("!m_runtime->currentAutoReturnToIdle()" in can_delay_body,
             "ChatController must not delay cleanFinish for auto-return-to-idle animations")
+    gate_finish_start = controller_cpp.index("void ChatController::requestGateCleanFinishIfTextDrained")
+    gate_finish_end = controller_cpp.index("void ChatController::requestFinishCleanFinishIfPacerEmpty")
+    gate_finish_body = controller_cpp[gate_finish_start:gate_finish_end]
+    require("!m_textDrained && canDelayCleanFinishForCurrentAnimation()" in gate_finish_body,
+            "ChatController gate cleanFinish must wait for text drain when the animation can keep looping")
+    require("requestCleanFinishForCurrentStream()" in gate_finish_body,
+            "ChatController gate cleanFinish helper must request the current stream cleanFinish")
+    finish_start = controller_cpp.index("void ChatController::requestFinishCleanFinishIfPacerEmpty")
+    finish_end = controller_cpp.index("void ChatController::requestCleanFinishForStream")
+    finish_body = controller_cpp[finish_start:finish_end]
+    require("!m_pacerEmpty && canDelayCleanFinishForCurrentAnimation()" in finish_body,
+            "ChatController final cleanFinish must wait for pacer empty when the animation can keep looping")
+    require("requestCleanFinishForCurrentStream()" in finish_body,
+            "ChatController final cleanFinish helper must request the current stream cleanFinish")
+    enter_gate_start = controller_cpp.index("void ChatController::enterGateForNextSegment")
+    enter_gate_end = controller_cpp.index("void ChatController::maybeAdvanceGate")
+    enter_gate_body = controller_cpp[enter_gate_start:enter_gate_end]
+    require("requestGateCleanFinishIfTextDrained()" in enter_gate_body,
+            "ChatController enterGateForNextSegment must use the gated cleanFinish helper")
+    require("requestCleanFinishForCurrentStream()" not in enter_gate_body,
+            "ChatController enterGateForNextSegment must not eagerly request cleanFinish")
+    maybe_advance_start = controller_cpp.index("void ChatController::maybeAdvanceGate")
+    maybe_advance_end = controller_cpp.index("void ChatController::maybeFinishWaitingForAnimationEnd")
+    maybe_advance_body = controller_cpp[maybe_advance_start:maybe_advance_end]
+    require("requestFinishCleanFinishIfPacerEmpty()" in maybe_advance_body,
+            "ChatController WAITING entry must use the pacer-aware final cleanFinish helper")
     send_message_start = controller_cpp.index("void ChatController::sendMessageInConversation")
     send_message_end = controller_cpp.index("void ChatController::cancelCurrentReply")
     send_message_body = controller_cpp[send_message_start:send_message_end]

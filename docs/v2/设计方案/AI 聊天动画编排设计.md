@@ -402,24 +402,26 @@ reply session 包含：
   cancelled         — 是否被用户取消
 ```
 
-reply session 开始于 `RUN_STARTED`，结束于以下条件**全部满足**：
+正常 reply session 开始于 `RUN_STARTED`，结束于以下条件**全部满足**：
 
-1. provider stream 结束（收到 `RUN_FINISHED`）或用户取消。
+1. provider stream 结束（收到 `RUN_FINISHED`）。
 2. segment queue 为空。
 3. 速率限制器队列为空。
 4. 当前 expression 动画已 clean finish。
 
 `assistantMessageIndex` 在 reply session 结束后重置为 -1。在此之前保持有效，因为速率限制器可能仍在吐字。
 
+用户取消、provider 出错、网络断开不走上述正常结束条件，而是走 §7.6 的立即中止路径。
+
 ### 7.6 取消与错误
 
 用户取消、provider 出错、网络断开时：
 
 - 任何状态都标记 `cancelled = true`，递增 `asyncGeneration` 使所有待执行回调失效。
-- segment queue 中所有剩余 textBuffer **全部 drain 到速率限制器**（不丢用户已经"看到一半"的回复）。
-- 速率限制器继续按人类节奏吐完剩余字符。
-- 进入和正常结束一致的收尾路径：按当前动画类型决定 cleanFinish 请求时机，等速率限制器清空和动画收尾都完成后再回 idle，不硬切。
-- `assistantMessageIndex` 在速率限制器清空后重置。
+- segment queue 中已到达本地的剩余 textBuffer drain 到速率限制器，尽量保留已经收到的内容。
+- 清理 reply session 状态，转 `IDLE`，恢复 PetRuntime 自动 idle 兜底。
+- 立即调用 `returnToIdle()`，不等待 `pacerEmpty` 或 cleanFinish。当前实现把取消 / 错误视为中止路径，而不是正常回复的优雅收尾路径。
+- 如果已有 assistant 消息，立即取消 pending 标记；后续旧 stream 回调由 `asyncGeneration` / `cancelled` 防护丢弃。
 
 ### 7.7 安全超时
 
@@ -663,7 +665,7 @@ sequenceDiagram
 | 组合 | 行为 |
 | --- | --- |
 | **A. 可循环动画 + 文字长** | 动画 enter → loop 持续循环。下一 expression 到来时，若当前段文字仍在 paced，则先保持 loop；`segmentDrained` 后请求 clean finish，等当前循环安全点 → 播 exit（如有）→ 切到新动画。RUN_FINISHED 时同理：等 `pacerEmpty` 后请求 clean finish，再回 idle |
-| **B. entry-only 动画 + 文字长** | 动画播一次定格末帧（onceThenHold），文字继续流出。下一 expression 到来 → 立即切换（已定帧 + 无 exit = 即时回调） |
+| **B. entry-only 动画 + 文字长** | 动画播一次定格末帧（onceThenHold），文字继续流出。下一 expression 到来后，entry-only 的 cleanFinish 可以立即 ready（已定帧 + 无 exit），但实际 expression 切换仍必须等待当前 segment 文字 `segmentDrained` |
 | **C. 动画 + 文字短** | 文字提前流完，RUN_FINISHED 后 segment queue 已空，转 WAITING_FOR_ANIMATION_END。动画 clean finish 后回 idle |
 | **D. 文字快速涌入** | segment queue / 速率限制器积压触发追平机制，临时提速消化积压 |
 
