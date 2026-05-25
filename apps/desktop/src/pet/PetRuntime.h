@@ -268,6 +268,7 @@ private:
     QTimer *m_cleanFinishSafetyTimer = nullptr;
     QTimer *m_autoIdleTimer = nullptr;
     bool m_cleanFinishExitInProgress = false;
+    bool m_returnToIdleAfterExit = false;
     bool m_suppressAutoIdle = false;
 
     static constexpr int kCleanFinishSafetyMs = 2000;

@@ -184,6 +184,7 @@ void PetRuntime::playRecipe(const QString &recipeId)
     }
 
     const bool recipeChanged = (m_currentRecipeId != nextRecipeId);
+    m_returnToIdleAfterExit = false;
     m_currentRecipeId = nextRecipeId;
     m_currentRecipeStepIndex = -1;
 
@@ -486,6 +487,7 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
                                       << QStringLiteral("requested=%1").arg(actionId)
                                       << QStringLiteral("resolved=%1").arg(nextActionId)
                                       << QStringLiteral("resetRecipe=%1").arg(logBool(resetRecipe));
+    m_returnToIdleAfterExit = false;
     setCurrentAction(nextActionId, m_manifest.actions.value(nextActionId));
 }
 
@@ -503,11 +505,15 @@ void PetRuntime::returnToIdle()
     clearActiveRecipe();
 
     const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
-    if (!action.exitPhase.isEmpty() && m_currentPhaseId != action.exitPhase) {
+    if (!action.exitPhase.isEmpty()
+            && m_currentPhaseId != action.exitPhase
+            && action.phases.contains(action.exitPhase)) {
+        m_returnToIdleAfterExit = true;
         playPhase(m_currentActionId, action.exitPhase);
         return;
     }
 
+    m_returnToIdleAfterExit = false;
     setState("idle");
     continueCleanFinishIfPossible();
 }
@@ -536,6 +542,13 @@ void PetRuntime::handleAnimationFinished()
     }
 
     if (continueCleanFinishIfPossible()) {
+        return;
+    }
+
+    if (m_returnToIdleAfterExit) {
+        m_returnToIdleAfterExit = false;
+        setState(QStringLiteral("idle"));
+        continueCleanFinishIfPossible();
         return;
     }
 

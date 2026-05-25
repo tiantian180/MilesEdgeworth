@@ -969,7 +969,18 @@ int main(int argc, char *argv[])
         require(runtime.currentActionId() == "bow",
                 "suppressAutoIdle should prevent the 3000ms fallback idle during reply sessions");
         runtime.setSuppressAutoIdle(false);
+        runtime.playAction("talking");
+        runtime.handleAnimationFinished();
+        require(runtime.currentPhaseId() == "loop",
+                "talking should reach loop before direct returnToIdle");
         runtime.returnToIdle();
+        require(runtime.currentPhaseId() == "exit",
+                "direct returnToIdle from phased action should play exit first");
+        runtime.handleAnimationFinished();
+        require(runtime.currentState() == "idle",
+                "direct returnToIdle should switch to idle after phased exit finishes");
+        require(runtime.currentActionId() == "idle_stand",
+                "direct returnToIdle should restore idle action after phased exit finishes");
     }
 
     runtime.playRecipe("doubleClick.holdIt");
