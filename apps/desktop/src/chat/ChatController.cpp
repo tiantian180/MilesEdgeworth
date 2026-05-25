@@ -853,7 +853,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
             transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
             m_animationReady = false;
             m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
-            requestCleanFinishForCurrentStream();
+            requestFinishCleanFinishIfPacerEmpty();
             maybeFinishWaitingForAnimationEnd();
         } else if (m_phase == ChatPhase::GATED) {
             maybeAdvanceGate();
@@ -861,7 +861,7 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
             transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
             m_animationReady = false;
             m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
-            requestCleanFinishForCurrentStream();
+            requestFinishCleanFinishIfPacerEmpty();
             maybeFinishWaitingForAnimationEnd();
         }
         return;
@@ -960,7 +960,7 @@ void ChatController::handleCleanFinishReady()
                 transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
                 m_animationReady = false;
                 m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
-                requestCleanFinishForCurrentStream();
+                requestFinishCleanFinishIfPacerEmpty();
                 maybeFinishWaitingForAnimationEnd();
             } else {
                 transitionTo(ChatPhase::STREAMING);
@@ -982,7 +982,7 @@ void ChatController::handleCleanFinishReady()
             m_animationReady = !appliedPendingThinking;
             m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
             if (appliedPendingThinking) {
-                requestCleanFinishForCurrentStream();
+                requestFinishCleanFinishIfPacerEmpty();
             }
             maybeFinishWaitingForAnimationEnd();
             return;
@@ -1017,6 +1017,33 @@ void ChatController::requestCleanFinishForCurrentStream()
     }
 
     requestCleanFinishForStream(m_currentStreamId, m_asyncGeneration, cleanFinishId);
+}
+
+void ChatController::requestGateCleanFinishIfTextDrained()
+{
+    if (m_phase != ChatPhase::GATED
+            || m_animationReady
+            || !m_textDrained
+            || m_cleanFinishRequestPending
+            || m_deferredCleanFinishStreamId != 0) {
+        return;
+    }
+
+    m_gateTimeout.start(kGateTimeoutMs);
+    requestCleanFinishForCurrentStream();
+}
+
+void ChatController::requestFinishCleanFinishIfPacerEmpty()
+{
+    if (m_phase != ChatPhase::WAITING_FOR_ANIMATION_END
+            || m_animationReady
+            || !m_pacerEmpty
+            || m_cleanFinishRequestPending
+            || m_deferredCleanFinishStreamId != 0) {
+        return;
+    }
+
+    requestCleanFinishForCurrentStream();
 }
 
 void ChatController::requestCleanFinishForStream(quint64 streamId, quint64 generation, quint64 cleanFinishId)
@@ -1061,8 +1088,8 @@ void ChatController::requestDeferredCleanFinishIfPossible()
     }
     if (cleanFinishId == m_cleanFinishRequestId
             && (m_phase == ChatPhase::BUFFERING_FOR_START
-                || m_phase == ChatPhase::GATED
-                || m_phase == ChatPhase::WAITING_FOR_ANIMATION_END)) {
+                || (m_phase == ChatPhase::GATED && m_textDrained)
+                || (m_phase == ChatPhase::WAITING_FOR_ANIMATION_END && m_pacerEmpty))) {
         requestCleanFinishForStream(streamId, generation, cleanFinishId);
     }
 }
@@ -1151,8 +1178,7 @@ void ChatController::enterGateForNextSegment()
     } else {
         m_textDrained = m_pacer->pendingCount() == 0;
     }
-    m_gateTimeout.start(kGateTimeoutMs);
-    requestCleanFinishForCurrentStream();
+    requestGateCleanFinishIfTextDrained();
     maybeAdvanceGate();
 }
 
@@ -1170,8 +1196,7 @@ void ChatController::maybeAdvanceGate()
         m_textDrained = (m_pacer != nullptr)
             ? m_pacer->pendingCountForSegment(m_activeSegmentId) == 0
             : true;
-        m_gateTimeout.start(kGateTimeoutMs);
-        requestCleanFinishForCurrentStream();
+        requestGateCleanFinishIfTextDrained();
         maybeAdvanceGate();
         return;
     }
@@ -1180,7 +1205,7 @@ void ChatController::maybeAdvanceGate()
         transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
         m_animationReady = false;
         m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
-        requestCleanFinishForCurrentStream();
+        requestFinishCleanFinishIfPacerEmpty();
         maybeFinishWaitingForAnimationEnd();
         return;
     }
@@ -1223,6 +1248,7 @@ void ChatController::handleSegmentDrained(int segmentId)
 {
     if (m_phase == ChatPhase::GATED && segmentId == m_activeSegmentId) {
         m_textDrained = true;
+        requestGateCleanFinishIfTextDrained();
         maybeAdvanceGate();
     }
 }
@@ -1232,8 +1258,10 @@ void ChatController::handlePacerEmpty()
     m_pacerEmpty = true;
     if (m_phase == ChatPhase::GATED && m_activeSegmentId < 0) {
         m_textDrained = true;
+        requestGateCleanFinishIfTextDrained();
         maybeAdvanceGate();
     }
+    requestFinishCleanFinishIfPacerEmpty();
     maybeFinishWaitingForAnimationEnd();
 }
 

@@ -98,6 +98,8 @@ private:
     void transitionTo(ChatPhase next);
     void handleCleanFinishReady();
     void requestCleanFinishForCurrentStream();
+    void requestGateCleanFinishIfTextDrained();
+    void requestFinishCleanFinishIfPacerEmpty();
     void requestCleanFinishForStream(quint64 streamId, quint64 generation, quint64 cleanFinishId);
     void deferCleanFinishRequest(quint64 streamId, quint64 generation, quint64 cleanFinishId);
     void requestDeferredCleanFinishIfPossible();
