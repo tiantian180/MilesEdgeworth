@@ -1573,6 +1573,7 @@ void ChatController::finishCurrentReply()
 void ChatController::failCurrentReply(const QString &message)
 {
     const QString text = message.trimmed().isEmpty() ? QStringLiteral("请求失败") : message.trimmed();
+    m_cancelled = true;
     bool hasBufferedText = !m_preExpressionBuffer.isEmpty();
     for (const ExpressionSegment &segment : std::as_const(m_segmentQueue)) {
         hasBufferedText = hasBufferedText || !segment.textBuffer.isEmpty();

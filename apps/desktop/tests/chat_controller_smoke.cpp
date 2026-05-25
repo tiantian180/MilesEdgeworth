@@ -917,6 +917,14 @@ int main(int argc, char *argv[])
                 "RUN_ERROR during GATED must not create a ghost assistant message");
         require(eController.messages().constLast().toMap().value(QStringLiteral("error")).toBool(),
                 "RUN_ERROR during GATED should mark the assistant message as error");
+
+        ChatStreamEvent staleAfterError;
+        staleAfterError.type = QStringLiteral("RUN_FINISHED");
+        eController.applyStreamEvent(staleAfterError);
+        require(eController.statusText() == QStringLiteral("错误"),
+                "stale RUN_FINISHED after RUN_ERROR must not overwrite error status");
+        require(eRuntime.currentState() == QStringLiteral("idle"),
+                "stale RUN_FINISHED after RUN_ERROR must not restart animation handling");
     }
 
     // --- Phase 2.4: expression after unsegmented text must wait for pacerEmpty ---
@@ -1369,6 +1377,19 @@ int main(int argc, char *argv[])
 
     // --- Phase 2.3.1: sendMessage must invalidate stale pacer chunks before RUN_STARTED ---
     {
+        QTcpServer holdServer;
+        QList<QTcpSocket *> heldSockets;
+        const bool holdServerListening = holdServer.listen(QHostAddress::LocalHost, 39710);
+        if (holdServerListening) {
+            QObject::connect(&holdServer, &QTcpServer::newConnection, &holdServer, [&holdServer, &heldSockets]() {
+                while (holdServer.hasPendingConnections()) {
+                    QTcpSocket *socket = holdServer.nextPendingConnection();
+                    socket->setParent(&holdServer);
+                    heldSockets.append(socket);
+                }
+            });
+        }
+
         PetRuntime sRuntime;
         for (int i = 0; i < 5 && sRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
             sRuntime.handleAnimationFinished();
@@ -1395,27 +1416,29 @@ int main(int argc, char *argv[])
         sController.applyStreamEvent(firstFinished);
         sRuntime.handleAnimationFinished();
 
-        sController.switchConversation(QStringLiteral("smoke-conversation"));
-        sController.sendMessage(QStringLiteral("next"));
-        waitFor([]() { return false; }, 200);
+        if (holdServerListening) {
+            sController.switchConversation(QStringLiteral("smoke-conversation"));
+            sController.sendMessage(QStringLiteral("next"));
+            waitFor([]() { return false; }, 200);
 
-        const auto messages = sController.messages();
-        require(!messages.constLast().toMap().value(QStringLiteral("text")).toString().contains(QStringLiteral("旧")),
-                "sendMessage should invalidate stale pacer chunks before sidecar RUN_STARTED arrives");
+            const auto messages = sController.messages();
+            require(!messages.constLast().toMap().value(QStringLiteral("text")).toString().contains(QStringLiteral("旧")),
+                    "sendMessage should invalidate stale pacer chunks before sidecar RUN_STARTED arrives");
 
-        ChatStreamEvent nextStarted;
-        nextStarted.type = QStringLiteral("RUN_STARTED");
-        sController.applyStreamEvent(nextStarted);
-        sRuntime.handleAnimationFinished();
-        ChatStreamEvent nextText;
-        nextText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
-        nextText.delta = QStringLiteral("新");
-        sController.applyStreamEvent(nextText);
-        require(waitFor([&sController]() {
-                    return sController.messages().constLast().toMap()
-                        .value(QStringLiteral("text")).toString().contains(QStringLiteral("新"));
-                }, 500),
-                "new reply text should not wait for stale pacer chunks to drain");
+            ChatStreamEvent nextStarted;
+            nextStarted.type = QStringLiteral("RUN_STARTED");
+            sController.applyStreamEvent(nextStarted);
+            sRuntime.handleAnimationFinished();
+            ChatStreamEvent nextText;
+            nextText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+            nextText.delta = QStringLiteral("新");
+            sController.applyStreamEvent(nextText);
+            require(waitFor([&sController]() {
+                        return sController.messages().constLast().toMap()
+                            .value(QStringLiteral("text")).toString().contains(QStringLiteral("新"));
+                    }, 500),
+                    "new reply text should not wait for stale pacer chunks to drain");
+        }
     }
 
     // --- Phase 2.4: sendMessage should wait for lifecycle thinking instead of pre-starting thinking ---

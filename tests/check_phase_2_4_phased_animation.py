@@ -201,6 +201,8 @@ def main() -> int:
     fail_reply_start = controller_cpp.index("void ChatController::failCurrentReply")
     fail_reply_end = controller_cpp.index("void ChatController::abortPendingConversationCreate")
     fail_reply_body = controller_cpp[fail_reply_start:fail_reply_end]
+    require("m_cancelled = true" in fail_reply_body,
+            "failCurrentReply must mark the stream cancelled so stale events are ignored")
     require("m_runtime->returnToIdle()" in fail_reply_body,
             "failCurrentReply must abort animation by returning to idle")
     require('requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"))' not in fail_reply_body,
