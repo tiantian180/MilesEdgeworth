@@ -91,6 +91,7 @@ public:
     QString currentMovementDirection() const { return m_currentMovementDirection; }
     QString currentLoopMode() const { return m_currentLoopMode; }
     bool currentAutoReturnToIdle() const { return m_currentAutoReturnToIdle; }
+    bool currentPhaseWillReachSustainedLoop() const;
     bool audioMuted() const { return m_audioController.muted(); }
     QString currentAudioLanguageId() const { return m_audioController.currentLanguageId(); }
     QVariantList availableAudioLanguages() const { return m_audioController.availableLanguages(); }

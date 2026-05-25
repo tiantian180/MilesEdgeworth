@@ -133,6 +133,9 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
         connect(m_runtime, &PetRuntime::skinManifestReloaded, this, [this]() {
             setConversationSkinState(m_currentConversationSkinId);
         });
+        connect(m_runtime, &PetRuntime::currentLoopModeChanged, this, [this]() {
+            requestFinishCleanFinishIfPacerEmpty();
+        });
     }
 }
 
@@ -1051,6 +1054,13 @@ void ChatController::requestFinishCleanFinishIfPacerEmpty()
         return;
     }
     if (!m_pacerEmpty && canDelayCleanFinishForCurrentAnimation()) {
+        return;  // pacer still has content, wait
+    }
+    // Pacer drained but animation hasn't reached its loop phase yet — wait
+    // for currentLoopModeChanged to re-trigger this function
+    if (m_runtime != nullptr
+            && m_runtime->currentPhaseWillReachSustainedLoop()
+            && m_runtime->currentLoopMode() != QStringLiteral("loop")) {
         return;
     }
 

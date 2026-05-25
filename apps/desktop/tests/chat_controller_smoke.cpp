@@ -1255,6 +1255,78 @@ int main(int argc, char *argv[])
                 "runtime should return to idle after talking exit cleanFinish");
     }
 
+    // --- Phase 2.4: RUN_FINISHED during talking enter must not cleanFinish before loop phase ---
+    {
+        SettingsService earlyFinishSettings(settingsDir.filePath(QStringLiteral("early-finish-settings.json")));
+        auto earlyFinishCfg = modelConfig(QStringLiteral("early-finish"),
+                                          QStringLiteral("https://api.example.test/v1"),
+                                          QStringLiteral("sk-test"),
+                                          QStringLiteral("miles-test-model"));
+        require(earlyFinishSettings.setModelConfig(earlyFinishCfg.name, earlyFinishCfg),
+                "early finish settings should accept config");
+        earlyFinishSettings.setActiveModelConfig(earlyFinishCfg.name);
+        earlyFinishSettings.setMsPerChar(120);
+
+        PetRuntime earlyFinishRuntime;
+        for (int i = 0; i < 5 && earlyFinishRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            earlyFinishRuntime.handleAnimationFinished();
+        }
+        ChatController earlyFinishController(&earlyFinishRuntime, &earlyFinishSettings);
+
+        ChatStreamEvent efStarted;
+        efStarted.type = QStringLiteral("RUN_STARTED");
+        earlyFinishController.applyStreamEvent(efStarted);
+
+        ChatStreamEvent efExpr;
+        efExpr.type = QStringLiteral("CUSTOM");
+        efExpr.name = QStringLiteral("miles.pet.expression.requested");
+        efExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        efExpr.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+        earlyFinishController.applyStreamEvent(efExpr);
+
+        ChatStreamEvent efTextStart;
+        efTextStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        efTextStart.role = QStringLiteral("assistant");
+        earlyFinishController.applyStreamEvent(efTextStart);
+
+        ChatStreamEvent efText;
+        efText.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        efText.delta = QStringLiteral("短短");
+        earlyFinishController.applyStreamEvent(efText);
+
+        // RUN_FINISHED arrives before talking has left enter phase
+        require(earlyFinishRuntime.currentPhaseId() == QStringLiteral("enter"),
+                "talking should be in enter phase when RUN_FINISHED arrives");
+        ChatStreamEvent efFinished;
+        efFinished.type = QStringLiteral("RUN_FINISHED");
+        earlyFinishController.applyStreamEvent(efFinished);
+
+        // Wait for pacer to drain — talking must still be in enter, not exit
+        require(waitFor([&earlyFinishController]() {
+                    return earlyFinishController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("短短");
+                }, 2000),
+                "text should drain even when RUN_FINISHED arrived during talking enter");
+        require(earlyFinishRuntime.currentPhaseId() == QStringLiteral("enter"),
+                "talking must not exit prematurely when pacer drains during enter phase");
+
+        // enter → loop: currentLoopModeChanged fires cleanFinish since pacer already empty
+        earlyFinishRuntime.handleAnimationFinished();
+        require(earlyFinishRuntime.currentPhaseId() == QStringLiteral("loop"),
+                "talking should advance from enter to loop");
+
+        // loop boundary: cleanFinish fires → exit
+        earlyFinishRuntime.handleAnimationFinished();
+        require(earlyFinishRuntime.currentPhaseId() == QStringLiteral("exit"),
+                "talking should move to exit after loop cleanFinish fires");
+
+        earlyFinishRuntime.handleAnimationFinished();
+        require(waitFor([&earlyFinishRuntime]() {
+                    return earlyFinishRuntime.currentState() == QStringLiteral("idle");
+                }, 500),
+                "runtime should return to idle after talking exit in early-finish scenario");
+    }
+
     // --- Phase 2.4: GATED must not cleanFinish current segment before segmentDrained ---
     {
         SettingsService gatedSettings(settingsDir.filePath(QStringLiteral("gated-talking-settings.json")));

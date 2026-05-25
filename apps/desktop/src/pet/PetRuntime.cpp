@@ -975,6 +975,29 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
 
 }
 
+bool PetRuntime::currentPhaseWillReachSustainedLoop() const
+{
+    if (m_currentActionId.isEmpty() || m_currentPhaseId.isEmpty()) {
+        return false;
+    }
+    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
+    QString phaseId = m_currentPhaseId;
+    QSet<QString> visited;
+    while (!phaseId.isEmpty() && !visited.contains(phaseId)) {
+        if (!action.phases.contains(phaseId)) {
+            return false;
+        }
+        visited.insert(phaseId);
+        const PhaseDefinition phase = action.phases.value(phaseId);
+        const QString loopMode = phase.loopMode.isEmpty() ? QStringLiteral("loop") : phase.loopMode;
+        if (loopMode == QStringLiteral("loop")) {
+            return true;
+        }
+        phaseId = phase.nextPhase;
+    }
+    return false;
+}
+
 bool PetRuntime::cleanFinishBoundaryReached() const
 {
     if (m_currentActionId.isEmpty()) {
