@@ -876,6 +876,14 @@ int main(int argc, char *argv[])
                 "runtime-controlled thinking loop should not auto-advance to exit without cleanFinish");
         require(runtime.currentRecipeId() == "thinking.holdUntilCancelled",
                 "runtime-controlled thinking recipe should remain active while loop is held by runtime");
+        const int thinkingLoopSerial = runtime.playbackSerial();
+        runtime.playRecipe("thinking.holdUntilCancelled");
+        require(runtime.currentRecipeId() == "thinking.holdUntilCancelled",
+                "duplicate thinking recipe request should keep the active recipe");
+        require(runtime.currentPhaseId() == "loop",
+                "duplicate thinking recipe request must not restart the enter phase");
+        require(runtime.playbackSerial() == thinkingLoopSerial,
+                "duplicate thinking recipe request must not restart QMovie playback");
 
         int thinkingCleanFinishCallbacks = 0;
         runtime.requestCleanFinishAndNotify([&thinkingCleanFinishCallbacks]() {

@@ -179,6 +179,10 @@ void PetRuntime::playRecipe(const QString &recipeId)
         return;
     }
 
+    if (m_currentRecipeId == nextRecipeId && m_currentRecipeStepRuntimeControlled) {
+        return;
+    }
+
     const bool recipeChanged = (m_currentRecipeId != nextRecipeId);
     m_currentRecipeId = nextRecipeId;
     m_currentRecipeStepIndex = -1;
