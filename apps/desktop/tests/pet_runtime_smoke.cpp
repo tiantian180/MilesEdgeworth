@@ -981,6 +981,23 @@ int main(int argc, char *argv[])
                 "direct returnToIdle should switch to idle after phased exit finishes");
         require(runtime.currentActionId() == "idle_stand",
                 "direct returnToIdle should restore idle action after phased exit finishes");
+
+        runtime.playAction("talking");
+        runtime.handleAnimationFinished();
+        int returnCleanFinishCallbacks = 0;
+        runtime.requestCleanFinishAndNotify([&returnCleanFinishCallbacks]() {
+            ++returnCleanFinishCallbacks;
+        });
+        runtime.returnToIdle();
+        require(runtime.currentPhaseId() == "exit",
+                "returnToIdle with pending cleanFinish should still play exit first");
+        runtime.handleAnimationFinished();
+        require(returnCleanFinishCallbacks == 1,
+                "pending cleanFinish should fire at returnToIdle exit boundary");
+        require(runtime.currentState() == "idle",
+                "returnToIdle should complete idle after cleanFinish callback at exit boundary");
+        require(runtime.currentActionId() == "idle_stand",
+                "returnToIdle should restore idle action after cleanFinish callback at exit boundary");
     }
 
     runtime.playRecipe("doubleClick.holdIt");

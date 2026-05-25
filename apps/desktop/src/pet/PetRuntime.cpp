@@ -541,7 +541,13 @@ void PetRuntime::handleAnimationFinished()
         return;
     }
 
+    const int cleanFinishPlaybackSerial = m_playbackSerial;
     if (continueCleanFinishIfPossible()) {
+        if (m_returnToIdleAfterExit && m_playbackSerial == cleanFinishPlaybackSerial) {
+            m_returnToIdleAfterExit = false;
+            setState(QStringLiteral("idle"));
+            continueCleanFinishIfPossible();
+        }
         return;
     }
 
