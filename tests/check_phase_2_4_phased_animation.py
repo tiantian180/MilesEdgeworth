@@ -136,8 +136,20 @@ def main() -> int:
         "miles.pet.lifecycle",
         "maybeAdvanceGate",
         "maybeFinishWaitingForAnimationEnd",
+        "requestGateCleanFinishIfTextDrained",
+        "requestFinishCleanFinishIfPacerEmpty",
+        "canDelayCleanFinishForCurrentAnimation",
     ]:
         require(token in controller_h + controller_cpp, f"ChatController missing {token}")
+    require('currentLoopMode() == QStringLiteral("loop")' in controller_cpp,
+            "ChatController must recognize loop-safe animations for delayed cleanFinish")
+    require("currentAutoReturnToIdle()" in controller_cpp,
+            "ChatController must not delay cleanFinish for auto-return-to-idle animations")
+    send_message_start = controller_cpp.index("void ChatController::sendMessageInConversation")
+    send_message_end = controller_cpp.index("void ChatController::cancelCurrentReply")
+    send_message_body = controller_cpp[send_message_start:send_message_end]
+    require('requestPetExpression(QStringLiteral("thinking"), QStringLiteral("neutral"));' not in send_message_body,
+            "sendMessageInConversation must wait for lifecycle thinking instead of pre-starting thinking")
 
     require('"miles.pet.lifecycle"' in provider_go, "Go provider must emit lifecycle event")
     require('"miles.pet.expression.requested"' in provider_go, "Go provider must still emit expression events")

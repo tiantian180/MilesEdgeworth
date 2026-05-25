@@ -226,7 +226,7 @@ sidecar 向 ChatController 发送两类 CUSTOM 事件：
 | --- | --- | --- |
 | `thinking` | `RUN_STARTED` 后、首个 `[EXPR:tag]` 前 | 请求 thinking expression，不影响 segment queue |
 
-> 注：当前 Go provider 在流结束时还发一个 `state: "idle"` 的 expression 事件（`provider.go:365`）。这个事件与 `RUN_FINISHED` 语义重复——ChatController 的 `WAITING_FOR_ANIMATION_END` 已通过 cleanFinish 处理回 idle 的过渡。Phase 2.4 应移除该 idle 事件，避免被 segment queue 误入队。
+> 注：Go provider 不应在流结束时额外发送 `state: "idle"` expression 事件。回 idle 由 ChatController 在 `RUN_FINISHED` 后通过 `WAITING_FOR_ANIMATION_END` 统一处理，避免 idle 被 segment queue 误入队。
 
 ### 6.2 事件序列
 
@@ -279,8 +279,8 @@ state PARSING_TAG:
 | `IDLE` | 没有活跃回复 |
 | `BUFFERING_FOR_START` | RUN_STARTED 已收到，等待 PetRuntime 干净收尾当前动画 |
 | `STREAMING` | 当前 expression 动画进行中，文字正常流出 |
-| `GATED` | 收到新 expression 事件或 segment queue 有待处理段，等待双条件满足（动画干净收尾 + 当前段文字吐完） |
-| `WAITING_FOR_ANIMATION_END` | RUN_FINISHED 已到且所有 segment 已处理完，等待动画自然收尾后回 idle |
+| `GATED` | 收到新 expression 事件或 segment queue 有待处理段，等待双条件满足（动画可切换 + 当前段文字吐完） |
+| `WAITING_FOR_ANIMATION_END` | RUN_FINISHED 已到且所有 segment 已处理完，等待动画可结束且文字吐完后回 idle |
 
 ### 7.2 Segment Queue
 
@@ -311,8 +311,9 @@ segment queue 的工作方式：
 - **双条件门控**：GATED 状态下，切换到下一段需要两个条件**同时满足**：
   1. `cleanFinishReady`：当前动画已干净收尾（exit 已播完）。
   2. `segmentDrained(segmentId)`：速率限制器已吐完当前段的所有文字。
+- **cleanFinish 请求时机**：双条件不变，但请求 cleanFinish 的时间取决于当前动画。若当前动画可以安全持续循环（`currentLoopMode == loop` 且不会自动回 idle），ChatController 等 `segmentDrained` 后才请求 cleanFinish，避免 talking loop 在文字仍被 paced 时提前退出。若当前动画是有限动画或会自然回 idle，ChatController 立即请求 cleanFinish 作为保护，但仍要等 `segmentDrained` 才能切到下一段。
 - 双条件都满足 → **激活下一段**：取 queue 头部 segment，设 `m_activeSegmentId = segment.segmentId`、`m_activeExpression = segment.expression`，请求 expression，把 textBuffer 喂给速率限制器（带 segmentId）。
-- 如果激活后 queue 还有剩余 segment → 请求新一轮 cleanFinish，留在 GATED。
+- 如果激活后 queue 还有剩余 segment → 按当前动画类型决定立即请求或延迟请求新一轮 cleanFinish，留在 GATED。
 - queue 空了 → 转 STREAMING。
 
 **为什么需要双条件**：如果只等动画收尾就切换，上一段长文本还在速率限制器里按节奏吐字时，动画已经切到新 expression——违背"expression A 的动画播放时才流出 expression A 的文字"的核心原则。双条件确保文字和动画严格分段同步。
@@ -326,12 +327,12 @@ stateDiagram-v2
     [*] --> IDLE
     IDLE --> BUFFERING_FOR_START: RUN_STARTED<br/>requestCleanFinishAndNotify
     BUFFERING_FOR_START --> STREAMING: cleanFinishReady + queue 空<br/>requestExpression + flush
-    BUFFERING_FOR_START --> GATED: cleanFinishReady + queue 非空<br/>requestExpression + flush 首段<br/>requestCleanFinish
-    STREAMING --> GATED: expression.requested<br/>requestCleanFinishAndNotify
+    BUFFERING_FOR_START --> GATED: cleanFinishReady + queue 非空<br/>requestExpression + flush 首段<br/>按动画类型请求 cleanFinish
+    STREAMING --> GATED: expression.requested<br/>按动画类型请求 cleanFinish
     GATED --> STREAMING: 双条件满足 + queue 空<br/>requestExpression + flush
-    GATED --> GATED: 双条件满足 + queue 非空<br/>requestExpression + flush 首段<br/>requestCleanFinish
-    STREAMING --> WAITING_FOR_ANIMATION_END: 流已结束 + queue 空<br/>requestCleanFinishAndNotify
-    GATED --> WAITING_FOR_ANIMATION_END: 双条件满足 + 流已结束 + 处理完最后 segment<br/>requestCleanFinishAndNotify
+    GATED --> GATED: 双条件满足 + queue 非空<br/>requestExpression + flush 首段<br/>按动画类型请求 cleanFinish
+    STREAMING --> WAITING_FOR_ANIMATION_END: 流已结束 + queue 空<br/>按动画类型请求 cleanFinish
+    GATED --> WAITING_FOR_ANIMATION_END: 双条件满足 + 流已结束 + 处理完最后 segment<br/>按动画类型请求 cleanFinish
     WAITING_FOR_ANIMATION_END --> IDLE: cleanFinishReady + pacerEmpty
 ```
 
@@ -345,20 +346,25 @@ stateDiagram-v2
 | `expression.requested` | 创建新 segment 入队。如果 hold buffer 有内容，移入该 segment 的 textBuffer。 |
 | `lifecycle.thinking` | 记录 `pendingThinkingExpression`，等 cleanFinish 后请求。 |
 | `RUN_FINISHED` | 标记 `streamFinished = true`，不清空 segment queue，继续等 cleanFinishReady。 |
-| `cleanFinishReady` | **先判断 queue 是否为空**：如果 queue 为空且有 `pendingThinkingExpression`，请求 thinking expression，转 STREAMING（等后续 expression.requested 到来再入 GATED）。如果 queue 非空，**跳过 pendingThinking**（首个文字段已排队，thinking 已无意义），直接激活 queue 头部 segment：设 active segment，请求 expression，喂 textBuffer 给速率限制器（带 segmentId）。如果 queue 还有剩余，转 GATED 并请求 `requestCleanFinishAndNotify`；否则转 STREAMING。如果 streamFinished 且 queue 已空，直接转 WAITING_FOR_ANIMATION_END。 |
+| `cleanFinishReady` | **先判断 queue 是否为空**：如果 queue 为空且有 `pendingThinkingExpression`，请求 thinking expression，转 STREAMING（等后续 expression.requested 到来再入 GATED）。如果 queue 非空，**跳过 pendingThinking**（首个文字段已排队，thinking 已无意义），直接激活 queue 头部 segment：设 active segment，请求 expression，喂 textBuffer 给速率限制器（带 segmentId）。如果 queue 还有剩余，转 GATED，并按新激活动画的类型决定立即请求或延迟请求 cleanFinish；否则转 STREAMING。如果 streamFinished 且 queue 已空，直接转 WAITING_FOR_ANIMATION_END。 |
 
 **`STREAMING`**
 
 | 事件 | 处理 |
 | --- | --- |
 | `TEXT_MESSAGE_CONTENT` | 直接喂速率限制器（使用 `m_activeSegmentId`）。 |
-| `expression.requested` | 创建新 segment 入队，转 GATED，请求 `requestCleanFinishAndNotify`。进入 GATED 时初始化双条件标志：`m_animationReady = false`；`m_textDrained` 根据当前 pacer 状态初始化——如果 `m_activeSegmentId == -1`（无活跃段，如 thinking 阶段）或 pacer 中该 segmentId 的文字已全部吐出，则 `m_textDrained = true`，否则 `false`。 |
+| `expression.requested` | 创建新 segment 入队，转 GATED。进入 GATED 时初始化双条件标志：`m_animationReady = false`；`m_textDrained` 根据当前 pacer 状态初始化——如果 `m_activeSegmentId == -1`（无活跃段，如 thinking 阶段）或 pacer 中该 segmentId 的文字已全部吐出，则 `m_textDrained = true`，否则 `false`。随后按当前动画类型决定 cleanFinish 请求时机：可安全循环的动画等 `m_textDrained` 后再请求；有限动画或会自动回 idle 的动画立即请求。 |
 | `lifecycle.thinking` | 仅在 `m_activeSegmentId == -1` 时处理（尚无文字段）。直接请求 thinking expression。 |
-| `RUN_FINISHED` | 标记 `streamFinished`。queue 应已空（STREAMING 时 queue 是空的）。请求 `requestCleanFinishAndNotify`，转 WAITING_FOR_ANIMATION_END。注意：pacer 可能仍在吐 active segment 的文字，需要在 WAITING_FOR_ANIMATION_END 等 pacerEmpty。 |
+| `RUN_FINISHED` | 标记 `streamFinished`。queue 应已空（STREAMING 时 queue 是空的），转 WAITING_FOR_ANIMATION_END。进入后按当前动画类型决定 cleanFinish 请求时机：可安全循环的动画等 `pacerEmpty` 后再请求；有限动画或会自动回 idle 的动画立即请求。最终回 idle 仍必须同时满足 `cleanFinishReady` 和 `pacerEmpty`。 |
 
 **`GATED`**
 
 GATED 状态下维护两个标志：`m_animationReady`（cleanFinishReady 已到达）和 `m_textDrained`（当前段文字已吐完）。两者都 true 时才执行切换。
+
+cleanFinish 请求时机由当前动画决定：
+
+- 当前动画可以安全持续循环（`currentLoopMode == loop` 且不会自动回 idle）：等 `m_textDrained` 为 true 后再请求 cleanFinish，避免当前 talking loop 提前进入 exit。
+- 当前动画是有限动画或会自动回 idle：进入 GATED 后立即请求 cleanFinish，防止动画自然结束后停在不受控状态；但切换仍必须等 `m_textDrained`。
 
 | 事件 | 处理 |
 | --- | --- |
@@ -366,20 +372,22 @@ GATED 状态下维护两个标志：`m_animationReady`（cleanFinishReady 已到
 | `expression.requested` | 创建新 segment 入队。 |
 | `RUN_FINISHED` | 标记 `streamFinished = true`。不清空 segment queue，继续等双条件。 |
 | `cleanFinishReady` | 设 `m_animationReady = true`。如果 `m_textDrained` 也为 true，执行切换（见下）。 |
-| `segmentDrained` | 设 `m_textDrained = true`。如果 `m_animationReady` 也为 true，执行切换（见下）。 |
+| `segmentDrained` | 设 `m_textDrained = true`。如果 cleanFinish 尚未请求且当前动画可安全循环，此时请求 cleanFinish；如果 `m_animationReady` 也为 true，执行切换（见下）。 |
 | 安全超时（2000ms） | 强制 `m_animationReady = true`，记录 warning，然后检查能否切换。 |
 
-**GATED 切换逻辑**（双条件满足时）：**激活下一段**——取 queue 头部 segment，设 `m_activeSegmentId = segment.segmentId`、`m_activeExpression = segment.expression`，请求 expression，喂其 textBuffer 给速率限制器（带 segmentId）。重置 `m_animationReady = false, m_textDrained = false`。如果 queue 还有剩余，再次请求 `requestCleanFinishAndNotify`，留在 GATED。如果 queue 已空且 streamFinished，请求 `requestCleanFinishAndNotify` 并转 WAITING_FOR_ANIMATION_END。如果 queue 已空且流未结束，转 STREAMING。
+**GATED 切换逻辑**（双条件满足时）：**激活下一段**——取 queue 头部 segment，设 `m_activeSegmentId = segment.segmentId`、`m_activeExpression = segment.expression`，请求 expression，喂其 textBuffer 给速率限制器（带 segmentId）。重置 `m_animationReady = false, m_textDrained = false`。如果 queue 还有剩余，按新激活动画的类型决定立即请求或延迟请求 cleanFinish，留在 GATED。如果 queue 已空且 streamFinished，转 WAITING_FOR_ANIMATION_END，并按当前动画类型决定立即请求或延迟请求 cleanFinish。如果 queue 已空且流未结束，转 STREAMING。
 
 **`WAITING_FOR_ANIMATION_END`**
 
-此状态等待两个条件：`cleanFinishReady`（动画收尾完成）和 `pacerEmpty`（速率限制器已吐完所有文字，包括 active segment 的剩余文字）。用 `m_animationReady` 和 `m_pacerEmpty` 两个标志追踪。进入此状态时初始化：`m_animationReady = false`；`m_pacerEmpty = (pacer.pendingCount() == 0)`。如果进入时 pacer 已空，`m_pacerEmpty` 直接为 true，只需等 `cleanFinishReady`。
+此状态等待两个条件：`cleanFinishReady`（动画收尾完成）和 `pacerEmpty`（速率限制器已吐完所有文字，包括 active segment 的剩余文字）。用 `m_animationReady` 和 `m_pacerEmpty` 两个标志追踪。进入此状态时初始化：`m_animationReady = false`；`m_pacerEmpty = (pacer.pendingCount() == 0)`。
+
+cleanFinish 请求时机同样由当前动画决定：可安全循环的动画等 `m_pacerEmpty` 后再请求 cleanFinish，让最后一段文字吐完前 talking loop 持续播放；有限动画或会自动回 idle 的动画进入 WAITING 后立即请求 cleanFinish 作为保护。无论哪种情况，最终 `returnToIdle` 都必须等 `cleanFinishReady` 和 `pacerEmpty` 同时满足。
 
 | 事件 | 处理 |
 | --- | --- |
 | `TEXT_MESSAGE_CONTENT` | 理论上不应到达，安全起见追加到速率限制器。 |
 | `cleanFinishReady` | 设 `m_animationReady = true`。如果 `m_pacerEmpty` 也为 true，`returnToIdle` 并转 IDLE。 |
-| `pacerEmpty` | 设 `m_pacerEmpty = true`。如果 `m_animationReady` 也为 true，`returnToIdle` 并转 IDLE。 |
+| `pacerEmpty` | 设 `m_pacerEmpty = true`。如果 cleanFinish 尚未请求且当前动画可安全循环，此时请求 cleanFinish；如果 `m_animationReady` 也为 true，`returnToIdle` 并转 IDLE。 |
 
 ### 7.5 Reply Session
 
@@ -410,7 +418,7 @@ reply session 开始于 `RUN_STARTED`，结束于以下条件**全部满足**：
 - 任何状态都标记 `cancelled = true`，递增 `asyncGeneration` 使所有待执行回调失效。
 - segment queue 中所有剩余 textBuffer **全部 drain 到速率限制器**（不丢用户已经"看到一半"的回复）。
 - 速率限制器继续按人类节奏吐完剩余字符。
-- 调 `requestCleanFinish` 让动画干净收尾（播 exit 段后回 idle），不硬切。
+- 进入和正常结束一致的收尾路径：按当前动画类型决定 cleanFinish 请求时机，等速率限制器清空和动画收尾都完成后再回 idle，不硬切。
 - `assistantMessageIndex` 在速率限制器清空后重置。
 
 ### 7.7 安全超时
@@ -556,7 +564,7 @@ sequenceDiagram
     SC-->>CC: expression.requested(objection)
     Note over CC: 创建 segment[0]={objection, ""}<br/>segmentId=0
     CC->>PR: requestCleanFinishAndNotify
-    Note over CC: 转 GATED<br/>等 cleanFinishReady + segmentDrained(无文字，立即满足)
+    Note over CC: 转 GATED<br/>无活跃文字，立即请求 cleanFinish<br/>等 cleanFinishReady + segmentDrained(无文字，立即满足)
 
     PR->>PR: thinking loop 播完一轮 → 播 exit（放下双臂）
     PR-->>CC: cleanFinishReady
@@ -573,7 +581,7 @@ sequenceDiagram
     SC-->>CC: expression.requested(polite)
     Note over CC: 创建 segment[1]={polite, ""}<br/>segmentId=1
     CC->>PR: requestCleanFinishAndNotify
-    Note over CC: 转 GATED<br/>等 cleanFinishReady + segmentDrained(0)
+    Note over CC: objecting 已定帧，立即请求 cleanFinish 保护<br/>转 GATED，仍等 segmentDrained(0) 才切换
 
     SC-->>CC: TEXT "不过我理解您的观点。"
     Note over CC: 追加到 segment[1].textBuffer
@@ -595,7 +603,7 @@ sequenceDiagram
 
     SC-->>CC: RUN_FINISHED
     CC->>PR: requestCleanFinishAndNotify
-    Note over CC: WAITING_FOR_ANIMATION_END<br/>等 cleanFinishReady + pacerEmpty
+    Note over CC: bow 已定帧，立即请求 cleanFinish 保护<br/>WAITING_FOR_ANIMATION_END 仍等 cleanFinishReady + pacerEmpty
 
     PR->>PR: bow 已定帧，无 exit → 立即回调
     PR-->>CC: cleanFinishReady
@@ -635,7 +643,7 @@ sequenceDiagram
     SC-->>CC: expression.requested(objection)
     Note over CC: segment[0]={objection, ""}, segmentId=0
     CC->>PR: requestCleanFinishAndNotify
-    Note over CC: 转 GATED<br/>等 cleanFinishReady + segmentDrained(无文字，立即满足)
+    Note over CC: 转 GATED<br/>无活跃文字，立即请求 cleanFinish<br/>等 cleanFinishReady + segmentDrained(无文字，立即满足)
 
     PR->>PR: thinking loop 播完一轮 → 到达安全点
     Note over PR: 播 exit（放下双臂）
@@ -654,7 +662,7 @@ sequenceDiagram
 
 | 组合 | 行为 |
 | --- | --- |
-| **A. 可循环动画 + 文字长** | 动画 enter → loop 持续循环。下一 expression 到来 → 等当前循环结束 → 播 exit（如有）→ 切到新动画。RUN_FINISHED → clean finish 播 exit → 回 idle |
+| **A. 可循环动画 + 文字长** | 动画 enter → loop 持续循环。下一 expression 到来时，若当前段文字仍在 paced，则先保持 loop；`segmentDrained` 后请求 clean finish，等当前循环安全点 → 播 exit（如有）→ 切到新动画。RUN_FINISHED 时同理：等 `pacerEmpty` 后请求 clean finish，再回 idle |
 | **B. entry-only 动画 + 文字长** | 动画播一次定格末帧（onceThenHold），文字继续流出。下一 expression 到来 → 立即切换（已定帧 + 无 exit = 即时回调） |
 | **C. 动画 + 文字短** | 文字提前流完，RUN_FINISHED 后 segment queue 已空，转 WAITING_FOR_ANIMATION_END。动画 clean finish 后回 idle |
 | **D. 文字快速涌入** | segment queue / 速率限制器积压触发追平机制，临时提速消化积压 |
