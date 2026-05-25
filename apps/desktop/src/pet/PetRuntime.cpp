@@ -493,6 +493,8 @@ void PetRuntime::playActionInternal(const QString &actionId, bool resetRecipe)
 
 void PetRuntime::returnToIdle()
 {
+    m_pendingRequest = ActionRequest::none();
+
     const QString idleAction = actionForState(QStringLiteral("idle"));
     if (m_currentRecipeId.isEmpty()
             && m_currentState == QStringLiteral("idle")

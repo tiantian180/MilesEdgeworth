@@ -998,6 +998,22 @@ int main(int argc, char *argv[])
                 "returnToIdle should complete idle after cleanFinish callback at exit boundary");
         require(runtime.currentActionId() == "idle_stand",
                 "returnToIdle should restore idle action after cleanFinish callback at exit boundary");
+
+        runtime.playAction("talking");
+        runtime.submitActionRequest(
+                ActionRequest::action("objecting").withInterruptHint(InterruptHint::AfterCurrent));
+        require(runtime.currentActionId() == "talking",
+                "after-current request should defer while talking enter phase is active");
+        runtime.returnToIdle();
+        require(runtime.currentPhaseId() == "exit",
+                "returnToIdle should play talking exit while cancelling deferred requests");
+        runtime.handleAnimationFinished();
+        require(runtime.currentActionId() == "idle_stand",
+                "returnToIdle should restore idle after cancelling deferred requests");
+        runtime.playAction("bow");
+        runtime.handleAnimationFinished();
+        require(runtime.currentActionId() == "bow",
+                "deferred after-current request should not leak after returnToIdle");
     }
 
     runtime.playRecipe("doubleClick.holdIt");
