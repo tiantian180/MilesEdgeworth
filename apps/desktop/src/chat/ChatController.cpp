@@ -629,7 +629,6 @@ void ChatController::sendMessageInConversation(const QString &trimmed)
 
     setSending(true);
     setStatusText(QStringLiteral("正在回复"));
-    requestPetExpression(QStringLiteral("thinking"), QStringLiteral("neutral"));
 
     QJsonObject body;
     body.insert(QStringLiteral("conversationId"), m_currentConversationId);

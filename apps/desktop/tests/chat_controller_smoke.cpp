@@ -292,6 +292,7 @@ int main(int argc, char *argv[])
 
         if (holdServerListening) {
             staleCallbackController.sendMessage(QStringLiteral("next"));
+            staleCallbackRuntime.requestExpression(QStringLiteral("thinking"), QStringLiteral("neutral"));
 
             ChatStreamEvent newStarted;
             newStarted.type = QStringLiteral("RUN_STARTED");
@@ -1222,6 +1223,36 @@ int main(int argc, char *argv[])
                         .value(QStringLiteral("text")).toString().contains(QStringLiteral("新"));
                 }, 500),
                 "new reply text should not wait for stale pacer chunks to drain");
+    }
+
+    // --- Phase 2.4: sendMessage should wait for lifecycle thinking instead of pre-starting thinking ---
+    {
+        PetRuntime preRunRuntime;
+        for (int i = 0; i < 5 && preRunRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            preRunRuntime.handleAnimationFinished();
+        }
+
+        ChatController preRunController(&preRunRuntime, &settings);
+        preRunController.sendMessage(QStringLiteral("need lifecycle thinking"));
+
+        require(preRunRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "sendMessage must not start thinking before RUN_STARTED/lifecycle events");
+
+        ChatStreamEvent preRunStarted;
+        preRunStarted.type = QStringLiteral("RUN_STARTED");
+        preRunController.applyStreamEvent(preRunStarted);
+
+        ChatStreamEvent preRunThinking;
+        preRunThinking.type = QStringLiteral("CUSTOM");
+        preRunThinking.name = QStringLiteral("miles.pet.lifecycle");
+        preRunThinking.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        preRunController.applyStreamEvent(preRunThinking);
+
+        for (int i = 0; i < 5 && preRunRuntime.currentState() != QStringLiteral("thinking"); ++i) {
+            preRunRuntime.handleAnimationFinished();
+        }
+        require(preRunRuntime.currentState() == QStringLiteral("thinking"),
+                "lifecycle thinking should still start thinking after RUN_STARTED");
     }
 
     return 0;
