@@ -1233,6 +1233,7 @@ int main(int argc, char *argv[])
         }
 
         ChatController preRunController(&preRunRuntime, &settings);
+        preRunController.switchConversation(QStringLiteral("smoke-conversation"));
         preRunController.sendMessage(QStringLiteral("need lifecycle thinking"));
 
         require(preRunRuntime.currentActionId() == QStringLiteral("idle_stand"),
