@@ -1604,7 +1604,9 @@ void ChatController::failCurrentReply(const QString &message)
     }
     setSending(false);
     setStatusText(QStringLiteral("错误"));
-    requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"));
+    if (m_runtime != nullptr) {
+        m_runtime->returnToIdle();
+    }
     if (!m_currentConversationId.isEmpty()) {
         loadConversations();
     }

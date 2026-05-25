@@ -222,7 +222,8 @@ int main(int argc, char *argv[])
     errorEvent.type = QStringLiteral("RUN_ERROR");
     errorEvent.error = QStringLiteral("mock failure");
     controller.applyStreamEvent(errorEvent);
-    require(runtime.currentState() == QStringLiteral("error"), "RUN_ERROR should move pet to error state");
+    require(runtime.currentState() == QStringLiteral("idle"), "RUN_ERROR should immediately return pet to idle");
+    require(runtime.currentActionId() == QStringLiteral("idle_stand"), "RUN_ERROR should restore idle action");
 
     // 切换会话后，旧 SSE stream 的残留事件不应该写入新会话消息模型。
     {
@@ -903,8 +904,10 @@ int main(int argc, char *argv[])
         eController.applyStreamEvent(eError);
 
         require(!eController.sending(), "RUN_ERROR during GATED should clear sending");
-        require(eRuntime.currentState() == QStringLiteral("error"),
-                "RUN_ERROR during GATED should move pet to error state");
+        require(eRuntime.currentState() == QStringLiteral("idle"),
+                "RUN_ERROR during GATED should immediately return pet to idle");
+        require(eRuntime.currentActionId() == QStringLiteral("idle_stand"),
+                "RUN_ERROR during GATED should restore idle action");
         require(waitFor([&eController]() {
                     return eController.messages().constLast().toMap()
                         .value(QStringLiteral("text")).toString() == QStringLiteral("前后");

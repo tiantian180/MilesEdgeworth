@@ -175,13 +175,36 @@ def main() -> int:
     maybe_advance_start = controller_cpp.index("void ChatController::maybeAdvanceGate")
     maybe_advance_end = controller_cpp.index("void ChatController::maybeFinishWaitingForAnimationEnd")
     maybe_advance_body = controller_cpp[maybe_advance_start:maybe_advance_end]
+    require("m_phase != ChatPhase::GATED || !m_animationReady || !m_textDrained" in maybe_advance_body,
+            "ChatController GATED transition must require animationReady and textDrained")
     require("requestFinishCleanFinishIfPacerEmpty()" in maybe_advance_body,
             "ChatController WAITING entry must use the pacer-aware final cleanFinish helper")
+    maybe_finish_start = controller_cpp.index("void ChatController::maybeFinishWaitingForAnimationEnd")
+    maybe_finish_end = controller_cpp.index("void ChatController::handleGateTimeout")
+    maybe_finish_body = controller_cpp[maybe_finish_start:maybe_finish_end]
+    require("m_phase != ChatPhase::WAITING_FOR_ANIMATION_END || !m_animationReady || !m_pacerEmpty" in maybe_finish_body,
+            "ChatController final idle transition must require animationReady and pacerEmpty")
+    deferred_start = controller_cpp.index("void ChatController::requestDeferredCleanFinishIfPossible")
+    deferred_end = controller_cpp.index("void ChatController::clearDeferredCleanFinishRequest")
+    deferred_body = controller_cpp[deferred_start:deferred_end]
+    require("m_phase == ChatPhase::GATED" in deferred_body
+            and "m_textDrained || !canDelayCleanFinishForCurrentAnimation()" in deferred_body,
+            "ChatController deferred GATED cleanFinish must preserve the text-drain gate")
+    require("m_phase == ChatPhase::WAITING_FOR_ANIMATION_END" in deferred_body
+            and "m_pacerEmpty || !canDelayCleanFinishForCurrentAnimation()" in deferred_body,
+            "ChatController deferred final cleanFinish must preserve the pacer-empty gate")
     send_message_start = controller_cpp.index("void ChatController::sendMessageInConversation")
     send_message_end = controller_cpp.index("void ChatController::cancelCurrentReply")
     send_message_body = controller_cpp[send_message_start:send_message_end]
     require('requestPetExpression(QStringLiteral("thinking"), QStringLiteral("neutral"));' not in send_message_body,
             "sendMessageInConversation must wait for lifecycle thinking instead of pre-starting thinking")
+    fail_reply_start = controller_cpp.index("void ChatController::failCurrentReply")
+    fail_reply_end = controller_cpp.index("void ChatController::abortPendingConversationCreate")
+    fail_reply_body = controller_cpp[fail_reply_start:fail_reply_end]
+    require("m_runtime->returnToIdle()" in fail_reply_body,
+            "failCurrentReply must abort animation by returning to idle")
+    require('requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"))' not in fail_reply_body,
+            "failCurrentReply must not request an error expression after aborting")
 
     require('"miles.pet.lifecycle"' in provider_go, "Go provider must emit lifecycle event")
     require('"miles.pet.expression.requested"' in provider_go, "Go provider must still emit expression events")
