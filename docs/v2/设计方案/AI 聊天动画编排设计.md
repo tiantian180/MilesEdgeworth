@@ -420,7 +420,7 @@ reply session 包含：
 - 任何状态都标记 `cancelled = true`，递增 `asyncGeneration` 使所有待执行回调失效。
 - segment queue 中已到达本地的剩余 textBuffer drain 到速率限制器，尽量保留已经收到的内容。
 - 清理 reply session 状态，转 `IDLE`，恢复 PetRuntime 自动 idle 兜底。
-- 立即调用 `returnToIdle()`，不等待 `pacerEmpty` 或 cleanFinish。当前实现把取消 / 错误视为中止路径，而不是正常回复的优雅收尾路径。
+- 立即调用 `returnToIdle()`，不等待 `pacerEmpty` 或 cleanFinish。取消 / 错误是中止路径，不是正常回复的优雅收尾路径。
 - 如果已有 assistant 消息，立即取消 pending 标记；后续旧 stream 回调由 `asyncGeneration` / `cancelled` 防护丢弃。
 
 ### 7.7 安全超时
