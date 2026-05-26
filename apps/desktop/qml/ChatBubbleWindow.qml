@@ -18,6 +18,8 @@ ApplicationWindow {
     property int dismissedAssistantMessageIndex: -1
     property int suppressedAssistantMessageIndex: -1
     property int trackedAssistantMessageIndex: -1
+    property double hideDeadlineMs: 0
+    property int remainingHideMs: 0
     readonly property int bubbleMargin: 12
     readonly property int contentHorizontalPadding: 28
     readonly property int contentVerticalPadding: 24
@@ -168,7 +170,14 @@ ApplicationWindow {
     }
 
     function scheduleHide() {
-        hideTimer.interval = Math.max(2500, Math.min(10000, 2500 + Math.ceil(assistantText.length / 20) * 1000))
+        const interval = Math.max(2500, Math.min(10000, 2500 + Math.ceil(assistantText.length / 20) * 1000))
+        startHideTimer(interval)
+    }
+
+    function startHideTimer(interval) {
+        remainingHideMs = Math.max(250, interval)
+        hideTimer.interval = remainingHideMs
+        hideDeadlineMs = Date.now() + remainingHideMs
         if (!bubbleHover.hovered) {
             hideTimer.restart()
         }
@@ -215,6 +224,8 @@ ApplicationWindow {
 
         repeat: false
         onTriggered: {
+            bubbleWindow.hideDeadlineMs = 0
+            bubbleWindow.remainingHideMs = 0
             bubbleWindow.trackedAssistantMessageIndex = -1
             bubbleWindow.visible = false
         }
@@ -229,9 +240,14 @@ ApplicationWindow {
             id: bubbleHover
             onHoveredChanged: {
                 if (hovered) {
+                    if (hideTimer.running) {
+                        bubbleWindow.remainingHideMs = Math.max(250, Math.ceil(bubbleWindow.hideDeadlineMs - Date.now()))
+                    }
                     hideTimer.stop()
                 } else if (bubbleWindow.visible && bubbleWindow.assistantPending !== true) {
-                    bubbleWindow.scheduleHide()
+                    bubbleWindow.startHideTimer(bubbleWindow.remainingHideMs > 0
+                            ? bubbleWindow.remainingHideMs
+                            : 250)
                 }
             }
         }
@@ -252,7 +268,7 @@ ApplicationWindow {
                 const left = 4
                 const right = w - 4
                 const tailLeft = bubbleWindow.pointerPlacement.endsWith("Left")
-                const tailBaseX = tailLeft ? 52 : w - 52
+                const tailBaseX = tailLeft ? 52 : w - 80
                 const tailTipX = tailLeft ? 28 : w - 28
                 const tailTipY = bubbleWindow.pointerPlacement.startsWith("top") ? 4 : h - 4
 
@@ -260,31 +276,23 @@ ApplicationWindow {
                 ctx.beginPath()
                 ctx.moveTo(left + radius, bodyTop)
 
-                if (bubbleWindow.pointerPlacement === "topLeft") {
+                if (bubbleWindow.pointerPlacement === "topLeft"
+                        || bubbleWindow.pointerPlacement === "topRight") {
                     ctx.lineTo(tailBaseX, bodyTop)
                     ctx.lineTo(tailTipX, tailTipY)
                     ctx.lineTo(tailBaseX + 28, bodyTop)
                 }
                 ctx.lineTo(right - radius, bodyTop)
-                if (bubbleWindow.pointerPlacement === "topRight") {
-                    ctx.lineTo(tailBaseX + 28, bodyTop)
-                    ctx.lineTo(tailTipX, tailTipY)
-                    ctx.lineTo(tailBaseX, bodyTop)
-                }
                 ctx.quadraticCurveTo(right, bodyTop, right, bodyTop + radius)
                 ctx.lineTo(right, bodyBottom - radius)
                 ctx.quadraticCurveTo(right, bodyBottom, right - radius, bodyBottom)
-                if (bubbleWindow.pointerPlacement === "bottomRight") {
+                if (bubbleWindow.pointerPlacement === "bottomRight"
+                        || bubbleWindow.pointerPlacement === "bottomLeft") {
                     ctx.lineTo(tailBaseX + 28, bodyBottom)
                     ctx.lineTo(tailTipX, tailTipY)
                     ctx.lineTo(tailBaseX, bodyBottom)
                 }
                 ctx.lineTo(left + radius, bodyBottom)
-                if (bubbleWindow.pointerPlacement === "bottomLeft") {
-                    ctx.lineTo(tailBaseX + 28, bodyBottom)
-                    ctx.lineTo(tailTipX, tailTipY)
-                    ctx.lineTo(tailBaseX, bodyBottom)
-                }
                 ctx.quadraticCurveTo(left, bodyBottom, left, bodyBottom - radius)
                 ctx.lineTo(left, bodyTop + radius)
                 ctx.quadraticCurveTo(left, bodyTop, left + radius, bodyTop)
@@ -307,7 +315,7 @@ ApplicationWindow {
             id: messageMeasure
 
             visible: false
-            width: bubbleText.width
+            width: bubbleWindow.maxBubbleWidth - bubbleWindow.contentHorizontalPadding * 2
             text: bubbleWindow.assistantText
             font.pixelSize: 14
             textFormat: Text.PlainText
@@ -378,7 +386,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.leftMargin: bubbleWindow.contentHorizontalPadding
-            anchors.rightMargin: bubbleWindow.contentHorizontalPadding
+            anchors.rightMargin: bubbleWindow.contentHorizontalPadding + 60
             anchors.topMargin: bubbleWindow.pointerPlacement.startsWith("top")
                     ? bubbleWindow.pointerExtent + bubbleWindow.contentVerticalPadding
                     : bubbleWindow.contentVerticalPadding
