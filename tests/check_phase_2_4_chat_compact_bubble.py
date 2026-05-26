@@ -29,6 +29,7 @@ def main() -> int:
     shell_h = read("apps/desktop/src/DesktopShellController.h")
     shell_cpp = read("apps/desktop/src/DesktopShellController.cpp")
     chat_qml = read("apps/desktop/qml/ChatWindow.qml")
+    icon_button_qml = read("apps/desktop/qml/MilesIconButton.qml")
     bubble_qml = read("apps/desktop/qml/ChatBubbleWindow.qml")
     placement_cpp = read("apps/desktop/src/chat/ChatBubblePlacement.cpp")
     placement_smoke = read("apps/desktop/tests/chat_bubble_placement_smoke.cpp")
@@ -57,6 +58,28 @@ def main() -> int:
     ]:
         require(token in desktop_cmake + pet_assets_qrc,
                 f"icon resource contract missing {token}")
+
+    for token in [
+        "implicitWidth: 34",
+        "implicitHeight: 34",
+    ]:
+        require(token in icon_button_qml, f"MilesIconButton.qml missing {token}")
+
+    for icon_name in [
+        "menu",
+        "settings",
+        "refresh-ccw",
+        "maximize-2",
+        "minimize-2",
+        "x",
+        "arrow-up-white",
+        "arrow-up-muted",
+    ]:
+        icon_svg = read(f"apps/desktop/resources/icons/{icon_name}.svg")
+        require('fill="none"' in icon_svg, f"{icon_name}.svg must use fill=\"none\"")
+
+    square_stop_svg = read("apps/desktop/resources/icons/square-stop.svg")
+    require('fill="#5f554b"' in square_stop_svg, "square-stop.svg must use fill=\"#5f554b\"")
 
     require(
         'loadFromModule("MilesEdgeworth", "ChatBubbleWindow")' in main_cpp,

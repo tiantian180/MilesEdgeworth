@@ -13,6 +13,8 @@ ToolButton {
 
     width: 34
     height: 34
+    implicitWidth: 34
+    implicitHeight: 34
     padding: 0
 
     ToolTip.visible: hovered && tooltipText.length > 0
