@@ -7,7 +7,10 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
+#include <QHash>
 #include <QHostAddress>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QThread>
@@ -51,6 +54,83 @@ ProviderConfigFile::ModelConfig modelConfig(const QString &name,
     cfg.model = model;
     return cfg;
 }
+
+class ToolResultCapture
+{
+public:
+    bool listen()
+    {
+        QObject::connect(&server, &QTcpServer::newConnection, &server, [this]() {
+            while (server.hasPendingConnections()) {
+                QTcpSocket *socket = server.nextPendingConnection();
+                socket->setParent(&server);
+                buffers.insert(socket, QByteArray());
+
+                QObject::connect(socket, &QTcpSocket::readyRead, &server, [this, socket]() {
+                    buffers[socket].append(socket->readAll());
+                    maybeComplete(socket);
+                });
+                QObject::connect(socket, &QTcpSocket::disconnected, &server, [this, socket]() {
+                    buffers.remove(socket);
+                });
+            }
+        });
+        return server.listen(QHostAddress::LocalHost, 0);
+    }
+
+    int count() const { return bodies.size(); }
+    QByteArray bodyAt(int index) const { return bodies.at(index); }
+    QString url() const
+    {
+        return QStringLiteral("http://127.0.0.1:%1/v1/chat/tool-result").arg(server.serverPort());
+    }
+
+private:
+    int contentLength(const QByteArray &headers) const
+    {
+        for (QByteArray line : headers.split('\n')) {
+            if (line.endsWith('\r')) {
+                line.chop(1);
+            }
+            const int colon = line.indexOf(':');
+            if (colon <= 0) {
+                continue;
+            }
+            if (line.left(colon).trimmed().toLower() == "content-length") {
+                return line.mid(colon + 1).trimmed().toInt();
+            }
+        }
+        return 0;
+    }
+
+    void maybeComplete(QTcpSocket *socket)
+    {
+        const QByteArray buffer = buffers.value(socket);
+        const int headerEnd = buffer.indexOf("\r\n\r\n");
+        if (headerEnd < 0) {
+            return;
+        }
+
+        const int bodyLength = contentLength(buffer.left(headerEnd));
+        const int bodyStart = headerEnd + 4;
+        if (buffer.size() < bodyStart + bodyLength) {
+            return;
+        }
+
+        bodies.append(buffer.mid(bodyStart, bodyLength));
+        buffers.remove(socket);
+        socket->write("HTTP/1.1 200 OK\r\n"
+                      "Content-Type: application/json\r\n"
+                      "Content-Length: 2\r\n"
+                      "Connection: close\r\n"
+                      "\r\n{}");
+        socket->disconnectFromHost();
+    }
+
+    QTcpServer server;
+    QHash<QTcpSocket *, QByteArray> buffers;
+    QList<QByteArray> bodies;
+};
 } // namespace
 
 int main(int argc, char *argv[])
@@ -1542,6 +1622,310 @@ int main(int argc, char *argv[])
         }
         require(preRunRuntime.currentState() == QStringLiteral("thinking"),
                 "lifecycle thinking should still start thinking after RUN_STARTED");
+    }
+
+    // --- Phase 2.5: TOOL_CALL waits for cleanFinish, executes pet_motion, and posts result ---
+    {
+        ToolResultCapture toolResults;
+        require(toolResults.listen(), "tool result capture server should listen on an ephemeral port");
+        qputenv("MILESEDGEWORTH_TOOL_RESULT_URL", toolResults.url().toUtf8());
+        {
+            PetRuntime toolRuntime;
+            toolRuntime.setPetSize(QStringLiteral("mini"));
+            toolRuntime.setMotionScreenGeometry(QRect(0, 0, 220, 220));
+            toolRuntime.setMotionCurrentPosition(QPoint(0, 0));
+            toolRuntime.setState(QStringLiteral("speaking"));
+            ChatController toolController(&toolRuntime, &settings);
+
+        ChatStreamEvent started;
+        started.type = QStringLiteral("RUN_STARTED");
+        started.runId = QStringLiteral("tool-run");
+        toolController.applyStreamEvent(started);
+
+        ChatStreamEvent thinking;
+        thinking.type = QStringLiteral("CUSTOM");
+        thinking.name = QStringLiteral("miles.pet.lifecycle");
+        thinking.value.insert(QStringLiteral("state"), QStringLiteral("thinking"));
+        toolController.applyStreamEvent(thinking);
+
+        ChatStreamEvent toolCall;
+        toolCall.type = QStringLiteral("TOOL_CALL");
+        toolCall.runId = QStringLiteral("tool-run");
+        toolCall.toolCallId = QStringLiteral("tc-motion");
+        toolCall.toolName = QStringLiteral("pet_motion");
+        toolCall.toolArgs = QStringLiteral("{\"action\":\"moveTo\",\"x\":1,\"y\":0,\"mode\":\"run\"}");
+        toolController.applyStreamEvent(toolCall);
+
+        require(toolRuntime.currentState() != QStringLiteral("moving"),
+                "TOOL_CALL must wait for current animation cleanFinish before moving");
+        for (int i = 0; i < 12 && toolRuntime.currentState() != QStringLiteral("moving"); ++i) {
+            toolRuntime.handleAnimationFinished();
+        }
+        require(toolRuntime.currentState() == QStringLiteral("moving"),
+                "pet_motion should start moving after cleanFinish");
+        require(toolRuntime.currentActionId() == QStringLiteral("run"),
+                "pet_motion mode=run should request run locomotion");
+        require(toolController.statusText() == QStringLiteral("Miles 正在移动…"),
+                "executing tool should expose moving status text");
+
+        require(waitFor([&toolResults]() { return toolResults.count() == 1; }, 3000),
+                "completed pet_motion should POST one tool result");
+        const QJsonObject body = QJsonDocument::fromJson(toolResults.bodyAt(0)).object();
+        require(body.value(QStringLiteral("runId")).toString() == QStringLiteral("tool-run"),
+                "tool result POST should include runId");
+        require(body.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-motion"),
+                "tool result POST should include toolCallId");
+        require(body.value(QStringLiteral("result")).toObject().value(QStringLiteral("success")).toBool(),
+                "completed pet_motion result should be success=true");
+        require(toolController.statusText() == QStringLiteral("正在回复"),
+                "after posting tool result controller should wait for stream continuation");
+
+        SettingsService textToolSettings(settingsDir.filePath(QStringLiteral("text-tool-settings.json")));
+        auto textToolCfg = modelConfig(QStringLiteral("text-tool"),
+                                       QStringLiteral("https://api.example.test/v1"),
+                                       QStringLiteral("sk-test"),
+                                       QStringLiteral("miles-test-model"));
+        require(textToolSettings.setModelConfig(textToolCfg.name, textToolCfg),
+                "text tool settings should accept config");
+        textToolSettings.setActiveModelConfig(textToolCfg.name);
+        textToolSettings.setMsPerChar(120);
+
+        PetRuntime textToolRuntime;
+        textToolRuntime.setPetSize(QStringLiteral("mini"));
+        textToolRuntime.setMotionScreenGeometry(QRect(0, 0, 260, 260));
+        textToolRuntime.setMotionCurrentPosition(QPoint(0, 0));
+        for (int i = 0; i < 5 && textToolRuntime.currentActionId() != QStringLiteral("idle_stand"); ++i) {
+            textToolRuntime.handleAnimationFinished();
+        }
+        ChatController textToolController(&textToolRuntime, &textToolSettings);
+
+        ChatStreamEvent textStarted;
+        textStarted.type = QStringLiteral("RUN_STARTED");
+        textStarted.runId = QStringLiteral("text-tool-run");
+        textToolController.applyStreamEvent(textStarted);
+
+        ChatStreamEvent textExpr;
+        textExpr.type = QStringLiteral("CUSTOM");
+        textExpr.name = QStringLiteral("miles.pet.expression.requested");
+        textExpr.value.insert(QStringLiteral("state"), QStringLiteral("speaking"));
+        textExpr.value.insert(QStringLiteral("expression"), QStringLiteral("neutral"));
+        textToolController.applyStreamEvent(textExpr);
+
+        ChatStreamEvent textStart;
+        textStart.type = QStringLiteral("TEXT_MESSAGE_START");
+        textStart.role = QStringLiteral("assistant");
+        textToolController.applyStreamEvent(textStart);
+
+        ChatStreamEvent textContent;
+        textContent.type = QStringLiteral("TEXT_MESSAGE_CONTENT");
+        textContent.delta = QStringLiteral("长长长长长长");
+        textToolController.applyStreamEvent(textContent);
+
+        for (int i = 0; i < 5 && textToolRuntime.currentActionId() != QStringLiteral("talking"); ++i) {
+            textToolRuntime.handleAnimationFinished();
+        }
+        require(textToolRuntime.currentActionId() == QStringLiteral("talking"),
+                "text+tool setup should activate talking before TOOL_CALL");
+
+        ChatStreamEvent textToolCall;
+        textToolCall.type = QStringLiteral("TOOL_CALL");
+        textToolCall.runId = QStringLiteral("text-tool-run");
+        textToolCall.toolCallId = QStringLiteral("tc-text-motion");
+        textToolCall.toolName = QStringLiteral("pet_motion");
+        textToolCall.toolArgs = QStringLiteral("{\"action\":\"moveTo\",\"x\":1,\"y\":0}");
+        textToolController.applyStreamEvent(textToolCall);
+
+        textToolRuntime.handleAnimationFinished();
+        require(textToolRuntime.currentState() != QStringLiteral("moving"),
+                "TOOL_CALL with pending text must not move before pacer drains");
+        require(waitFor([&textToolController]() {
+                    return textToolController.messages().constLast().toMap()
+                        .value(QStringLiteral("text")).toString() == QStringLiteral("长长长长长长");
+                }, 2000),
+                "text before TOOL_CALL should drain before movement starts");
+        for (int i = 0; i < 5 && textToolRuntime.currentState() != QStringLiteral("moving"); ++i) {
+            textToolRuntime.handleAnimationFinished();
+        }
+        require(textToolRuntime.currentState() == QStringLiteral("moving"),
+                "TOOL_CALL should move after pending text drains and cleanFinish completes");
+        require(waitFor([&toolResults]() { return toolResults.count() == 2; }, 3000),
+                "text+tool pet_motion should POST one tool result");
+
+        ChatStreamEvent unknownTool;
+        unknownTool.type = QStringLiteral("TOOL_CALL");
+        unknownTool.runId = QStringLiteral("tool-run");
+        unknownTool.toolCallId = QStringLiteral("tc-unknown");
+        unknownTool.toolName = QStringLiteral("unknown_tool");
+        unknownTool.toolArgs = QStringLiteral("{}");
+        toolController.applyStreamEvent(unknownTool);
+        require(waitFor([&toolResults]() { return toolResults.count() == 3; }, 1000),
+                "unknown tool should POST an error tool result");
+        const QJsonObject unknownBody = QJsonDocument::fromJson(toolResults.bodyAt(2)).object();
+        const QJsonObject unknownResult = unknownBody.value(QStringLiteral("result")).toObject();
+        require(!unknownResult.value(QStringLiteral("success")).toBool(),
+                "unknown tool result should be success=false");
+        require(!unknownResult.value(QStringLiteral("error")).toString().isEmpty(),
+                "unknown tool result should include an error message");
+
+        ChatStreamEvent invalidArgsTool;
+        invalidArgsTool.type = QStringLiteral("TOOL_CALL");
+        invalidArgsTool.runId = QStringLiteral("tool-run");
+        invalidArgsTool.toolCallId = QStringLiteral("tc-invalid-args");
+        invalidArgsTool.toolName = QStringLiteral("pet_motion");
+        invalidArgsTool.toolArgs = QStringLiteral("{\"action\":\"jump\",\"x\":\"bad\",\"y\":0}");
+        toolController.applyStreamEvent(invalidArgsTool);
+        require(waitFor([&toolResults]() { return toolResults.count() == 4; }, 1000),
+                "invalid pet_motion args should POST an error tool result");
+        const QJsonObject invalidArgsResult = QJsonDocument::fromJson(toolResults.bodyAt(3)).object()
+            .value(QStringLiteral("result")).toObject();
+        require(!invalidArgsResult.value(QStringLiteral("success")).toBool(),
+                "invalid pet_motion args result should be success=false");
+        require(!invalidArgsResult.value(QStringLiteral("error")).toString().isEmpty(),
+                "invalid pet_motion args result should include an error message");
+
+        ChatController nullRuntimeController(nullptr, &settings);
+        ChatStreamEvent nullStarted;
+        nullStarted.type = QStringLiteral("RUN_STARTED");
+        nullStarted.runId = QStringLiteral("null-runtime-run");
+        nullRuntimeController.applyStreamEvent(nullStarted);
+
+        ChatStreamEvent nullTool;
+        nullTool.type = QStringLiteral("TOOL_CALL");
+        nullTool.runId = QStringLiteral("null-runtime-run");
+        nullTool.toolCallId = QStringLiteral("tc-null-runtime");
+        nullTool.toolName = QStringLiteral("pet_motion");
+        nullTool.toolArgs = QStringLiteral("{\"action\":\"moveBy\",\"x\":0.1,\"y\":0.1}");
+        nullRuntimeController.applyStreamEvent(nullTool);
+        require(waitFor([&toolResults]() { return toolResults.count() == 5; }, 1000),
+                "pet_motion with null runtime should POST an error tool result");
+        const QJsonObject nullRuntimeResult = QJsonDocument::fromJson(toolResults.bodyAt(4)).object()
+            .value(QStringLiteral("result")).toObject();
+        require(!nullRuntimeResult.value(QStringLiteral("success")).toBool(),
+                "null runtime pet_motion result should be success=false");
+
+        PetRuntime cancelRuntime;
+        cancelRuntime.setPetSize(QStringLiteral("mini"));
+        cancelRuntime.setMotionScreenGeometry(QRect(0, 0, 260, 260));
+        cancelRuntime.setMotionCurrentPosition(QPoint(0, 0));
+        ChatController cancelController(&cancelRuntime, &settings);
+
+        ChatStreamEvent cancelStarted;
+        cancelStarted.type = QStringLiteral("RUN_STARTED");
+        cancelStarted.runId = QStringLiteral("cancel-run");
+        cancelController.applyStreamEvent(cancelStarted);
+
+        ChatStreamEvent cancelTool;
+        cancelTool.type = QStringLiteral("TOOL_CALL");
+        cancelTool.runId = QStringLiteral("cancel-run");
+        cancelTool.toolCallId = QStringLiteral("tc-cancel");
+        cancelTool.toolName = QStringLiteral("pet_motion");
+        cancelTool.toolArgs = QStringLiteral("{\"action\":\"moveTo\",\"x\":1,\"y\":1}");
+        cancelController.applyStreamEvent(cancelTool);
+        for (int i = 0; i < 5 && cancelRuntime.currentState() != QStringLiteral("moving"); ++i) {
+            cancelRuntime.handleAnimationFinished();
+        }
+        require(cancelRuntime.currentState() == QStringLiteral("moving"),
+                "cancel setup should enter moving state");
+
+            cancelController.cancelCurrentReply();
+            waitFor([]() { return false; }, 250);
+            require(toolResults.count() == 5,
+                    "explicit user cancellation during tool execution must not POST a tool result");
+
+            PetRuntime duplicateRuntime;
+            duplicateRuntime.setPetSize(QStringLiteral("mini"));
+            duplicateRuntime.setMotionScreenGeometry(QRect(0, 0, 260, 260));
+            duplicateRuntime.setMotionCurrentPosition(QPoint(0, 0));
+            ChatController duplicateController(&duplicateRuntime, &settings);
+
+            ChatStreamEvent duplicateStarted;
+            duplicateStarted.type = QStringLiteral("RUN_STARTED");
+            duplicateStarted.runId = QStringLiteral("duplicate-run");
+            duplicateController.applyStreamEvent(duplicateStarted);
+
+            ChatStreamEvent primaryTool;
+            primaryTool.type = QStringLiteral("TOOL_CALL");
+            primaryTool.runId = QStringLiteral("duplicate-run");
+            primaryTool.toolCallId = QStringLiteral("tc-primary");
+            primaryTool.toolName = QStringLiteral("pet_motion");
+            primaryTool.toolArgs = QStringLiteral("{\"action\":\"moveTo\",\"x\":1,\"y\":0}");
+            duplicateController.applyStreamEvent(primaryTool);
+
+            ChatStreamEvent repeatedPrimaryTool = primaryTool;
+            duplicateController.applyStreamEvent(repeatedPrimaryTool);
+            waitFor([]() { return false; }, 150);
+            require(toolResults.count() == 5,
+                    "repeated TOOL_CALL with the same toolCallId should be ignored, not posted as a result");
+
+            ChatStreamEvent duplicateTool;
+            duplicateTool.type = QStringLiteral("TOOL_CALL");
+            duplicateTool.runId = QStringLiteral("duplicate-run");
+            duplicateTool.toolCallId = QStringLiteral("tc-duplicate");
+            duplicateTool.toolName = QStringLiteral("pet_motion");
+            duplicateTool.toolArgs = QStringLiteral("{\"action\":\"moveTo\",\"x\":0,\"y\":1}");
+            duplicateController.applyStreamEvent(duplicateTool);
+
+            require(waitFor([&toolResults]() { return toolResults.count() == 6; }, 1000),
+                    "duplicate TOOL_CALL while pending should POST an error for the duplicate call");
+            const QJsonObject duplicateBody = QJsonDocument::fromJson(toolResults.bodyAt(5)).object();
+            require(duplicateBody.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-duplicate"),
+                    "duplicate TOOL_CALL error should target the duplicate toolCallId");
+            require(!duplicateBody.value(QStringLiteral("result")).toObject()
+                        .value(QStringLiteral("success")).toBool(),
+                    "duplicate TOOL_CALL result should be success=false");
+
+            for (int i = 0; i < 5 && duplicateRuntime.currentState() != QStringLiteral("moving"); ++i) {
+                duplicateRuntime.handleAnimationFinished();
+            }
+            require(duplicateRuntime.currentState() == QStringLiteral("moving"),
+                    "duplicate TOOL_CALL must not overwrite the original pending tool");
+            require(waitFor([&toolResults]() { return toolResults.count() == 7; }, 3000),
+                    "original pending tool should still complete after duplicate TOOL_CALL is rejected");
+            const QJsonObject primaryBody = QJsonDocument::fromJson(toolResults.bodyAt(6)).object();
+            require(primaryBody.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-primary"),
+                    "original pending tool result should keep the original toolCallId");
+            require(primaryBody.value(QStringLiteral("result")).toObject()
+                        .value(QStringLiteral("success")).toBool(),
+                    "original pending tool should complete successfully");
+
+            PetRuntime residualRuntime;
+            residualRuntime.setPetSize(QStringLiteral("mini"));
+            residualRuntime.setMotionScreenGeometry(QRect(0, 0, 260, 260));
+            residualRuntime.setMotionCurrentPosition(QPoint(0, 0));
+            ChatController residualController(&residualRuntime, &settings);
+
+            ChatStreamEvent residualStarted;
+            residualStarted.type = QStringLiteral("RUN_STARTED");
+            residualStarted.runId = QStringLiteral("residual-run");
+            residualController.applyStreamEvent(residualStarted);
+
+            ChatStreamEvent residualTool;
+            residualTool.type = QStringLiteral("TOOL_CALL");
+            residualTool.runId = QStringLiteral("residual-run");
+            residualTool.toolCallId = QStringLiteral("tc-residual");
+            residualTool.toolName = QStringLiteral("pet_motion");
+            residualTool.toolArgs = QStringLiteral("{\"action\":\"moveTo\",\"x\":0.1,\"y\":0.1,\"mode\":\"run\"}");
+            residualController.applyStreamEvent(residualTool);
+            for (int i = 0; i < 5 && residualRuntime.currentState() != QStringLiteral("moving"); ++i) {
+                residualRuntime.handleAnimationFinished();
+            }
+            require(residualController.executingTool(),
+                    "residual RUN_FINISHED setup should enter EXECUTING_TOOL");
+
+            ChatStreamEvent residualFinished;
+            residualFinished.type = QStringLiteral("RUN_FINISHED");
+            residualController.applyStreamEvent(residualFinished);
+            require(residualController.executingTool(),
+                    "residual RUN_FINISHED during tool execution must not clear EXECUTING_TOOL");
+            require(residualController.statusText() == QStringLiteral("Miles 正在移动…"),
+                    "residual RUN_FINISHED during tool execution must not reset status text");
+            require(waitFor([&toolResults]() { return toolResults.count() == 8; }, 3000),
+                    "tool should still POST result after residual RUN_FINISHED is ignored");
+            const QJsonObject residualBody = QJsonDocument::fromJson(toolResults.bodyAt(7)).object();
+            require(residualBody.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-residual"),
+                    "residual RUN_FINISHED must not corrupt pending toolCallId");
+        }
+        qunsetenv("MILESEDGEWORTH_TOOL_RESULT_URL");
     }
 
     return 0;

@@ -14,6 +14,9 @@ struct ChatStreamEvent
     QString role;
     QString delta;
     QString error;
+    QString toolCallId;
+    QString toolName;
+    QString toolArgs;
     QVariantMap value;
 };
 

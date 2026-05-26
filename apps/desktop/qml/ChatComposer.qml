@@ -16,6 +16,7 @@ Item {
     property alias text: input.text
     readonly property bool disconnectedInput: !App.ChatController.sidecarReady && !App.ChatController.sending
     readonly property bool providerConfigured: App.ChatController.providerConfigured
+    readonly property bool executingTool: App.ChatController.executingTool
     readonly property bool canType: App.ChatController.sidecarReady && providerConfigured && !App.ChatController.sending
     readonly property bool missingProviderConfig: !providerConfigured && !App.ChatController.sending
     readonly property bool disabledInput: disconnectedInput || missingProviderConfig
@@ -107,9 +108,11 @@ Item {
                 anchors.topMargin: root.compactMode ? 5 : 8
                 anchors.bottomMargin: root.compactMode ? 5 : 8
                 wrapMode: TextArea.Wrap
-                placeholderText: root.missingProviderConfig
+                placeholderText: root.executingTool
+                        ? "Miles 正在移动…"
+                        : (root.missingProviderConfig
                         ? "先点设置填写模型配置"
-                        : (root.disconnectedInput ? "未连接，点重连或稍后重试" : "输入消息")
+                        : (root.disconnectedInput ? "未连接，点重连或稍后重试" : "输入消息"))
                 placeholderTextColor: root.disabledInput ? "#8a4b38" : "#8d8580"
                 color: enabled ? "#26201b" : "#6f5545"
                 selectionColor: "#b9d0f2"

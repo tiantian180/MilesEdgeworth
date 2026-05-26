@@ -2045,7 +2045,7 @@ git commit -m "feat: 添加工具结果回传接口"
 - Modify: `apps/desktop/tests/chat_controller_smoke.cpp`
 - Modify: `apps/desktop/qml/ChatComposer.qml`
 
-- [ ] **Step 1: Add failing parser assertions**
+- [x] **Step 1: Add failing parser assertions**
 
 In `apps/desktop/tests/chat_stream_event_parser_smoke.cpp`, before malformed JSON tests, add:
 
@@ -2061,7 +2061,7 @@ In `apps/desktop/tests/chat_stream_event_parser_smoke.cpp`, before malformed JSO
     require(events[0].toolArgs.contains("\"moveTo\""), "toolArgs should parse");
 ```
 
-- [ ] **Step 2: Add parser fields**
+- [x] **Step 2: Add parser fields**
 
 In `ChatStreamEvent.h`, add:
 
@@ -2079,7 +2079,7 @@ In `eventFromObject`, add:
     event.toolArgs = object.value("toolArgs").toString();
 ```
 
-- [ ] **Step 3: Run parser test**
+- [x] **Step 3: Run parser test**
 
 Run:
 
@@ -2094,7 +2094,7 @@ Expected:
 100% tests passed
 ```
 
-- [ ] **Step 4: Add ChatController state and helpers**
+- [x] **Step 4: Add ChatController state and helpers**
 
 In `ChatController::ChatPhase`, add:
 
@@ -2136,7 +2136,7 @@ Add members:
     static constexpr int kMotionToolTimeoutMs = 90000;
 ```
 
-- [ ] **Step 5: Wire motion signals and timeout**
+- [x] **Step 5: Wire motion signals and timeout**
 
 In `ChatController` constructor, add:
 
@@ -2155,7 +2155,7 @@ Inside the existing `if (m_runtime != nullptr)` block, add:
                 this, &ChatController::handleMotionToolInterrupted);
 ```
 
-- [ ] **Step 6: Handle TOOL_CALL in applyStreamEvent**
+- [x] **Step 6: Handle TOOL_CALL in applyStreamEvent**
 
 In `ChatController::applyStreamEvent`, before `RUN_FINISHED`, add:
 
@@ -2206,7 +2206,7 @@ void ChatController::handleToolCall(const ChatStreamEvent &event)
 
 After implementing, simplify the BUFFERING path if it double-requests cleanFinish. The final behavior must be: stop start timeout, request cleanFinish, execute tool only from the cleanFinish callback.
 
-- [ ] **Step 7: Execute pet_motion**
+- [x] **Step 7: Execute pet_motion**
 
 Implement:
 
@@ -2265,7 +2265,7 @@ void ChatController::executeToolCallAfterCleanFinish()
 }
 ```
 
-- [ ] **Step 8: POST tool result**
+- [x] **Step 8: POST tool result**
 
 Add URL constant:
 
@@ -2300,7 +2300,7 @@ void ChatController::postToolResult(const QString &runId, const QString &toolCal
 }
 ```
 
-- [ ] **Step 9: Finish motion result paths**
+- [x] **Step 9: Finish motion result paths**
 
 Implement:
 
@@ -2347,7 +2347,7 @@ In `cancelCurrentReply`, add:
 
 Do not POST a tool result on explicit user cancellation.
 
-- [ ] **Step 10: Update ChatComposer placeholder**
+- [x] **Step 10: Update ChatComposer placeholder**
 
 Update the existing `ChatComposer.qml` placeholder binding to include:
 
@@ -2357,7 +2357,7 @@ placeholderText: App.ChatController.statusText === "Miles 正在移动…" ? "Mi
 
 Keep the existing placeholder property name if it is not `placeholderText`; only replace the expression value.
 
-- [ ] **Step 11: Run Qt chat tests**
+- [x] **Step 11: Run Qt chat tests**
 
 Run:
 
@@ -2372,7 +2372,7 @@ Expected:
 100% tests passed
 ```
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 Run:
 

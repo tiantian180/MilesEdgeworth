@@ -11,6 +11,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonParseError>
 #include <QLoggingCategory>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -32,12 +33,22 @@ Q_LOGGING_CATEGORY(chatLog, "miles.chat", QtInfoMsg)
 constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kConversationsUrl = "http://127.0.0.1:39710/v1/conversations";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
+constexpr auto kToolResultUrl = "http://127.0.0.1:39710/v1/chat/tool-result";
 constexpr auto kExpressionRequestedEvent = "miles.pet.expression.requested";
 constexpr auto kLifecycleEvent = "miles.pet.lifecycle";
 constexpr auto kMemorySummarizingEvent = "miles.chat.memory.summarizing";
 constexpr int kSidecarRestartDelayMs = 150;
 constexpr int kSidecarRestartRetryDelayMs = 300;
 constexpr int kSidecarRestartMaxAttempts = 3;
+
+QString toolResultUrl()
+{
+    const QByteArray envUrl = qgetenv("MILESEDGEWORTH_TOOL_RESULT_URL");
+    if (!envUrl.isEmpty()) {
+        return QString::fromLocal8Bit(envUrl);
+    }
+    return QString::fromLatin1(kToolResultUrl);
+}
 
 QString logBool(bool value)
 {
@@ -126,6 +137,9 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
     m_startTimeout.setSingleShot(true);
     connect(&m_startTimeout, &QTimer::timeout,
             this, &ChatController::handleStartTimeout);
+    m_motionToolTimeout.setSingleShot(true);
+    connect(&m_motionToolTimeout, &QTimer::timeout,
+            this, &ChatController::handleMotionToolTimeout);
     if (m_runtime != nullptr) {
         connect(m_runtime, &PetRuntime::activeSkinChanged, this, [this]() {
             setConversationSkinState(m_currentConversationSkinId);
@@ -136,6 +150,10 @@ ChatController::ChatController(PetRuntime *runtime, SettingsService *settings, Q
         connect(m_runtime, &PetRuntime::currentLoopModeChanged, this, [this]() {
             requestFinishCleanFinishIfPacerEmpty();
         });
+        connect(m_runtime, &PetRuntime::motionCompleted,
+                this, &ChatController::handleMotionToolCompleted);
+        connect(m_runtime, &PetRuntime::motionInterrupted,
+                this, &ChatController::handleMotionToolInterrupted);
     }
 }
 
@@ -725,6 +743,7 @@ void ChatController::sendMessageInConversation(const QString &trimmed)
 void ChatController::cancelCurrentReply()
 {
     const bool activePhase = m_phase != ChatPhase::IDLE;
+    const bool executingTool = m_phase == ChatPhase::EXECUTING_TOOL;
     const bool pendingCreate = !m_pendingConversationCreateReply.isNull();
     if (!m_sending && m_currentReply.isNull() && !pendingCreate && !activePhase) {
         return;
@@ -734,10 +753,14 @@ void ChatController::cancelCurrentReply()
     ++m_asyncGeneration;
     abortPendingConversationCreate();
     clearDeferredCleanFinishRequest();
+    m_motionToolTimeout.stop();
     m_activeRunId.clear();
     drainQueuedSegmentsToPacer();
     resetReplySessionState();
     transitionTo(ChatPhase::IDLE);
+    if (executingTool && m_runtime != nullptr) {
+        m_runtime->stopMotion();
+    }
     if (m_currentReply) {
         QNetworkReply *reply = m_currentReply;
         m_currentReply.clear();
@@ -831,7 +854,18 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
         return;
     }
 
+    if (event.type == QStringLiteral("TOOL_CALL")) {
+        handleToolCall(event);
+        return;
+    }
+
     if (event.type == QStringLiteral("RUN_FINISHED")) {
+        if (m_phase == ChatPhase::EXECUTING_TOOL || hasPendingToolCall()) {
+            qCWarning(chatLog).noquote() << "ignoring RUN_FINISHED while waiting for tool result"
+                                         << QStringLiteral("phase=%1").arg(static_cast<int>(m_phase));
+            return;
+        }
+
         m_completedChatRequestIds.insert(m_chatRequestId);
         if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
             QVariantMap message = m_messages.at(m_assistantMessageIndex).toMap();
@@ -946,13 +980,30 @@ void ChatController::transitionTo(ChatPhase next)
     if (m_phase == next) {
         return;
     }
+    const bool wasExecutingTool = executingTool();
     m_phase = next;
+    if (wasExecutingTool != executingTool()) {
+        emit executingToolChanged();
+    }
 }
 
 void ChatController::handleCleanFinishReady()
 {
     if (m_phase == ChatPhase::BUFFERING_FOR_START) {
         m_startTimeout.stop();
+        if (hasPendingToolCall()) {
+            if (!m_pendingThinkingState.isEmpty()) {
+                requestPetExpression(m_pendingThinkingState, m_pendingThinkingExpression);
+                m_pendingThinkingExpression.clear();
+                m_pendingThinkingState.clear();
+                requestCleanFinishForCurrentStream();
+                return;
+            }
+            m_pendingThinkingExpression.clear();
+            m_pendingThinkingState.clear();
+            executeToolCallAfterCleanFinish();
+            return;
+        }
         if (!m_segmentQueue.isEmpty()) {
             m_pendingThinkingExpression.clear();
             m_pendingThinkingState.clear();
@@ -1242,6 +1293,11 @@ void ChatController::maybeFinishWaitingForAnimationEnd()
         return;
     }
 
+    if (hasPendingToolCall()) {
+        executeToolCallAfterCleanFinish();
+        return;
+    }
+
     if (m_runtime != nullptr) {
         m_runtime->returnToIdle();
         m_runtime->setSuppressAutoIdle(false);
@@ -1304,6 +1360,233 @@ void ChatController::handleStartTimeout()
     handleCleanFinishReady();
 }
 
+void ChatController::handleToolCall(const ChatStreamEvent &event)
+{
+    PendingToolCall toolCall;
+    toolCall.runId = event.runId.isEmpty() ? m_activeRunId : event.runId;
+    toolCall.toolCallId = event.toolCallId;
+    toolCall.toolName = event.toolName;
+    toolCall.toolArgs = event.toolArgs;
+
+    if (toolCall.toolCallId.isEmpty()) {
+        postToolResult(toolCall.runId,
+                       toolCall.toolCallId,
+                       invalidToolResult(QStringLiteral("missing toolCallId")));
+        return;
+    }
+
+    if ((m_phase == ChatPhase::EXECUTING_TOOL || hasPendingToolCall())
+            && toolCall.toolCallId == m_pendingToolCall.toolCallId) {
+        qCWarning(chatLog).noquote() << "ignoring duplicate TOOL_CALL"
+                                     << QStringLiteral("toolCallId=%1").arg(toolCall.toolCallId);
+        return;
+    }
+
+    if (m_phase == ChatPhase::EXECUTING_TOOL || hasPendingToolCall()) {
+        postToolResult(toolCall.runId,
+                       toolCall.toolCallId,
+                       invalidToolResult(QStringLiteral("tool call received while another tool is pending")));
+        return;
+    }
+
+    m_pendingToolCall = toolCall;
+    m_motionToolTimedOut = false;
+
+    if (m_phase == ChatPhase::BUFFERING_FOR_START) {
+        m_startTimeout.stop();
+        if (!m_cleanFinishRequestPending) {
+            requestCleanFinishForCurrentStream();
+        }
+        return;
+    }
+
+    if (m_phase == ChatPhase::STREAMING || m_phase == ChatPhase::WAITING_FOR_ANIMATION_END) {
+        m_streamFinished = true;
+        transitionTo(ChatPhase::WAITING_FOR_ANIMATION_END);
+        m_animationReady = false;
+        m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
+        requestFinishCleanFinishIfPacerEmpty();
+        maybeFinishWaitingForAnimationEnd();
+        return;
+    }
+
+    if (m_phase == ChatPhase::GATED) {
+        m_streamFinished = true;
+        maybeAdvanceGate();
+        return;
+    }
+
+    m_pendingToolCall = PendingToolCall();
+    postToolResult(toolCall.runId,
+                   toolCall.toolCallId,
+                   invalidToolResult(QStringLiteral("tool call received in invalid state")));
+}
+
+bool ChatController::hasPendingToolCall() const
+{
+    return !m_pendingToolCall.toolCallId.isEmpty();
+}
+
+void ChatController::executeToolCallAfterCleanFinish()
+{
+    if (!hasPendingToolCall()) {
+        return;
+    }
+    m_startTimeout.stop();
+    m_gateTimeout.stop();
+    clearDeferredCleanFinishRequest();
+    executePetMotionTool(m_pendingToolCall);
+}
+
+void ChatController::executePetMotionTool(const PendingToolCall &toolCall)
+{
+    if (toolCall.toolName != QStringLiteral("pet_motion")) {
+        postToolResult(toolCall.runId,
+                       toolCall.toolCallId,
+                       invalidToolResult(QStringLiteral("unknown tool")));
+        resumeAfterToolResult();
+        return;
+    }
+
+    QString action;
+    QString mode;
+    double x = 0.0;
+    double y = 0.0;
+    if (!parsePetMotionArgs(toolCall.toolArgs, &action, &x, &y, &mode)) {
+        postToolResult(toolCall.runId,
+                       toolCall.toolCallId,
+                       invalidToolResult(QStringLiteral("invalid pet_motion arguments")));
+        resumeAfterToolResult();
+        return;
+    }
+
+    if (m_runtime == nullptr) {
+        postToolResult(toolCall.runId,
+                       toolCall.toolCallId,
+                       invalidToolResult(QStringLiteral("pet runtime unavailable")));
+        resumeAfterToolResult();
+        return;
+    }
+
+    transitionTo(ChatPhase::EXECUTING_TOOL);
+    setStatusText(QStringLiteral("Miles 正在移动…"));
+    m_motionToolTimedOut = false;
+    m_motionToolTimeout.start(kMotionToolTimeoutMs);
+    m_runtime->requestMotion(action, x, y, mode);
+}
+
+bool ChatController::parsePetMotionArgs(const QString &toolArgs, QString *action, double *x, double *y, QString *mode) const
+{
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(toolArgs.toUtf8(), &error);
+    if (error.error != QJsonParseError::NoError || !document.isObject()) {
+        return false;
+    }
+
+    const QJsonObject object = document.object();
+    const QString parsedAction = object.value(QStringLiteral("action")).toString();
+    if (parsedAction != QStringLiteral("moveTo") && parsedAction != QStringLiteral("moveBy")) {
+        return false;
+    }
+    if (!object.value(QStringLiteral("x")).isDouble()
+            || !object.value(QStringLiteral("y")).isDouble()) {
+        return false;
+    }
+
+    *action = parsedAction;
+    *x = object.value(QStringLiteral("x")).toDouble();
+    *y = object.value(QStringLiteral("y")).toDouble();
+    *mode = object.value(QStringLiteral("mode")).toString() == QStringLiteral("run")
+        ? QStringLiteral("run")
+        : QStringLiteral("walk");
+    return true;
+}
+
+QVariantMap ChatController::invalidToolResult(const QString &error) const
+{
+    QVariantMap result;
+    result.insert(QStringLiteral("success"), false);
+    result.insert(QStringLiteral("error"), error);
+    return result;
+}
+
+void ChatController::postToolResult(const QString &runId, const QString &toolCallId, const QVariantMap &result)
+{
+    QJsonObject body;
+    body.insert(QStringLiteral("runId"), runId);
+    body.insert(QStringLiteral("toolCallId"), toolCallId);
+    body.insert(QStringLiteral("result"), QJsonObject::fromVariantMap(result));
+
+    QNetworkRequest request{QUrl(toolResultUrl())};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    QNetworkReply *reply = m_network.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [reply]() {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (reply->error() != QNetworkReply::NoError || status >= 400) {
+            qCWarning(chatLog).noquote() << "tool result POST failed"
+                                         << QStringLiteral("status=%1").arg(status)
+                                         << QStringLiteral("error=%1").arg(reply->errorString());
+        }
+        reply->deleteLater();
+    });
+}
+
+void ChatController::resumeAfterToolResult()
+{
+    m_motionToolTimeout.stop();
+    m_motionToolTimedOut = false;
+    m_pendingToolCall = PendingToolCall();
+    m_streamFinished = false;
+    m_animationReady = false;
+    m_textDrained = false;
+    m_pacerEmpty = (m_pacer == nullptr || m_pacer->pendingCount() == 0);
+    clearDeferredCleanFinishRequest();
+
+    transitionTo(ChatPhase::BUFFERING_FOR_START);
+    setStatusText(QStringLiteral("正在回复"));
+    if (m_runtime != nullptr) {
+        m_runtime->setSuppressAutoIdle(true);
+    }
+    requestCleanFinishForCurrentStream();
+    if (m_phase == ChatPhase::BUFFERING_FOR_START) {
+        m_startTimeout.start(kStartTimeoutMs);
+    }
+}
+
+void ChatController::handleMotionToolCompleted(const QVariantMap &result)
+{
+    if (m_phase != ChatPhase::EXECUTING_TOOL) {
+        return;
+    }
+
+    postToolResult(m_pendingToolCall.runId, m_pendingToolCall.toolCallId, result);
+    resumeAfterToolResult();
+}
+
+void ChatController::handleMotionToolInterrupted(const QVariantMap &result)
+{
+    if (m_phase != ChatPhase::EXECUTING_TOOL) {
+        return;
+    }
+
+    QVariantMap toolResult = result;
+    if (m_motionToolTimedOut) {
+        toolResult.insert(QStringLiteral("reason"), QStringLiteral("timeout"));
+    }
+    postToolResult(m_pendingToolCall.runId, m_pendingToolCall.toolCallId, toolResult);
+    resumeAfterToolResult();
+}
+
+void ChatController::handleMotionToolTimeout()
+{
+    if (m_phase != ChatPhase::EXECUTING_TOOL || m_runtime == nullptr) {
+        return;
+    }
+
+    m_motionToolTimedOut = true;
+    m_runtime->stopMotion();
+}
+
 void ChatController::drainQueuedSegmentsToPacer()
 {
     bool hasQueuedText = !m_preExpressionBuffer.isEmpty();
@@ -1343,6 +1626,7 @@ void ChatController::resetReplySessionState()
 {
     m_startTimeout.stop();
     m_gateTimeout.stop();
+    m_motionToolTimeout.stop();
     m_preExpressionBuffer.clear();
     m_segmentQueue.clear();
     m_activeSegmentId = -1;
@@ -1354,6 +1638,8 @@ void ChatController::resetReplySessionState()
     m_pacerEmpty = true;
     m_pendingThinkingState.clear();
     m_pendingThinkingExpression.clear();
+    m_pendingToolCall = PendingToolCall();
+    m_motionToolTimedOut = false;
 }
 
 void ChatController::appendChunkToCurrentMessage(const QString &chunk, quint64 streamId)
@@ -1583,6 +1869,7 @@ void ChatController::finishCurrentReply()
 void ChatController::failCurrentReply(const QString &message)
 {
     const QString text = message.trimmed().isEmpty() ? QStringLiteral("请求失败") : message.trimmed();
+    const bool executingTool = m_phase == ChatPhase::EXECUTING_TOOL;
     m_cancelled = true;
     bool hasBufferedText = !m_preExpressionBuffer.isEmpty();
     for (const ExpressionSegment &segment : std::as_const(m_segmentQueue)) {
@@ -1594,6 +1881,9 @@ void ChatController::failCurrentReply(const QString &message)
     drainQueuedSegmentsToPacer();
     resetReplySessionState();
     transitionTo(ChatPhase::IDLE);
+    if (executingTool && m_runtime != nullptr) {
+        m_runtime->stopMotion();
+    }
 
     if (m_assistantMessageIndex >= 0 && m_assistantMessageIndex < m_messages.size()) {
         QVariantMap assistantMessage = m_messages.at(m_assistantMessageIndex).toMap();
@@ -1640,6 +1930,7 @@ void ChatController::isolateConversationAsyncState()
         || !m_currentReply.isNull()
         || !m_pendingConversationCreateReply.isNull()
         || m_phase != ChatPhase::IDLE;
+    const bool executingTool = m_phase == ChatPhase::EXECUTING_TOOL;
 
     m_cancelled = true;
     ++m_asyncGeneration;
@@ -1652,6 +1943,9 @@ void ChatController::isolateConversationAsyncState()
     resetReplySessionState();
     m_activeRunId.clear();
     transitionTo(ChatPhase::IDLE);
+    if (executingTool && m_runtime != nullptr) {
+        m_runtime->stopMotion();
+    }
     if (m_runtime != nullptr) {
         m_runtime->setSuppressAutoIdle(false);
     }

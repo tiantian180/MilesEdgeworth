@@ -53,6 +53,16 @@ int main()
     require(events[0].name == "miles.pet.lifecycle", "lifecycle name should parse");
     require(events[0].value.value("state").toString() == "thinking", "lifecycle state should parse");
 
+    events = parser.ingest(
+        "data: {\"type\":\"TOOL_CALL\",\"runId\":\"run-1\",\"toolCallId\":\"tc-1\","
+        "\"toolName\":\"pet_motion\",\"toolArgs\":\"{\\\"action\\\":\\\"moveTo\\\",\\\"x\\\":1,\\\"y\\\":0.5}\"}\n\n"
+    );
+    require(events.size() == 1, "tool call event should parse");
+    require(events[0].type == "TOOL_CALL", "tool call type should parse");
+    require(events[0].toolCallId == "tc-1", "toolCallId should parse");
+    require(events[0].toolName == "pet_motion", "toolName should parse");
+    require(events[0].toolArgs.contains("\"moveTo\""), "toolArgs should parse");
+
     events = parser.ingest("data: {not-json}\n\n");
     require(events.isEmpty(), "malformed JSON should be ignored");
 
