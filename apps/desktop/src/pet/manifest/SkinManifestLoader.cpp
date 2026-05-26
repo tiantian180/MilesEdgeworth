@@ -355,14 +355,15 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
     manifest.motion.walkSpeed = motion.value("walkSpeed").toDouble(manifest.motion.walkSpeed);
     manifest.motion.runSpeed = motion.value("runSpeed").toDouble(manifest.motion.runSpeed);
     manifest.motion.snapDistance = motion.value("snapDistance").toDouble(manifest.motion.snapDistance);
+    const MotionDefinition defaultMotion;
     if (manifest.motion.walkSpeed <= 0.0) {
-        manifest.motion.walkSpeed = 60.0;
+        manifest.motion.walkSpeed = defaultMotion.walkSpeed;
     }
     if (manifest.motion.runSpeed <= 0.0) {
-        manifest.motion.runSpeed = 120.0;
+        manifest.motion.runSpeed = defaultMotion.runSpeed;
     }
     if (manifest.motion.snapDistance <= 0.0) {
-        manifest.motion.snapDistance = 5.0;
+        manifest.motion.snapDistance = defaultMotion.snapDistance;
     }
 
     const QJsonObject audio = root.value("audio").toObject();
