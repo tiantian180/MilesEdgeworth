@@ -30,23 +30,21 @@ ChatBubblePlacementResult placeChatBubble(
     const int safeMargin = qMax(0, margin);
     const int bubbleWidth = safeDimension(bubbleSize.width());
     const int bubbleHeight = safeDimension(bubbleSize.height());
+    const int tailInset = qMin(qMax(42, safeMargin * 3), qMax(42, bubbleWidth / 2));
 
     const QPoint petCenter = pet.center();
-    const QPoint screenCenter = available.center();
-    const bool petOnLeft = petCenter.x() < screenCenter.x();
-    const bool petOnTop = petCenter.y() < screenCenter.y();
-
-    const int preferredX = petOnLeft
-        ? pet.right() + 1 + safeMargin
-        : pet.left() - bubbleWidth - safeMargin;
-    const int preferredY = petOnTop
-        ? pet.bottom() + 1 + safeMargin
-        : pet.top() - bubbleHeight - safeMargin;
-
     const int minX = available.left() + safeMargin;
     const int minY = available.top() + safeMargin;
     const int maxX = available.right() - bubbleWidth - safeMargin + 1;
     const int maxY = available.bottom() - bubbleHeight - safeMargin + 1;
+
+    const int preferredX = petCenter.x() - bubbleWidth / 2;
+    const int aboveY = pet.top() - bubbleHeight - safeMargin;
+    const int belowY = pet.bottom() + 1 + safeMargin;
+    const bool canPlaceAbove = aboveY >= minY;
+    const bool canPlaceBelow = belowY <= maxY;
+    const bool placeAbove = canPlaceAbove || !canPlaceBelow;
+    const int preferredY = placeAbove ? aboveY : belowY;
 
     ChatBubblePlacementResult result;
     result.topLeft = QPoint(
@@ -54,14 +52,12 @@ ChatBubblePlacementResult placeChatBubble(
         clampCoordinate(preferredY, minY, maxY)
     );
 
-    if (petOnTop && petOnLeft) {
-        result.pointer = QStringLiteral("topLeft");
-    } else if (petOnTop) {
-        result.pointer = QStringLiteral("topRight");
-    } else if (petOnLeft) {
-        result.pointer = QStringLiteral("bottomLeft");
+    result.tailX = clampCoordinate(petCenter.x() - result.topLeft.x(), tailInset, bubbleWidth - tailInset);
+    const bool tailOnLeft = result.tailX <= bubbleWidth / 2;
+    if (placeAbove) {
+        result.pointer = tailOnLeft ? QStringLiteral("bottomLeft") : QStringLiteral("bottomRight");
     } else {
-        result.pointer = QStringLiteral("bottomRight");
+        result.pointer = tailOnLeft ? QStringLiteral("topLeft") : QStringLiteral("topRight");
     }
 
     return result;

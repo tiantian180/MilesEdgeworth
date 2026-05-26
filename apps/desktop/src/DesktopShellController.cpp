@@ -290,7 +290,7 @@ void DesktopShellController::setChatWindowExpanded(bool expanded)
 
 QVariantMap DesktopShellController::placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const
 {
-    const QRect petGeometry(petWindowX(), petWindowY(), petWindowWidth(), petWindowHeight());
+    const QRect petGeometry = petVisibleScreenGeometry();
     const ChatBubblePlacementResult placement = ::placeChatBubble(
         petGeometry,
         petScreenAvailableGeometry(),
@@ -302,6 +302,7 @@ QVariantMap DesktopShellController::placeChatBubble(int bubbleWidth, int bubbleH
     result.insert(QStringLiteral("x"), placement.topLeft.x());
     result.insert(QStringLiteral("y"), placement.topLeft.y());
     result.insert(QStringLiteral("pointer"), placement.pointer);
+    result.insert(QStringLiteral("tailX"), placement.tailX);
     return result;
 }
 

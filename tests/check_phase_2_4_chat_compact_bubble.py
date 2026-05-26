@@ -157,25 +157,24 @@ def main() -> int:
             "visible bounds smoke must cover alpha scanning")
 
     for token in [
-        "pet.right() + 1 + safeMargin",
-        "pet.bottom() + 1 + safeMargin",
-        "available.right() - bubbleWidth - safeMargin + 1",
-        "available.bottom() - bubbleHeight - safeMargin + 1",
-        "QStringLiteral(\"topLeft\")",
-        "QStringLiteral(\"topRight\")",
+        "tailX",
+        "petCenter.x() - bubbleWidth / 2",
+        "canPlaceAbove",
+        "result.tailX = clampCoordinate",
         "QStringLiteral(\"bottomLeft\")",
         "QStringLiteral(\"bottomRight\")",
+        "QStringLiteral(\"topLeft\")",
+        "QStringLiteral(\"topRight\")",
     ]:
         require(token in placement_cpp, f"ChatBubblePlacement.cpp missing {token}")
     for token in [
-        "top-left pet should keep an exact horizontal margin",
-        "top-right pet should keep an exact horizontal margin",
-        "bottom-left pet should keep an exact vertical margin",
-        "bottom-right pet should keep an exact vertical margin",
-        "normal bubble should clamp to the available right margin",
-        "normal bubble should clamp to the available bottom margin with a shifted screen",
+        "centered bubble should use centered tail",
+        "pet with room above should place bubble above",
+        "tailX should stay inside safe tail range",
     ]:
         require(token in placement_smoke, f"chat_bubble_placement_smoke.cpp missing {token}")
+    require("result.insert(QStringLiteral(\"tailX\"), placement.tailX);" in shell_cpp,
+            "DesktopShellController.placeChatBubble must expose tailX")
 
     for token in [
         "property bool compactMode",

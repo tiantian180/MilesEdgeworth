@@ -9,6 +9,7 @@ struct ChatBubblePlacementResult
 {
     QPoint topLeft;
     QString pointer;
+    int tailX = 0;
 };
 
 ChatBubblePlacementResult placeChatBubble(
