@@ -2389,7 +2389,7 @@ git commit -m "feat: 接入聊天工具调用执行"
 - Create: `tests/check_phase_2_5_movement_tool.py`
 - Modify: `CMakeLists.txt`
 
-- [ ] **Step 1: Add contract check script**
+- [x] **Step 1: Add contract check script**
 
 Create `tests/check_phase_2_5_movement_tool.py`:
 
@@ -2542,7 +2542,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 2: Register contract check in root CMake**
+- [x] **Step 2: Register contract check in root CMake**
 
 In root `CMakeLists.txt`, after `check_phase_2_4_chat_compact_bubble`, add:
 
@@ -2556,7 +2556,7 @@ In root `CMakeLists.txt`, after `check_phase_2_4_chat_compact_bubble`, add:
         )
 ```
 
-- [ ] **Step 3: Run contract check**
+- [x] **Step 3: Run contract check**
 
 Run:
 
@@ -2571,7 +2571,7 @@ Expected:
 100% tests passed
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 
