@@ -40,6 +40,10 @@ Item {
     }
 
     function submitOrCancel() {
+        if (!root.canSubmit) {
+            return
+        }
+
         if (App.ChatController.sending) {
             root.cancelRequested()
             return
@@ -54,7 +58,7 @@ Item {
 
     RowLayout {
         anchors.fill: parent
-        spacing: compactMode ? 6 : 8
+        spacing: root.compactMode ? 6 : 8
 
         ToolButton {
             id: expandButton
@@ -82,7 +86,7 @@ Item {
 
             Layout.fillWidth: true
             Layout.preferredHeight: root.inputTargetHeight
-            radius: compactMode ? 15 : 18
+            radius: root.compactMode ? 15 : 18
             color: root.disabledInput ? "#fff4ec" : "#fffdf8"
             border.color: root.disabledInput ? "#c66a4b" : (input.activeFocus ? "#9fb4cc" : "#cfd8e3")
             border.width: input.activeFocus || root.disabledInput ? 2 : 1
@@ -94,8 +98,8 @@ Item {
                 anchors.fill: parent
                 anchors.leftMargin: 14
                 anchors.rightMargin: root.buttonSize + 18
-                anchors.topMargin: compactMode ? 5 : 8
-                anchors.bottomMargin: compactMode ? 5 : 8
+                anchors.topMargin: root.compactMode ? 5 : 8
+                anchors.bottomMargin: root.compactMode ? 5 : 8
                 wrapMode: TextArea.Wrap
                 placeholderText: root.missingProviderConfig
                         ? "先点设置填写模型配置"
@@ -127,9 +131,9 @@ Item {
                 width: root.buttonSize
                 height: root.buttonSize
                 anchors.right: parent.right
-                anchors.rightMargin: compactMode ? 8 : 10
+                anchors.rightMargin: root.compactMode ? 8 : 10
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: compactMode ? 5 : 8
+                anchors.bottomMargin: root.compactMode ? 5 : 8
                 enabled: root.canSubmit
                 text: App.ChatController.sending ? "■" : "↑"
                 font.pixelSize: App.ChatController.sending ? 16 : 22
