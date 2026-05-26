@@ -15,6 +15,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 MAC_BEHAVIOR = ROOT / "apps/desktop/src/platform/MacPetWindowBehavior.mm"
+MAC_BEHAVIOR_H = ROOT / "apps/desktop/src/platform/MacPetWindowBehavior.h"
 PET_WINDOW_QML = ROOT / "apps/desktop/qml/PetWindow.qml"
 DESKTOP_CMAKE = ROOT / "apps/desktop/CMakeLists.txt"
 MAIN_CPP = ROOT / "apps/desktop/src/main.cpp"
@@ -44,6 +45,7 @@ def extract_function(source: str, name: str) -> str:
 
 def main() -> int:
     source = MAC_BEHAVIOR.read_text(encoding="utf-8")
+    header = MAC_BEHAVIOR_H.read_text(encoding="utf-8")
     function_body = extract_function(source, "setMacPetWindowAlwaysOnTop")
 
     forbidden_tokens = [
@@ -95,6 +97,25 @@ def main() -> int:
         return 1
     if "QApplication" not in main_source or "QGuiApplication app" in main_source:
         print("Qt.labs.platform 菜单应使用 QApplication，而不是纯 QGuiApplication。", file=sys.stderr)
+        return 1
+
+    companion_required_tokens = [
+        "applyMacCompanionWindowBehavior(QWindow *window)",
+        "prepareMacCompanionWindowForOpen(QWindow *window)",
+        "NSWindowCollectionBehaviorCanJoinAllSpaces",
+        "NSWindowCollectionBehaviorFullScreenAuxiliary",
+        "NSWindowCollectionBehaviorStationary",
+        "kCGScreenSaverWindowLevelKey",
+        "orderFrontRegardless",
+        "activateIgnoringOtherApps:YES",
+    ]
+    missing_companion_tokens = [
+        token for token in companion_required_tokens
+        if token not in source + header
+    ]
+    if missing_companion_tokens:
+        joined = ", ".join(missing_companion_tokens)
+        print(f"聊天/气泡窗口缺少跨 Space 全屏辅助窗口行为：{joined}", file=sys.stderr)
         return 1
 
     return 0

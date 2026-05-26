@@ -114,8 +114,28 @@ def main() -> int:
         "DesktopShellController must expose chat Dock visibility control",
     )
     require(
+        "setChatWindow(QWindow *window)" in shell_h + shell_cpp
+        and "m_chatWindow" in shell_h + shell_cpp,
+        "DesktopShellController must retain the ChatWindow QWindow for macOS Space behavior",
+    )
+    require(
+        "setChatBubbleWindow(QWindow *window)" in shell_h + shell_cpp
+        and "m_chatBubbleWindow" in shell_h + shell_cpp,
+        "DesktopShellController must retain the ChatBubbleWindow QWindow for macOS Space behavior",
+    )
+    require(
+        "prepareChatWindowForOpen()" in shell_h + shell_cpp
+        and "App.DesktopShell.prepareChatWindowForOpen()" in chat_qml,
+        "ChatWindow open path must prepare the native window before activation",
+    )
+    require(
         "setMacApplicationDockVisible(visible)" in shell_cpp,
         "DesktopShellController must delegate chat Dock visibility to macOS platform code",
+    )
+    require(
+        "applyMacCompanionWindowBehavior" in shell_cpp + mac_behavior_h + mac_behavior_mm
+        and "prepareMacCompanionWindowForOpen" in shell_cpp + mac_behavior_h + mac_behavior_mm,
+        "macOS platform layer must expose companion behavior for chat windows",
     )
     require(
         "setMacApplicationDockVisible(bool visible)" in mac_behavior_h + mac_behavior_mm,
@@ -131,6 +151,16 @@ def main() -> int:
         "main must start macOS in accessory mode until the chat window is visible",
     )
     require("loadFromModule(\"MilesEdgeworth\", \"ChatWindow\")" in main_cpp, "main must load ChatWindow QML")
+    require(
+        "qobject_cast<QWindow *>(chatEngine.rootObjects().at(0))" in main_cpp
+        and "shellController.setChatWindow(chatWindow)" in main_cpp,
+        "main must register ChatWindow with DesktopShellController",
+    )
+    require(
+        "qobject_cast<QWindow *>(chatEngine.rootObjects().at(2))" in main_cpp
+        and "shellController.setChatBubbleWindow(chatBubbleWindow)" in main_cpp,
+        "main must register ChatBubbleWindow with DesktopShellController",
+    )
     require("聊天" in menu_cpp, "native pet context menu must include chat entry")
     require('"error"' in manifest, "Miles manifest must expose error state for chat failures")
     require('"recipe": "thinking.holdUntilCancelled", "allowedStates": ["thinking"]' in manifest,
