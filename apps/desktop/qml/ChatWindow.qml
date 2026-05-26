@@ -24,6 +24,7 @@ ApplicationWindow {
     property int compactWidth: 380
     property int compactMinHeight: 56
     property string draftText: ""
+    readonly property int expandedTitleButtonInset: 11
 
     onVisibleChanged: {
         App.DesktopShell.setChatWindowDockVisible(visible)
@@ -203,8 +204,8 @@ ApplicationWindow {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 28
-                        anchors.rightMargin: 28
+                        anchors.leftMargin: chatWindow.expandedTitleButtonInset
+                        anchors.rightMargin: chatWindow.expandedTitleButtonInset
                         z: 1
                         spacing: 8
 
