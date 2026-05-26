@@ -2,4 +2,15 @@
   <qresource prefix="/icon">
     <file alias="favicon-bar.ico">../../../icon/favicon_bar.ico</file>
   </qresource>
+  <qresource prefix="/ui-icons">
+    <file alias="menu.svg">icons/menu.svg</file>
+    <file alias="settings.svg">icons/settings.svg</file>
+    <file alias="refresh-ccw.svg">icons/refresh-ccw.svg</file>
+    <file alias="maximize-2.svg">icons/maximize-2.svg</file>
+    <file alias="minimize-2.svg">icons/minimize-2.svg</file>
+    <file alias="x.svg">icons/x.svg</file>
+    <file alias="arrow-up-white.svg">icons/arrow-up-white.svg</file>
+    <file alias="arrow-up-muted.svg">icons/arrow-up-muted.svg</file>
+    <file alias="square-stop.svg">icons/square-stop.svg</file>
+  </qresource>
 </RCC>

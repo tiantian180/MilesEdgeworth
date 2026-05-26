@@ -6,6 +6,7 @@
 #include "pet/PetRuntime.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/surface/PetContextMenu.h"
+#include "pet/surface/PetVisibleBounds.h"
 #include "pet/surface/PropSurfaceWindow.h"
 
 #ifdef Q_OS_MACOS
@@ -223,6 +224,7 @@ void PetSurfaceWindow::resizeEvent(QResizeEvent *event)
         imageSize
     );
     applyCurrentFrameMask();
+    syncVisibleBoundsToShell();
 }
 
 QString PetSurfaceWindow::imagePathFromUrl(const QUrl &url) const
@@ -250,6 +252,7 @@ void PetSurfaceWindow::syncSizeFromRuntime()
     );
 
     applyCurrentFrameMask();
+    syncVisibleBoundsToShell();
 }
 
 void PetSurfaceWindow::restartMovieFromRuntime()
@@ -260,6 +263,7 @@ void PetSurfaceWindow::restartMovieFromRuntime()
         m_movie->setFileName(QString());
         m_petLabel->clear();
         clearMask();
+        m_shellController->setPetVisibleLocalBounds(QRect());
         return;
     }
 
@@ -271,6 +275,7 @@ void PetSurfaceWindow::restartMovieFromRuntime()
     // 直接 start() 可让 QMovie 以正常节奏从首帧开始。
     m_movie->start();
     applyCurrentFrameMask();
+    syncVisibleBoundsToShell();
 }
 
 void PetSurfaceWindow::handleMovieFrameChanged(int frame)
@@ -279,6 +284,7 @@ void PetSurfaceWindow::handleMovieFrameChanged(int frame)
     const int endFrame = frameCount > 0 ? frameCount - 1 : -1;
 
     applyCurrentFrameMask();
+    syncVisibleBoundsToShell();
 
     consumeFrameMovementDelta();
 
@@ -411,6 +417,44 @@ QRegion PetSurfaceWindow::regionFromCurrentFrame() const
     }
 
     return region;
+}
+
+QRect PetSurfaceWindow::visibleLocalBoundsFromCurrentFrame() const
+{
+    if (m_movie == nullptr || m_petLabel == nullptr || m_petLabel->size().isEmpty()) {
+        return {};
+    }
+
+    QImage currentFrame = m_movie->currentImage();
+    if (currentFrame.isNull()) {
+        const QPixmap currentPixmap = m_movie->currentPixmap();
+        if (!currentPixmap.isNull()) {
+            currentFrame = currentPixmap.toImage();
+        }
+    }
+    if (currentFrame.isNull()) {
+        return {};
+    }
+
+    const QImage scaledFrame = currentFrame
+        .scaled(m_petLabel->size(), Qt::IgnoreAspectRatio, Qt::FastTransformation)
+        .convertToFormat(QImage::Format_ARGB32);
+    QRect visibleBounds = visibleBoundsFromImage(scaledFrame, kAlphaThreshold);
+    if (!visibleBounds.isValid()) {
+        return {};
+    }
+
+    visibleBounds.translate(m_petLabel->pos());
+    return visibleBounds;
+}
+
+void PetSurfaceWindow::syncVisibleBoundsToShell()
+{
+    if (m_shellController == nullptr) {
+        return;
+    }
+
+    m_shellController->setPetVisibleLocalBounds(visibleLocalBoundsFromCurrentFrame());
 }
 
 void PetSurfaceWindow::showContextMenuAt(const QPoint &globalPosition)

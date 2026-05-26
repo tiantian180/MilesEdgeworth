@@ -30,6 +30,7 @@ def main() -> int:
     controller_cpp = read("apps/desktop/src/settings/SettingsController.cpp")
     settings_qml = read("apps/desktop/qml/SettingsWindow.qml")
     chat_qml = read("apps/desktop/qml/ChatWindow.qml")
+    composer_qml = read("apps/desktop/qml/ChatComposer.qml")
     chat_h = read("apps/desktop/src/chat/ChatController.h")
     chat_cpp = read("apps/desktop/src/chat/ChatController.cpp")
     main_cpp = read("apps/desktop/src/main.cpp")
@@ -115,11 +116,11 @@ def main() -> int:
     require("TextEdit" in chat_qml, "chat message text must be selectable")
     require("selectByMouse: true" in chat_qml, "chat message text must support mouse selection")
     require("readOnly: true" in chat_qml, "chat message text selection must not make bubbles editable")
-    require("providerConfigured" in chat_h + chat_cpp + chat_qml,
-            "ChatWindow must know whether provider settings are complete")
-    require("sidecarReady && providerConfigured" in chat_qml,
-            "ChatWindow input must be disabled until the sidecar and provider config are ready")
-    require("先点设置填写模型配置" in chat_qml,
+    require("providerConfigured" in chat_h + chat_cpp + chat_qml + composer_qml,
+            "ChatWindow or shared composer must know whether provider settings are complete")
+    require("sidecarReady && providerConfigured" in composer_qml,
+            "shared chat composer input must be disabled until the sidecar and provider config are ready")
+    require("先点设置填写模型配置" in composer_qml,
             "disabled input placeholder must tell the user to fill model config")
     require("SettingsService" in chat_h, "ChatController must take a SettingsService")
     require("providerConfiguredChanged" in chat_h, "ChatController must notify provider config completeness")

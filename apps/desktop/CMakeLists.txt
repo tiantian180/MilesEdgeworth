@@ -141,6 +141,8 @@ set(DESKTOP_SOURCES
     src/chat/ChatStreamEvent.h
     src/chat/ChatTextPacer.cpp
     src/chat/ChatTextPacer.h
+    src/chat/ChatBubblePlacement.cpp
+    src/chat/ChatBubblePlacement.h
     src/logging/MilesLogHandler.cpp
     src/logging/MilesLogHandler.h
     src/main.cpp
@@ -196,6 +198,8 @@ set(DESKTOP_SOURCES
     src/pet/surface/PetContextMenu.h
     src/pet/surface/PetSurfaceWindow.cpp
     src/pet/surface/PetSurfaceWindow.h
+    src/pet/surface/PetVisibleBounds.cpp
+    src/pet/surface/PetVisibleBounds.h
     src/pet/surface/PropSurfaceWindow.cpp
     src/pet/surface/PropSurfaceWindow.h
     src/skins/miles-edgeworth/MilesEdgeworthInteractions.cpp
@@ -223,7 +227,9 @@ qt_add_qml_module(MilesEdgeworthDesktop
     VERSION 1.0
     QML_FILES
         qml/ChatBubbleWindow.qml
+        qml/ChatComposer.qml
         qml/ChatWindow.qml
+        qml/MilesIconButton.qml
         qml/PetWindow.qml
         qml/SettingsWindow.qml
     SOURCES
@@ -328,6 +334,43 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME chat_text_pacer_smoke COMMAND ChatTextPacerSmoke)
+
+    add_executable(ChatBubblePlacementSmoke
+        tests/chat_bubble_placement_smoke.cpp
+        src/chat/ChatBubblePlacement.cpp
+        src/chat/ChatBubblePlacement.h
+    )
+
+    target_include_directories(ChatBubblePlacementSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(ChatBubblePlacementSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    add_test(NAME chat_bubble_placement_smoke COMMAND ChatBubblePlacementSmoke)
+
+    add_executable(PetVisibleBoundsSmoke
+        tests/pet_visible_bounds_smoke.cpp
+        src/pet/surface/PetVisibleBounds.cpp
+        src/pet/surface/PetVisibleBounds.h
+    )
+
+    target_include_directories(PetVisibleBoundsSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(PetVisibleBoundsSmoke
+        PRIVATE
+            Qt6::Core
+            Qt6::Gui
+    )
+
+    add_test(NAME pet_visible_bounds_smoke COMMAND PetVisibleBoundsSmoke)
 
     add_executable(LoggingFormatterSmoke
         tests/logging_formatter_smoke.cpp
