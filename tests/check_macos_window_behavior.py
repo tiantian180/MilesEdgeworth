@@ -47,6 +47,9 @@ def main() -> int:
     source = MAC_BEHAVIOR.read_text(encoding="utf-8")
     header = MAC_BEHAVIOR_H.read_text(encoding="utf-8")
     function_body = extract_function(source, "setMacPetWindowAlwaysOnTop")
+    context_menu_body = extract_function(source, "prepareMacPetWindowForContextMenu")
+    companion_open_body = extract_function(source, "prepareMacCompanionWindowForOpen")
+    dock_body = extract_function(source, "setMacApplicationDockVisible")
 
     forbidden_tokens = [
         "moveWindowToStationarySkyLightSpace",
@@ -99,6 +102,22 @@ def main() -> int:
         print("Qt.labs.platform 菜单应使用 QApplication，而不是纯 QGuiApplication。", file=sys.stderr)
         return 1
 
+    activating_functions = {
+        "prepareMacPetWindowForContextMenu": context_menu_body,
+        "prepareMacCompanionWindowForOpen": companion_open_body,
+        "setMacApplicationDockVisible": dock_body,
+    }
+    for name, body in activating_functions.items():
+        if "activateIgnoringOtherApps" in body:
+            print(
+                f"{name} 不应主动激活应用；否则会把全屏 Space 中的桌宠操作带回原桌面 Space。",
+                file=sys.stderr,
+            )
+            return 1
+    if "makeKeyAndOrderFront" not in companion_open_body:
+        print("聊天窗打开时应让 companion window 自身成为 key window，而不是激活整个应用。", file=sys.stderr)
+        return 1
+
     companion_required_tokens = [
         "applyMacCompanionWindowBehavior(QWindow *window)",
         "prepareMacCompanionWindowForOpen(QWindow *window)",
@@ -107,7 +126,7 @@ def main() -> int:
         "NSWindowCollectionBehaviorStationary",
         "kCGScreenSaverWindowLevelKey",
         "orderFrontRegardless",
-        "activateIgnoringOtherApps:YES",
+        "makeKeyAndOrderFront",
     ]
     missing_companion_tokens = [
         token for token in companion_required_tokens

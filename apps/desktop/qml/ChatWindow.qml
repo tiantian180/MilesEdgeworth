@@ -91,8 +91,6 @@ ApplicationWindow {
         App.ChatController.loadConversations()
         show()
         App.DesktopShell.prepareChatWindowForOpen()
-        raise()
-        requestActivate()
         expandedComposer.forceInputFocus()
     }
 

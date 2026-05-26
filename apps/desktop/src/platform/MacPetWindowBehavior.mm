@@ -111,7 +111,6 @@ void prepareMacPetWindowForContextMenu(QWindow *window)
     }
 
     [nativeWindow orderFrontRegardless];
-    [NSApp activateIgnoringOtherApps:YES];
 }
 
 void applyMacCompanionWindowBehavior(QWindow *window)
@@ -140,13 +139,10 @@ void prepareMacCompanionWindowForOpen(QWindow *window)
 
     applyMacCompanionWindowBehavior(window);
     [nativeWindow orderFrontRegardless];
-    [NSApp activateIgnoringOtherApps:YES];
+    [nativeWindow makeKeyAndOrderFront:nil];
 }
 
 void setMacApplicationDockVisible(bool visible)
 {
     [NSApp setActivationPolicy:visible ? NSApplicationActivationPolicyRegular : NSApplicationActivationPolicyAccessory];
-    if (visible) {
-        [NSApp activateIgnoringOtherApps:YES];
-    }
 }

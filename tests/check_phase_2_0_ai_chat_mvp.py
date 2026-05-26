@@ -129,6 +129,10 @@ def main() -> int:
         "ChatWindow open path must prepare the native window before activation",
     )
     require(
+        "requestActivate()" not in chat_qml,
+        "ChatWindow QML must not request app activation directly because it can switch macOS Spaces",
+    )
+    require(
         "setMacApplicationDockVisible(visible)" in shell_cpp,
         "DesktopShellController must delegate chat Dock visibility to macOS platform code",
     )
