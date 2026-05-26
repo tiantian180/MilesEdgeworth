@@ -679,10 +679,68 @@ expression 通过 `ExpressionMappingResolver` 映射到具体 action。一个 ex
 - **action 层**：确认所有候选 action 都能正常播放。验证方式：在单元测试中传入固定 `randomValue` 做确定性验证（`ExpressionMappingResolver::resolve` 已接受 `randomValue` 参数）。
 - **体验层**：随机选择有利于自然感。如果某个场景需要确定性动作（例如强剧情"异议！"必须播 `objecting`），皮肤可以配置 `selection: first_available` 或直接在 recipe 里指定 action。
 
-## 13. 文档维护规则
+## 13. Tool use 与移动-聊天互斥
 
-- 修改 SSE 事件类型（expression.requested / lifecycle）时同步更新 §6。
+Phase 2.5 引入 tool use 能力。模型可以在流式回复中输出 `tool_calls`（例如 `pet_motion`），ChatController 需要在正常的文字-动画编排流中插入 tool 执行阶段。
+
+完整 tool use 协议和 MotionController 设计详见 `移动系统与工具调用设计.md`。本节只记录对 ChatController 状态机和编排流的影响。
+
+### 13.1 ChatController 状态机扩展
+
+新增 `EXECUTING_TOOL` 状态，可从两个路径进入：
+
+```
+IDLE → BUFFERING_FOR_START
+  ├── 收到 TEXT_MESSAGE_START → STREAMING → GATED
+  │     ├── 正常路径 → 继续 STREAMING
+  │     └── 收到 TOOL_CALL → EXECUTING_TOOL
+  └── 收到 TOOL_CALL（tool-only） → EXECUTING_TOOL
+EXECUTING_TOOL → BUFFERING_FOR_START → ...
+GATED → WAITING_FOR_ANIMATION_END → IDLE
+```
+
+### 13.2 TOOL_CALL 处理时序
+
+TOOL_CALL 可在两种状态下到达：
+
+**路径 A（STREAMING/GATED，模型先说话再调 tool）**：
+
+1. 如果有 pending 文字（模型同时输出了 content 和 tool_calls），等 segment 全部流出（pacer drain）。
+2. 等当前 expression 动画 cleanFinish。
+3. 进入 `EXECUTING_TOOL` 状态。
+
+**路径 B（BUFFERING_FOR_START，模型直接调 tool 不说话）**：
+
+1. 停止 start timeout。
+2. 等 thinking 动画 cleanFinish。
+3. 进入 `EXECUTING_TOOL` 状态。
+
+进入 `EXECUTING_TOOL` 后：
+
+4. 将 tool 请求转给 PetRuntime → MotionController 执行。
+5. 移动完成后，POST tool result 到 sidecar `/v1/chat/tool-result`。
+6. Sidecar 继续与 provider 对话，ChatController 回到 `BUFFERING_FOR_START` 处理后续事件。
+
+### 13.3 移动-聊天互斥
+
+`EXECUTING_TOOL` 期间：
+
+- **输入框禁用**，placeholder 改为"Miles 正在移动…"。
+- 文字不流出，速率限制器暂停。
+- 桌宠播放走/跑动画（由 MotionController + PetRuntime 管理）。PetRuntime 通过 `enterMovingState()` 设置 `suppressAutoIdle` 和 `m_motionLoopOverride`，后者让 `playLocomotion()` 以 `loopMode="loop"` 播放 walk/run 动画，确保持续循环直到移动完成（详见 `移动系统与工具调用设计.md` §7.5）。
+- 取消按钮可用：停止移动 + 取消 chat session（走正常取消路径，详见 `移动系统与工具调用设计.md` §9.2）。
+- 用户拖拽桌宠：MotionController 立即打断，回传 `interrupted_by_user` tool result，继续对话。
+- sidecar 等待 tool result 有 120 秒超时（详见 `移动系统与工具调用设计.md` §9.1）。
+
+### 13.4 SSE 事件序列示例
+
+见 `移动系统与工具调用设计.md` §2.4。
+
+## 14. 文档维护规则
+
+- 修改 SSE 事件类型（expression.requested / lifecycle / TOOL_CALL）时同步更新 §6 和 `移动系统与工具调用设计.md` §2。
 - 修改 ChatController 状态机、segment queue 或双条件门控逻辑时同步更新 §7。
+- 修改 EXECUTING_TOOL 状态或 tool 处理流程时同步更新 §13 和 `移动系统与工具调用设计.md` §6。
 - PetRuntime 新增 / 修改 cleanFinish 接口或 postcondition 时同步更新 §4 和 §8。
 - 速率限制器参数、segmentId 机制或追平算法调整时同步更新 §9。
 - 新增动画类型或改变 phase 自动转移规则时同步更新 §4。

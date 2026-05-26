@@ -205,9 +205,9 @@ Go sidecar（`apps/agent-core`）、QML `ChatWindow`、C++ `ChatController`、mo
 
 范围：
 
-- `MotionController` 落地：`moveTo(target, mode)`、`moveBy(delta, mode)`、`wander()`、`stop()`。
+- `MotionController` 落地：`moveTo(x, y, mode)`、`moveBy(dx, dy, mode)`、`stop()`。wander 不在本阶段范围。
 - 走 / 跑模式，8 方向动画，接近目标后吸附并切回 idle。
-- Go sidecar 增加 `miles.pet.motion.requested` 事件；Qt 侧 `ChatController` 接收后转给 `MotionController`。
+- Go sidecar 通过 OpenAI-compatible tool use 注册 `pet_motion` tool；模型调用后 sidecar emit `TOOL_CALL` SSE 事件，Qt 侧 `ChatController` 接收后转给 `MotionController`，执行完毕后 POST tool result 回 sidecar。
 
 验收：
 
