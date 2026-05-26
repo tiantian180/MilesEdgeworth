@@ -72,16 +72,22 @@ def main() -> int:
 
     for token in [
         "property bool compactMode",
+        "property int compactWidth: 460",
+        "property int compactMinHeight: 62",
+        "function syncShellChatState()",
         "function showCompact()",
         "function showExpanded()",
         "function hideChatUi()",
-        "height = compactHeight",
+        "ChatComposer",
+        "id: compactComposer",
+        "compactMode: chatWindow.compactMode",
+        "height = compactComposer.implicitHeight + 24",
+        "App.DesktopShell.setChatWindowExpanded(visible && !compactMode)",
         "visible: !chatWindow.compactMode",
-        "visible: chatWindow.compactMode",
+        "enabled: chatWindow.compactMode",
         "text: \"收起\"",
-        "text: \"展开\"",
-        "text: \"关闭\"",
-        "chatLayout.submitInput()",
+        "onExpandRequested: App.ChatController.openWindow()",
+        "onCloseRequested: chatWindow.hideChatUi()",
         "App.ChatController.sendMessage(text)",
     ]:
         require(token in chat_qml, f"ChatWindow.qml missing {token}")

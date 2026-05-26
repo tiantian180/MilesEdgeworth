@@ -577,8 +577,8 @@ ApplicationWindow {
 
                 onImplicitHeightChanged: {
                     if (chatWindow.compactMode) {
+                        chatWindow.maximumHeight = implicitHeight + 24
                         chatWindow.height = implicitHeight + 24
-                        chatWindow.maximumHeight = chatWindow.height
                     }
                 }
             }
@@ -588,26 +588,6 @@ ApplicationWindow {
                 anchors.right: parent.right
                 anchors.top: parent.top
                 height: 8
-                enabled: chatWindow.compactMode
-                acceptedButtons: Qt.LeftButton
-                onPressed: chatWindow.startSystemMove()
-            }
-
-            MouseArea {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: 46
-                enabled: chatWindow.compactMode
-                acceptedButtons: Qt.LeftButton
-                onPressed: chatWindow.startSystemMove()
-            }
-
-            MouseArea {
-                anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: 46
                 enabled: chatWindow.compactMode
                 acceptedButtons: Qt.LeftButton
                 onPressed: chatWindow.startSystemMove()
