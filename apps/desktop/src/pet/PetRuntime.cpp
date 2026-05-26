@@ -362,8 +362,7 @@ void PetRuntime::setAudioLanguage(const QString &languageId)
 
 void PetRuntime::toggleAutoMovementEnabled()
 {
-    m_autoMovementEnabled = !m_autoMovementEnabled;
-    emit autoMovementEnabledChanged();
+    setAutoMovementEnabled(!m_autoMovementEnabled);
 }
 
 void PetRuntime::setPetSize(const QString &sizeId)
