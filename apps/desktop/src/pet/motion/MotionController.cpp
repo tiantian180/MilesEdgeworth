@@ -278,16 +278,18 @@ void MotionController::beginMove(const QPoint &target, const QString &mode, bool
 
 void MotionController::reclampMovingTarget()
 {
-    if (m_state != State::Moving) {
-        return;
-    }
-
     bool currentClamped = false;
     const QPoint currentPosition = clampToReachable(m_currentPositionF, &currentClamped);
     if (currentClamped) {
         m_currentPosition = currentPosition;
         m_currentPositionF = QPointF(currentPosition);
-        emit positionChanged(m_currentPosition);
+        if (m_state == State::Moving) {
+            emit positionChanged(m_currentPosition);
+        }
+    }
+
+    if (m_state != State::Moving) {
+        return;
     }
 
     bool targetClamped = false;

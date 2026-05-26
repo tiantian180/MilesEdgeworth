@@ -241,5 +241,31 @@ int main(int argc, char *argv[])
             "low speed movement should accumulate subpixel progress and complete");
     require(lowSpeedController.currentPosition() == QPoint(2, 0), "low speed movement should finish at target");
 
+    MotionController idleClampController;
+    idleClampController.configure(testConfig());
+    idleClampController.setScreenGeometry(QRect(0, 0, 120, 100));
+    idleClampController.setCurrentPosition(QPoint(90, 70));
+
+    int idlePositionChangedCount = 0;
+    QObject::connect(&idleClampController, &MotionController::positionChanged, &idleClampController,
+                     [&](const QPoint &) {
+                         ++idlePositionChangedCount;
+                     });
+    idleClampController.setScreenGeometry(QRect(0, 0, 70, 60));
+    require(idleClampController.currentPosition() == QPoint(50, 40),
+            "idle geometry shrink should clamp current position internally");
+    require(idlePositionChangedCount == 0, "idle geometry shrink should not emit positionChanged");
+
+    bool idleMoveCompleted = false;
+    QObject::connect(&idleClampController, &MotionController::completed, &idleClampController,
+                     [&](double, double) {
+                         idleMoveCompleted = true;
+                     });
+    idleClampController.moveBy(0.0, 0.0, QStringLiteral("walk"));
+    require(waitFor([&]() { return idleMoveCompleted; }, 200),
+            "moveBy after idle clamp should complete from sanitized current position");
+    require(idleClampController.currentPosition() == QPoint(50, 40),
+            "moveBy after idle clamp should start from clamped current position");
+
     return 0;
 }
