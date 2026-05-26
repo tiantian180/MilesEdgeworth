@@ -26,7 +26,7 @@ ctest --test-dir build -R "chat_stream_event_parser_smoke|chat_controller_smoke|
 ## 当前限制
 
 - 只有 mock provider，不读取 API key，不访问外部模型服务。
-- ChatWindow 仍是独立窗口；桌宠本体保持原生 QWidget `PetSurfaceWindow`。后续 UI 优化已补齐 macOS companion window 行为，聊天窗和迷你态气泡会加入所有 Space 并允许显示在全屏应用上方。
+- ChatWindow 仍是独立窗口；桌宠本体保持原生 QWidget `PetSurfaceWindow`。后续 UI 优化已补齐 macOS companion window 行为，聊天窗和迷你态气泡会加入所有 Space 并允许显示在全屏应用上方；聊天窗显隐不再切换应用 Dock / activation policy。
 - 会话不持久化，重启后不保留历史。
 - expression 只覆盖 Phase 2.0 的 thinking、speaking、idle、error 最小状态链路。
 - Go 已成为当前根 CMake 构建的前置条件。

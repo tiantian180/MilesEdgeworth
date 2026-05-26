@@ -289,15 +289,6 @@ void DesktopShellController::clearPetInputMask()
     WindowInputMaskController::clearMask(m_petWindow);
 }
 
-void DesktopShellController::setChatWindowDockVisible(bool visible)
-{
-#ifdef Q_OS_MACOS
-    setMacApplicationDockVisible(visible);
-#else
-    Q_UNUSED(visible);
-#endif
-}
-
 void DesktopShellController::setChatWindowExpanded(bool expanded)
 {
     if (m_chatWindowExpanded == expanded) {

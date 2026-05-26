@@ -19,6 +19,9 @@ MAC_BEHAVIOR_H = ROOT / "apps/desktop/src/platform/MacPetWindowBehavior.h"
 PET_WINDOW_QML = ROOT / "apps/desktop/qml/PetWindow.qml"
 DESKTOP_CMAKE = ROOT / "apps/desktop/CMakeLists.txt"
 MAIN_CPP = ROOT / "apps/desktop/src/main.cpp"
+CHAT_WINDOW_QML = ROOT / "apps/desktop/qml/ChatWindow.qml"
+SHELL_CONTROLLER_H = ROOT / "apps/desktop/src/DesktopShellController.h"
+SHELL_CONTROLLER_CPP = ROOT / "apps/desktop/src/DesktopShellController.cpp"
 
 
 def extract_function(source: str, name: str) -> str:
@@ -95,6 +98,8 @@ def main() -> int:
 
     cmake_source = DESKTOP_CMAKE.read_text(encoding="utf-8")
     main_source = MAIN_CPP.read_text(encoding="utf-8")
+    chat_window_source = CHAT_WINDOW_QML.read_text(encoding="utf-8")
+    shell_source = SHELL_CONTROLLER_H.read_text(encoding="utf-8") + SHELL_CONTROLLER_CPP.read_text(encoding="utf-8")
     if "Widgets" not in cmake_source or "Qt6::Widgets" not in cmake_source:
         print("Qt.labs.platform 菜单需要链接 Qt Widgets 作为平台菜单兼容层。", file=sys.stderr)
         return 1
@@ -114,6 +119,21 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
+    if "App.DesktopShell.setChatWindowDockVisible" in chat_window_source:
+        print(
+            "聊天窗显示/隐藏不应切换 NSApplicationActivationPolicy；否则会把全屏 Space 操作带回应用原桌面。",
+            file=sys.stderr,
+        )
+        return 1
+    if "setChatWindowDockVisible" in shell_source:
+        print(
+            "DesktopShellController 不应再暴露聊天窗 Dock 可见性入口；聊天窗应作为 companion window 跟随桌宠。",
+            file=sys.stderr,
+        )
+        return 1
+    if "MILES_DIAG_SKIP_CHAT_DOCK_POLICY" in source or "MILES_SPACES" in source + chat_window_source + shell_source:
+        print("macOS Space 调试开关和临时日志不应进入正式实现。", file=sys.stderr)
+        return 1
     if "makeKeyAndOrderFront" not in companion_open_body:
         print("聊天窗打开时应让 companion window 自身成为 key window，而不是激活整个应用。", file=sys.stderr)
         return 1

@@ -27,7 +27,6 @@ ApplicationWindow {
     readonly property int expandedTitleButtonInset: 11
 
     onVisibleChanged: {
-        App.DesktopShell.setChatWindowDockVisible(visible)
         syncShellChatState()
     }
 

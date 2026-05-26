@@ -84,10 +84,10 @@ def main() -> int:
     require("import QtQuick.Controls" in chat_qml, "ChatWindow must use Qt Quick Controls")
     require("App.ChatController.sendMessage" in chat_qml, "ChatWindow must send through ChatController")
     require("onOpenWindowRequested" in chat_qml, "ChatWindow must react to controller open signal")
-    require("flags: Qt.Window" in chat_qml, "ChatWindow must be a normal dock/taskbar window")
+    require("flags: Qt.Window" in chat_qml, "ChatWindow must be a top-level Qt window")
     require(
-        "App.DesktopShell.setChatWindowDockVisible(visible)" in chat_qml,
-        "ChatWindow visibility must control macOS Dock presence",
+        "App.DesktopShell.setChatWindowDockVisible" not in chat_qml,
+        "ChatWindow visibility must not switch macOS activation policy because it can move Spaces",
     )
     require("id: compactComposer" in chat_qml, "ChatWindow composer must be addressable by id")
     require(
@@ -109,10 +109,8 @@ def main() -> int:
         'QQuickStyle::setStyle("Basic")' in main_cpp,
         "main must use a customizable Qt Quick Controls style before loading ChatWindow",
     )
-    require(
-        "setChatWindowDockVisible(bool visible)" in shell_h + shell_cpp,
-        "DesktopShellController must expose chat Dock visibility control",
-    )
+    require("setChatWindowDockVisible" not in shell_h + shell_cpp,
+            "DesktopShellController must not expose chat Dock visibility control")
     require(
         "setChatWindow(QWindow *window)" in shell_h + shell_cpp
         and "m_chatWindow" in shell_h + shell_cpp,
@@ -133,26 +131,21 @@ def main() -> int:
         "ChatWindow QML must not request app activation directly because it can switch macOS Spaces",
     )
     require(
-        "setMacApplicationDockVisible(visible)" in shell_cpp,
-        "DesktopShellController must delegate chat Dock visibility to macOS platform code",
-    )
-    require(
         "applyMacCompanionWindowBehavior" in shell_cpp + mac_behavior_h + mac_behavior_mm
         and "prepareMacCompanionWindowForOpen" in shell_cpp + mac_behavior_h + mac_behavior_mm,
         "macOS platform layer must expose companion behavior for chat windows",
     )
     require(
         "setMacApplicationDockVisible(bool visible)" in mac_behavior_h + mac_behavior_mm,
-        "macOS platform layer must expose application Dock visibility control",
+        "macOS platform layer must expose startup application activation policy control",
     )
     require(
-        "NSApplicationActivationPolicyRegular" in mac_behavior_mm
-        and "NSApplicationActivationPolicyAccessory" in mac_behavior_mm,
-        "macOS chat Dock control must switch between Regular and Accessory activation policies",
+        "NSApplicationActivationPolicyAccessory" in mac_behavior_mm,
+        "macOS app must be able to start in accessory activation policy",
     )
     require(
         "setMacApplicationDockVisible(false)" in main_cpp,
-        "main must start macOS in accessory mode until the chat window is visible",
+        "main must start macOS in accessory mode; chat visibility must not change activation policy",
     )
     require("loadFromModule(\"MilesEdgeworth\", \"ChatWindow\")" in main_cpp, "main must load ChatWindow QML")
     require(

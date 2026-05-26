@@ -67,7 +67,6 @@ public slots:
     Q_INVOKABLE void movePetWindowTo(double x, double y);
     Q_INVOKABLE void setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize);
     Q_INVOKABLE void clearPetInputMask();
-    Q_INVOKABLE void setChatWindowDockVisible(bool visible);
     Q_INVOKABLE void setChatWindowExpanded(bool expanded);
     Q_INVOKABLE void prepareChatWindowForOpen();
     Q_INVOKABLE QVariantMap placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const;
