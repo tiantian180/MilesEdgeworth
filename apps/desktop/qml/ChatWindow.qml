@@ -600,11 +600,11 @@ ApplicationWindow {
 
         modal: true
         anchors.centerIn: parent
+        width: 320
         title: "删除会话"
         standardButtons: Dialog.Ok | Dialog.Cancel
 
         contentItem: Label {
-            width: 260
             text: chatWindow.pendingDeleteConversationTitle.length > 0
                     ? "确定删除「" + chatWindow.pendingDeleteConversationTitle + "」？"
                     : "确定删除这个会话？"
