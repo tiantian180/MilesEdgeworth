@@ -141,6 +141,8 @@ set(DESKTOP_SOURCES
     src/chat/ChatStreamEvent.h
     src/chat/ChatTextPacer.cpp
     src/chat/ChatTextPacer.h
+    src/chat/ChatBubblePlacement.cpp
+    src/chat/ChatBubblePlacement.h
     src/logging/MilesLogHandler.cpp
     src/logging/MilesLogHandler.h
     src/main.cpp
@@ -328,6 +330,24 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME chat_text_pacer_smoke COMMAND ChatTextPacerSmoke)
+
+    add_executable(ChatBubblePlacementSmoke
+        tests/chat_bubble_placement_smoke.cpp
+        src/chat/ChatBubblePlacement.cpp
+        src/chat/ChatBubblePlacement.h
+    )
+
+    target_include_directories(ChatBubblePlacementSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(ChatBubblePlacementSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    add_test(NAME chat_bubble_placement_smoke COMMAND ChatBubblePlacementSmoke)
 
     add_executable(LoggingFormatterSmoke
         tests/logging_formatter_smoke.cpp
