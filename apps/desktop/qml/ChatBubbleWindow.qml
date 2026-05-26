@@ -24,6 +24,7 @@ ApplicationWindow {
     readonly property int contentHorizontalPadding: 24
     readonly property int contentVerticalPadding: 22
     readonly property int pointerExtent: 20
+    readonly property int actionInset: 12
     readonly property int maxBubbleWidth: 320
     readonly property int minBubbleWidth: 190
     readonly property int maxBubbleHeight: 340
@@ -338,8 +339,8 @@ ApplicationWindow {
 
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.topMargin: bubbleWindow.bodyTop + 8
-            anchors.rightMargin: 8
+            anchors.topMargin: bubbleWindow.bodyTop + bubbleWindow.actionInset
+            anchors.rightMargin: bubbleWindow.actionInset
             spacing: 5
             z: 2
             opacity: bubbleHover.hovered ? 0.82 : 0
