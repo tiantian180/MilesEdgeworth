@@ -21,16 +21,20 @@ ApplicationWindow {
     property double hideDeadlineMs: 0
     property int remainingHideMs: 0
     readonly property int bubbleMargin: 12
-    readonly property int contentHorizontalPadding: 28
-    readonly property int contentVerticalPadding: 24
-    readonly property int pointerExtent: 28
-    readonly property int maxBubbleWidth: 360
-    readonly property int minBubbleWidth: 210
+    readonly property int contentHorizontalPadding: 24
+    readonly property int contentVerticalPadding: 22
+    readonly property int pointerExtent: 30
+    readonly property int maxBubbleWidth: 320
+    readonly property int minBubbleWidth: 190
+    readonly property int maxBodyHeight: 340
     readonly property int bodyWidth: Math.max(minBubbleWidth,
             Math.min(maxBubbleWidth, messageMeasure.contentWidth + contentHorizontalPadding * 2))
-    readonly property int bodyHeight: Math.max(82,
-            Math.min(190, messageMeasure.contentHeight + contentVerticalPadding * 2))
+    readonly property int bodyHeight: Math.max(76,
+            Math.min(maxBodyHeight, messageMeasure.contentHeight + contentVerticalPadding * 2))
+    readonly property int bodyTop: pointerPlacement.startsWith("top") ? pointerExtent : 2
+    readonly property int bodyBottom: pointerPlacement.startsWith("bottom") ? height - pointerExtent : height - 2
     property string pointerPlacement: "bottomLeft"
+    property int tailX: Math.round(width / 2)
 
     width: bodyWidth
     height: bodyHeight + pointerExtent
@@ -42,6 +46,7 @@ ApplicationWindow {
         x = nextPlacement.x || 0
         y = nextPlacement.y || 0
         pointerPlacement = nextPlacement.pointer || "bottomLeft"
+        tailX = Math.max(42, Math.min(width - 42, nextPlacement.tailX || Math.round(width / 2)))
         if (bubbleCanvas) {
             bubbleCanvas.requestPaint()
         }
@@ -266,16 +271,13 @@ ApplicationWindow {
                 const ctx = getContext("2d")
                 const w = bubbleWindow.width
                 const h = bubbleWindow.height
-                const tail = bubbleWindow.pointerExtent
-                const bodyTop = bubbleWindow.pointerPlacement.startsWith("top") ? tail : 2
-                const bodyBottom = bubbleWindow.pointerPlacement.startsWith("bottom") ? h - tail : h - 2
+                const tailX = Math.max(42, Math.min(w - 42, bubbleWindow.tailX))
+                const tailHalf = 18
+                const bodyTop = bubbleWindow.bodyTop
+                const bodyBottom = bubbleWindow.bodyBottom
                 const radius = 22
                 const left = 4
                 const right = w - 4
-                const tailLeft = bubbleWindow.pointerPlacement.endsWith("Left")
-                const tailBaseX = tailLeft ? 52 : w - 80
-                const tailTipX = tailLeft ? 28 : w - 28
-                const tailTipY = bubbleWindow.pointerPlacement.startsWith("top") ? 4 : h - 4
 
                 ctx.clearRect(0, 0, w, h)
                 ctx.beginPath()
@@ -283,9 +285,9 @@ ApplicationWindow {
 
                 if (bubbleWindow.pointerPlacement === "topLeft"
                         || bubbleWindow.pointerPlacement === "topRight") {
-                    ctx.lineTo(tailBaseX, bodyTop)
-                    ctx.lineTo(tailTipX, tailTipY)
-                    ctx.lineTo(tailBaseX + 28, bodyTop)
+                    ctx.lineTo(tailX - tailHalf, bodyTop)
+                    ctx.lineTo(tailX, 4)
+                    ctx.lineTo(tailX + tailHalf, bodyTop)
                 }
                 ctx.lineTo(right - radius, bodyTop)
                 ctx.quadraticCurveTo(right, bodyTop, right, bodyTop + radius)
@@ -293,9 +295,9 @@ ApplicationWindow {
                 ctx.quadraticCurveTo(right, bodyBottom, right - radius, bodyBottom)
                 if (bubbleWindow.pointerPlacement === "bottomRight"
                         || bubbleWindow.pointerPlacement === "bottomLeft") {
-                    ctx.lineTo(tailBaseX + 28, bodyBottom)
-                    ctx.lineTo(tailTipX, tailTipY)
-                    ctx.lineTo(tailBaseX, bodyBottom)
+                    ctx.lineTo(tailX + tailHalf, bodyBottom)
+                    ctx.lineTo(tailX, h - 4)
+                    ctx.lineTo(tailX - tailHalf, bodyBottom)
                 }
                 ctx.lineTo(left + radius, bodyBottom)
                 ctx.quadraticCurveTo(left, bodyBottom, left, bodyBottom - radius)
@@ -332,53 +334,37 @@ ApplicationWindow {
 
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.topMargin: bubbleWindow.pointerPlacement.startsWith("top") ? bubbleWindow.pointerExtent + 16 : 18
-            anchors.rightMargin: 22
-            spacing: 10
-            opacity: bubbleHover.hovered ? 1 : 0
+            anchors.topMargin: bubbleWindow.bodyTop + 14
+            anchors.rightMargin: 16
+            spacing: 8
+            opacity: bubbleHover.hovered ? 0.82 : 0
             visible: opacity > 0
 
             Behavior on opacity {
                 NumberAnimation { duration: 100 }
             }
 
-            ToolButton {
+            MilesIconButton {
                 id: expandButton
 
-                text: "↗"
-                font.pixelSize: 18
-                width: 20
-                height: 20
-                ToolTip.visible: hovered
-                ToolTip.text: "展开聊天"
-                contentItem: Text {
-                    text: expandButton.text
-                    color: "#8d8780"
-                    font: expandButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                background: Item {}
+                iconSource: "qrc:/ui-icons/maximize-2.svg"
+                iconSize: 16
+                width: 22
+                height: 22
+                tooltipText: "展开聊天"
+                showHoverFill: false
                 onClicked: App.ChatController.openWindow()
             }
 
-            ToolButton {
+            MilesIconButton {
                 id: closeBubbleButton
 
-                text: "×"
-                font.pixelSize: 18
-                width: 20
-                height: 20
-                ToolTip.visible: hovered
-                ToolTip.text: "隐藏气泡"
-                contentItem: Text {
-                    text: closeBubbleButton.text
-                    color: "#8d8780"
-                    font: closeBubbleButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                background: Item {}
+                iconSource: "qrc:/ui-icons/x.svg"
+                iconSize: 16
+                width: 22
+                height: 22
+                tooltipText: "隐藏气泡"
+                showHoverFill: false
                 onClicked: bubbleWindow.hideCurrentBubble()
             }
         }
@@ -420,7 +406,7 @@ ApplicationWindow {
                 background: Item {}
 
                 onTextChanged: {
-                    if (text.length > cursorPosition && !bubbleHover.hovered && !activeFocus) {
+                    if (!bubbleHover.hovered && !activeFocus) {
                         cursorPosition = text.length
                     }
                 }

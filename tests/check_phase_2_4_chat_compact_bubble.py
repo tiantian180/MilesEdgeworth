@@ -278,13 +278,24 @@ def main() -> int:
         "HoverHandler",
         "App.ChatController.openWindow()",
         "bubbleDismissed = true",
-        "opacity: bubbleHover.hovered ? 1 : 0",
-        "visible: opacity > 0",
-        "text: \"↗\"",
-        "text: \"×\"",
-        "color: \"#8d8780\"",
     ]:
         require(token in bubble_qml, f"ChatBubbleWindow.qml missing {token}")
+
+    for token in [
+        "readonly property int maxBubbleWidth: 320",
+        "readonly property int maxBodyHeight: 340",
+        "property int tailX: Math.round(width / 2)",
+        "nextPlacement.tailX",
+        "qrc:/ui-icons/maximize-2.svg",
+        "qrc:/ui-icons/x.svg",
+        "anchors.topMargin: bubbleWindow.bodyTop + 14",
+        "anchors.rightMargin: 16",
+        "bubbleHover.hovered ? 0.82 : 0",
+        "ctx.lineTo(tailX - tailHalf, bodyBottom)",
+        "ctx.lineTo(tailX, h - 4)",
+        "ctx.lineTo(tailX + tailHalf, bodyBottom)",
+    ]:
+        require(token in bubble_qml, f"ChatBubbleWindow.qml missing bubble polish token {token}")
 
     print("phase 2.4 compact chat bubble contract ok")
     return 0
