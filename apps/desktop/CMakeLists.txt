@@ -459,6 +459,8 @@ if(BUILD_TESTING)
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h
+        src/pet/motion/MotionController.cpp
+        src/pet/motion/MotionController.h
         src/pet/PetLogging.cpp
         src/pet/PetLogging.h
         src/pet/PetRuntime.cpp
@@ -537,6 +539,8 @@ if(BUILD_TESTING)
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h
+        src/pet/motion/MotionController.cpp
+        src/pet/motion/MotionController.h
         src/pet/PetLogging.cpp
         src/pet/PetLogging.h
         src/pet/PetRuntime.cpp
@@ -601,6 +605,8 @@ if(BUILD_TESTING)
         src/pet/manifest/SkinManifest.h
         src/pet/manifest/SkinManifestLoader.cpp
         src/pet/manifest/SkinManifestLoader.h
+        src/pet/motion/MotionController.cpp
+        src/pet/motion/MotionController.h
         src/pet/PetLogging.cpp
         src/pet/PetLogging.h
         src/pet/PetRuntime.cpp
