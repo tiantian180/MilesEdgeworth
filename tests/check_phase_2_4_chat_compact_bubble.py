@@ -70,6 +70,9 @@ def main() -> int:
         "implicitHeight: 34",
         "width: control.iconSize",
         "height: control.iconSize",
+        "property int hoverFillSize",
+        "width: control.hoverFillSize",
+        "height: control.hoverFillSize",
     ]:
         require(token in icon_button_qml, f"MilesIconButton.qml missing {token}")
 
@@ -93,6 +96,8 @@ def main() -> int:
 
     square_stop_svg = read("apps/desktop/resources/icons/square-stop.svg")
     require('fill="#5f554b"' in square_stop_svg, "square-stop.svg must use fill=\"#5f554b\"")
+    require('x="5"' in square_stop_svg, "square-stop.svg must use the larger stop square")
+    require('width="14"' in square_stop_svg, "square-stop.svg must use the larger stop square")
 
     require(
         'loadFromModule("MilesEdgeworth", "ChatBubbleWindow")' in main_cpp,
@@ -198,14 +203,16 @@ def main() -> int:
         "readonly property int buttonSize: compactMode ? 30 : 32",
         "readonly property int sideButtonWidth: compactMode ? 36 : 0",
         "readonly property int sideIconSize: 14",
-        "readonly property int sendIconSize: 17",
-        "readonly property int stopIconSize: 16",
+        "readonly property int sideHoverFillSize: 24",
+        "readonly property int sendIconSize: 18",
+        "readonly property int stopIconSize: 18",
         "width: App.ChatController.sending ? root.stopIconSize : root.sendIconSize",
         "sourceSize.width: width",
         'tooltipText: ""',
         "ToolTip.visible: !root.compactMode && hovered",
         "hoverEnabled: true",
         "showHoverFill: true",
+        "hoverFillSize: root.sideHoverFillSize",
         "sendButton.hovered ? \"#3b668a\" : \"#315a7d\"",
         "App.ChatController.sending",
         "opacity: sendButton.enabled ? 1.0 : 0.38",

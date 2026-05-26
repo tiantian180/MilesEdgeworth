@@ -7,6 +7,7 @@ ToolButton {
     property url iconSource
     property string tooltipText: ""
     property int iconSize: 20
+    property int hoverFillSize: Math.min(width, height)
     property color hoverFill: "#eee7da"
     property color pressedFill: "#e2d8cc"
     property bool showHoverFill: true
@@ -34,10 +35,15 @@ ToolButton {
         }
     }
 
-    background: Rectangle {
-        radius: 10
-        color: !control.showHoverFill
-                ? "transparent"
-                : (control.down ? control.pressedFill : (control.hovered ? control.hoverFill : "transparent"))
+    background: Item {
+        Rectangle {
+            anchors.centerIn: parent
+            width: control.hoverFillSize
+            height: control.hoverFillSize
+            radius: 10
+            color: !control.showHoverFill
+                    ? "transparent"
+                    : (control.down ? control.pressedFill : (control.hovered ? control.hoverFill : "transparent"))
+        }
     }
 }

@@ -32,8 +32,9 @@ Item {
     readonly property int buttonSize: compactMode ? 30 : 32
     readonly property int sideButtonWidth: compactMode ? 36 : 0
     readonly property int sideIconSize: 14
-    readonly property int sendIconSize: 17
-    readonly property int stopIconSize: 16
+    readonly property int sideHoverFillSize: 24
+    readonly property int sendIconSize: 18
+    readonly property int stopIconSize: 18
 
     implicitWidth: compactMode ? compactBarWidth : 520
     implicitHeight: inputTargetHeight + outerVerticalPadding * 2
@@ -80,6 +81,7 @@ Item {
             iconSize: root.sideIconSize
             tooltipText: ""
             showHoverFill: true
+            hoverFillSize: root.sideHoverFillSize
             Layout.preferredWidth: visible ? root.sideButtonWidth : 0
             Layout.preferredHeight: root.inputMinHeight
             onClicked: root.expandRequested()
@@ -180,6 +182,7 @@ Item {
             iconSize: root.sideIconSize
             tooltipText: ""
             showHoverFill: true
+            hoverFillSize: root.sideHoverFillSize
             Layout.preferredWidth: visible ? root.sideButtonWidth : 0
             Layout.preferredHeight: root.inputMinHeight
             onClicked: root.closeRequested()
