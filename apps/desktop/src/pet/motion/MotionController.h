@@ -69,6 +69,7 @@ private:
     MotionConfig m_config;
     QRect m_screenGeometry;
     QPoint m_currentPosition;
+    QPointF m_currentPositionF;
     QPoint m_targetPosition;
     State m_state = State::Idle;
     QTimer m_tickTimer;

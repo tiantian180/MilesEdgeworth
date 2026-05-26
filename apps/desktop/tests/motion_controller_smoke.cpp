@@ -6,6 +6,7 @@
 #include <QPoint>
 #include <QRect>
 #include <QThread>
+#include <QVector>
 
 #include <cmath>
 #include <functional>
@@ -184,6 +185,61 @@ int main(int argc, char *argv[])
     require(waitFor([&]() { return reclampCompleted; }), "reclamped move should complete");
     require(reclampController.currentPosition() == QPoint(50, 0), "moving target should reclamp to new reachable edge");
     require(std::abs(reclampFinalX - 1.0) < 0.001, "reclamped completion should report new reachable edge percent");
+
+    MotionController currentClampController;
+    currentClampController.configure(testConfig());
+    currentClampController.setScreenGeometry(QRect(0, 0, 120, 100));
+    currentClampController.setCurrentPosition(QPoint(90, 70));
+
+    bool observedShrink = false;
+    QVector<QPoint> positionsAfterShrink;
+    const auto isInsideShrunkenReachable = [](const QPoint &position) {
+        return position.x() >= 0 && position.x() <= 50
+            && position.y() >= 0 && position.y() <= 40;
+    };
+    QObject::connect(&currentClampController, &MotionController::positionChanged, &currentClampController,
+                     [&](const QPoint &position) {
+                         if (observedShrink) {
+                             positionsAfterShrink.append(position);
+                         }
+                     });
+    currentClampController.moveTo(0.0, 0.0, QStringLiteral("walk"));
+    observedShrink = true;
+    currentClampController.setScreenGeometry(QRect(0, 0, 70, 60));
+    require(!positionsAfterShrink.isEmpty(), "geometry shrink should emit clamped current position");
+    require(currentClampController.currentPosition() == QPoint(50, 40),
+            "geometry shrink should clamp current position into new reachable bounds");
+    require(currentClampController.lastMoveWasClamped(), "current clamp should remember clamp note");
+    require(waitFor([&]() {
+                return std::any_of(positionsAfterShrink.cbegin(), positionsAfterShrink.cend(),
+                                   [](const QPoint &position) {
+                                       return position == QPoint(0, 0);
+                                   });
+            }),
+            "current-clamped move should continue to target");
+    for (const QPoint &position : positionsAfterShrink) {
+        require(isInsideShrunkenReachable(position), "positions after geometry shrink should stay in new bounds");
+    }
+
+    MotionConfig lowSpeedConfig = testConfig();
+    lowSpeedConfig.walkSpeed = 10.0;
+    lowSpeedConfig.snapDistance = 0.1;
+    lowSpeedConfig.petWindowSize = 0.0;
+
+    MotionController lowSpeedController;
+    lowSpeedController.configure(lowSpeedConfig);
+    lowSpeedController.setScreenGeometry(QRect(0, 0, 100, 100));
+    lowSpeedController.setCurrentPosition(QPoint(0, 0));
+
+    bool lowSpeedCompleted = false;
+    QObject::connect(&lowSpeedController, &MotionController::completed, &lowSpeedController,
+                     [&](double, double) {
+                         lowSpeedCompleted = true;
+                     });
+    lowSpeedController.moveTo(0.02, 0.0, QStringLiteral("walk"));
+    require(waitFor([&]() { return lowSpeedCompleted; }, 500),
+            "low speed movement should accumulate subpixel progress and complete");
+    require(lowSpeedController.currentPosition() == QPoint(2, 0), "low speed movement should finish at target");
 
     return 0;
 }

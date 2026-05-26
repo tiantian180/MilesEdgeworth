@@ -73,6 +73,7 @@ void MotionController::setScreenGeometry(const QRect &screenGeometry)
 void MotionController::setCurrentPosition(const QPoint &petWindowPosition)
 {
     m_currentPosition = petWindowPosition;
+    m_currentPositionF = QPointF(petWindowPosition);
 }
 
 void MotionController::moveTo(double x, double y, const QString &mode)
@@ -105,7 +106,7 @@ void MotionController::tick()
 
     const qint64 elapsedMs = m_elapsed.isValid() ? m_elapsed.restart() : kTickIntervalMs;
     const double elapsedSeconds = std::max(0.001, static_cast<double>(elapsedMs) / 1000.0);
-    const QPointF delta = QPointF(m_targetPosition) - QPointF(m_currentPosition);
+    const QPointF delta = QPointF(m_targetPosition) - m_currentPositionF;
     const double distance = std::hypot(delta.x(), delta.y());
     const double stepDistance = speedForMode(m_currentMode) * elapsedSeconds;
 
@@ -114,15 +115,14 @@ void MotionController::tick()
         return;
     }
 
-    const QPoint nextPosition = (QPointF(m_currentPosition)
-                                 + (delta / distance) * stepDistance)
-                                    .toPoint();
+    m_currentPositionF = m_currentPositionF + (delta / distance) * stepDistance;
+    const QPoint nextPosition = m_currentPositionF.toPoint();
     if (nextPosition != m_currentPosition) {
         m_currentPosition = nextPosition;
         emit positionChanged(m_currentPosition);
     }
 
-    const QString nextDirection = directionForVector(QPointF(m_targetPosition) - QPointF(m_currentPosition));
+    const QString nextDirection = directionForVector(QPointF(m_targetPosition) - m_currentPositionF);
     if (nextDirection != m_currentDirection) {
         m_currentDirection = nextDirection;
         emit directionChanged(m_currentDirection);
@@ -157,7 +157,7 @@ QPoint MotionController::targetForPercent(double x, double y, bool *clamped) con
 QPoint MotionController::targetForDeltaPercent(double dx, double dy, bool *clamped) const
 {
     const QRect reachable = reachableGeometry();
-    const QPointF candidate(QPointF(m_currentPosition)
+    const QPointF candidate(m_currentPositionF
                             + QPointF(dx * reachable.width(), dy * reachable.height()));
     return clampToReachable(candidate, clamped);
 }
@@ -182,10 +182,10 @@ QPointF MotionController::currentPercentPosition() const
 {
     const QRect reachable = reachableGeometry();
     const double x = reachable.width() > 0
-        ? (static_cast<double>(m_currentPosition.x() - reachable.x()) / reachable.width())
+        ? ((m_currentPositionF.x() - reachable.x()) / reachable.width())
         : 0.0;
     const double y = reachable.height() > 0
-        ? (static_cast<double>(m_currentPosition.y() - reachable.y()) / reachable.height())
+        ? ((m_currentPositionF.y() - reachable.y()) / reachable.height())
         : 0.0;
     return QPointF(clampUnit(x), clampUnit(y));
 }
@@ -260,7 +260,7 @@ void MotionController::beginMove(const QPoint &target, const QString &mode, bool
     m_currentMode = normalizedMode(mode);
     m_lastMoveWasClamped = clamped;
 
-    const QString nextDirection = directionForVector(QPointF(m_targetPosition) - QPointF(m_currentPosition));
+    const QString nextDirection = directionForVector(QPointF(m_targetPosition) - m_currentPositionF);
     if (m_state == State::Moving) {
         if (nextDirection != m_currentDirection) {
             m_currentDirection = nextDirection;
@@ -282,16 +282,23 @@ void MotionController::reclampMovingTarget()
         return;
     }
 
-    bool clamped = false;
-    const QPoint target = clampToReachable(QPointF(m_targetPosition), &clamped);
-    if (target == m_targetPosition) {
-        return;
+    bool currentClamped = false;
+    const QPoint currentPosition = clampToReachable(m_currentPositionF, &currentClamped);
+    if (currentClamped) {
+        m_currentPosition = currentPosition;
+        m_currentPositionF = QPointF(currentPosition);
+        emit positionChanged(m_currentPosition);
     }
 
-    m_targetPosition = target;
-    m_lastMoveWasClamped = m_lastMoveWasClamped || clamped;
+    bool targetClamped = false;
+    const QPoint target = clampToReachable(QPointF(m_targetPosition), &targetClamped);
+    if (targetClamped) {
+        m_targetPosition = target;
+    }
 
-    const QString nextDirection = directionForVector(QPointF(m_targetPosition) - QPointF(m_currentPosition));
+    m_lastMoveWasClamped = m_lastMoveWasClamped || currentClamped || targetClamped;
+
+    const QString nextDirection = directionForVector(QPointF(m_targetPosition) - m_currentPositionF);
     if (nextDirection != m_currentDirection) {
         m_currentDirection = nextDirection;
         emit directionChanged(m_currentDirection);
@@ -302,6 +309,7 @@ void MotionController::finishAtTarget()
 {
     m_tickTimer.stop();
     m_currentPosition = m_targetPosition;
+    m_currentPositionF = QPointF(m_targetPosition);
     m_state = State::Idle;
     emit positionChanged(m_currentPosition);
 
