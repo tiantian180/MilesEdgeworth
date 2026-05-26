@@ -353,11 +353,11 @@ ApplicationWindow {
                 id: expandButton
 
                 iconSource: "qrc:/ui-icons/maximize-2.svg"
-                iconSize: 12
-                width: 16
-                height: 16
-                implicitWidth: 16
-                implicitHeight: 16
+                iconSize: 10
+                width: 14
+                height: 14
+                implicitWidth: 14
+                implicitHeight: 14
                 tooltipText: "展开聊天"
                 showHoverFill: false
                 onClicked: App.ChatController.openWindow()
@@ -367,11 +367,11 @@ ApplicationWindow {
                 id: closeBubbleButton
 
                 iconSource: "qrc:/ui-icons/x.svg"
-                iconSize: 12
-                width: 16
-                height: 16
-                implicitWidth: 16
-                implicitHeight: 16
+                iconSize: 11
+                width: 14
+                height: 14
+                implicitWidth: 14
+                implicitHeight: 14
                 tooltipText: "隐藏气泡"
                 showHoverFill: false
                 onClicked: bubbleWindow.hideCurrentBubble()

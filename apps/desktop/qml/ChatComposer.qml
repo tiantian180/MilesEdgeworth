@@ -30,6 +30,8 @@ Item {
             Math.min(inputMaxHeight, Math.ceil(input.contentHeight + 18)))
     readonly property int outerVerticalPadding: compactMode ? 7 : 14
     readonly property int buttonSize: compactMode ? 30 : 32
+    readonly property int sideButtonWidth: compactMode ? 30 : 0
+    readonly property int sideIconSize: 14
 
     implicitWidth: compactMode ? compactBarWidth : 520
     implicitHeight: inputTargetHeight + outerVerticalPadding * 2
@@ -73,10 +75,10 @@ Item {
 
             visible: root.compactMode
             iconSource: root.expandIconSource
-            iconSize: 18
+            iconSize: root.sideIconSize
             tooltipText: "展开聊天"
             showHoverFill: false
-            Layout.preferredWidth: visible ? 36 : 0
+            Layout.preferredWidth: visible ? root.sideButtonWidth : 0
             Layout.preferredHeight: root.inputMinHeight
             onClicked: root.expandRequested()
         }
@@ -140,15 +142,18 @@ Item {
                 padding: 0
                 ToolTip.visible: hovered
                 ToolTip.text: App.ChatController.sending ? "停止回复" : "发送"
-                contentItem: Image {
-                    source: App.ChatController.sending ? root.stopIconSource : root.sendIconSource
-                    sourceSize.width: App.ChatController.sending ? 11 : 16
-                    sourceSize.height: App.ChatController.sending ? 11 : 16
-                    fillMode: Image.PreserveAspectFit
-                    horizontalAlignment: Image.AlignHCenter
-                    verticalAlignment: Image.AlignVCenter
-                    opacity: sendButton.enabled ? 1.0 : 0.38
-                    smooth: true
+                contentItem: Item {
+                    Image {
+                        anchors.centerIn: parent
+                        width: App.ChatController.sending ? 10 : 14
+                        height: App.ChatController.sending ? 10 : 14
+                        source: App.ChatController.sending ? root.stopIconSource : root.sendIconSource
+                        sourceSize.width: width
+                        sourceSize.height: height
+                        fillMode: Image.PreserveAspectFit
+                        opacity: sendButton.enabled ? 1.0 : 0.38
+                        smooth: true
+                    }
                 }
                 background: Rectangle {
                     radius: root.buttonSize / 2
@@ -170,10 +175,10 @@ Item {
 
             visible: root.compactMode
             iconSource: root.closeIconSource
-            iconSize: 18
+            iconSize: root.sideIconSize
             tooltipText: "隐藏聊天"
             showHoverFill: false
-            Layout.preferredWidth: visible ? 36 : 0
+            Layout.preferredWidth: visible ? root.sideButtonWidth : 0
             Layout.preferredHeight: root.inputMinHeight
             onClicked: root.closeRequested()
         }

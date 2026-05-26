@@ -20,15 +20,18 @@ ToolButton {
     ToolTip.visible: hovered && tooltipText.length > 0
     ToolTip.text: tooltipText
 
-    contentItem: Image {
-        source: control.iconSource
-        sourceSize.width: control.iconSize
-        sourceSize.height: control.iconSize
-        fillMode: Image.PreserveAspectFit
-        horizontalAlignment: Image.AlignHCenter
-        verticalAlignment: Image.AlignVCenter
-        opacity: control.enabled ? 1.0 : 0.42
-        smooth: true
+    contentItem: Item {
+        Image {
+            anchors.centerIn: parent
+            width: control.iconSize
+            height: control.iconSize
+            source: control.iconSource
+            sourceSize.width: control.iconSize
+            sourceSize.height: control.iconSize
+            fillMode: Image.PreserveAspectFit
+            opacity: control.enabled ? 1.0 : 0.42
+            smooth: true
+        }
     }
 
     background: Rectangle {

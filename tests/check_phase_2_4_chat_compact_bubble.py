@@ -68,6 +68,8 @@ def main() -> int:
     for token in [
         "implicitWidth: 34",
         "implicitHeight: 34",
+        "width: control.iconSize",
+        "height: control.iconSize",
     ]:
         require(token in icon_button_qml, f"MilesIconButton.qml missing {token}")
 
@@ -189,6 +191,10 @@ def main() -> int:
         "readonly property int outerVerticalPadding: compactMode ? 7 : 14",
         "readonly property bool readyToSend: canSubmit && !App.ChatController.sending",
         "readonly property int buttonSize: compactMode ? 30 : 32",
+        "readonly property int sideButtonWidth: compactMode ? 30 : 0",
+        "readonly property int sideIconSize: 14",
+        "width: App.ChatController.sending ? 10 : 14",
+        "sourceSize.width: width",
         "hoverEnabled: true",
         "sendButton.hovered ? \"#3b668a\" : \"#315a7d\"",
         "App.ChatController.sending",
@@ -209,8 +215,8 @@ def main() -> int:
         "qrc:/ui-icons/settings.svg",
         "qrc:/ui-icons/refresh-ccw.svg",
         "qrc:/ui-icons/minimize-2.svg",
-        "Layout.preferredWidth: 28",
-        "Layout.preferredHeight: 28",
+        "Layout.preferredWidth: 24",
+        "Layout.preferredHeight: 24",
         "Layout.preferredHeight: 46",
         "color: \"transparent\"",
         "expandedTitleDragArea",
@@ -309,7 +315,10 @@ def main() -> int:
         "const tailHalf = 10",
         "ctx.lineJoin = \"round\"",
         "ctx.lineWidth = 2.4",
-        "iconSize: 12",
+        "iconSize: 10",
+        "iconSize: 11",
+        "width: 14",
+        "height: 14",
         "cursorPosition = bubbleWindow.bodyAtMaxHeight ? text.length : 0",
         "ctx.lineTo(tailX - tailHalf, bodyTop)",
         "ctx.lineTo(tailX, 4)",

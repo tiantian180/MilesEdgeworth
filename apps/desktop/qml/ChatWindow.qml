@@ -199,9 +199,9 @@ ApplicationWindow {
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/menu.svg"
-                            iconSize: 18
-                            Layout.preferredWidth: 28
-                            Layout.preferredHeight: 28
+                            iconSize: 15
+                            Layout.preferredWidth: 24
+                            Layout.preferredHeight: 24
                             tooltipText: "会话"
                             onClicked: chatWindow.conversationPanelOpen = !chatWindow.conversationPanelOpen
                         }
@@ -232,18 +232,18 @@ ApplicationWindow {
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/settings.svg"
-                            iconSize: 17
-                            Layout.preferredWidth: 28
-                            Layout.preferredHeight: 28
+                            iconSize: 14
+                            Layout.preferredWidth: 24
+                            Layout.preferredHeight: 24
                             tooltipText: "设置"
                             onClicked: App.SettingsController.openWindow()
                         }
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/refresh-ccw.svg"
-                            iconSize: 17
-                            Layout.preferredWidth: 28
-                            Layout.preferredHeight: 28
+                            iconSize: 14
+                            Layout.preferredWidth: 24
+                            Layout.preferredHeight: 24
                             tooltipText: "重连"
                             enabled: !App.ChatController.sending
                             onClicked: {
@@ -254,18 +254,18 @@ ApplicationWindow {
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/minimize-2.svg"
-                            iconSize: 17
-                            Layout.preferredWidth: 28
-                            Layout.preferredHeight: 28
+                            iconSize: 14
+                            Layout.preferredWidth: 24
+                            Layout.preferredHeight: 24
                             tooltipText: "收起"
                             onClicked: chatWindow.showCompact()
                         }
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/x.svg"
-                            iconSize: 17
-                            Layout.preferredWidth: 28
-                            Layout.preferredHeight: 28
+                            iconSize: 14
+                            Layout.preferredWidth: 24
+                            Layout.preferredHeight: 24
                             tooltipText: "隐藏聊天"
                             onClicked: chatWindow.hideChatUi()
                         }
