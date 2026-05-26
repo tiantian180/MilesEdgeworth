@@ -7,6 +7,12 @@ Item {
     id: root
 
     property bool compactMode: false
+    property url expandIconSource: "qrc:/ui-icons/maximize-2.svg"
+    property url closeIconSource: "qrc:/ui-icons/x.svg"
+    property url sendIconSource: canSubmit && !App.ChatController.sending
+            ? "qrc:/ui-icons/arrow-up-white.svg"
+            : "qrc:/ui-icons/arrow-up-muted.svg"
+    property url stopIconSource: "qrc:/ui-icons/square-stop.svg"
     property alias text: input.text
     readonly property bool disconnectedInput: !App.ChatController.sidecarReady && !App.ChatController.sending
     readonly property bool providerConfigured: App.ChatController.providerConfigured
@@ -16,14 +22,15 @@ Item {
     readonly property bool hasText: input.text.trim().length > 0
     readonly property bool canSubmit: App.ChatController.sending
             || (App.ChatController.sidecarReady && providerConfigured && hasText)
-    readonly property int inputMinHeight: compactMode ? 44 : 52
-    readonly property int inputMaxHeight: compactMode ? 112 : 136
+    readonly property int compactBarWidth: 380
+    readonly property int inputMinHeight: compactMode ? 42 : 52
+    readonly property int inputMaxHeight: compactMode ? 140 : 156
     readonly property int inputTargetHeight: Math.max(inputMinHeight,
             Math.min(inputMaxHeight, Math.ceil(input.contentHeight + 18)))
-    readonly property int outerVerticalPadding: compactMode ? 8 : 12
+    readonly property int outerVerticalPadding: compactMode ? 7 : 14
     readonly property int buttonSize: compactMode ? 34 : 38
 
-    implicitWidth: compactMode ? 460 : 520
+    implicitWidth: compactMode ? compactBarWidth : 520
     implicitHeight: inputTargetHeight + outerVerticalPadding * 2
 
     signal submitRequested(string text)
@@ -60,24 +67,16 @@ Item {
         anchors.fill: parent
         spacing: root.compactMode ? 6 : 8
 
-        ToolButton {
+        MilesIconButton {
             id: expandButton
 
             visible: root.compactMode
-            text: "↗"
-            font.pixelSize: 26
-            Layout.preferredWidth: visible ? 38 : 0
+            iconSource: root.expandIconSource
+            iconSize: 20
+            tooltipText: "展开聊天"
+            showHoverFill: false
+            Layout.preferredWidth: visible ? 36 : 0
             Layout.preferredHeight: root.inputMinHeight
-            ToolTip.visible: hovered
-            ToolTip.text: "展开聊天"
-            contentItem: Text {
-                text: expandButton.text
-                color: "#7b746d"
-                font: expandButton.font
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            background: Item {}
             onClicked: root.expandRequested()
         }
 
@@ -135,20 +134,21 @@ Item {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: root.compactMode ? 5 : 8
                 enabled: root.canSubmit
-                text: App.ChatController.sending ? "■" : "↑"
-                font.pixelSize: App.ChatController.sending ? 16 : 22
-                font.weight: Font.DemiBold
+                text: ""
+                padding: 0
                 ToolTip.visible: hovered
                 ToolTip.text: App.ChatController.sending ? "停止回复" : "发送"
-                contentItem: Text {
-                    text: sendButton.text
-                    color: sendButton.enabled ? "#fffdf8" : "#7d746d"
-                    font: sendButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                contentItem: Image {
+                    source: App.ChatController.sending ? root.stopIconSource : root.sendIconSource
+                    sourceSize.width: App.ChatController.sending ? 18 : 22
+                    sourceSize.height: App.ChatController.sending ? 18 : 22
+                    fillMode: Image.PreserveAspectFit
+                    horizontalAlignment: Image.AlignHCenter
+                    verticalAlignment: Image.AlignVCenter
+                    smooth: true
                 }
                 background: Rectangle {
-                    radius: 12
+                    radius: root.buttonSize / 2
                     color: sendButton.enabled
                             ? (sendButton.down ? "#254867" : "#315a7d")
                             : "#ede8df"
@@ -158,24 +158,16 @@ Item {
             }
         }
 
-        ToolButton {
+        MilesIconButton {
             id: closeButton
 
             visible: root.compactMode
-            text: "×"
-            font.pixelSize: 28
-            Layout.preferredWidth: visible ? 38 : 0
+            iconSource: root.closeIconSource
+            iconSize: 20
+            tooltipText: "隐藏聊天"
+            showHoverFill: false
+            Layout.preferredWidth: visible ? 36 : 0
             Layout.preferredHeight: root.inputMinHeight
-            ToolTip.visible: hovered
-            ToolTip.text: "隐藏聊天"
-            contentItem: Text {
-                text: closeButton.text
-                color: "#7b746d"
-                font: closeButton.font
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-            background: Item {}
             onClicked: root.closeRequested()
         }
     }

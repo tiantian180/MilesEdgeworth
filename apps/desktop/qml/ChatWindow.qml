@@ -21,8 +21,8 @@ ApplicationWindow {
     property bool compactMode: false
     property int expandedWidth: 420
     property int expandedHeight: 560
-    property int compactWidth: 460
-    property int compactMinHeight: 62
+    property int compactWidth: 380
+    property int compactMinHeight: 56
 
     onVisibleChanged: {
         App.DesktopShell.setChatWindowDockVisible(visible)
@@ -108,9 +108,9 @@ ApplicationWindow {
         compactMode = true
         minimumWidth = compactWidth
         minimumHeight = compactMinHeight
-        maximumHeight = compactComposer.implicitHeight + 24
+        maximumHeight = compactComposer.implicitHeight
         width = compactWidth
-        height = compactComposer.implicitHeight + 24
+        height = compactComposer.implicitHeight
         syncShellChatState()
         compactComposer.forceInputFocus()
     }
@@ -154,7 +154,7 @@ ApplicationWindow {
         id: chatLayout
 
         anchors.fill: parent
-        anchors.margins: 12
+        anchors.margins: chatWindow.compactMode ? 0 : 12
         spacing: 10
 
         RowLayout {
@@ -554,16 +554,26 @@ ApplicationWindow {
 
             Layout.fillWidth: true
             Layout.preferredHeight: compactComposer.implicitHeight
-            radius: chatWindow.compactMode ? 16 : 10
+            radius: chatWindow.compactMode ? 18 : 0
             color: chatWindow.compactMode ? "#fffdf8" : "transparent"
-            border.color: chatWindow.compactMode ? "#d7cec3" : "transparent"
+            border.color: chatWindow.compactMode ? "#d8cec1" : "transparent"
             border.width: chatWindow.compactMode ? 1 : 0
+
+            MouseArea {
+                id: compactDragArea
+
+                anchors.fill: parent
+                z: 0
+                enabled: chatWindow.compactMode
+                acceptedButtons: Qt.LeftButton
+                onPressed: chatWindow.startSystemMove()
+            }
 
             ChatComposer {
                 id: compactComposer
 
                 anchors.fill: parent
-                anchors.margins: chatWindow.compactMode ? 8 : 0
+                z: 1
                 compactMode: chatWindow.compactMode
 
                 onSubmitRequested: function(text) {
@@ -577,20 +587,10 @@ ApplicationWindow {
 
                 onImplicitHeightChanged: {
                     if (chatWindow.compactMode) {
-                        chatWindow.maximumHeight = implicitHeight + 24
-                        chatWindow.height = implicitHeight + 24
+                        chatWindow.maximumHeight = implicitHeight
+                        chatWindow.height = implicitHeight
                     }
                 }
-            }
-
-            MouseArea {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.top: parent.top
-                height: 8
-                enabled: chatWindow.compactMode
-                acceptedButtons: Qt.LeftButton
-                onPressed: chatWindow.startSystemMove()
             }
         }
     }

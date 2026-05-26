@@ -33,6 +33,7 @@ def main() -> int:
     visible_bounds_h = read("apps/desktop/src/pet/surface/PetVisibleBounds.h")
     visible_bounds_cpp = read("apps/desktop/src/pet/surface/PetVisibleBounds.cpp")
     visible_bounds_smoke = read("apps/desktop/tests/pet_visible_bounds_smoke.cpp")
+    composer_qml = read("apps/desktop/qml/ChatComposer.qml")
     chat_qml = read("apps/desktop/qml/ChatWindow.qml")
     icon_button_qml = read("apps/desktop/qml/MilesIconButton.qml")
     bubble_qml = read("apps/desktop/qml/ChatBubbleWindow.qml")
@@ -178,9 +179,21 @@ def main() -> int:
             "DesktopShellController.placeChatBubble must expose tailX")
 
     for token in [
+        "property url expandIconSource: \"qrc:/ui-icons/maximize-2.svg\"",
+        "property url sendIconSource",
+        "property url stopIconSource: \"qrc:/ui-icons/square-stop.svg\"",
+        "readonly property int compactBarWidth: 380",
+        "readonly property int inputMaxHeight: compactMode ? 140 : 156",
+        "MilesIconButton",
+        "arrow-up-white.svg",
+        "arrow-up-muted.svg",
+    ]:
+        require(token in composer_qml, f"ChatComposer.qml missing compact polish token {token}")
+
+    for token in [
         "property bool compactMode",
-        "property int compactWidth: 460",
-        "property int compactMinHeight: 62",
+        "property int compactWidth: 380",
+        "property int compactMinHeight: 56",
         "function syncShellChatState()",
         "function showCompact()",
         "function showExpanded()",
@@ -188,7 +201,12 @@ def main() -> int:
         "ChatComposer",
         "id: compactComposer",
         "compactMode: chatWindow.compactMode",
-        "height = compactComposer.implicitHeight + 24",
+        "height = compactComposer.implicitHeight",
+        "maximumHeight = compactComposer.implicitHeight",
+        "compactDragArea",
+        "z: 0",
+        "z: 1",
+        "startSystemMove()",
         "App.DesktopShell.setChatWindowExpanded(visible && !compactMode)",
         "visible: !chatWindow.compactMode",
         "enabled: chatWindow.compactMode",
