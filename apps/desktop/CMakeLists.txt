@@ -182,6 +182,8 @@ set(DESKTOP_SOURCES
     src/pet/manifest/SkinManifest.h
     src/pet/manifest/SkinManifestLoader.cpp
     src/pet/manifest/SkinManifestLoader.h
+    src/pet/motion/MotionController.cpp
+    src/pet/motion/MotionController.h
     src/pet/PetLogging.cpp
     src/pet/PetLogging.h
     src/pet/PetRuntime.cpp
@@ -297,6 +299,24 @@ endif()
 
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
+
+    add_executable(MotionControllerSmoke
+        tests/motion_controller_smoke.cpp
+        src/pet/motion/MotionController.cpp
+        src/pet/motion/MotionController.h
+    )
+
+    target_include_directories(MotionControllerSmoke
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(MotionControllerSmoke
+        PRIVATE
+            Qt6::Core
+    )
+
+    add_test(NAME motion_controller_smoke COMMAND MotionControllerSmoke)
 
     add_executable(ChatStreamEventParserSmoke
         tests/chat_stream_event_parser_smoke.cpp
