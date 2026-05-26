@@ -99,21 +99,7 @@ int DesktopShellController::petScreenAvailableHeight() const
 
 QRect DesktopShellController::petMotionScreenGeometry() const
 {
-    QScreen *targetScreen = nullptr;
-    if (m_petWindow != nullptr) {
-        const QPoint petCenter(
-            m_petWindow->x() + m_petWindow->width() / 2,
-            m_petWindow->y() + m_petWindow->height() / 2
-        );
-        targetScreen = QGuiApplication::screenAt(petCenter);
-        if (targetScreen == nullptr) {
-            targetScreen = m_petWindow->screen();
-        }
-    }
-
-    if (targetScreen == nullptr) {
-        targetScreen = QGuiApplication::primaryScreen();
-    }
+    QScreen *targetScreen = petTargetScreen();
     return targetScreen != nullptr ? targetScreen->geometry() : QRect();
 }
 
@@ -279,6 +265,16 @@ void DesktopShellController::movePetWindowTo(double x, double y)
     emit petWindowGeometryChanged();
 }
 
+void DesktopShellController::movePetWindowToMotionClampedPosition(const QPoint &position)
+{
+    if (m_petWindow == nullptr) {
+        return;
+    }
+
+    m_petWindow->setPosition(position);
+    emit petWindowGeometryChanged();
+}
+
 void DesktopShellController::setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize)
 {
     WindowInputMaskController::applyMask(m_petWindow, animationUrl, imageSize, windowSize);
@@ -387,6 +383,12 @@ QPointF DesktopShellController::legacyStartupPosition(double petScale) const
 
 QRect DesktopShellController::petScreenAvailableGeometry() const
 {
+    QScreen *targetScreen = petTargetScreen();
+    return targetScreen != nullptr ? targetScreen->availableGeometry() : QRect();
+}
+
+QScreen *DesktopShellController::petTargetScreen() const
+{
     QScreen *targetScreen = nullptr;
     if (m_petWindow != nullptr) {
         const QPoint petCenter(
@@ -402,7 +404,7 @@ QRect DesktopShellController::petScreenAvailableGeometry() const
     if (targetScreen == nullptr) {
         targetScreen = QGuiApplication::primaryScreen();
     }
-    return targetScreen != nullptr ? targetScreen->availableGeometry() : QRect();
+    return targetScreen;
 }
 
 QRect DesktopShellController::petVisibleScreenGeometry() const

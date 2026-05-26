@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
                      &petRuntime, syncMotionEnvironment);
     QObject::connect(&petRuntime, &PetRuntime::motionPositionChanged,
                      &shellController, [&shellController](const QPoint &position) {
-                         shellController.movePetWindowTo(position.x(), position.y());
+                         shellController.movePetWindowToMotionClampedPosition(position);
                      });
     petSurfaceWindow.show();
     petSurfaceWindow.winId();
