@@ -23,6 +23,7 @@ ApplicationWindow {
     property int expandedHeight: 560
     property int compactWidth: 380
     property int compactMinHeight: 56
+    property string draftText: ""
 
     onVisibleChanged: {
         App.DesktopShell.setChatWindowDockVisible(visible)
@@ -33,6 +34,10 @@ ApplicationWindow {
 
     function syncShellChatState() {
         App.DesktopShell.setChatWindowExpanded(visible && !compactMode)
+    }
+
+    function syncDraftFromVisibleComposer() {
+        draftText = compactMode ? compactComposer.text : expandedComposer.text
     }
 
     function scheduleTranscriptScroll() {
@@ -90,12 +95,16 @@ ApplicationWindow {
     }
 
     function showExpanded() {
+        if (compactMode) {
+            syncDraftFromVisibleComposer()
+        }
         compactMode = false
         minimumWidth = 360
         minimumHeight = 420
         maximumHeight = 16777215
         width = Math.max(360, expandedWidth)
         height = Math.max(420, expandedHeight)
+        expandedComposer.text = draftText
         syncShellChatState()
     }
 
@@ -103,6 +112,7 @@ ApplicationWindow {
         if (!compactMode) {
             expandedWidth = width
             expandedHeight = height
+            syncDraftFromVisibleComposer()
         }
         conversationPanelOpen = false
         compactMode = true
@@ -111,6 +121,7 @@ ApplicationWindow {
         maximumHeight = compactComposer.implicitHeight
         width = compactWidth
         height = compactComposer.implicitHeight
+        compactComposer.text = draftText
         syncShellChatState()
         compactComposer.forceInputFocus()
     }
@@ -154,7 +165,7 @@ ApplicationWindow {
         id: chatLayout
 
         anchors.fill: parent
-        anchors.margins: chatWindow.compactMode ? 0 : 12
+        anchors.margins: 0
         spacing: 0
 
         Rectangle {
@@ -192,8 +203,8 @@ ApplicationWindow {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 16
-                        anchors.rightMargin: 16
+                        anchors.leftMargin: 28
+                        anchors.rightMargin: 28
                         z: 1
                         spacing: 8
 
@@ -275,8 +286,8 @@ ApplicationWindow {
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.leftMargin: 14
-                    Layout.rightMargin: 14
+                    Layout.leftMargin: 26
+                    Layout.rightMargin: 26
                     spacing: chatWindow.conversationPanelOpen ? 10 : 0
                     visible: !chatWindow.compactMode
                     Layout.preferredHeight: chatWindow.compactMode ? 0 : -1
@@ -561,16 +572,18 @@ ApplicationWindow {
                         id: expandedComposer
 
                         anchors.fill: parent
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 14
+                        anchors.leftMargin: 26
+                        anchors.rightMargin: 26
                         anchors.bottomMargin: 12
                         compactMode: false
 
                         onSubmitRequested: function(text) {
                             clearText()
+                            chatWindow.draftText = ""
                             App.ChatController.sendMessage(text)
                         }
 
+                        onTextChanged: chatWindow.draftText = text
                         onCancelRequested: App.ChatController.cancelCurrentReply()
                         onExpandRequested: App.ChatController.openWindow()
                         onCloseRequested: chatWindow.hideChatUi()
@@ -610,9 +623,11 @@ ApplicationWindow {
 
                 onSubmitRequested: function(text) {
                     clearText()
+                    chatWindow.draftText = ""
                     App.ChatController.sendMessage(text)
                 }
 
+                onTextChanged: chatWindow.draftText = text
                 onCancelRequested: App.ChatController.cancelCurrentReply()
                 onExpandRequested: App.ChatController.openWindow()
                 onCloseRequested: chatWindow.hideChatUi()

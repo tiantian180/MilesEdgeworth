@@ -338,8 +338,8 @@ ApplicationWindow {
 
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.topMargin: bubbleWindow.bodyTop + 6
-            anchors.rightMargin: 20
+            anchors.topMargin: bubbleWindow.bodyTop + 8
+            anchors.rightMargin: 8
             spacing: 5
             z: 2
             opacity: bubbleHover.hovered ? 0.82 : 0
@@ -353,13 +353,13 @@ ApplicationWindow {
                 id: expandButton
 
                 iconSource: "qrc:/ui-icons/maximize-2.svg"
-                iconSize: 10
+                iconSize: 9
                 width: 14
                 height: 14
                 implicitWidth: 14
                 implicitHeight: 14
                 tooltipText: ""
-                showHoverFill: false
+                showHoverFill: true
                 onClicked: App.ChatController.openWindow()
             }
 
@@ -373,7 +373,7 @@ ApplicationWindow {
                 implicitWidth: 14
                 implicitHeight: 14
                 tooltipText: ""
-                showHoverFill: false
+                showHoverFill: true
                 onClicked: bubbleWindow.hideCurrentBubble()
             }
         }

@@ -32,6 +32,8 @@ Item {
     readonly property int buttonSize: compactMode ? 30 : 32
     readonly property int sideButtonWidth: compactMode ? 36 : 0
     readonly property int sideIconSize: 14
+    readonly property int sendIconSize: 17
+    readonly property int stopIconSize: 16
 
     implicitWidth: compactMode ? compactBarWidth : 520
     implicitHeight: inputTargetHeight + outerVerticalPadding * 2
@@ -77,7 +79,7 @@ Item {
             iconSource: root.expandIconSource
             iconSize: root.sideIconSize
             tooltipText: ""
-            showHoverFill: false
+            showHoverFill: true
             Layout.preferredWidth: visible ? root.sideButtonWidth : 0
             Layout.preferredHeight: root.inputMinHeight
             onClicked: root.expandRequested()
@@ -145,8 +147,8 @@ Item {
                 contentItem: Item {
                     Image {
                         anchors.centerIn: parent
-                        width: App.ChatController.sending ? 13 : 16
-                        height: App.ChatController.sending ? 13 : 16
+                        width: App.ChatController.sending ? root.stopIconSize : root.sendIconSize
+                        height: App.ChatController.sending ? root.stopIconSize : root.sendIconSize
                         source: App.ChatController.sending ? root.stopIconSource : root.sendIconSource
                         sourceSize.width: width
                         sourceSize.height: height
@@ -177,7 +179,7 @@ Item {
             iconSource: root.closeIconSource
             iconSize: root.sideIconSize
             tooltipText: ""
-            showHoverFill: false
+            showHoverFill: true
             Layout.preferredWidth: visible ? root.sideButtonWidth : 0
             Layout.preferredHeight: root.inputMinHeight
             onClicked: root.closeRequested()
