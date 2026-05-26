@@ -59,8 +59,10 @@ private:
     QPointF currentPercentPosition() const;
     QString normalizedMode(const QString &mode) const;
     double speedForMode(const QString &mode) const;
+    double safePetScale() const;
     QString directionForVector(const QPointF &vector) const;
     void beginMove(const QPoint &target, const QString &mode, bool clamped);
+    void reclampMovingTarget();
     void finishAtTarget();
     void interruptWithReason(const QString &reason);
 

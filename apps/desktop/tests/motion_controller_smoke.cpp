@@ -126,5 +126,64 @@ int main(int argc, char *argv[])
     require(interruptedReason == QStringLiteral("drag"), "drag cancel reason should be drag");
     require(!controller.isMoving(), "controller should be idle after drag cancel");
 
+    MotionConfig scaledConfig = testConfig();
+    scaledConfig.walkSpeed = 1.0;
+    scaledConfig.snapDistance = 5.0;
+    scaledConfig.petScale = 2.0;
+    scaledConfig.petWindowSize = 0.0;
+
+    MotionController scaledController;
+    scaledController.configure(scaledConfig);
+    scaledController.setScreenGeometry(QRect(0, 0, 100, 100));
+    scaledController.setCurrentPosition(QPoint(0, 0));
+
+    bool scaledCompleted = false;
+    QObject::connect(&scaledController, &MotionController::completed, &scaledController,
+                     [&](double, double) {
+                         scaledCompleted = true;
+                     });
+    scaledController.moveTo(0.09, 0.0, QStringLiteral("walk"));
+    require(waitFor([&]() { return scaledCompleted; }, 200), "snap distance should scale with petScale");
+
+    MotionConfig partialDirectionConfig = testConfig();
+    partialDirectionConfig.availableDirections = {
+        QStringLiteral("south"),
+        QStringLiteral("north"),
+    };
+
+    MotionController partialDirectionController;
+    partialDirectionController.configure(partialDirectionConfig);
+    partialDirectionController.setScreenGeometry(QRect(0, 0, 200, 200));
+    partialDirectionController.setCurrentPosition(QPoint(50, 50));
+
+    QString partialStartedDirection;
+    QObject::connect(&partialDirectionController, &MotionController::started, &partialDirectionController,
+                     [&](const QString &direction, const QString &) {
+                         partialStartedDirection = direction;
+                     });
+    partialDirectionController.moveBy(1.0, -0.1, QStringLiteral("walk"));
+    require(partialStartedDirection == QStringLiteral("north"),
+            "partial direction skin should choose nearest available canonical direction");
+    partialDirectionController.stop();
+
+    MotionController reclampController;
+    reclampController.configure(testConfig());
+    reclampController.setScreenGeometry(QRect(0, 0, 120, 100));
+    reclampController.setCurrentPosition(QPoint(0, 0));
+
+    bool reclampCompleted = false;
+    double reclampFinalX = -1.0;
+    QObject::connect(&reclampController, &MotionController::completed, &reclampController,
+                     [&](double x, double) {
+                         reclampCompleted = true;
+                         reclampFinalX = x;
+                     });
+    reclampController.moveTo(1.0, 0.0, QStringLiteral("walk"));
+    reclampController.setScreenGeometry(QRect(0, 0, 70, 100));
+    require(reclampController.lastMoveWasClamped(), "moving target should remember reclamp after geometry shrink");
+    require(waitFor([&]() { return reclampCompleted; }), "reclamped move should complete");
+    require(reclampController.currentPosition() == QPoint(50, 0), "moving target should reclamp to new reachable edge");
+    require(std::abs(reclampFinalX - 1.0) < 0.001, "reclamped completion should report new reachable edge percent");
+
     return 0;
 }
