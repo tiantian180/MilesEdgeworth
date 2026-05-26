@@ -7,7 +7,6 @@ import json
 import re
 import subprocess
 import sys
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +19,6 @@ ROOT = Path(__file__).resolve().parents[1]
 SKIN_ROOT = ROOT / "apps/desktop/resources/skins/miles-edgeworth"
 MANIFEST_PATH = SKIN_ROOT / "manifest.json"
 CLIPS_ROOT = SKIN_ROOT / "generated/clips"
-CLIPS_QRC = SKIN_ROOT / "generated/clips.qrc"
 SPLIT_SCRIPT = ROOT / "tools/split_manifest_clips.py"
 
 EXPECTED_CLIPS = {
@@ -65,9 +63,11 @@ def path_label(path: list[str]) -> str:
     return ".".join(path)
 
 
-def diff_message(label: str, expected: set[str], actual: set[str]) -> str:
-    missing = sorted(expected - actual)
-    extra = sorted(actual - expected)
+def diff_message(label: str, expected: set[str] | list[str], actual: set[str] | list[str]) -> str:
+    expected_set = set(expected)
+    actual_set = set(actual)
+    missing = sorted(expected_set - actual_set)
+    extra = sorted(actual_set - expected_set)
     parts = [label]
     if missing:
         parts.append("missing=" + ",".join(missing))
@@ -208,12 +208,15 @@ def assert_source_contract() -> None:
         require(token in manifest_h, f"SkinManifest.h must keep build-time {token}")
 
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
-    for token in ["generatedClipUrlForId", "resolvedUrlExists"]:
-        require(token in loader_cpp, f"SkinManifestLoader.cpp missing {token}")
+    skin_path_utils_h = read("apps/desktop/src/pet/manifest/SkinPathUtils.h")
+    require("generatedClipUrlForId" in loader_cpp, "SkinManifestLoader.cpp missing generatedClipUrlForId")
+    for token in ["existingLocalFileIsInsideRoot", "canonicalRootPath"]:
+        require(token in skin_path_utils_h, f"SkinPathUtils.h missing {token}")
 
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
-    for token in ["GenerateMilesClips", "add_miles_generated_clips_qrc"]:
+    for token in ["GenerateMilesClips", "split_manifest_clips.py"]:
         require(token in desktop_cmake, f"apps/desktop/CMakeLists.txt missing {token}")
+    require("clips.qrc" not in desktop_cmake, "apps/desktop/CMakeLists.txt must not wire generated clips qrc")
 
     root_cmake = read("CMakeLists.txt")
     require(
@@ -240,11 +243,11 @@ def run_split_tool() -> None:
 
 
 def assert_generated_clips(clips: dict[str, Any]) -> None:
-    generated = sorted(CLIPS_ROOT.glob("*.gif"))
-    require(len(generated) == len(clips), "generated/clips GIF count must equal manifest clips count")
-
-    missing = [clip_id for clip_id in clips if not (CLIPS_ROOT / f"{clip_id}.gif").is_file()]
-    require(not missing, "missing generated clip files: " + ", ".join(sorted(missing)))
+    require(CLIPS_ROOT.exists(), "generated/clips directory must exist after running splitter")
+    actual = sorted(p.name for p in CLIPS_ROOT.glob("*.gif"))
+    expected = sorted(f"{clip_id}.gif" for clip_id in clips)
+    require(actual == expected, diff_message("generated clip files must exactly match manifest clips", expected, actual))
+    require(not (SKIN_ROOT / "generated" / "clips.qrc").exists(), "splitter must not create generated/clips.qrc")
 
     for clip_id, clip in clips.items():
         source_path = resolve_skin_file(clip["source"])
@@ -259,21 +262,6 @@ def assert_generated_clips(clips: dict[str, Any]) -> None:
             actual_durations == expected_durations,
             f"{clip_id} generated frame durations must match source frameRange",
         )
-
-    tree = ET.parse(CLIPS_QRC)
-    resource = None
-    for candidate in tree.getroot().findall("qresource"):
-        if candidate.attrib.get("prefix") == "/skins/miles-edgeworth/generated/clips":
-            resource = candidate
-            break
-    require(resource is not None, "clips.qrc must contain /skins/miles-edgeworth/generated/clips prefix")
-
-    aliases = {file_node.attrib.get("alias", "") for file_node in resource.findall("file")}
-    expected_aliases = {f"{clip_id}.gif" for clip_id in clips}
-    require(
-        aliases == expected_aliases,
-        diff_message("clips.qrc aliases must exactly match manifest clips", expected_aliases, aliases),
-    )
 
 
 def main() -> int:

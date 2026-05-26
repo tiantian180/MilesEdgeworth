@@ -35,7 +35,9 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
+    manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    skin_root = manifest_path.parent
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
     action_pools = manifest.get("animationPools", {})
@@ -52,7 +54,9 @@ def main() -> int:
         require(set(variants.keys()) == set(MOVEMENT_DIRECTIONS), f"{action_id} 应包含 8 个移动方向 variant")
         for direction_id in MOVEMENT_DIRECTIONS:
             variant = variants[direction_id]
-            require("clip" in variant, f"{action_id}.{direction_id} 缺少 clip")
+            clip = variant.get("clip", "")
+            require(clip.startswith("file:"), f"{action_id}.{direction_id} 缺少 file: clip")
+            require((skin_root / clip[len("file:"):]).is_file(), f"皮肤文件缺失 {clip}")
             movement = variant.get("movement", {})
             require({"dx", "dy"} <= set(movement.keys()), f"{action_id}.{direction_id} 缺少每帧移动增量")
 
@@ -73,11 +77,6 @@ def main() -> int:
     idle_recipe_ids = {entry.get("recipe") for entry in idle_entries}
     require(any(recipe_id.startswith("walk.") for recipe_id in idle_recipe_ids if recipe_id), "idle.random 应能抽到 walk")
     require(any(recipe_id.startswith("run.") for recipe_id in idle_recipe_ids if recipe_id), "idle.random 应能抽到 run")
-
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for action_id in ["walk", "run"]:
-        for direction_id in MOVEMENT_DIRECTIONS:
-            require(f'alias="{action_id}-{direction_id}.gif"' in qrc, f"qrc 缺少 {action_id}-{direction_id}.gif")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")

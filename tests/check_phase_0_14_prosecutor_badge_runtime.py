@@ -26,12 +26,14 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
+    skin_root = ROOT / "apps/desktop/resources/skins/miles-edgeworth"
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
 
     props = manifest.get("props", {})
     badge = props.get("prosecutor_badge")
     require(badge, "manifest 缺少 props.prosecutor_badge")
     require(badge.get("asset") == "file:assets/props/prosecutor_badge/prosecutor-badge.png", "prosecutor_badge 应声明徽章图片资源")
+    require((skin_root / "assets/props/prosecutor_badge/prosecutor-badge.png").is_file(), "皮肤文件缺失 prosecutor_badge 图片")
     require(badge.get("delayMs") == 700, "prosecutor_badge 应保留旧版 700ms 延迟")
     require(badge.get("durationMs") == 1500, "prosecutor_badge 应保留旧版 1500ms 飞行时间")
     require(badge.get("clickedRecipe") == "bow.once", "点击徽章后应触发鞠躬")
@@ -49,14 +51,13 @@ def main() -> None:
     pickup_urls = {variant.get("clip") for variant in pickup.get("variants", {}).values()}
     require("file:assets/body/interaction/pickup-right.gif" in pickup_urls, "pickup_badge 缺少右向动画")
     require("file:assets/body/interaction/pickup-left.gif" in pickup_urls, "pickup_badge 缺少左向动画")
+    for url in pickup_urls:
+        require(isinstance(url, str) and url.startswith("file:"), f"pickup_badge 动画应使用 file: URL: {url}")
+        require((skin_root / url[len("file:"):]).is_file(), f"皮肤文件缺失 {url}")
 
     take_that = manifest.get("recipes", {}).get("doubleClick.takeThat", {})
     require(take_that.get("prop") == "prosecutor_badge", "doubleClick.takeThat 应触发 prosecutor_badge")
     require(manifest.get("recipes", {}).get("pickup.once", {}).get("action") == "pickup_badge", "pickup.once 应播放 pickup_badge")
-
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in ["prosecutor-badge.png", "pickup-right.gif", "pickup-left.gif"]:
-        require(alias in qrc, f"qrc 缺少 {alias}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     prop_controller_h = read("apps/desktop/src/pet/effects/PropController.h")

@@ -41,7 +41,9 @@ def main() -> int:
 
     loader_text = loader_header.read_text(encoding="utf-8") + loader_cpp.read_text(encoding="utf-8")
     require("class SkinManifestLoader" in loader_text, "SkinManifestLoader 应作为独立加载器存在")
-    require("loadFromResource" in loader_text, "SkinManifestLoader 应提供资源路径加载入口")
+    require("loadFromDescriptor" in loader_text, "SkinManifestLoader 应提供 descriptor 加载入口")
+    require("discoverAll" in loader_text, "SkinManifestLoader 应提供皮肤发现入口")
+    require("loadFromResource" not in loader_text, "SkinManifestLoader 不应保留 qrc 资源路径加载入口")
     require("fallbackManifest" in loader_text, "SkinManifestLoader 应提供 fallback manifest")
 
     pool_selector_text = pool_selector_header.read_text(encoding="utf-8") + pool_selector_cpp.read_text(encoding="utf-8")
@@ -70,7 +72,7 @@ def main() -> int:
         require(token not in runtime_header + runtime_cpp, f"PetRuntime 不应继续承担 manifest JSON 解析：{token}")
 
     runtime_sources = runtime_cpp + runtime_skin_cpp
-    require("SkinManifestLoader::loadFromResource" in runtime_sources or "SkinManifestLoader::loadFromDescriptor" in runtime_sources, "PetRuntime 应调用 SkinManifestLoader 加载 manifest")
+    require("SkinManifestLoader::loadFromDescriptor" in runtime_sources, "PetRuntime 应调用 SkinManifestLoader descriptor 加载 manifest")
     require("SkinManifestLoader::fallbackManifest" in runtime_sources, "PetRuntime 应调用 SkinManifestLoader fallback")
     require("AnimationPoolSelector::resolvePoolId" in runtime_cpp, "PetRuntime 应委托 AnimationPoolSelector 解析候选池")
     require("AnimationPoolSelector::selectEntry" in runtime_cpp, "PetRuntime 应委托 AnimationPoolSelector 权重抽取")

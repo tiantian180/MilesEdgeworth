@@ -2,13 +2,18 @@
 #include "pet/effects/AudioController.h"
 #include "pet/events/PetEventBridge.h"
 #include "pet/interaction/CustomInteractionRegistry.h"
+#include "pet/manifest/SkinManifestLoader.h"
 #include "pet/requests/ActionRequest.h"
 #include "skins/miles-edgeworth/MilesEdgeworthInteractions.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QEventLoop>
+#include <QFile>
+#include <QFileInfo>
 #include <QSettings>
 #include <QStringList>
+#include <QTemporaryDir>
 #include <QTimer>
 #include <QVariantList>
 #include <QVariantMap>
@@ -49,6 +54,27 @@ bool hasSkinCommand(const QVariantList &commands, const QString &commandId)
         }
     }
     return false;
+}
+
+bool writeTextFile(const QString &path, const QString &content)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+        return false;
+    }
+    file.write(content.toUtf8());
+    return true;
+}
+
+QString milesSkinPath(const QString &relative)
+{
+    return QDir(QCoreApplication::applicationDirPath())
+        .filePath(QStringLiteral("skins/miles-edgeworth/%1").arg(relative));
+}
+
+QString milesSkinUrl(const QString &relative)
+{
+    return QUrl::fromLocalFile(milesSkinPath(relative)).toString();
 }
 
 struct MovementCase
@@ -274,16 +300,266 @@ int main(int argc, char *argv[])
     AudioController defaultOnlyAudioController;
     defaultOnlyAudioController.setAudioDefinition(defaultOnlyAudio);
     RecipeDefinition defaultOnlyRecipe;
-    defaultOnlyRecipe.soundUrls.insert("jp", QUrl("qrc:/audio/holdit0.wav"));
+    const QUrl defaultOnlySoundUrl = QUrl::fromLocalFile(
+        QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("test-audio/holdit0.wav"))
+    );
+    defaultOnlyRecipe.soundUrls.insert("jp", defaultOnlySoundUrl);
     require(defaultOnlyAudioController.availableLanguages().isEmpty(), "未声明 voiceLanguages 时不应生成语言菜单数据");
     require(defaultOnlyAudioController.currentLanguageId() == "jp", "只声明 defaultVoiceLanguage 时仍应按默认语言选择声音");
-    require(defaultOnlyAudioController.soundUrlForRecipe(defaultOnlyRecipe).toString() == "qrc:/audio/holdit0.wav", "默认语言应能选择对应 soundUrls");
+    require(defaultOnlyAudioController.soundUrlForRecipe(defaultOnlyRecipe).toString() == defaultOnlySoundUrl.toString(), "默认语言应能选择对应 soundUrls");
 
     PetRuntime runtime;
     require(!runtime.activeSkinId().isEmpty(), "runtime should have an active skin id");
     require(runtime.activeSkinId() == QStringLiteral("miles-edgeworth"), "built-in Miles should be active by default");
     require(!runtime.availableSkins().isEmpty(), "runtime should expose available skins");
     require(runtime.reloadActiveSkin(), "runtime should reload active skin");
+    {
+        const SkinManifest fallbackManifest = SkinManifestLoader::fallbackManifest();
+        require(fallbackManifest.actions.value(QStringLiteral("idle_stand"))
+                    .variants.value(QStringLiteral("right"))
+                    .url.toString() == milesSkinUrl(QStringLiteral("assets/body/idle/stand-right.gif")),
+                "fallback manifest should use packaged Miles idle animation");
+
+        SkinManifest &fallbackVariantManifest = const_cast<SkinManifest &>(runtime.manifest());
+        ActionDefinition missingVariantAction;
+        missingVariantAction.loopMode = QStringLiteral("loop");
+        fallbackVariantManifest.actions.insert(QStringLiteral("test_missing_variant"), missingVariantAction);
+        runtime.playAction(QStringLiteral("test_missing_variant"));
+        require(runtime.currentActionId() == fallbackVariantManifest.fallbackAction,
+                "missing action variants should fall back to fallback action");
+        require(runtime.currentAnimationUrl().toString() == milesSkinUrl(QStringLiteral("assets/body/idle/stand-right.gif")),
+                "missing action variants should use packaged Miles idle animation");
+        require(runtime.reloadActiveSkin(), "runtime should reload active skin after fallback variant assertion");
+
+        SkinManifest &missingAssetManifest = const_cast<SkinManifest &>(runtime.manifest());
+        ActionDefinition missingAssetAction;
+        missingAssetAction.loopMode = QStringLiteral("loop");
+        missingAssetAction.variants.insert(
+            QStringLiteral("right"),
+            AnimationVariant {QUrl::fromLocalFile(milesSkinPath(QStringLiteral("assets/body/idle/missing-action.gif")))}
+        );
+        missingAssetManifest.actions.insert(QStringLiteral("test_missing_asset"), missingAssetAction);
+        runtime.setFacing(QStringLiteral("right"));
+        runtime.playAction(QStringLiteral("test_missing_asset"));
+        require(runtime.currentActionId() == missingAssetManifest.fallbackAction,
+                "missing non-fallback action asset should fall back to fallback action");
+        require(runtime.currentAnimationUrl().toString() == milesSkinUrl(QStringLiteral("assets/body/idle/stand-right.gif")),
+                "missing non-fallback action asset should use packaged Miles idle animation");
+        require(runtime.reloadActiveSkin(), "runtime should reload active skin after missing asset assertion");
+
+        QTemporaryDir runtimeRootDir;
+        QTemporaryDir runtimeOutsideDir;
+        require(runtimeRootDir.isValid() && runtimeOutsideDir.isValid(),
+                "runtime escaping asset dirs should be valid");
+        QDir runtimeRoot(runtimeRootDir.path());
+        require(runtimeRoot.mkpath(QStringLiteral("assets/body/idle")),
+                "runtime escaping asset dir should be created");
+        const QString outsideRuntimeAsset = QDir(runtimeOutsideDir.path()).filePath(QStringLiteral("outside.gif"));
+        QFile outsideRuntimeFile(outsideRuntimeAsset);
+        require(outsideRuntimeFile.open(QIODevice::WriteOnly),
+                "runtime outside asset should be writable");
+        outsideRuntimeFile.write("outside");
+        outsideRuntimeFile.close();
+        const QString escapingRuntimeAsset = runtimeRoot.filePath(QStringLiteral("assets/body/idle/evil.gif"));
+        const bool runtimeSymlinkCreated = QFile::link(outsideRuntimeAsset, escapingRuntimeAsset);
+        if (runtimeSymlinkCreated && QFileInfo(escapingRuntimeAsset).isSymLink()) {
+            SkinManifest &escapingAssetManifest = const_cast<SkinManifest &>(runtime.manifest());
+            escapingAssetManifest.skinRootUrl = QUrl::fromLocalFile(runtimeRoot.absolutePath() + QLatin1Char('/'));
+            ActionDefinition escapingAssetAction;
+            escapingAssetAction.loopMode = QStringLiteral("loop");
+            escapingAssetAction.variants.insert(
+                QStringLiteral("right"),
+                AnimationVariant {QUrl::fromLocalFile(escapingRuntimeAsset)}
+            );
+            escapingAssetManifest.actions.insert(QStringLiteral("test_escaping_asset"), escapingAssetAction);
+            runtime.setFacing(QStringLiteral("right"));
+            runtime.playAction(QStringLiteral("test_escaping_asset"));
+            require(runtime.currentActionId() == escapingAssetManifest.fallbackAction,
+                    "escaping non-fallback action asset should fall back to fallback action");
+            require(runtime.currentAnimationUrl().toString() == milesSkinUrl(QStringLiteral("assets/body/idle/stand-right.gif")),
+                    "escaping non-fallback action asset should use packaged Miles idle animation");
+            require(runtime.reloadActiveSkin(), "runtime should reload active skin after escaping asset assertion");
+        }
+
+        SkinManifest &missingRecipeAssetManifest = const_cast<SkinManifest &>(runtime.manifest());
+        ActionDefinition missingRecipeAssetAction;
+        missingRecipeAssetAction.initialPhase = QStringLiteral("loop");
+        PhaseDefinition missingRecipeAssetPhase;
+        missingRecipeAssetPhase.loopMode = QStringLiteral("loop");
+        missingRecipeAssetPhase.variants.insert(
+            QStringLiteral("right"),
+            AnimationVariant {QUrl::fromLocalFile(milesSkinPath(QStringLiteral("assets/body/idle/missing-recipe.gif")))}
+        );
+        missingRecipeAssetAction.phases.insert(QStringLiteral("loop"), missingRecipeAssetPhase);
+        missingRecipeAssetManifest.actions.insert(QStringLiteral("test_missing_recipe_asset"), missingRecipeAssetAction);
+        RecipeDefinition missingRecipeAssetRecipe;
+        RecipeStep missingRecipeAssetStep;
+        missingRecipeAssetStep.actionId = QStringLiteral("test_missing_recipe_asset");
+        missingRecipeAssetStep.phaseId = QStringLiteral("loop");
+        missingRecipeAssetRecipe.steps.append(missingRecipeAssetStep);
+        missingRecipeAssetManifest.recipes.insert(QStringLiteral("test_missing_recipe_asset_recipe"), missingRecipeAssetRecipe);
+        runtime.setFacing(QStringLiteral("right"));
+        runtime.playRecipe(QStringLiteral("test_missing_recipe_asset_recipe"));
+        require(runtime.currentActionId() == missingRecipeAssetManifest.fallbackAction,
+                "missing recipe step asset should fall back to fallback action");
+        require(runtime.currentRecipeId().isEmpty(),
+                "missing recipe step asset fallback should clear the interrupted recipe");
+        require(runtime.currentAnimationUrl().toString() == milesSkinUrl(QStringLiteral("assets/body/idle/stand-right.gif")),
+                "missing recipe step asset should use packaged Miles idle animation");
+        require(runtime.reloadActiveSkin(), "runtime should reload active skin after missing recipe asset assertion");
+    }
+
+    {
+        QDir appSkinRoot(SkinManifestLoader::appSkinDirectoryPath());
+        require(appSkinRoot.mkpath(QStringLiteral(".")),
+                "app skin root should be creatable for preserve reload fallback smoke");
+        QDir preserveSkin(appSkinRoot.filePath(QStringLiteral("preserve-missing-smoke")));
+        if (preserveSkin.exists()) {
+            require(preserveSkin.removeRecursively(),
+                    "existing preserve reload fallback smoke skin should be removable");
+        }
+        require(preserveSkin.mkpath(QStringLiteral("assets/body/idle")),
+                "preserve reload fallback idle asset dir should be created");
+        require(preserveSkin.mkpath(QStringLiteral("assets/body/interaction")),
+                "preserve reload fallback interaction asset dir should be created");
+        require(writeTextFile(preserveSkin.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{
+  "id": "preserve-missing-smoke",
+  "name": "Preserve Missing Smoke",
+  "version": "1.0.0",
+  "skinSchemaVersion": 1,
+  "manifest": "manifest.json"
+}
+)JSON")), "preserve reload fallback skin.json should be written");
+        require(writeTextFile(preserveSkin.filePath(QStringLiteral("assets/body/idle/stand.gif")),
+                              QStringLiteral("fake stand gif")),
+                "preserve reload fallback idle asset should be written");
+        const QString objectingPath = preserveSkin.filePath(QStringLiteral("assets/body/interaction/objecting.gif"));
+        require(writeTextFile(objectingPath, QStringLiteral("fake objecting gif")),
+                "preserve reload fallback objecting asset should be written");
+        require(writeTextFile(preserveSkin.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "schemaVersion": 4,
+  "fallbackAction": "idle_stand",
+  "defaultFacing": "right",
+  "facings": ["right"],
+  "states": { "idle": { "action": "idle_stand" } },
+  "actions": {
+    "idle_stand": {
+      "variants": {
+        "right": { "clip": "file:assets/body/idle/stand.gif" }
+      }
+    },
+    "objecting": {
+      "loopMode": "onceThenHold",
+      "variants": {
+        "right": { "clip": "file:assets/body/interaction/objecting.gif" }
+      }
+    }
+  }
+}
+)JSON")), "preserve reload fallback manifest should be written");
+
+        require(runtime.setActiveSkin(QStringLiteral("preserve-missing-smoke")),
+                "preserve reload fallback smoke skin should activate");
+        runtime.setFacing(QStringLiteral("right"));
+        runtime.playAction(QStringLiteral("objecting"));
+        require(runtime.currentActionId() == QStringLiteral("objecting"),
+                "preserve reload fallback setup should play objecting");
+        require(QFile::remove(objectingPath),
+                "preserve reload fallback objecting asset should be removable before reload");
+        require(runtime.reloadActiveSkinPreservingPlayback(),
+                "preserve reload should succeed when preserved action asset disappeared");
+        require(runtime.currentActionId() == runtime.manifest().fallbackAction,
+                "preserve reload should fall back when preserved action asset disappeared");
+        require(runtime.currentRecipeId().isEmpty(),
+                "preserve reload fallback should not keep stale recipe state");
+        require(runtime.currentAnimationUrl().toString()
+                    == QUrl::fromLocalFile(preserveSkin.filePath(QStringLiteral("assets/body/idle/stand.gif"))).toString(),
+                "preserve reload fallback should use the skin fallback animation");
+        require(preserveSkin.removeRecursively(),
+                "preserve reload fallback smoke skin should be cleaned up");
+        require(runtime.setActiveSkin(QStringLiteral("miles-edgeworth")),
+                "runtime should restore Miles skin after preserve reload fallback smoke");
+    }
+
+    {
+        const QString shadowId = QStringLiteral("same-id-fallback-smoke");
+        QDir userSkinRoot(SkinManifestLoader::userSkinDirectoryPath());
+        QDir appSkinRoot(SkinManifestLoader::appSkinDirectoryPath());
+        require(userSkinRoot.mkpath(QStringLiteral(".")) && appSkinRoot.mkpath(QStringLiteral(".")),
+                "same-id fallback skin roots should be creatable");
+
+        QDir userShadowSkin(userSkinRoot.filePath(shadowId));
+        QDir appShadowSkin(appSkinRoot.filePath(shadowId));
+        if (userShadowSkin.exists()) {
+            require(userShadowSkin.removeRecursively(),
+                    "existing same-id user fallback smoke skin should be removable");
+        }
+        if (appShadowSkin.exists()) {
+            require(appShadowSkin.removeRecursively(),
+                    "existing same-id app fallback smoke skin should be removable");
+        }
+
+        require(userShadowSkin.mkpath(QStringLiteral(".")),
+                "same-id user fallback smoke skin should be created");
+        require(appShadowSkin.mkpath(QStringLiteral("assets/body/idle")),
+                "same-id app fallback smoke asset dir should be created");
+        require(writeTextFile(userShadowSkin.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{
+  "id": "same-id-fallback-smoke",
+  "name": "Same Id User Broken",
+  "version": "1.0.0",
+  "skinSchemaVersion": 1,
+  "manifest": "manifest.json"
+}
+)JSON")), "same-id user fallback skin.json should be written");
+        require(writeTextFile(userShadowSkin.filePath(QStringLiteral("manifest.json")), QStringLiteral("{}")),
+                "same-id user fallback broken manifest should be written");
+        require(writeTextFile(appShadowSkin.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
+{
+  "id": "same-id-fallback-smoke",
+  "name": "Same Id App Valid",
+  "version": "1.0.0",
+  "skinSchemaVersion": 1,
+  "manifest": "manifest.json"
+}
+)JSON")), "same-id app fallback skin.json should be written");
+        require(writeTextFile(appShadowSkin.filePath(QStringLiteral("assets/body/idle/stand.gif")),
+                              QStringLiteral("fake stand gif")),
+                "same-id app fallback idle asset should be written");
+        require(writeTextFile(appShadowSkin.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "schemaVersion": 4,
+  "fallbackAction": "idle_stand",
+  "defaultFacing": "right",
+  "facings": ["right"],
+  "states": { "idle": { "action": "idle_stand" } },
+  "actions": {
+    "idle_stand": {
+      "variants": {
+        "right": { "clip": "file:assets/body/idle/stand.gif" }
+      }
+    }
+  }
+}
+)JSON")), "same-id app fallback manifest should be written");
+
+        require(runtime.setActiveSkin(shadowId),
+                "runtime should activate same-id app candidate after user candidate fails to load");
+        require(runtime.manifest().skinName == QStringLiteral("Same Id App Valid"),
+                "runtime should load the valid app descriptor after invalid same-id user descriptor");
+        require(runtime.currentAnimationUrl().toString()
+                    == QUrl::fromLocalFile(appShadowSkin.filePath(QStringLiteral("assets/body/idle/stand.gif"))).toString(),
+                "same-id app fallback should use the app skin animation");
+        require(userShadowSkin.removeRecursively(),
+                "same-id user fallback smoke skin should be cleaned up");
+        require(appShadowSkin.removeRecursively(),
+                "same-id app fallback smoke skin should be cleaned up");
+        require(runtime.setActiveSkin(QStringLiteral("miles-edgeworth")),
+                "runtime should restore Miles skin after same-id fallback smoke");
+    }
+
     runtime.setAudioLanguage("zh");
     runtime.setPetSize("mini");
     runtime.setFacing("left");
@@ -513,7 +789,7 @@ int main(int argc, char *argv[])
     runtime.setFacing("right");
     bridge.submitDoubleClickForTest(0.0);
     require(runtime.currentActionId() == "objecting", "确定性随机命中时应由徽章 CI 播放 objecting");
-    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/takethat0.wav", qPrintable(QStringLiteral("确定性随机命中时应播放看招语音，实际为 %1").arg(runtime.currentSoundUrl().toString())));
+    require(runtime.currentSoundUrl().toString() == milesSkinUrl(QStringLiteral("assets/audio/voice/takethat0.wav")), qPrintable(QStringLiteral("确定性随机命中时应播放看招语音，实际为 %1").arg(runtime.currentSoundUrl().toString())));
     waitForMilliseconds(750);
     require(runtime.currentPropId() == "prosecutor_badge", "确定性随机命中后应飞出检察官徽章");
     bridge.submitPropClicked();
@@ -539,7 +815,7 @@ int main(int argc, char *argv[])
 
     runtime.setAudioLanguage("zh");
     bridge.submitDoubleClickForTest(0.0);
-    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/takethat2.wav", "徽章 CI 应沿用当前语音语言选择看招音频");
+    require(runtime.currentSoundUrl().toString() == milesSkinUrl(QStringLiteral("assets/audio/voice/takethat2.wav")), "徽章 CI 应沿用当前语音语言选择看招音频");
     waitForMilliseconds(750);
     bridge.submitPropExpired();
     runtime.handleAnimationFinished();
@@ -773,11 +1049,11 @@ int main(int argc, char *argv[])
     require(runtime.availableAudioLanguages().size() == 3, "Miles 应暴露三种可选语音语言");
     runtime.setAudioLanguage("zh");
     runtime.playRecipe("doubleClick.holdIt");
-    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit2.wav", "中文语音应选择 holdit2");
+    require(runtime.currentSoundUrl().toString() == milesSkinUrl(QStringLiteral("assets/audio/voice/holdit2.wav")), "中文语音应选择 holdit2");
 
     runtime.setAudioLanguage("en");
     runtime.playRecipe("doubleClick.holdIt");
-    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit1.wav", "英语语音应选择 holdit1");
+    require(runtime.currentSoundUrl().toString() == milesSkinUrl(QStringLiteral("assets/audio/voice/holdit1.wav")), "英语语音应选择 holdit1");
 
     runtime.setAudioLanguage("jp");
     runtime.submitExpressionRequest("speaking", "objection", 0.0);
@@ -786,11 +1062,11 @@ int main(int argc, char *argv[])
     runtime.submitExpressionRequest("speaking", "neutral", 0.0);
     require(runtime.currentActionId() == "talking", "speaking + neutral 应映射到 talking 分段说话动作，而不是站立待机");
     require(runtime.currentPhaseId() == "enter"
-                && runtime.currentAnimationUrl().toString() == "qrc:/skins/miles-edgeworth/generated/clips/talking.enter.right.gif",
+                && runtime.currentAnimationUrl().toString() == milesSkinUrl(QStringLiteral("generated/clips/talking.enter.right.gif")),
             "talking enter 应使用预切片 generated clip，而不是运行时 frameRange");
     runtime.handleAnimationFinished();
     require(runtime.currentPhaseId() == "loop"
-                && runtime.currentAnimationUrl().toString() == "qrc:/skins/miles-edgeworth/generated/clips/talking.loop.right.gif",
+                && runtime.currentAnimationUrl().toString() == milesSkinUrl(QStringLiteral("generated/clips/talking.loop.right.gif")),
             "talking enter 播完后应进入预切片 talking loop clip");
     runtime.submitExpressionRequest("idle", "polite", 0.0);
     require(runtime.currentActionId() == "bow", "idle + polite 应映射到鞠躬动作");
@@ -1018,19 +1294,19 @@ int main(int argc, char *argv[])
 
     runtime.playRecipe("doubleClick.holdIt");
     require(runtime.currentActionId() == "crossed", "Hold it 应播放抱臂动作");
-    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit0.wav", "Hold it 应播放默认语音");
+    require(runtime.currentSoundUrl().toString() == milesSkinUrl(QStringLiteral("assets/audio/voice/holdit0.wav")), "Hold it 应播放默认语音");
 
     runtime.playRecipe("doubleClick.takeThat");
     require(runtime.currentActionId() == "objecting", "Take that 应播放异议动作");
-    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/takethat0.wav", "Take that 应播放默认语音");
+    require(runtime.currentSoundUrl().toString() == milesSkinUrl(QStringLiteral("assets/audio/voice/takethat0.wav")), "Take that 应播放默认语音");
 
     runtime.playRecipe("doubleClick.objection");
     require(runtime.currentActionId() == "objecting", "Objection 应播放异议动作");
-    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/objection0.wav", "Objection 应播放默认语音");
+    require(runtime.currentSoundUrl().toString() == milesSkinUrl(QStringLiteral("assets/audio/voice/objection0.wav")), "Objection 应播放默认语音");
 
     runtime.playRecipe("doubleClick.eureka");
     require(runtime.currentActionId() == "objecting", "Eureka 应播放异议动作");
-    require(runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/eureka0.wav", "Eureka 应播放默认语音");
+    require(runtime.currentSoundUrl().toString() == milesSkinUrl(QStringLiteral("assets/audio/voice/eureka0.wav")), "Eureka 应播放默认语音");
 
     runtime.returnToIdle();
     runtime.setFacing("right");

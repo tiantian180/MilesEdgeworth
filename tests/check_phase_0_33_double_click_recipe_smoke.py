@@ -23,6 +23,33 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def has_file_based_audio_expectation(source: str, relative_path: str) -> bool:
+    markers = [
+        "file:",
+        "fromLocalFile",
+        "resolveSkinUrl",
+        "SkinUrl",
+        "skinUrl",
+        "skinFile",
+        "skinAsset",
+        "descriptor",
+        "Descriptor",
+        "expectedSoundUrl",
+        "expectedAudioUrl",
+        "assetUrl",
+        "audioUrl",
+    ]
+    start = 0
+    while True:
+        index = source.find(relative_path, start)
+        if index < 0:
+            return False
+        window = source[max(0, index - 240): index + len(relative_path) + 240]
+        if any(marker in window for marker in markers):
+            return True
+        start = index + len(relative_path)
+
+
 def main() -> int:
     smoke_test = read("apps/desktop/tests/pet_runtime_smoke.cpp")
 
@@ -35,12 +62,19 @@ def main() -> int:
         "Take that 应播放默认语音",
         "Objection 应播放默认语音",
         "Eureka 应播放默认语音",
-        'qrc:/skins/miles-edgeworth/assets/audio/voice/holdit0.wav',
-        'qrc:/skins/miles-edgeworth/assets/audio/voice/takethat0.wav',
-        'qrc:/skins/miles-edgeworth/assets/audio/voice/objection0.wav',
-        'qrc:/skins/miles-edgeworth/assets/audio/voice/eureka0.wav',
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少双击 recipe 行为覆盖：{token}")
+    require("qrc:/skins/miles-edgeworth/assets/audio/voice/" not in smoke_test, "PetRuntimeSmoke 不应硬编码 qrc skin 音频 URL")
+    for relative in [
+        "assets/audio/voice/holdit0.wav",
+        "assets/audio/voice/takethat0.wav",
+        "assets/audio/voice/objection0.wav",
+        "assets/audio/voice/eureka0.wav",
+    ]:
+        require(
+            has_file_based_audio_expectation(smoke_test, relative),
+            f"PetRuntimeSmoke 应通过文件系统皮肤 URL helper 或 file: 期望验证默认语音：{relative}",
+        )
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_33_double_click_recipe_smoke" in root_cmake, "CTest 未注册 Phase 0.33 检查")

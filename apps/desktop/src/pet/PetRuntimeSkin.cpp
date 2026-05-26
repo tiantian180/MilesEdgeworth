@@ -2,6 +2,7 @@
 
 #include "pet/manifest/SkinManifestLoader.h"
 
+#include <QSet>
 #include <QSettings>
 #include <QVariantMap>
 
@@ -160,12 +161,17 @@ bool playbackStateStillValid(
 QVariantList PetRuntime::availableSkins() const
 {
     QVariantList skins;
+    QSet<QString> seenIds;
     for (const SkinDescriptor &descriptor : m_availableSkinDescriptors) {
+        if (descriptor.id.isEmpty() || seenIds.contains(descriptor.id)) {
+            continue;
+        }
+        seenIds.insert(descriptor.id);
+
         QVariantMap skin;
         skin.insert(QStringLiteral("id"), descriptor.id);
         skin.insert(QStringLiteral("name"), descriptor.name);
         skin.insert(QStringLiteral("version"), descriptor.version);
-        skin.insert(QStringLiteral("builtin"), descriptor.builtin);
         skin.insert(QStringLiteral("thumbnailUrl"), descriptor.thumbnailUrl.toString());
         skins.append(skin);
     }
@@ -196,20 +202,22 @@ bool PetRuntime::activateSkin(const QString &skinId, bool persistSelection)
         refreshAvailableSkins();
     }
 
-    SkinDescriptor descriptor = descriptorForSkinId(skinId);
-    if (descriptor.id.isEmpty()) {
+    QList<SkinDescriptor> descriptors = descriptorsForSkinId(skinId);
+    if (descriptors.isEmpty()) {
         refreshAvailableSkins();
-        descriptor = descriptorForSkinId(skinId);
+        descriptors = descriptorsForSkinId(skinId);
     }
 
-    if (!loadSkinDescriptor(descriptor, SkinReloadMode::PlayStartup)) {
-        return false;
+    for (const SkinDescriptor &descriptor : descriptors) {
+        if (loadSkinDescriptor(descriptor, SkinReloadMode::PlayStartup)) {
+            if (persistSelection) {
+                QSettings().setValue(QStringLiteral("skin/activeSkinId"), m_activeSkinId);
+            }
+            return true;
+        }
     }
 
-    if (persistSelection) {
-        QSettings().setValue(QStringLiteral("skin/activeSkinId"), m_activeSkinId);
-    }
-    return true;
+    return false;
 }
 
 bool PetRuntime::reloadActiveSkin()
@@ -225,7 +233,12 @@ bool PetRuntime::reloadActiveSkinPreservingPlayback()
 bool PetRuntime::reloadActiveSkin(SkinReloadMode mode)
 {
     refreshAvailableSkins();
-    return loadSkinDescriptor(descriptorForSkinId(m_activeSkinId), mode);
+    for (const SkinDescriptor &descriptor : descriptorsForSkinId(m_activeSkinId)) {
+        if (loadSkinDescriptor(descriptor, mode)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void PetRuntime::applyManifestState(bool preserveRuntimeState)
@@ -448,6 +461,21 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
             currentVariant = variantForAction(currentAction);
         }
 
+        if (m_currentActionId != m_manifest.fallbackAction && !animationUrlPlayable(currentVariant.url)) {
+            hideCurrentProp();
+            clearActiveRecipe();
+            const bool soundCleared = m_audioController.clearCurrentSound();
+            setState(QStringLiteral("idle"));
+            if (soundCleared) {
+                emit currentSoundUrlChanged();
+                emit soundPlaybackSerialChanged();
+            }
+            emitDerivedStateChanges();
+            emit activeSkinChanged();
+            emit skinManifestReloaded();
+            return true;
+        }
+
         const bool currentAutoReturnToIdle = (currentLoopMode == QStringLiteral("onceThenIdle"));
         const bool loopModeChangedDuringPreserve = (preservedLoopMode != currentLoopMode);
         const bool autoReturnChangedDuringPreserve = (preservedAutoReturnToIdle != currentAutoReturnToIdle);
@@ -490,14 +518,15 @@ bool PetRuntime::loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReload
     return true;
 }
 
-SkinDescriptor PetRuntime::descriptorForSkinId(const QString &skinId) const
+QList<SkinDescriptor> PetRuntime::descriptorsForSkinId(const QString &skinId) const
 {
+    QList<SkinDescriptor> descriptors;
     for (const SkinDescriptor &descriptor : m_availableSkinDescriptors) {
         if (descriptor.id == skinId) {
-            return descriptor;
+            descriptors.append(descriptor);
         }
     }
-    return {};
+    return descriptors;
 }
 
 void PetRuntime::refreshAvailableSkins()

@@ -24,7 +24,9 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
+    manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    skin_root = manifest_path.parent
     recipes = manifest.get("recipes", {})
     action_pools = manifest.get("animationPools", {})
 
@@ -60,10 +62,9 @@ def main() -> int:
     variants = tea_alt.get("variants", {})
     require(variants.get("right", {}).get("clip") == "file:assets/body/menu/tea-alt-right.gif", "tea_alt.right 应使用 tea2")
     require(variants.get("left", {}).get("clip") == "file:assets/body/menu/tea-alt-left.gif", "tea_alt.left 应使用 tea3")
-
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in ["tea-alt-right.gif", "tea-alt-left.gif"]:
-        require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
+    for facing in ["right", "left"]:
+        clip = variants.get(facing, {}).get("clip", "")
+        require((skin_root / clip[len("file:"):]).is_file(), f"皮肤文件缺失 {clip}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     bridge_h = read("apps/desktop/src/pet/events/PetEventBridge.h")

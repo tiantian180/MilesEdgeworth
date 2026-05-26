@@ -1,5 +1,8 @@
 #include "pet/manifest/PersonaStore.h"
 
+#include "pet/manifest/SkinManifestLoader.h"
+#include "pet/manifest/SkinPathUtils.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -31,32 +34,35 @@ QString readTextFile(const QString &path)
     return QString::fromUtf8(file.readAll());
 }
 
-QString qrcUrlToResourcePath(const QUrl &url)
+QString comparablePath(const QString &path)
 {
-    if (url.scheme() != QStringLiteral("qrc")) {
-        return {};
+    const QFileInfo fileInfo(path);
+    if (fileInfo.exists()) {
+        const QString canonicalPath = fileInfo.canonicalFilePath();
+        if (!canonicalPath.isEmpty()) {
+            return canonicalPath;
+        }
     }
-    return QStringLiteral(":") + url.path();
+    return QDir::cleanPath(fileInfo.absoluteFilePath());
+}
+
+bool isAppDirectorySkin(const QUrl &rootUrl)
+{
+    if (!rootUrl.isLocalFile()) {
+        return false;
+    }
+
+    const QString rootPath = comparablePath(QDir(rootUrl.toLocalFile()).absolutePath());
+    const QString appSkinRootPath = comparablePath(SkinManifestLoader::appSkinDirectoryPath());
+    return SkinPathUtils::pathIsInsideRoot(rootPath, appSkinRootPath);
 }
 
 QString personaPathForRootUrl(const QUrl &rootUrl)
 {
-    if (rootUrl.isLocalFile()) {
-        return QDir(rootUrl.toLocalFile()).filePath(QStringLiteral("persona.md"));
+    if (!rootUrl.isLocalFile()) {
+        return {};
     }
-
-    if (rootUrl.scheme() == QStringLiteral("qrc")) {
-        QUrl personaUrl = rootUrl;
-        QString path = personaUrl.path();
-        if (!path.endsWith(QLatin1Char('/'))) {
-            path.append(QLatin1Char('/'));
-        }
-        path.append(QStringLiteral("persona.md"));
-        personaUrl.setPath(path);
-        return qrcUrlToResourcePath(personaUrl);
-    }
-
-    return {};
+    return QDir(rootUrl.toLocalFile()).filePath(QStringLiteral("persona.md"));
 }
 
 bool writeTextFile(const QString &path, const QString &content, QString *errorMessage)
@@ -106,7 +112,7 @@ QString PersonaStore::overridePathForSkin(const QString &skinId)
     if (!isValidSkinId(skinId)) {
         return {};
     }
-    return QDir(dataDir()).filePath(QStringLiteral("persona-overrides/%1.md").arg(skinId));
+    return QDir(dataDir()).filePath(QStringLiteral("skin-overrides/%1/persona.md").arg(skinId));
 }
 
 QString PersonaStore::readForDescriptor(const SkinDescriptor &descriptor)
@@ -115,9 +121,11 @@ QString PersonaStore::readForDescriptor(const SkinDescriptor &descriptor)
         return {};
     }
 
-    const QString overridePath = overridePathForSkin(descriptor.id);
-    if (QFileInfo::exists(overridePath) && QFileInfo(overridePath).isFile()) {
-        return readTextFile(overridePath);
+    if (isAppDirectorySkin(descriptor.rootUrl)) {
+        const QString overridePath = overridePathForSkin(descriptor.id);
+        if (QFileInfo::exists(overridePath) && QFileInfo(overridePath).isFile()) {
+            return readTextFile(overridePath);
+        }
     }
 
     const QString skinPersonaPath = personaPathForRootUrl(descriptor.rootUrl);
@@ -138,7 +146,7 @@ bool PersonaStore::writeForManifest(const SkinManifest &manifest, const QString 
     }
 
     QString path;
-    if (manifest.builtin) {
+    if (isAppDirectorySkin(manifest.skinRootUrl)) {
         path = overridePathForSkin(manifest.skinId);
     } else if (manifest.skinRootUrl.isLocalFile()) {
         path = QDir(manifest.skinRootUrl.toLocalFile()).filePath(QStringLiteral("persona.md"));

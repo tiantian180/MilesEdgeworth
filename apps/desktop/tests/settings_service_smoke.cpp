@@ -424,8 +424,12 @@ int main(int argc, char *argv[])
             + QStringLiteral("/skins/invalid-id-skin");
         QDir invalidSkinDir(invalidSkinRoot);
         assert(invalidSkinDir.mkpath(QStringLiteral("assets/body/idle")));
+        assert(writeFile(
+            invalidSkinDir.filePath(QStringLiteral("assets/body/idle/stand.gif")),
+            QStringLiteral("fake stand gif")
+        ));
         assert(writeFile(invalidSkinDir.filePath(QStringLiteral("skin.json")), QStringLiteral(R"JSON(
-{"id":"bad/skin","name":"非法 id 皮肤","version":"1.0.0","manifestVersion":1}
+{"id":"bad/skin","name":"非法 id 皮肤","version":"1.0.0","skinSchemaVersion":1,"manifest":"manifest.json"}
 )JSON")));
         assert(writeFile(invalidSkinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
 {
@@ -433,7 +437,7 @@ int main(int argc, char *argv[])
   "actions": {
     "idle_stand": {
       "variants": {
-        "right": { "animation": "skin:assets/body/idle/stand.gif" }
+        "right": { "clip": "file:assets/body/idle/stand.gif" }
       }
     }
   }

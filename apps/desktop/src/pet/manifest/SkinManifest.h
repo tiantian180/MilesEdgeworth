@@ -311,7 +311,6 @@ struct SkinManifest
     QString skinId;
     QString skinName;
     QUrl skinRootUrl;
-    bool builtin = false;
     QString personaPrompt;
 
     CanvasDefinition canvas;

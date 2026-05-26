@@ -18,25 +18,118 @@ endif()
 
 set(MILES_REPOSITORY_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 set(MILES_BUILTIN_SKIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/resources/skins/miles-edgeworth")
-set(MILES_GENERATED_CLIPS_QRC "${MILES_BUILTIN_SKIN_ROOT}/generated/clips.qrc")
 set(MILES_SPLIT_MANIFEST_CLIPS_SCRIPT "${MILES_REPOSITORY_ROOT}/tools/split_manifest_clips.py")
+set(MILES_COPY_SKIN_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/generated/copy_miles_skin.cmake")
+set(MILES_CODESIGN_BUNDLE_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/generated/codesign_miles_bundle.cmake")
+set(MILES_COPY_SKIN_LOCK "${CMAKE_CURRENT_BINARY_DIR}/generated/copy_miles_skin.lock")
+
+file(GLOB_RECURSE MILES_BUILTIN_SKIN_ASSET_INPUTS
+    CONFIGURE_DEPENDS
+    LIST_DIRECTORIES false
+    "${MILES_BUILTIN_SKIN_ROOT}/assets/*"
+)
+set(MILES_BUILTIN_SKIN_INPUTS
+    "${MILES_BUILTIN_SKIN_ROOT}/manifest.json"
+    "${MILES_BUILTIN_SKIN_ROOT}/skin.json"
+    "${MILES_BUILTIN_SKIN_ROOT}/persona.md"
+    ${MILES_BUILTIN_SKIN_ASSET_INPUTS}
+)
+
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
+file(WRITE "${MILES_COPY_SKIN_SCRIPT}" [=[
+foreach(required SOURCE DEST LOCK_FILE)
+    if(NOT DEFINED ${required})
+        message(FATAL_ERROR "${required} is required")
+    endif()
+endforeach()
+
+if(NOT IS_DIRECTORY "${SOURCE}")
+    message(FATAL_ERROR "Skin source directory does not exist: ${SOURCE}")
+endif()
+
+function(remove_ds_store directory)
+    if(EXISTS "${directory}/.DS_Store")
+        file(REMOVE "${directory}/.DS_Store")
+    endif()
+
+    file(GLOB children LIST_DIRECTORIES true "${directory}/*")
+    foreach(child IN LISTS children)
+        if(IS_DIRECTORY "${child}")
+            remove_ds_store("${child}")
+        endif()
+    endforeach()
+endfunction()
+
+get_filename_component(lock_dir "${LOCK_FILE}" DIRECTORY)
+file(MAKE_DIRECTORY "${lock_dir}")
+file(LOCK "${LOCK_FILE}" GUARD PROCESS RESULT_VARIABLE lock_result TIMEOUT 120)
+if(NOT lock_result STREQUAL "0")
+    message(FATAL_ERROR "Unable to lock skin copy destination: ${lock_result}")
+endif()
+
+file(REMOVE_RECURSE "${DEST}")
+get_filename_component(dest_parent "${DEST}" DIRECTORY)
+file(MAKE_DIRECTORY "${dest_parent}")
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${SOURCE}" "${DEST}"
+    RESULT_VARIABLE copy_result
+)
+if(NOT copy_result EQUAL 0)
+    message(FATAL_ERROR "Failed to copy skin directory: ${SOURCE} -> ${DEST}")
+endif()
+remove_ds_store("${DEST}")
+]=])
+file(WRITE "${MILES_CODESIGN_BUNDLE_SCRIPT}" [=[
+foreach(required BUNDLE EXECUTABLE)
+    if(NOT DEFINED ${required})
+        message(FATAL_ERROR "${required} is required")
+    endif()
+endforeach()
+
+if(EXISTS "${EXECUTABLE}")
+    if(NOT IS_DIRECTORY "${BUNDLE}")
+        message(FATAL_ERROR "Bundle directory does not exist: ${BUNDLE}")
+    endif()
+
+    message(STATUS "Ad-hoc signing MilesEdgeworthDesktop.app for local macOS runs")
+    execute_process(
+        COMMAND /usr/bin/codesign --force --deep --sign - "${BUNDLE}"
+        RESULT_VARIABLE codesign_result
+    )
+    if(NOT codesign_result EQUAL 0)
+        message(FATAL_ERROR "codesign failed for ${BUNDLE}")
+    endif()
+else()
+    message(STATUS "Skipping MilesEdgeworthDesktop.app codesign until executable exists")
+endif()
+]=])
 
 add_custom_target(GenerateMilesClips
-    COMMAND ${Python3_EXECUTABLE}
-            "${MILES_SPLIT_MANIFEST_CLIPS_SCRIPT}"
-            "${MILES_BUILTIN_SKIN_ROOT}"
-    BYPRODUCTS "${MILES_GENERATED_CLIPS_QRC}"
+    COMMAND "${Python3_EXECUTABLE}" "${MILES_SPLIT_MANIFEST_CLIPS_SCRIPT}" "${MILES_BUILTIN_SKIN_ROOT}"
+    DEPENDS
+        "${MILES_SPLIT_MANIFEST_CLIPS_SCRIPT}"
+        ${MILES_BUILTIN_SKIN_INPUTS}
     WORKING_DIRECTORY "${MILES_REPOSITORY_ROOT}"
-    COMMENT "Generating Miles pre-cut animation clips"
+    COMMENT "Generating Miles Edgeworth manifest clips"
     VERBATIM
 )
 
-set_source_files_properties("${MILES_GENERATED_CLIPS_QRC}" PROPERTIES GENERATED TRUE)
-
-function(add_miles_generated_clips_qrc target_name)
-    target_sources(${target_name} PRIVATE "${MILES_GENERATED_CLIPS_QRC}")
-    add_dependencies(${target_name} GenerateMilesClips)
-    set_property(TARGET ${target_name} APPEND PROPERTY AUTOGEN_TARGET_DEPENDS GenerateMilesClips)
+function(add_miles_skin_copy target_name)
+    set(copy_target "Copy${target_name}MilesSkin")
+    add_custom_target(${copy_target}
+        COMMAND "${CMAKE_COMMAND}"
+                "-DSOURCE=${MILES_BUILTIN_SKIN_ROOT}"
+                "-DDEST=$<TARGET_FILE_DIR:${target_name}>/skins/miles-edgeworth"
+                "-DLOCK_FILE=${MILES_COPY_SKIN_LOCK}"
+                -P "${MILES_COPY_SKIN_SCRIPT}"
+        DEPENDS
+            GenerateMilesClips
+            ${MILES_BUILTIN_SKIN_INPUTS}
+            "${MILES_COPY_SKIN_SCRIPT}"
+        COMMENT "Copying Miles Edgeworth skin beside ${target_name}"
+        VERBATIM
+    )
+    add_dependencies(${target_name} ${copy_target})
 endfunction()
 
 set(DESKTOP_SOURCES
@@ -90,6 +183,7 @@ set(DESKTOP_SOURCES
     src/pet/PetLogging.cpp
     src/pet/PetLogging.h
     src/pet/PetRuntime.cpp
+    src/pet/PetRuntimeCleanFinish.cpp
     src/pet/PetRuntime.h
     src/pet/PetRuntimeSkin.cpp
     src/pet/requests/ActionRequest.h
@@ -158,8 +252,6 @@ target_link_libraries(MilesEdgeworthDesktop
         Qt6::QuickControls2
 )
 
-add_miles_generated_clips_qrc(MilesEdgeworthDesktop)
-
 set_target_properties(MilesEdgeworthDesktop PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME "MilesEdgeworth v2"
@@ -170,11 +262,14 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 )
 
 qt_finalize_executable(MilesEdgeworthDesktop)
+add_miles_skin_copy(MilesEdgeworthDesktop)
 
 if(APPLE)
     add_custom_command(TARGET MilesEdgeworthDesktop POST_BUILD
-        COMMAND /usr/bin/codesign --force --deep --sign -
-                "$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>"
+        COMMAND "${CMAKE_COMMAND}"
+                "-DBUNDLE=$<TARGET_BUNDLE_DIR:MilesEdgeworthDesktop>"
+                "-DEXECUTABLE=$<TARGET_FILE_DIR:MilesEdgeworthDesktop>/$<TARGET_FILE_NAME:MilesEdgeworthDesktop>"
+                -P "${MILES_CODESIGN_BUNDLE_SCRIPT}"
         COMMENT "Ad-hoc signing MilesEdgeworthDesktop.app for local macOS runs"
         VERBATIM
     )
@@ -265,14 +360,13 @@ if(BUILD_TESTING)
             Qt6::Core
     )
 
-    add_miles_generated_clips_qrc(SkinManifestLoaderSmoke)
-
     target_include_directories(SkinManifestLoaderSmoke
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
 
     add_test(NAME skin_manifest_loader_smoke COMMAND SkinManifestLoaderSmoke)
+    add_miles_skin_copy(SkinManifestLoaderSmoke)
 
     qt_add_executable(PetRuntimeSmoke
         tests/pet_runtime_smoke.cpp
@@ -305,6 +399,7 @@ if(BUILD_TESTING)
         src/pet/PetLogging.cpp
         src/pet/PetLogging.h
         src/pet/PetRuntime.cpp
+        src/pet/PetRuntimeCleanFinish.cpp
         src/pet/PetRuntime.h
         src/pet/PetRuntimeSkin.cpp
         src/pet/requests/ActionRequest.h
@@ -333,12 +428,11 @@ if(BUILD_TESTING)
             Qt6::Qml
     )
 
-    add_miles_generated_clips_qrc(PetRuntimeSmoke)
-
     add_test(
         NAME pet_runtime_smoke
         COMMAND PetRuntimeSmoke
     )
+    add_miles_skin_copy(PetRuntimeSmoke)
 
     qt_add_executable(ChatControllerSmoke
         tests/chat_controller_smoke.cpp
@@ -383,6 +477,7 @@ if(BUILD_TESTING)
         src/pet/PetLogging.cpp
         src/pet/PetLogging.h
         src/pet/PetRuntime.cpp
+        src/pet/PetRuntimeCleanFinish.cpp
         src/pet/PetRuntime.h
         src/pet/PetRuntimeSkin.cpp
         src/pet/requests/ActionRequest.h
@@ -412,9 +507,8 @@ if(BUILD_TESTING)
             Qt6::Network
     )
 
-    add_miles_generated_clips_qrc(ChatControllerSmoke)
-
     add_test(NAME chat_controller_smoke COMMAND ChatControllerSmoke)
+    add_miles_skin_copy(ChatControllerSmoke)
 
     qt_add_executable(SettingsServiceSmoke
         tests/settings_service_smoke.cpp
@@ -447,6 +541,7 @@ if(BUILD_TESTING)
         src/pet/PetLogging.cpp
         src/pet/PetLogging.h
         src/pet/PetRuntime.cpp
+        src/pet/PetRuntimeCleanFinish.cpp
         src/pet/PetRuntime.h
         src/pet/PetRuntimeSkin.cpp
         src/pet/requests/ActionRequest.h
@@ -484,7 +579,6 @@ if(BUILD_TESTING)
             Qt6::Qml
     )
 
-    add_miles_generated_clips_qrc(SettingsServiceSmoke)
-
     add_test(NAME settings_service_smoke COMMAND SettingsServiceSmoke)
+    add_miles_skin_copy(SettingsServiceSmoke)
 endif()

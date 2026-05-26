@@ -15,16 +15,15 @@
 class SkinManifestLoader
 {
 public:
-    static SkinManifest loadFromResource(const QString &resourcePath);
     static SkinManifest loadFromDescriptor(const SkinDescriptor &descriptor);
     static SkinManifest loadFromDirectory(const QString &filesystemPath);
     static SkinManifest fallbackManifest();
 
     static QList<SkinDescriptor> discoverAll();
-    static QList<SkinDescriptor> discoverInDirectories(const QStringList &directories, bool includeBuiltins = true);
+    static QList<SkinDescriptor> discoverInDirectories(const QStringList &directories);
     static QString userSkinDirectoryPath();
-    static QString portableSkinDirectoryPath();
+    static QString appSkinDirectoryPath();
 
-    // Schema v4: file: paths are skin-root relative; other URL schemes are already absolute.
+    // Schema v4: only root-local file: paths are accepted.
     static QUrl resolveSkinUrl(const QString &rawUrl, const QUrl &rootUrl);
 };

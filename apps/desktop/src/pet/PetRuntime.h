@@ -231,6 +231,7 @@ private:
     void playPhase(const QString &actionId, const QString &phaseId);
     void setCurrentAction(const QString &actionId, const ActionDefinition &action);
     void setCurrentPhase(const QString &actionId, const QString &phaseId, const PhaseDefinition &phase);
+    bool animationUrlPlayable(const QUrl &url) const;
     bool cleanFinishBoundaryReached() const;
     bool continueCleanFinishIfPossible();
     void triggerCleanFinishCallback();
@@ -240,7 +241,7 @@ private:
     bool activateSkin(const QString &skinId, bool persistSelection);
     bool reloadActiveSkin(SkinReloadMode mode);
     bool loadSkinDescriptor(const SkinDescriptor &descriptor, SkinReloadMode mode);
-    SkinDescriptor descriptorForSkinId(const QString &skinId) const;
+    QList<SkinDescriptor> descriptorsForSkinId(const QString &skinId) const;
     void refreshAvailableSkins();
 
     SkinManifest m_manifest;

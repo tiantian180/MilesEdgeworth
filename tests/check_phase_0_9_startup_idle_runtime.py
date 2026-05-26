@@ -34,7 +34,10 @@ def action_phase_loop_mode(actions: dict, action_id: str, phase_id: str) -> str:
 
 
 def main() -> int:
-    manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
+    manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    skin_root = manifest_path.parent
+    manifest_text = json.dumps(manifest, ensure_ascii=False)
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
     action_pools = manifest.get("animationPools", {})
@@ -85,24 +88,24 @@ def main() -> int:
     ]:
         require(recipe_id in idle_recipe_ids, f"idle.random 缺少 {recipe_id}")
 
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in [
-        "briefcase-in-right.gif",
-        "briefcase-stop-right.gif",
-        "turn-right-to-left.gif",
-        "turn-left-to-right.gif",
-        "idle-thinking-once-right.gif",
-        "idle-thinking-once-left.gif",
-        "idle-tapping-head-right.gif",
-        "idle-tapping-head-left.gif",
-        "idle-shrug-right.gif",
-        "idle-shrug-left.gif",
-        "idle-check-watch-right.gif",
-        "idle-check-watch-left.gif",
-        "idle-pointing-right.gif",
-        "idle-pointing-left.gif",
+    for url in [
+        "file:assets/body/startup/briefcase-in-right.gif",
+        "file:assets/body/startup/briefcase-stop-right.gif",
+        "file:assets/body/interaction/turn-right-to-left.gif",
+        "file:assets/body/interaction/turn-left-to-right.gif",
+        "file:assets/body/gestures/thinking-right.gif",
+        "file:assets/body/gestures/thinking-left.gif",
+        "file:assets/body/gestures/tapping-head-right.gif",
+        "file:assets/body/gestures/tapping-head-left.gif",
+        "file:assets/body/gestures/shrug-right.gif",
+        "file:assets/body/gestures/shrug-left.gif",
+        "file:assets/body/gestures/check-watch-right.gif",
+        "file:assets/body/gestures/check-watch-left.gif",
+        "file:assets/body/gestures/pointing-right.gif",
+        "file:assets/body/gestures/pointing-left.gif",
     ]:
-        require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
+        require(url in manifest_text, f"manifest 缺少动画资源 {url}")
+        require((skin_root / url[len("file:"):]).is_file(), f"皮肤文件缺失 {url}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")

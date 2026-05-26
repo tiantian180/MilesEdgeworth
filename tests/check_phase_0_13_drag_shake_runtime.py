@@ -26,6 +26,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
+    skin_root = ROOT / "apps/desktop/resources/skins/miles-edgeworth"
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     actions = manifest.get("actions", {})
     behavior_rules = manifest.get("behaviorRules", [])
@@ -45,17 +46,7 @@ def main() -> None:
         actual_urls = {variant.get("clip") for variant in variants.values()}
         for url in urls:
             require(url in actual_urls, f"{action_id} 缺少动画 {url}")
-
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in [
-        "crouch-right.gif",
-        "crouch-left.gif",
-        "stand-up-full-right.gif",
-        "stand-up-full-left.gif",
-        "stand-up-quick-right.gif",
-        "stand-up-quick-left.gif",
-    ]:
-        require(alias in qrc, f"qrc 缺少 {alias}")
+            require((skin_root / url[len("file:"):]).is_file(), f"皮肤文件缺失 {url}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")

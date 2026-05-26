@@ -1,66 +1,24 @@
 #!/usr/bin/env python3
 import json
-import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
-qrc_path = ROOT / "apps/desktop/resources/pet_assets.qrc"
-raw = manifest_path.read_text(encoding="utf-8")
-
-if "qrc:/pet/" in raw or "qrc:/audio/" in raw:
-    raise AssertionError("built-in Miles manifest should use file: URLs, not qrc:/pet or qrc:/audio")
-
-manifest = json.loads(raw)
+SKIN_ROOT = ROOT / "apps/desktop/resources/skins/miles-edgeworth"
 
 
-def walk(value):
-    if isinstance(value, dict):
-        for item in value.values():
-            yield from walk(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from walk(item)
-    elif isinstance(value, str):
-        yield value
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
 
 
-file_urls = [value for value in walk(manifest) if value.startswith("file:")]
-if not file_urls:
-    raise AssertionError("manifest should contain file: URLs")
+skin_json_raw = (SKIN_ROOT / "skin.json").read_text(encoding="utf-8")
+manifest_raw = (SKIN_ROOT / "manifest.json").read_text(encoding="utf-8")
 
-required = [
-    "file:assets/body/idle/stand-right.gif",
-    "file:assets/body/locomotion/walk-east.gif",
-    "file:assets/body/locomotion/run-east.gif",
-    "file:assets/props/prosecutor_badge/prosecutor-badge.png",
-    "file:assets/audio/voice/holdit0.wav",
-]
-missing = [url for url in required if url not in file_urls]
-if missing:
-    raise AssertionError(f"missing required file URLs: {missing}")
+json.loads(skin_json_raw)
+json.loads(manifest_raw)
 
-qrc_text = qrc_path.read_text(encoding="utf-8")
-skin_section = re.search(
-    r'<qresource\s+prefix="/skins/miles-edgeworth">(.*?)</qresource>',
-    qrc_text,
-    re.S,
-)
-if skin_section is None:
-    raise AssertionError("qrc must expose /skins/miles-edgeworth resource block")
-
-aliases = set(re.findall(r'alias="([^"]+)"', skin_section.group(1)))
-
-unknown = []
-for url in file_urls:
-    relative = url[len("file:"):].lstrip("/")
-    if relative not in aliases:
-        unknown.append(url)
-
-if unknown:
-    raise AssertionError(
-        "file: URLs not present in /skins/miles-edgeworth qrc aliases:\n  "
-        + "\n  ".join(sorted(unknown))
-    )
+for token in ["skin:", "qrc:/pet/", "qrc:/audio/", "qrc:/skins/miles-edgeworth"]:
+    require(token not in skin_json_raw, f"skin.json must not contain legacy URL token {token}")
+    require(token not in manifest_raw, f"manifest.json must not contain legacy URL token {token}")
 
 print("phase 1.4 skin url migration ok")

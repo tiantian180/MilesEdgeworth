@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import html
 import json
 import re
 import shutil
@@ -145,30 +144,13 @@ def write_clip(path: Path, clip_name: str, frames: list[Image.Image], durations:
         fail(f"clip {clip_name}: generated GIF did not preserve frame count or durations")
 
 
-def write_qrc(path: Path, skin_name: str, clip_names: list[str]) -> None:
-    lines = [
-        "<RCC>",
-        f'  <qresource prefix="/skins/{html.escape(skin_name)}/generated/clips">',
-    ]
-    for clip_name in sorted(clip_names):
-        escaped = html.escape(f"{clip_name}.gif")
-        lines.append(f'    <file alias="{escaped}">clips/{escaped}</file>')
-    lines.extend([
-        "  </qresource>",
-        "</RCC>",
-        "",
-    ])
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines), encoding="utf-8")
-
-
-def generate_clips(skin_root: Path) -> tuple[int, Path]:
+def generate_clips(skin_root: Path) -> tuple[Path, int]:
     manifest_path = skin_root / "manifest.json"
     manifest = load_manifest(manifest_path)
-    clips = require_object(manifest.get("clips"), "manifest must contain top-level clips object")
+    clips = require_object(manifest.get("clips"), "manifest.json must contain object field: clips")
 
     prepared = []
-    for clip_name, definition in clips.items():
+    for clip_name, definition in sorted(clips.items()):
         if not isinstance(clip_name, str) or not CLIP_NAME_RE.fullmatch(clip_name):
             fail(f"invalid clip name: {clip_name}")
 
@@ -178,28 +160,38 @@ def generate_clips(skin_root: Path) -> tuple[int, Path]:
         frames, durations = load_clip_frames(source_path, start, end, clip_name)
         prepared.append((clip_name, frames, durations))
 
-    generated_root = skin_root / "generated"
-    clips_root = generated_root / "clips"
-    if clips_root.exists():
-        shutil.rmtree(clips_root)
-    clips_root.mkdir(parents=True, exist_ok=True)
+    generated_parent = skin_root / "generated"
+    generated_root = generated_parent / "clips"
+    temp_root = generated_parent / ".clips.tmp"
+    if temp_root.exists():
+        shutil.rmtree(temp_root)
+    temp_root.mkdir(parents=True, exist_ok=True)
 
-    for clip_name, frames, durations in prepared:
-        write_clip(clips_root / f"{clip_name}.gif", clip_name, frames, durations)
+    try:
+        for clip_name, frames, durations in prepared:
+            write_clip(temp_root / f"{clip_name}.gif", clip_name, frames, durations)
+    except BaseException:
+        if temp_root.exists():
+            shutil.rmtree(temp_root)
+        raise
 
-    qrc_path = generated_root / "clips.qrc"
-    write_qrc(qrc_path, skin_root.name, [clip_name for clip_name, _, _ in prepared])
-    return len(prepared), qrc_path
+    if generated_root.exists():
+        shutil.rmtree(generated_root)
+    temp_root.replace(generated_root)
+
+    legacy_qrc = generated_parent / "clips.qrc"
+    if legacy_qrc.is_file():
+        legacy_qrc.unlink()
+
+    return generated_root, len(prepared)
 
 
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
         fail("usage: split_manifest_clips.py <skin-root>")
 
-    skin_root = Path(argv[1])
-    count, qrc_path = generate_clips(skin_root)
-    print(f"generated {count} clips")
-    print(qrc_path)
+    clips_root, count = generate_clips(Path(argv[1]).resolve())
+    print(f"generated {count} clips under {clips_root}")
     return 0
 
 

@@ -12,18 +12,11 @@ struct SkinDescriptor
     QString version;
     QString author;
     QString license;
-    int manifestVersion = 1;
+    int skinSchemaVersion = 1;
     QString minAppVersion;
     QUrl thumbnailUrl;
-
-    // rootUrl 是资源根目录。内置皮肤形如 qrc:/skins/miles-edgeworth/，
-    // 文件系统皮肤形如 file:///.../skins/my-skin/。
+    // 文件系统皮肤根目录，形如 file:///.../skins/my-skin/。
     QUrl rootUrl;
-
-    // manifestPath 是 Qt 可直接读取的 manifest.json 位置。
-    // 内置皮肤使用 :/skins/miles-edgeworth/manifest.json，
-    // 文件系统皮肤使用 /absolute/path/to/skin/manifest.json。
+    // 绝对文件系统路径，指向 skin.json 声明的 manifest 文件。
     QString manifestPath;
-
-    bool builtin = false;
 };
