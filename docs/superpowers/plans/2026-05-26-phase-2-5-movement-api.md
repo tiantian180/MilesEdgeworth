@@ -2587,7 +2587,7 @@ git commit -m "test: 添加移动工具调用契约检查"
 **Files:**
 - Read-only, unless failures reveal a bug in prior tasks.
 
-- [ ] **Step 1: Run full focused Qt build**
+- [x] **Step 1: Run full focused Qt build**
 
 Run:
 
@@ -2606,7 +2606,7 @@ Expected:
 [100%] Built target SkinManifestLoaderSmoke
 ```
 
-- [ ] **Step 2: Run focused CTest suite**
+- [x] **Step 2: Run focused CTest suite**
 
 Run:
 
@@ -2620,7 +2620,7 @@ Expected:
 100% tests passed
 ```
 
-- [ ] **Step 3: Run Go tests**
+- [x] **Step 3: Run Go tests**
 
 Run:
 
