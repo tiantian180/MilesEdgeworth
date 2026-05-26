@@ -21,10 +21,19 @@ ApplicationWindow {
     property bool compactMode: false
     property int expandedWidth: 420
     property int expandedHeight: 560
-    property int compactWidth: 420
-    property int compactHeight: 128
+    property int compactWidth: 460
+    property int compactMinHeight: 62
 
-    onVisibleChanged: App.DesktopShell.setChatWindowDockVisible(visible)
+    onVisibleChanged: {
+        App.DesktopShell.setChatWindowDockVisible(visible)
+        syncShellChatState()
+    }
+
+    onCompactModeChanged: syncShellChatState()
+
+    function syncShellChatState() {
+        App.DesktopShell.setChatWindowExpanded(visible && !compactMode)
+    }
 
     function scheduleTranscriptScroll() {
         if (!transcriptScrollTimer.running) {
@@ -77,15 +86,17 @@ ApplicationWindow {
         show()
         raise()
         requestActivate()
-        input.forceActiveFocus()
+        compactComposer.forceInputFocus()
     }
 
     function showExpanded() {
         compactMode = false
         minimumWidth = 360
         minimumHeight = 420
+        maximumHeight = 16777215
         width = Math.max(360, expandedWidth)
         height = Math.max(420, expandedHeight)
+        syncShellChatState()
     }
 
     function showCompact() {
@@ -95,15 +106,18 @@ ApplicationWindow {
         }
         conversationPanelOpen = false
         compactMode = true
-        minimumWidth = 360
-        minimumHeight = compactHeight
-        width = Math.max(360, Math.min(width, compactWidth))
-        height = compactHeight
-        input.forceActiveFocus()
+        minimumWidth = compactWidth
+        minimumHeight = compactMinHeight
+        maximumHeight = compactComposer.implicitHeight + 24
+        width = compactWidth
+        height = compactComposer.implicitHeight + 24
+        syncShellChatState()
+        compactComposer.forceInputFocus()
     }
 
     function hideChatUi() {
         hide()
+        syncShellChatState()
     }
 
     Connections {
@@ -142,20 +156,6 @@ ApplicationWindow {
         anchors.fill: parent
         anchors.margins: 12
         spacing: 10
-
-        function submitInput() {
-            if (App.ChatController.sending) {
-                App.ChatController.cancelCurrentReply()
-                return
-            }
-
-            const text = input.text.trim()
-            if (text.length === 0) {
-                return
-            }
-            input.text = ""
-            App.ChatController.sendMessage(text)
-        }
 
         RowLayout {
             Layout.fillWidth: true
@@ -549,124 +549,52 @@ ApplicationWindow {
             }
         }
 
-        RowLayout {
+        Rectangle {
+            id: compactDragShell
+
             Layout.fillWidth: true
-            spacing: 8
-            Layout.preferredHeight: chatWindow.compactMode ? 56 : 72
+            Layout.preferredHeight: compactComposer.implicitHeight
+            radius: chatWindow.compactMode ? 16 : 10
+            color: chatWindow.compactMode ? "#fffdf8" : "transparent"
+            border.color: chatWindow.compactMode ? "#d7cec3" : "transparent"
+            border.width: chatWindow.compactMode ? 1 : 0
 
-            Button {
-                id: compactExpandButton
-
-                visible: chatWindow.compactMode
-                text: "展开"
-                font.pixelSize: 13
-                Layout.preferredWidth: visible ? 64 : 0
-                Layout.preferredHeight: chatWindow.compactMode ? 52 : 72
-                contentItem: Text {
-                    text: compactExpandButton.text
-                    color: "#5a4031"
-                    font: compactExpandButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                background: Rectangle {
-                    radius: 6
-                    color: compactExpandButton.down ? "#e1d8ce" : "#f3ede5"
-                    border.color: "#bfae9e"
-                }
-                onClicked: App.ChatController.openWindow()
-            }
-
-            TextArea {
-                id: input
-
-                readonly property bool disconnectedInput: !App.ChatController.sidecarReady && !App.ChatController.sending
-                readonly property bool providerConfigured: App.ChatController.providerConfigured
-                readonly property bool canSendInput: App.ChatController.sidecarReady && providerConfigured && !App.ChatController.sending
-                readonly property bool missingProviderConfig: !providerConfigured && !App.ChatController.sending
-                readonly property bool disabledInput: disconnectedInput || missingProviderConfig
-
-                Layout.fillWidth: true
-                Layout.preferredHeight: chatWindow.compactMode ? 52 : 72
-                wrapMode: TextArea.Wrap
-                placeholderText: missingProviderConfig
-                        ? "先点设置填写模型配置"
-                        : (disconnectedInput ? "未连接，点重连或稍后重试" : "输入消息")
-                placeholderTextColor: input.disabledInput ? "#8a4b38" : "#82786e"
-                color: enabled ? "#26201b" : "#6f5545"
-                selectionColor: "#b9d0f2"
-                selectedTextColor: "#26201b"
-                enabled: input.canSendInput
-                opacity: 1.0
-                leftPadding: 12
-                rightPadding: 12
-                topPadding: 10
-                bottomPadding: 10
-                background: Rectangle {
-                    radius: 6
-                    color: input.disabledInput ? "#fff4ec" : (input.enabled ? "#fffdf8" : "#eee9e2")
-                    border.color: input.disabledInput ? "#c66a4b" : (input.activeFocus ? "#7b604c" : "#d8d1c8")
-                    border.width: (input.disabledInput || input.activeFocus) ? 2 : 1
-                }
-
-                Keys.onPressed: function(event) {
-                    if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                            && (event.modifiers & Qt.ShiftModifier) === 0) {
-                        event.accepted = true
-                        chatLayout.submitInput()
+            MouseArea {
+                anchors.fill: parent
+                enabled: chatWindow.compactMode
+                acceptedButtons: Qt.LeftButton
+                propagateComposedEvents: true
+                onPressed: function(mouse) {
+                    if (mouse.y < 8 || mouse.x < 46 || mouse.x > width - 46) {
+                        chatWindow.startSystemMove()
+                    } else {
+                        mouse.accepted = false
                     }
                 }
             }
 
-            Button {
-                id: sendButton
+            ChatComposer {
+                id: compactComposer
 
-                text: App.ChatController.sending ? "停止" : "发送"
-                enabled: App.ChatController.sending
-                        || (App.ChatController.sidecarReady
-                            && App.ChatController.providerConfigured
-                            && input.text.trim().length > 0)
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
-                Layout.preferredWidth: 76
-                Layout.preferredHeight: chatWindow.compactMode ? 52 : 72
-                contentItem: Text {
-                    text: sendButton.text
-                    color: sendButton.enabled ? "#fffdf8" : "#9a9086"
-                    font: sendButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                background: Rectangle {
-                    radius: 6
-                    color: sendButton.enabled ? (sendButton.down ? "#4b372b" : "#6f4f3e") : "#eee9e2"
-                    border.color: sendButton.enabled ? "#5a4031" : "#d8d1c8"
+                anchors.fill: parent
+                anchors.margins: chatWindow.compactMode ? 8 : 0
+                compactMode: chatWindow.compactMode
+
+                onSubmitRequested: function(text) {
+                    clearText()
+                    App.ChatController.sendMessage(text)
                 }
 
-                onClicked: chatLayout.submitInput()
-            }
+                onCancelRequested: App.ChatController.cancelCurrentReply()
+                onExpandRequested: App.ChatController.openWindow()
+                onCloseRequested: chatWindow.hideChatUi()
 
-            Button {
-                id: compactCloseButton
-
-                visible: chatWindow.compactMode
-                text: "关闭"
-                font.pixelSize: 13
-                Layout.preferredWidth: visible ? 64 : 0
-                Layout.preferredHeight: chatWindow.compactMode ? 52 : 72
-                contentItem: Text {
-                    text: compactCloseButton.text
-                    color: "#5a4031"
-                    font: compactCloseButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                onImplicitHeightChanged: {
+                    if (chatWindow.compactMode) {
+                        chatWindow.height = implicitHeight + 24
+                        chatWindow.maximumHeight = chatWindow.height
+                    }
                 }
-                background: Rectangle {
-                    radius: 6
-                    color: compactCloseButton.down ? "#e1d8ce" : "#f3ede5"
-                    border.color: "#bfae9e"
-                }
-                onClicked: chatWindow.hideChatUi()
             }
         }
     }
