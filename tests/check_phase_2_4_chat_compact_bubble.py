@@ -24,6 +24,7 @@ def require(condition: bool, message: str) -> None:
 def main() -> int:
     root_cmake = read("CMakeLists.txt")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
+    pet_assets_qrc = read("apps/desktop/resources/pet_assets.qrc")
     main_cpp = read("apps/desktop/src/main.cpp")
     shell_h = read("apps/desktop/src/DesktopShellController.h")
     shell_cpp = read("apps/desktop/src/DesktopShellController.cpp")
@@ -40,6 +41,23 @@ def main() -> int:
         "qml/ChatBubbleWindow.qml" in desktop_cmake,
         "desktop QML module must include ChatBubbleWindow.qml",
     )
+
+    for token in [
+        'qml/MilesIconButton.qml',
+        '<qresource prefix="/ui-icons">',
+        'alias="settings.svg"',
+        'alias="refresh-ccw.svg"',
+        'alias="maximize-2.svg"',
+        'alias="minimize-2.svg"',
+        'alias="x.svg"',
+        'alias="menu.svg"',
+        'alias="arrow-up-white.svg"',
+        'alias="arrow-up-muted.svg"',
+        'alias="square-stop.svg"',
+    ]:
+        require(token in desktop_cmake + pet_assets_qrc,
+                f"icon resource contract missing {token}")
+
     require(
         'loadFromModule("MilesEdgeworth", "ChatBubbleWindow")' in main_cpp,
         "main must load ChatBubbleWindow from the MilesEdgeworth QML module",

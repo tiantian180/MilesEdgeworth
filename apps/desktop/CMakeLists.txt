@@ -227,6 +227,7 @@ qt_add_qml_module(MilesEdgeworthDesktop
         qml/ChatBubbleWindow.qml
         qml/ChatComposer.qml
         qml/ChatWindow.qml
+        qml/MilesIconButton.qml
         qml/PetWindow.qml
         qml/SettingsWindow.qml
     SOURCES
