@@ -1,13 +1,10 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Layouts
 import MilesEdgeworth as App
 
 ApplicationWindow {
     id: bubbleWindow
 
-    width: 340
-    height: Math.min(180, Math.max(78, messageMeasure.contentHeight + 58))
     visible: false
     flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     color: "transparent"
@@ -21,35 +18,41 @@ ApplicationWindow {
     property int dismissedAssistantMessageIndex: -1
     property int suppressedAssistantMessageIndex: -1
     property int trackedAssistantMessageIndex: -1
-    readonly property int screenMargin: 10
+    property double hideDeadlineMs: 0
+    property int remainingHideMs: 0
+    readonly property int bubbleMargin: 12
+    readonly property int contentHorizontalPadding: 24
+    readonly property int contentVerticalPadding: 22
+    readonly property int pointerExtent: 20
+    readonly property int actionInset: 12
+    readonly property int maxBubbleWidth: 320
+    readonly property int minBubbleWidth: 190
+    readonly property int maxBubbleHeight: 340
+    readonly property int maxBodyHeight: maxBubbleHeight - pointerExtent
+    readonly property bool bodyAtMaxHeight: messageMeasure.contentHeight + contentVerticalPadding * 2 >= maxBodyHeight
+    readonly property int bodyWidth: Math.max(minBubbleWidth,
+            Math.min(maxBubbleWidth, messageMeasure.contentWidth + contentHorizontalPadding * 2))
+    readonly property int bodyHeight: Math.max(76,
+            Math.min(maxBodyHeight, messageMeasure.contentHeight + contentVerticalPadding * 2))
+    readonly property int bodyTop: pointerPlacement.startsWith("top") ? pointerExtent : 2
+    readonly property int bodyBottom: pointerPlacement.startsWith("bottom") ? height - pointerExtent : height - 2
+    property string pointerPlacement: "bottomLeft"
+    property int tailX: Math.round(width / 2)
 
-    x: clampedBubbleX()
-    y: clampedBubbleY()
+    width: bodyWidth
+    height: bodyHeight + pointerExtent
+    onWidthChanged: updatePlacement()
+    onHeightChanged: updatePlacement()
 
-    function clamp(value, minimum, maximum) {
-        return maximum >= minimum ? Math.min(Math.max(value, minimum), maximum) : minimum
-    }
-
-    function clampedBubbleX() {
-        const preferredX = App.DesktopShell.petWindowX
-                + App.DesktopShell.petWindowWidth / 2
-                - width / 2
-        return Math.round(clamp(preferredX,
-                                App.DesktopShell.petScreenAvailableX + screenMargin,
-                                App.DesktopShell.petScreenAvailableX
-                                + App.DesktopShell.petScreenAvailableWidth
-                                - width
-                                - screenMargin))
-    }
-
-    function clampedBubbleY() {
-        const preferredY = App.DesktopShell.petWindowY - height - screenMargin
-        return Math.round(clamp(preferredY,
-                                App.DesktopShell.petScreenAvailableY + screenMargin,
-                                App.DesktopShell.petScreenAvailableY
-                                + App.DesktopShell.petScreenAvailableHeight
-                                - height
-                                - screenMargin))
+    function updatePlacement() {
+        const nextPlacement = App.DesktopShell.placeChatBubble(width, height, bubbleMargin)
+        x = nextPlacement.x || 0
+        y = nextPlacement.y || 0
+        pointerPlacement = nextPlacement.pointer || "bottomLeft"
+        tailX = Math.max(38, Math.min(width - 38, nextPlacement.tailX || Math.round(width / 2)))
+        if (bubbleCanvas) {
+            bubbleCanvas.requestPaint()
+        }
     }
 
     function latestAssistantMessageIndex() {
@@ -65,6 +68,12 @@ ApplicationWindow {
 
     function syncAssistantBubble() {
         const messages = App.ChatController.messages
+        if (App.DesktopShell.chatWindowExpanded) {
+            hideTimer.stop()
+            visible = false
+            return
+        }
+
         let found = false
         let nextText = ""
         let nextPending = false
@@ -168,9 +177,23 @@ ApplicationWindow {
         visible = false
     }
 
+    function hideForExpandedChat() {
+        hideTimer.stop()
+        visible = false
+    }
+
     function scheduleHide() {
-        hideTimer.interval = Math.max(4000, Math.min(12000, 3000 + assistantText.length * 80))
-        hideTimer.restart()
+        const interval = Math.max(2500, Math.min(10000, 2500 + Math.ceil(assistantText.length / 20) * 1000))
+        startHideTimer(interval)
+    }
+
+    function startHideTimer(interval) {
+        remainingHideMs = Math.max(250, interval)
+        hideTimer.interval = remainingHideMs
+        hideDeadlineMs = Date.now() + remainingHideMs
+        if (!bubbleHover.hovered) {
+            hideTimer.restart()
+        }
     }
 
     Connections {
@@ -181,7 +204,7 @@ ApplicationWindow {
         }
 
         function onOpenWindowRequested() {
-            bubbleWindow.hideCurrentBubble()
+            bubbleWindow.hideForExpandedChat()
         }
 
         function onSendingChanged() {
@@ -192,95 +215,166 @@ ApplicationWindow {
         }
     }
 
-    Component.onCompleted: syncAssistantBubble()
+    Connections {
+        target: App.DesktopShell
+
+        function onChatWindowStateChanged() {
+            bubbleWindow.syncAssistantBubble()
+        }
+
+        function onPetWindowGeometryChanged() {
+            bubbleWindow.updatePlacement()
+        }
+    }
+
+    Component.onCompleted: {
+        updatePlacement()
+        syncAssistantBubble()
+    }
 
     Timer {
         id: hideTimer
 
         repeat: false
         onTriggered: {
+            bubbleWindow.hideDeadlineMs = 0
+            bubbleWindow.remainingHideMs = 0
             bubbleWindow.trackedAssistantMessageIndex = -1
             bubbleWindow.visible = false
         }
     }
 
-    Rectangle {
+    Item {
         id: bubbleFrame
 
         anchors.fill: parent
-        radius: 8
-        color: "#fffdf8"
-        border.color: "#bfae9e"
-        border.width: 1
 
         HoverHandler {
             id: bubbleHover
+            onHoveredChanged: {
+                if (hovered) {
+                    if (hideTimer.running) {
+                        bubbleWindow.remainingHideMs = Math.max(250, Math.ceil(bubbleWindow.hideDeadlineMs - Date.now()))
+                    }
+                    hideTimer.stop()
+                } else if (bubbleWindow.visible && bubbleWindow.assistantPending !== true) {
+                    bubbleWindow.startHideTimer(bubbleWindow.remainingHideMs > 0
+                            ? bubbleWindow.remainingHideMs
+                            : 250)
+                }
+            }
+        }
+
+        Canvas {
+            id: bubbleCanvas
+
+            anchors.fill: parent
+            antialiasing: true
+            onPaint: {
+                const ctx = getContext("2d")
+                const w = bubbleWindow.width
+                const h = bubbleWindow.height
+                const tailX = Math.max(38, Math.min(w - 38, bubbleWindow.tailX))
+                const tailHalf = 10
+                const bodyTop = bubbleWindow.bodyTop
+                const bodyBottom = bubbleWindow.bodyBottom
+                const radius = 22
+                const left = 4
+                const right = w - 4
+
+                ctx.clearRect(0, 0, w, h)
+                ctx.lineJoin = "round"
+                ctx.lineCap = "round"
+                ctx.beginPath()
+                ctx.moveTo(left + radius, bodyTop)
+
+                if (bubbleWindow.pointerPlacement === "topLeft"
+                        || bubbleWindow.pointerPlacement === "topRight") {
+                    ctx.lineTo(tailX - tailHalf, bodyTop)
+                    ctx.lineTo(tailX, 4)
+                    ctx.lineTo(tailX + tailHalf, bodyTop)
+                }
+                ctx.lineTo(right - radius, bodyTop)
+                ctx.quadraticCurveTo(right, bodyTop, right, bodyTop + radius)
+                ctx.lineTo(right, bodyBottom - radius)
+                ctx.quadraticCurveTo(right, bodyBottom, right - radius, bodyBottom)
+                if (bubbleWindow.pointerPlacement === "bottomRight"
+                        || bubbleWindow.pointerPlacement === "bottomLeft") {
+                    ctx.lineTo(tailX + tailHalf, bodyBottom)
+                    ctx.lineTo(tailX, h - 4)
+                    ctx.lineTo(tailX - tailHalf, bodyBottom)
+                }
+                ctx.lineTo(left + radius, bodyBottom)
+                ctx.quadraticCurveTo(left, bodyBottom, left, bodyBottom - radius)
+                ctx.lineTo(left, bodyTop + radius)
+                ctx.quadraticCurveTo(left, bodyTop, left + radius, bodyTop)
+                ctx.closePath()
+
+                ctx.fillStyle = "#fffdf8"
+                ctx.fill()
+                ctx.lineWidth = 2.4
+                ctx.strokeStyle = "#6f6a63"
+                ctx.stroke()
+            }
+
+            Connections {
+                target: bubbleWindow
+                function onPointerPlacementChanged() { bubbleCanvas.requestPaint() }
+            }
         }
 
         Text {
             id: messageMeasure
 
             visible: false
-            width: bubbleText.width
+            width: bubbleWindow.maxBubbleWidth - bubbleWindow.contentHorizontalPadding * 2
             text: bubbleWindow.assistantText
             font.pixelSize: 14
             textFormat: Text.PlainText
             wrapMode: Text.Wrap
         }
 
-        RowLayout {
+        Row {
             id: bubbleActions
 
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.topMargin: 6
-            anchors.rightMargin: 6
-            spacing: 4
+            anchors.topMargin: bubbleWindow.bodyTop + bubbleWindow.actionInset
+            anchors.rightMargin: bubbleWindow.actionInset
+            spacing: 5
+            z: 2
+            opacity: bubbleHover.hovered ? 0.82 : 0
+            visible: opacity > 0
 
-            ToolButton {
+            Behavior on opacity {
+                NumberAnimation { duration: 100 }
+            }
+
+            MilesIconButton {
                 id: expandButton
 
-                text: "展开"
-                font.pixelSize: 12
-                Layout.preferredWidth: 44
-                Layout.preferredHeight: 26
-                contentItem: Text {
-                    text: expandButton.text
-                    color: "#5a4031"
-                    font: expandButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                background: Rectangle {
-                    radius: 6
-                    color: expandButton.down ? "#e1d8ce" : "#f3ede5"
-                    border.color: "#d8d1c8"
-                }
+                iconSource: "qrc:/ui-icons/maximize-2.svg"
+                iconSize: 9
+                width: 14
+                height: 14
+                implicitWidth: 14
+                implicitHeight: 14
+                tooltipText: ""
+                showHoverFill: true
                 onClicked: App.ChatController.openWindow()
             }
 
-            ToolButton {
+            MilesIconButton {
                 id: closeBubbleButton
 
-                visible: true
-                enabled: bubbleHover.hovered
-                opacity: bubbleHover.hovered ? 1 : 0
-                text: "关闭"
-                font.pixelSize: 12
-                Layout.preferredWidth: 44
-                Layout.preferredHeight: 26
-                contentItem: Text {
-                    text: closeBubbleButton.text
-                    color: "#5a4031"
-                    font: closeBubbleButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                background: Rectangle {
-                    radius: 6
-                    color: closeBubbleButton.down ? "#e1d8ce" : "#f3ede5"
-                    border.color: "#d8d1c8"
-                }
+                iconSource: "qrc:/ui-icons/x.svg"
+                iconSize: 11
+                width: 14
+                height: 14
+                implicitWidth: 14
+                implicitHeight: 14
+                tooltipText: ""
+                showHoverFill: true
                 onClicked: bubbleWindow.hideCurrentBubble()
             }
         }
@@ -292,10 +386,14 @@ ApplicationWindow {
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.bottom: parent.bottom
-            anchors.leftMargin: 12
-            anchors.rightMargin: 12
-            anchors.topMargin: 36
-            anchors.bottomMargin: 12
+            anchors.leftMargin: bubbleWindow.contentHorizontalPadding
+            anchors.rightMargin: bubbleWindow.contentHorizontalPadding
+            anchors.topMargin: bubbleWindow.pointerPlacement.startsWith("top")
+                    ? bubbleWindow.pointerExtent + bubbleWindow.contentVerticalPadding
+                    : bubbleWindow.contentVerticalPadding
+            anchors.bottomMargin: bubbleWindow.pointerPlacement.startsWith("bottom")
+                    ? bubbleWindow.pointerExtent + bubbleWindow.contentVerticalPadding
+                    : bubbleWindow.contentVerticalPadding
             clip: true
 
             TextArea {
@@ -318,8 +416,8 @@ ApplicationWindow {
                 background: Item {}
 
                 onTextChanged: {
-                    if (text.length > cursorPosition && !bubbleHover.hovered && !activeFocus) {
-                        cursorPosition = text.length
+                    if (!bubbleHover.hovered && !activeFocus) {
+                        cursorPosition = bubbleWindow.bodyAtMaxHeight ? text.length : 0
                     }
                 }
             }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QPoint>
+#include <QRect>
 #include <QString>
 #include <QTimer>
 #include <QWidget>
@@ -57,6 +58,8 @@ private:
     void submitIdleLoopFinishedIfStillCurrent(int playbackSerial);
     void applyCurrentFrameMask();
     QRegion regionFromCurrentFrame() const;
+    QRect visibleLocalBoundsFromCurrentFrame() const;
+    void syncVisibleBoundsToShell();
     void showContextMenuQueued(const QPoint &globalPosition);
     void showContextMenuAt(const QPoint &globalPosition);
     void playSoundFromRuntime();

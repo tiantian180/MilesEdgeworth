@@ -30,11 +30,12 @@ cmake = read("apps/desktop/CMakeLists.txt")
 qresources = qrc_tree.getroot().findall("qresource")
 prefixes = {resource.attrib.get("prefix", "") for resource in qresources}
 
-allowed_prefixes = {"/icon"}
+allowed_prefixes = {"/icon", "/ui-icons"}
 for forbidden_prefix in ["/pet", "/audio", "/skins/miles-edgeworth"]:
     require(forbidden_prefix not in prefixes, f"pet_assets.qrc must not keep skin qresource prefix {forbidden_prefix}")
 require(prefixes <= allowed_prefixes, f"pet_assets.qrc prefixes must be app-only resources, got {sorted(prefixes)}")
 require("/icon" in prefixes, "pet_assets.qrc may keep app icon resources under /icon")
+require("/ui-icons" in prefixes, "pet_assets.qrc may keep app UI icon resources under /ui-icons")
 
 for file_node in qrc_tree.getroot().iter("file"):
     alias = file_node.attrib.get("alias", "")

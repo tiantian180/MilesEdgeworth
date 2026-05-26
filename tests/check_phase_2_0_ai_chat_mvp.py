@@ -34,6 +34,7 @@ def main() -> int:
     controller_h = read("apps/desktop/src/chat/ChatController.h")
     controller_cpp = read("apps/desktop/src/chat/ChatController.cpp")
     chat_qml = read("apps/desktop/qml/ChatWindow.qml")
+    composer_qml = read("apps/desktop/qml/ChatComposer.qml")
     main_cpp = read("apps/desktop/src/main.cpp")
     shell_h = read("apps/desktop/src/DesktopShellController.h")
     shell_cpp = read("apps/desktop/src/DesktopShellController.cpp")
@@ -88,14 +89,16 @@ def main() -> int:
         "App.DesktopShell.setChatWindowDockVisible(visible)" in chat_qml,
         "ChatWindow visibility must control macOS Dock presence",
     )
-    require("id: chatLayout" in chat_qml, "ChatWindow submit handler must be addressable by id")
+    require("id: compactComposer" in chat_qml, "ChatWindow composer must be addressable by id")
     require(
-        "chatLayout.submitInput()" in chat_qml,
-        "ChatWindow send actions must call the addressable submit handler",
+        "onSubmitRequested: function(text)" in chat_qml
+        and "App.ChatController.sendMessage(text)" in chat_qml,
+        "ChatWindow composer submit action must send through ChatController",
     )
-    require("placeholderTextColor" in chat_qml, "ChatWindow input must set readable placeholder color")
-    require("background: Rectangle" in chat_qml, "ChatWindow input and buttons must use explicit backgrounds")
-    require("contentItem: Text" in chat_qml, "ChatWindow buttons must use readable explicit text content")
+    chat_input_qml = chat_qml + composer_qml
+    require("placeholderTextColor" in chat_input_qml, "ChatWindow input must set readable placeholder color")
+    require("background: Rectangle" in chat_input_qml, "ChatWindow input and buttons must use explicit backgrounds")
+    require("contentItem: Text" in chat_input_qml, "ChatWindow buttons must use readable explicit text content")
     require("ChatControllerForeign::s_instance" in main_cpp, "main must expose ChatController singleton")
     require(
         "QJSEngine::setObjectOwnership(s_instance, QJSEngine::CppOwnership)" in controller_h,

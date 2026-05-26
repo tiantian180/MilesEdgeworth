@@ -1,5 +1,6 @@
 #include "DesktopShellController.h"
 
+#include "chat/ChatBubblePlacement.h"
 #include "window/WindowInputMaskController.h"
 
 #include <QAction>
@@ -10,6 +11,7 @@
 #include <QPoint>
 #include <QRect>
 #include <QScreen>
+#include <QSize>
 #include <QString>
 #include <QStringList>
 #include <QSystemTrayIcon>
@@ -95,6 +97,11 @@ int DesktopShellController::petScreenAvailableHeight() const
     return petScreenAvailableGeometry().height();
 }
 
+bool DesktopShellController::chatWindowExpanded() const
+{
+    return m_chatWindowExpanded;
+}
+
 void DesktopShellController::setPetWindow(QWindow *window)
 {
     if (m_petWindow == window) {
@@ -107,6 +114,7 @@ void DesktopShellController::setPetWindow(QWindow *window)
     m_petWindowGeometryConnections.clear();
 
     m_petWindow = window;
+    m_petVisibleLocalBounds = QRect();
 
     if (m_petWindow != nullptr) {
         auto notifyGeometryChanged = [this]() {
@@ -136,6 +144,17 @@ void DesktopShellController::setPetWindow(QWindow *window)
 #endif
 
     applyCurrentLayerMode();
+    emit petWindowGeometryChanged();
+}
+
+void DesktopShellController::setPetVisibleLocalBounds(const QRect &bounds)
+{
+    const QRect normalizedBounds = bounds.isValid() ? bounds : QRect();
+    if (m_petVisibleLocalBounds == normalizedBounds) {
+        return;
+    }
+
+    m_petVisibleLocalBounds = normalizedBounds;
     emit petWindowGeometryChanged();
 }
 
@@ -259,6 +278,34 @@ void DesktopShellController::setChatWindowDockVisible(bool visible)
 #endif
 }
 
+void DesktopShellController::setChatWindowExpanded(bool expanded)
+{
+    if (m_chatWindowExpanded == expanded) {
+        return;
+    }
+
+    m_chatWindowExpanded = expanded;
+    emit chatWindowStateChanged();
+}
+
+QVariantMap DesktopShellController::placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const
+{
+    const QRect petGeometry = petVisibleScreenGeometry();
+    const ChatBubblePlacementResult placement = ::placeChatBubble(
+        petGeometry,
+        petScreenAvailableGeometry(),
+        QSize(bubbleWidth, bubbleHeight),
+        margin
+    );
+
+    QVariantMap result;
+    result.insert(QStringLiteral("x"), placement.topLeft.x());
+    result.insert(QStringLiteral("y"), placement.topLeft.y());
+    result.insert(QStringLiteral("pointer"), placement.pointer);
+    result.insert(QStringLiteral("tailX"), placement.tailX);
+    return result;
+}
+
 void DesktopShellController::createTrayIcon()
 {
     if (m_trayIcon != nullptr) {
@@ -336,6 +383,19 @@ QRect DesktopShellController::petScreenAvailableGeometry() const
         targetScreen = QGuiApplication::primaryScreen();
     }
     return targetScreen != nullptr ? targetScreen->availableGeometry() : QRect();
+}
+
+QRect DesktopShellController::petVisibleScreenGeometry() const
+{
+    if (m_petWindow == nullptr || !m_petVisibleLocalBounds.isValid()) {
+        return QRect(petWindowX(), petWindowY(), petWindowWidth(), petWindowHeight());
+    }
+
+    return QRect(
+        QPoint(m_petWindow->x() + m_petVisibleLocalBounds.x(),
+               m_petWindow->y() + m_petVisibleLocalBounds.y()),
+        m_petVisibleLocalBounds.size()
+    );
 }
 
 QRect DesktopShellController::virtualDesktopGeometry() const
