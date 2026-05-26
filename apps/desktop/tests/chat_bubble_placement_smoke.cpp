@@ -88,6 +88,14 @@ int main()
     }
 
     {
+        const QRect pet(430, 520, 100, 140);
+        const QSize narrowBubble(60, 90);
+        const ChatBubblePlacementResult result = placeChatBubble(pet, screen, narrowBubble, margin);
+        require(result.tailX >= 0 && result.tailX <= narrowBubble.width(), "narrow bubble tailX should stay inside bubble");
+        require(result.tailX == narrowBubble.width() / 2, "centered narrow bubble should use centered tail");
+    }
+
+    {
         const QRect shiftedScreen(-500, -300, 500, 400);
         const QRect pet(-450, -222, 80, 240);
         const ChatBubblePlacementResult result = placeChatBubble(pet, shiftedScreen, bubbleSize, margin);

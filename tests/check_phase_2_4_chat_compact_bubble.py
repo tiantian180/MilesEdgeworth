@@ -169,6 +169,7 @@ def main() -> int:
         require(token in placement_cpp, f"ChatBubblePlacement.cpp missing {token}")
     for token in [
         "centered bubble should use centered tail",
+        "narrow bubble tailX should stay inside bubble",
         "pet with room above should place bubble above",
         "tailX should stay inside safe tail range",
     ]:

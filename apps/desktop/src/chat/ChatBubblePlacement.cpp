@@ -30,7 +30,7 @@ ChatBubblePlacementResult placeChatBubble(
     const int safeMargin = qMax(0, margin);
     const int bubbleWidth = safeDimension(bubbleSize.width());
     const int bubbleHeight = safeDimension(bubbleSize.height());
-    const int tailInset = qMin(qMax(42, safeMargin * 3), qMax(42, bubbleWidth / 2));
+    const int tailInset = qMin(42, qMax(0, bubbleWidth / 2));
 
     const QPoint petCenter = pet.center();
     const int minX = available.left() + safeMargin;
