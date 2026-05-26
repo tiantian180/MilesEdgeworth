@@ -979,10 +979,10 @@ int main(int argc, char *argv[])
         int motionPositionChanges = 0;
         int motionCompletedCount = 0;
         QVariantMap completedResult;
-        QObject::connect(&runtime, &PetRuntime::motionPositionChanged, [&motionPositionChanges](const QPoint &) {
+        const QMetaObject::Connection positionConnection = QObject::connect(&runtime, &PetRuntime::motionPositionChanged, [&motionPositionChanges](const QPoint &) {
             ++motionPositionChanges;
         });
-        QObject::connect(&runtime, &PetRuntime::motionCompleted, [&](const QVariantMap &result) {
+        const QMetaObject::Connection completedConnection = QObject::connect(&runtime, &PetRuntime::motionCompleted, [&](const QVariantMap &result) {
             ++motionCompletedCount;
             completedResult = result;
         });
@@ -1002,6 +1002,19 @@ int main(int argc, char *argv[])
                 "完成结果应包含最终百分比 x");
         require(runtime.currentState() == "idle", "目标移动完成后应回到 idle");
 
+        runtime.toggleAutoMovementEnabled();
+        require(!runtime.autoMovementEnabled(), "目标移动前测试应先禁用随机移动");
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+        completedResult.clear();
+        motionCompletedCount = 0;
+        runtime.requestMotion("moveTo", 1.0, 0.0, "walk");
+        require(waitUntil([&]() { return motionCompletedCount == 1; }, 2500),
+                "禁用随机移动时目标移动仍应完成");
+        require(!runtime.autoMovementEnabled(),
+                "目标移动完成后应恢复进入移动前的 autoMovementEnabled 偏好");
+        runtime.toggleAutoMovementEnabled();
+        require(runtime.autoMovementEnabled(), "motion 偏好保持测试后应恢复随机移动");
+
         runtime.setMotionCurrentPosition(QPoint(0, 0));
         completedResult.clear();
         motionCompletedCount = 0;
@@ -1013,10 +1026,14 @@ int main(int argc, char *argv[])
                 "clamp 完成结果应包含 clamped_to_screen_edge note");
 
         int motionInterruptedCount = 0;
+        bool stopInterruptedObservedIdle = false;
         QVariantMap interruptedResult;
-        QObject::connect(&runtime, &PetRuntime::motionInterrupted, [&](const QVariantMap &result) {
+        const QMetaObject::Connection interruptedConnection = QObject::connect(&runtime, &PetRuntime::motionInterrupted, [&](const QVariantMap &result) {
             ++motionInterruptedCount;
             interruptedResult = result;
+            if (result.value("reason").toString() == "stop") {
+                stopInterruptedObservedIdle = runtime.currentState() == "idle";
+            }
         });
 
         runtime.setMotionCurrentPosition(QPoint(0, 0));
@@ -1026,6 +1043,7 @@ int main(int argc, char *argv[])
         require(!interruptedResult.value("success").toBool(), "stopMotion 结果 success 应为 false");
         require(interruptedResult.value("reason").toString() == "stop", "stopMotion reason 应为 stop");
         require(runtime.currentState() == "idle", "stopMotion 应回到 idle");
+        require(stopInterruptedObservedIdle, "stopMotion 的 motionInterrupted 槽应观察到 runtime 已回 idle");
 
         runtime.setMotionCurrentPosition(QPoint(0, 0));
         runtime.requestMotion("moveTo", 1.0, 1.0, "walk");
@@ -1043,6 +1061,10 @@ int main(int argc, char *argv[])
         require(runtime.currentAutoReturnToIdle(), "普通随机 walk 仍应自动回 idle");
         require(runtime.consumeFrameMovementDelta().value("dx").toDouble() > 0.0,
                 "普通随机 walk 仍应输出帧移动增量");
+
+        QObject::disconnect(positionConnection);
+        QObject::disconnect(completedConnection);
+        QObject::disconnect(interruptedConnection);
     }
 
     runtime.toggleAutoMovementEnabled();

@@ -55,10 +55,10 @@ PetRuntime::PetRuntime(QObject *parent)
             resultReason
         );
         exitMovingState();
-        emit motionInterrupted(result);
         if (reason != QStringLiteral("drag")) {
             returnToIdle();
         }
+        emit motionInterrupted(result);
     });
 
     refreshAvailableSkins();
@@ -1108,6 +1108,11 @@ void PetRuntime::configureMotionController()
 
 void PetRuntime::enterMovingState()
 {
+    if (!m_hasMotionAutoMovementSnapshot) {
+        m_autoMovementEnabledBeforeMotion = m_autoMovementEnabled;
+        m_hasMotionAutoMovementSnapshot = true;
+    }
+
     const bool stateChanged = m_currentState != QStringLiteral("moving");
     m_currentState = QStringLiteral("moving");
     if (stateChanged) {
@@ -1123,7 +1128,11 @@ void PetRuntime::exitMovingState()
 {
     m_motionLoopOverride = false;
     setSuppressAutoIdle(false);
-    setAutoMovementEnabled(true);
+    const bool restoreAutoMovementEnabled = m_hasMotionAutoMovementSnapshot
+        ? m_autoMovementEnabledBeforeMotion
+        : true;
+    m_hasMotionAutoMovementSnapshot = false;
+    setAutoMovementEnabled(restoreAutoMovementEnabled);
 }
 
 QVariantMap PetRuntime::motionResult(bool success, const QPointF &position, const QString &reason) const

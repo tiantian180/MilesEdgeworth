@@ -291,6 +291,8 @@ private:
     bool m_returnToIdleAfterExit = false;
     bool m_suppressAutoIdle = false;
     bool m_motionLoopOverride = false;
+    bool m_autoMovementEnabledBeforeMotion = true;
+    bool m_hasMotionAutoMovementSnapshot = false;
 
     static constexpr int kCleanFinishSafetyMs = 2000;
     static constexpr int kAutoIdleAfterCleanFinishMs = 3000;
