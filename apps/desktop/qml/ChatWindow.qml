@@ -554,10 +554,9 @@ ApplicationWindow {
 
             Layout.fillWidth: true
             Layout.preferredHeight: compactComposer.implicitHeight
-            radius: chatWindow.compactMode ? 18 : 0
-            color: chatWindow.compactMode ? "#fffdf8" : "transparent"
-            border.color: chatWindow.compactMode ? "#d8cec1" : "transparent"
-            border.width: chatWindow.compactMode ? 1 : 0
+            radius: 0
+            color: "transparent"
+            border.width: 0
 
             MouseArea {
                 id: compactDragArea
