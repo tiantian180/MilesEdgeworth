@@ -10,6 +10,7 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -230,6 +231,11 @@ int main(int argc, char **argv)
 {
   "schemaVersion": 4,
   "defaultFacing": "right",
+  "motion": {
+    "walkSpeed": 42,
+    "runSpeed": 84,
+    "snapDistance": 6
+  },
   "states": { "idle": { "action": "idle_stand" } },
   "clips": {
     "thinking.enter.right": {
@@ -333,6 +339,12 @@ int main(int argc, char **argv)
     require(manifest.skinName == QStringLiteral("测试皮肤"), "loadFromDirectory should populate skinName");
     require(manifest.skinRootUrl.isLocalFile(), "filesystem manifest root should be a local file URL");
     require(manifest.actions.contains(QStringLiteral("idle_stand")), "filesystem manifest should load actions");
+    require(std::abs(manifest.motion.walkSpeed - 42.0) < 0.001,
+            "manifest motion.walkSpeed should parse");
+    require(std::abs(manifest.motion.runSpeed - 84.0) < 0.001,
+            "manifest motion.runSpeed should parse");
+    require(std::abs(manifest.motion.snapDistance - 6.0) < 0.001,
+            "manifest motion.snapDistance should parse");
     requireAllAnimationAndAudioUrlsAreLocalFiles(manifest);
 
     const QString expectedAnimationUrl = QUrl::fromLocalFile(

@@ -11,6 +11,11 @@
     "hitZoneSize": 240,
     "idleLoopAction": "idle_stand"
   },
+  "motion": {
+    "walkSpeed": 60,
+    "runSpeed": 120,
+    "snapDistance": 5
+  },
   "defaultSize": "medium",
   "sizes": [
     { "id": "mini", "label": "迷你", "scale": 1.0 },
