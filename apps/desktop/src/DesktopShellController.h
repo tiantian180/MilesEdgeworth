@@ -52,6 +52,7 @@ public:
     int petScreenAvailableHeight() const;
     bool chatWindowExpanded() const;
     void setPetWindow(QWindow *window);
+    void setPetVisibleLocalBounds(const QRect &bounds);
 
 public slots:
     void setAlwaysOnTop(bool alwaysOnTop);
@@ -80,6 +81,7 @@ private:
     void applyCurrentLayerMode();
     QPointF legacyStartupPosition(double petScale) const;
     QRect petScreenAvailableGeometry() const;
+    QRect petVisibleScreenGeometry() const;
     QRect virtualDesktopGeometry() const;
     QPointF clampedPetWindowPosition(const QPointF &candidatePosition) const;
 
@@ -88,6 +90,7 @@ private:
     QSystemTrayIcon *m_trayIcon = nullptr;
     QMenu *m_trayMenu = nullptr;
     QAction *m_exitAction = nullptr;
+    QRect m_petVisibleLocalBounds;
     QString m_screenLayoutMode = "single";
     double m_petScale = 2.0;
     bool m_alwaysOnTop = true;

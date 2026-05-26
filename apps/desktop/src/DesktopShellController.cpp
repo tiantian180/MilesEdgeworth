@@ -114,6 +114,7 @@ void DesktopShellController::setPetWindow(QWindow *window)
     m_petWindowGeometryConnections.clear();
 
     m_petWindow = window;
+    m_petVisibleLocalBounds = QRect();
 
     if (m_petWindow != nullptr) {
         auto notifyGeometryChanged = [this]() {
@@ -143,6 +144,17 @@ void DesktopShellController::setPetWindow(QWindow *window)
 #endif
 
     applyCurrentLayerMode();
+    emit petWindowGeometryChanged();
+}
+
+void DesktopShellController::setPetVisibleLocalBounds(const QRect &bounds)
+{
+    const QRect normalizedBounds = bounds.isValid() ? bounds : QRect();
+    if (m_petVisibleLocalBounds == normalizedBounds) {
+        return;
+    }
+
+    m_petVisibleLocalBounds = normalizedBounds;
     emit petWindowGeometryChanged();
 }
 
@@ -370,6 +382,19 @@ QRect DesktopShellController::petScreenAvailableGeometry() const
         targetScreen = QGuiApplication::primaryScreen();
     }
     return targetScreen != nullptr ? targetScreen->availableGeometry() : QRect();
+}
+
+QRect DesktopShellController::petVisibleScreenGeometry() const
+{
+    if (m_petWindow == nullptr || !m_petVisibleLocalBounds.isValid()) {
+        return QRect(petWindowX(), petWindowY(), petWindowWidth(), petWindowHeight());
+    }
+
+    return QRect(
+        QPoint(m_petWindow->x() + m_petVisibleLocalBounds.x(),
+               m_petWindow->y() + m_petVisibleLocalBounds.y()),
+        m_petVisibleLocalBounds.size()
+    );
 }
 
 QRect DesktopShellController::virtualDesktopGeometry() const

@@ -28,6 +28,11 @@ def main() -> int:
     main_cpp = read("apps/desktop/src/main.cpp")
     shell_h = read("apps/desktop/src/DesktopShellController.h")
     shell_cpp = read("apps/desktop/src/DesktopShellController.cpp")
+    surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")
+    surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
+    visible_bounds_h = read("apps/desktop/src/pet/surface/PetVisibleBounds.h")
+    visible_bounds_cpp = read("apps/desktop/src/pet/surface/PetVisibleBounds.cpp")
+    visible_bounds_smoke = read("apps/desktop/tests/pet_visible_bounds_smoke.cpp")
     chat_qml = read("apps/desktop/qml/ChatWindow.qml")
     icon_button_qml = read("apps/desktop/qml/MilesIconButton.qml")
     bubble_qml = read("apps/desktop/qml/ChatBubbleWindow.qml")
@@ -118,6 +123,38 @@ def main() -> int:
         "result.insert(QStringLiteral(\"pointer\"), placement.pointer);",
     ]:
         require(token in shell_cpp, f"DesktopShellController.cpp missing {token}")
+
+    for token in [
+        "PetVisibleBounds.cpp",
+        "PetVisibleBoundsSmoke",
+        "pet_visible_bounds_smoke",
+        "setPetVisibleLocalBounds",
+        "petVisibleScreenGeometry",
+    ]:
+        require(token in desktop_cmake + shell_h + shell_cpp,
+                f"visible pet bounds bridge missing {token}")
+
+    for token in [
+        "visibleBoundsFromImage",
+        "QImage::Format_ARGB32",
+        "constScanLine",
+        "qAlpha",
+    ]:
+        require(token in visible_bounds_h + visible_bounds_cpp,
+                f"PetVisibleBounds missing {token}")
+
+    for token in [
+        "visibleLocalBoundsFromCurrentFrame",
+        "syncVisibleBoundsToShell",
+        "m_movie->currentImage()",
+        "m_petLabel->size()",
+        "m_shellController->setPetVisibleLocalBounds",
+    ]:
+        require(token in surface_h + surface_cpp,
+                f"PetSurfaceWindow visible bounds sync missing {token}")
+
+    require("alpha bounds should cover opaque pixels only" in visible_bounds_smoke,
+            "visible bounds smoke must cover alpha scanning")
 
     for token in [
         "pet.right() + 1 + safeMargin",
