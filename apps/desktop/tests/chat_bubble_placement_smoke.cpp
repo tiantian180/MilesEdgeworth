@@ -29,6 +29,10 @@ int main()
                 "top-left pet should place the bubble to the pet's right");
         require(result.topLeft.y() >= pet.bottom(),
                 "top-left pet should place the bubble below the pet");
+        require(result.topLeft.x() == pet.right() + 1 + margin,
+                "top-left pet should keep an exact horizontal margin");
+        require(result.topLeft.y() == pet.bottom() + 1 + margin,
+                "top-left pet should keep an exact vertical margin");
     }
 
     {
@@ -40,6 +44,10 @@ int main()
                 "top-right pet should place the bubble to the pet's left");
         require(result.topLeft.y() >= pet.bottom(),
                 "top-right pet should place the bubble below the pet");
+        require(result.topLeft.x() == pet.left() - bubbleSize.width() - margin,
+                "top-right pet should keep an exact horizontal margin");
+        require(result.topLeft.y() == pet.bottom() + 1 + margin,
+                "top-right pet should keep an exact vertical margin");
     }
 
     {
@@ -51,6 +59,10 @@ int main()
                 "bottom-left pet should place the bubble to the pet's right");
         require(result.topLeft.y() + bubbleSize.height() <= pet.top(),
                 "bottom-left pet should place the bubble above the pet");
+        require(result.topLeft.x() == pet.right() + 1 + margin,
+                "bottom-left pet should keep an exact horizontal margin");
+        require(result.topLeft.y() == pet.top() - bubbleSize.height() - margin,
+                "bottom-left pet should keep an exact vertical margin");
     }
 
     {
@@ -62,6 +74,10 @@ int main()
                 "bottom-right pet should place the bubble to the pet's left");
         require(result.topLeft.y() + bubbleSize.height() <= pet.top(),
                 "bottom-right pet should place the bubble above the pet");
+        require(result.topLeft.x() == pet.left() - bubbleSize.width() - margin,
+                "bottom-right pet should keep an exact horizontal margin");
+        require(result.topLeft.y() == pet.top() - bubbleSize.height() - margin,
+                "bottom-right pet should keep an exact vertical margin");
     }
 
     {

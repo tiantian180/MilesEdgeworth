@@ -37,10 +37,10 @@ ChatBubblePlacementResult placeChatBubble(
     const bool petOnTop = petCenter.y() < screenCenter.y();
 
     const int preferredX = petOnLeft
-        ? pet.right() + safeMargin
+        ? pet.right() + 1 + safeMargin
         : pet.left() - bubbleWidth - safeMargin;
     const int preferredY = petOnTop
-        ? pet.bottom() + safeMargin
+        ? pet.bottom() + 1 + safeMargin
         : pet.top() - bubbleHeight - safeMargin;
 
     const int minX = available.left() + safeMargin;
