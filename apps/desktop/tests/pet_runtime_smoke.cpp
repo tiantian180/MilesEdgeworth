@@ -1072,6 +1072,41 @@ int main(int argc, char *argv[])
     require(walkDelta.value("dx").toDouble() == 0.0 && walkDelta.value("dy").toDouble() == 0.0, "禁止走动后移动增量应为 0");
     runtime.toggleAutoMovementEnabled();
 
+    {
+        runtime.returnToIdle();
+        runtime.setMotionScreenGeometry(QRect(0, 0, 200, 200));
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+
+        int motionInterruptedCount = 0;
+        QVariantMap interruptedResult;
+        const QMetaObject::Connection interruptedConnection = QObject::connect(&runtime, &PetRuntime::motionInterrupted, [&](const QVariantMap &result) {
+            ++motionInterruptedCount;
+            interruptedResult = result;
+        });
+
+        runtime.requestMotion("moveTo", 1.0, 1.0, "walk");
+        bridge.submitDragStarted(100);
+        require(motionInterruptedCount == 1, "submitDragStarted 应打断活跃目标移动");
+        require(interruptedResult.value("reason").toString() == "interrupted_by_user",
+                "submitDragStarted 打断结果 reason 应映射为 interrupted_by_user");
+
+        bridge.submitDragMoved(90);
+        bridge.submitDragMoved(110);
+        bridge.submitDragMoved(85);
+        bridge.submitDragMoved(115);
+        bridge.submitDragMoved(80);
+        require(runtime.currentActionId() == "drag_crouch",
+                "submitDragStarted 打断移动后仍应继续原有拖拽晃动流程");
+        bridge.submitDragEnded();
+        require(runtime.currentActionId() == "drag_stand_up_quick",
+                "submitDragStarted 打断移动后松手仍应进入拖拽释放流程");
+        runtime.handleAnimationFinished();
+        require(runtime.currentActionId() == "idle_stand",
+                "submitDragStarted 打断移动后的拖拽释放播完应回到 idle");
+
+        QObject::disconnect(interruptedConnection);
+    }
+
     // 旧版拖拽晃动会在 1 秒内统计左右换向次数：达到阈值后先蹲下，
     // 松手时再根据蹲下动画是否播到末帧，选择快速站起或完整站起。
     runtime.returnToIdle();

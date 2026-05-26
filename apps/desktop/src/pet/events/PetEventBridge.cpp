@@ -58,6 +58,8 @@ void PetEventBridge::submitDragStarted(double globalX)
         return;
     }
 
+    m_runtime->cancelMotionForDrag();
+
     const RuntimeSnapshot snapshot = m_runtime->snapshot();
     if (!snapshot.pointerInteractionEnabled || snapshot.sleeping || snapshot.sleepTransitioning) {
         m_gestureTracker.reset();

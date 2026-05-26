@@ -97,6 +97,26 @@ int DesktopShellController::petScreenAvailableHeight() const
     return petScreenAvailableGeometry().height();
 }
 
+QRect DesktopShellController::petMotionScreenGeometry() const
+{
+    QScreen *targetScreen = nullptr;
+    if (m_petWindow != nullptr) {
+        const QPoint petCenter(
+            m_petWindow->x() + m_petWindow->width() / 2,
+            m_petWindow->y() + m_petWindow->height() / 2
+        );
+        targetScreen = QGuiApplication::screenAt(petCenter);
+        if (targetScreen == nullptr) {
+            targetScreen = m_petWindow->screen();
+        }
+    }
+
+    if (targetScreen == nullptr) {
+        targetScreen = QGuiApplication::primaryScreen();
+    }
+    return targetScreen != nullptr ? targetScreen->geometry() : QRect();
+}
+
 bool DesktopShellController::chatWindowExpanded() const
 {
     return m_chatWindowExpanded;

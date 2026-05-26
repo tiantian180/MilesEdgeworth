@@ -50,6 +50,7 @@ public:
     int petScreenAvailableY() const;
     int petScreenAvailableWidth() const;
     int petScreenAvailableHeight() const;
+    QRect petMotionScreenGeometry() const;
     bool chatWindowExpanded() const;
     void setPetWindow(QWindow *window);
     void setPetVisibleLocalBounds(const QRect &bounds);
