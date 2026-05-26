@@ -1,5 +1,6 @@
 #include "DesktopShellController.h"
 
+#include "chat/ChatBubblePlacement.h"
 #include "window/WindowInputMaskController.h"
 
 #include <QAction>
@@ -93,6 +94,11 @@ int DesktopShellController::petScreenAvailableWidth() const
 int DesktopShellController::petScreenAvailableHeight() const
 {
     return petScreenAvailableGeometry().height();
+}
+
+bool DesktopShellController::chatWindowExpanded() const
+{
+    return m_chatWindowExpanded;
 }
 
 void DesktopShellController::setPetWindow(QWindow *window)
@@ -257,6 +263,33 @@ void DesktopShellController::setChatWindowDockVisible(bool visible)
 #else
     Q_UNUSED(visible);
 #endif
+}
+
+void DesktopShellController::setChatWindowExpanded(bool expanded)
+{
+    if (m_chatWindowExpanded == expanded) {
+        return;
+    }
+
+    m_chatWindowExpanded = expanded;
+    emit chatWindowStateChanged();
+}
+
+QVariantMap DesktopShellController::placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const
+{
+    const QRect petGeometry(petWindowX(), petWindowY(), petWindowWidth(), petWindowHeight());
+    const ChatBubblePlacementResult placement = ::placeChatBubble(
+        petGeometry,
+        petScreenAvailableGeometry(),
+        QSize(bubbleWidth, bubbleHeight),
+        margin
+    );
+
+    QVariantMap result;
+    result.insert(QStringLiteral("x"), placement.topLeft.x());
+    result.insert(QStringLiteral("y"), placement.topLeft.y());
+    result.insert(QStringLiteral("pointer"), placement.pointer);
+    return result;
 }
 
 void DesktopShellController::createTrayIcon()

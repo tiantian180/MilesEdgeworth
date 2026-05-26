@@ -8,6 +8,7 @@
 #include <QJSEngine>
 #include <QQmlEngine>
 #include <QUrl>
+#include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
 class QAction;
@@ -32,6 +33,7 @@ class DesktopShellController : public QObject
     Q_PROPERTY(int petScreenAvailableY READ petScreenAvailableY NOTIFY petWindowGeometryChanged)
     Q_PROPERTY(int petScreenAvailableWidth READ petScreenAvailableWidth NOTIFY petWindowGeometryChanged)
     Q_PROPERTY(int petScreenAvailableHeight READ petScreenAvailableHeight NOTIFY petWindowGeometryChanged)
+    Q_PROPERTY(bool chatWindowExpanded READ chatWindowExpanded NOTIFY chatWindowStateChanged)
 
 public:
     explicit DesktopShellController(QObject *parent = nullptr);
@@ -48,6 +50,7 @@ public:
     int petScreenAvailableY() const;
     int petScreenAvailableWidth() const;
     int petScreenAvailableHeight() const;
+    bool chatWindowExpanded() const;
     void setPetWindow(QWindow *window);
 
 public slots:
@@ -62,12 +65,15 @@ public slots:
     Q_INVOKABLE void setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize);
     Q_INVOKABLE void clearPetInputMask();
     Q_INVOKABLE void setChatWindowDockVisible(bool visible);
+    Q_INVOKABLE void setChatWindowExpanded(bool expanded);
+    Q_INVOKABLE QVariantMap placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const;
 
 signals:
     void alwaysOnTopChanged();
     void screenLayoutModeChanged();
     void screenCountChanged();
     void petWindowGeometryChanged();
+    void chatWindowStateChanged();
 
 private:
     void createTrayIcon();
@@ -85,6 +91,7 @@ private:
     QString m_screenLayoutMode = "single";
     double m_petScale = 2.0;
     bool m_alwaysOnTop = true;
+    bool m_chatWindowExpanded = false;
 };
 
 // 这个 wrapper 只负责告诉 QML 类型系统：
