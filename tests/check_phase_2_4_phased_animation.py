@@ -116,6 +116,8 @@ def main() -> int:
             "native surface must still handle onceThenHold full-GIF playback")
     require("GenerateMilesClips" in desktop_cmake and "split_manifest_clips.py" in desktop_cmake,
             "desktop build must generate built-in Miles pre-cut clips")
+    require("clips.qrc" not in desktop_cmake,
+            "pre-cut clips must be packaged as files, not qrc")
 
     for token in [
         "append(const QString &text, quint64 streamId = 0, int segmentId = -1)",

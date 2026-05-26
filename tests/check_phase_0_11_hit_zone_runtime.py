@@ -49,7 +49,10 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
+    manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    skin_root = manifest_path.parent
+    manifest_text = json.dumps(manifest, ensure_ascii=False)
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
     action_pools = manifest.get("animationPools", {})
@@ -95,18 +98,18 @@ def main() -> int:
     for recipe_id, action_id in expected_recipes.items():
         require(recipes.get(recipe_id, {}).get("action") == action_id, f"{recipe_id} 应映射到 {action_id}")
 
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in [
-        "scared-right.gif",
-        "scared-left.gif",
-        "back-right.gif",
-        "back-left.gif",
-        "idle-look-up-right.gif",
-        "idle-look-up-left.gif",
-        "idle-look-down-right.gif",
-        "idle-look-down-left.gif",
+    for url in [
+        "file:assets/body/interaction/scared-right.gif",
+        "file:assets/body/interaction/scared-left.gif",
+        "file:assets/body/interaction/back-right.gif",
+        "file:assets/body/interaction/back-left.gif",
+        "file:assets/body/gestures/look-up-right.gif",
+        "file:assets/body/gestures/look-up-left.gif",
+        "file:assets/body/gestures/look-down-right.gif",
+        "file:assets/body/gestures/look-down-left.gif",
     ]:
-        require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
+        require(url in manifest_text, f"manifest 缺少动画资源 {url}")
+        require((skin_root / url[len("file:"):]).is_file(), f"皮肤文件缺失 {url}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     pipeline_cpp = read("apps/desktop/src/pet/interaction/InteractionPipeline.cpp")

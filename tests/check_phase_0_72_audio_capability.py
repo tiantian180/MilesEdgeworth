@@ -23,6 +23,33 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def has_file_based_audio_expectation(source: str, relative_path: str) -> bool:
+    markers = [
+        "file:",
+        "fromLocalFile",
+        "resolveSkinUrl",
+        "SkinUrl",
+        "skinUrl",
+        "skinFile",
+        "skinAsset",
+        "descriptor",
+        "Descriptor",
+        "expectedSoundUrl",
+        "expectedAudioUrl",
+        "assetUrl",
+        "audioUrl",
+    ]
+    start = 0
+    while True:
+        index = source.find(relative_path, start)
+        if index < 0:
+            return False
+        window = source[max(0, index - 240): index + len(relative_path) + 240]
+        if any(marker in window for marker in markers):
+            return True
+        start = index + len(relative_path)
+
+
 def main() -> int:
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     audio = manifest.get("audio", {})
@@ -118,14 +145,21 @@ def main() -> int:
     for token in [
         "runtime.availableAudioLanguages()",
         'runtime.setAudioLanguage("zh")',
-        'runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit2.wav"',
         'runtime.setAudioLanguage("en")',
-        'runtime.currentSoundUrl().toString() == "qrc:/skins/miles-edgeworth/assets/audio/voice/holdit1.wav"',
         'runtime.setAudioLanguage("jp")',
         "defaultOnlyAudio.defaultVoiceLanguage",
         "defaultOnlyAudioController.availableLanguages().isEmpty()",
     ]:
         require(token in smoke_test, f"PetRuntimeSmoke 缺少语音语言回归：{token}")
+    require("qrc:/skins/miles-edgeworth/assets/audio/voice/" not in smoke_test, "PetRuntimeSmoke 不应硬编码 qrc skin 音频 URL")
+    for relative in [
+        "assets/audio/voice/holdit2.wav",
+        "assets/audio/voice/holdit1.wav",
+    ]:
+        require(
+            has_file_based_audio_expectation(smoke_test, relative),
+            f"PetRuntimeSmoke 应通过文件系统皮肤 URL helper 或 file: 期望验证语音语言资源：{relative}",
+        )
 
     for token in [
         "src/pet/effects/AudioController.cpp",

@@ -24,7 +24,10 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
+    manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    skin_root = manifest_path.parent
+    manifest_text = json.dumps(manifest, ensure_ascii=False)
     actions = manifest.get("actions", {})
     sleep = actions.get("sleep", {})
     phases = sleep.get("phases", {})
@@ -45,9 +48,16 @@ def main() -> int:
         require("clip" in variants["right"], f"sleep.{phase_id}.right 缺少 clip")
         require("clip" in variants["left"], f"sleep.{phase_id}.left 缺少 clip")
 
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in ["sleep-right.gif", "sleep-left.gif", "sleeping-right.gif", "sleeping-left.gif", "wake-right.gif", "wake-left.gif"]:
-        require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
+    for url in [
+        "file:assets/body/rest/sleep-right.gif",
+        "file:assets/body/rest/sleep-left.gif",
+        "file:assets/body/rest/sleeping-right.gif",
+        "file:assets/body/rest/sleeping-left.gif",
+        "file:assets/body/rest/wake-right.gif",
+        "file:assets/body/rest/wake-left.gif",
+    ]:
+        require(url in manifest_text, f"manifest 缺少动画资源 {url}")
+        require((skin_root / url[len("file:"):]).is_file(), f"皮肤文件缺失 {url}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     for token in [

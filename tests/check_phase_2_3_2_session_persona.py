@@ -41,17 +41,12 @@ def main() -> int:
     service_go = read_go_package("apps/agent-core/internal/chat/service")
     manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
     loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
-    persona_store = (
-        read("apps/desktop/src/pet/manifest/PersonaStore.h")
-        + "\n"
-        + read("apps/desktop/src/pet/manifest/PersonaStore.cpp")
-    )
+    persona_store = read("apps/desktop/src/pet/manifest/PersonaStore.cpp")
     settings_h = read("apps/desktop/src/settings/SettingsController.h")
     chat_h = read("apps/desktop/src/chat/ChatController.h")
     chat_cpp = read("apps/desktop/src/chat/ChatController.cpp")
     chat_qml = read("apps/desktop/qml/ChatWindow.qml")
     settings_qml = read("apps/desktop/qml/SettingsWindow.qml")
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
     persona = read("apps/desktop/resources/skins/miles-edgeworth/persona.md")
     root_cmake = read("CMakeLists.txt")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
@@ -111,7 +106,10 @@ def main() -> int:
 
     require("personaPrompt" in manifest_h, "SkinManifest must contain personaPrompt")
     require("PersonaStore" in loader_cpp, "SkinManifestLoader must delegate persona read to PersonaStore")
-    require("persona-overrides" in persona_store, "PersonaStore must support built-in override path")
+    require("skin-overrides" in persona_store, "PersonaStore must write app-dir overrides under skin-overrides")
+    require("persona-overrides" not in persona_store, "legacy persona-overrides path must be removed")
+    require("appSkinDirectoryPath" in persona_store, "PersonaStore must decide app-dir skin writability by appSkinDirectoryPath")
+    require("manifest.builtin" not in persona_store, "PersonaStore must not use builtin flag")
     require("savePersona" in settings_h or "personaPrompt" in settings_h, "SettingsController must expose persona editing")
     require("角色人格" in settings_qml, "SettingsWindow must show persona editor")
     require(
@@ -120,7 +118,7 @@ def main() -> int:
         and "wrapMode: TextArea.Wrap" in settings_qml,
         "SettingsWindow persona editor must use readable dark text",
     )
-    require("persona.md" in qrc, "Miles persona.md must be bundled")
+    require(persona.strip(), "Miles persona.md must exist as a filesystem skin file")
     require("[EXPR:" not in persona, "persona.md must not contain EXPR marker instructions")
 
     require("conversations" in chat_h and "currentConversationId" in chat_h, "ChatController must expose conversations")

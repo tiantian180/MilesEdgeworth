@@ -25,6 +25,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> None:
+    skin_root = ROOT / "apps/desktop/resources/skins/miles-edgeworth"
     manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
     recipes = manifest.get("recipes", {})
 
@@ -56,15 +57,8 @@ def main() -> None:
     for recipe_id, sounds in expected_sounds.items():
         recipe = recipes.get(recipe_id, {})
         require(recipe.get("sounds") == sounds, f"{recipe_id} 应声明三语言 sounds")
-
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in [
-        "holdit0.wav", "holdit1.wav", "holdit2.wav",
-        "takethat0.wav", "takethat1.wav", "takethat2.wav",
-        "objection0.wav", "objection1.wav", "objection2.wav",
-        "eureka0.wav", "eureka1.wav",
-    ]:
-        require(alias in qrc, f"qrc 缺少语音资源 {alias}")
+        for language_id, url in sounds.items():
+            require((skin_root / url[len("file:"):]).is_file(), f"{recipe_id}.{language_id} 皮肤音频文件缺失 {url}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     for token in [

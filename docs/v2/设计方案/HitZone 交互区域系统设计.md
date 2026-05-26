@@ -99,7 +99,7 @@ flowchart LR
 
 > 桌宠应用菜单可以提供一个**"重载当前皮肤"**入口（属于用户偏好/调试入口），让开发者在 Studio 中保存 manifest 后立刻在主应用看到效果，无需重启桌宠进程。
 >
-> Pet Skin Studio 编辑的是**文件系统**上的皮肤目录，参见《皮肤包分发与加载机制设计》。这意味着皮肤本身已经从 qrc 编入二进制改成磁盘加载，最终用户只调整素材和配置（无需 C++/Qt 编译环境）即可换皮肤。
+> Pet Skin Studio 编辑的是**文件系统**上的皮肤目录，参见《皮肤包分发与加载机制设计》。所有皮肤通过文件系统目录加载，最终用户只调整素材和配置（无需 C++/Qt 编译环境）即可换皮肤。
 
 ---
 
@@ -483,7 +483,7 @@ editor 加载时:
 - 复用 `SkinManifest` / `SkinManifestLoader`（只读 manifest）
 - HitZone Panel 内部模型：`HitZoneEditorModel`（维护当前 panel 的编辑状态、撤销栈、脏标记）
 - 保存时只更新 manifest 的 `hitZones` 和 `clickBehaviors.singleClick` 字段，其他字段透传（避免覆盖其它 panel 正在编辑的字段）
-- 通过《皮肤包分发与加载机制设计》§5 的约束：Studio 只编辑用户目录下的皮肤；编辑内置 Miles 时提示"克隆到用户目录后再编辑"
+- 通过《皮肤包分发与加载机制设计》§5 的约束：Studio 只编辑用户目录下的皮肤；编辑应用目录皮肤（如随 app 分发的 Miles）时提示"克隆到用户目录后再编辑"
 
 ---
 

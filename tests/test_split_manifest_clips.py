@@ -37,6 +37,26 @@ def make_source_gif(path: Path) -> None:
     )
 
 
+def make_duplicate_opaque_source_gif(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    palette = [0, 0, 0] * 256
+    palette[0:3] = [10, 20, 30]
+    palette[3:6] = [10, 20, 30]
+    first = Image.new("P", (4, 4), 0)
+    second = Image.new("P", (4, 4), 1)
+    first.putpalette(palette)
+    second.putpalette(palette)
+    first.save(
+        path,
+        save_all=True,
+        append_images=[second],
+        duration=[20, 20],
+        loop=0,
+        optimize=False,
+        disposal=2,
+    )
+
+
 def frame_count(path: Path) -> int:
     with Image.open(path) as image:
         return sum(1 for _ in ImageSequence.Iterator(image))
@@ -47,13 +67,13 @@ def frame_durations(path: Path) -> list[int]:
         return [frame.info.get("duration", 0) for frame in ImageSequence.Iterator(image)]
 
 
-def write_manifest(skin: Path, clips: dict) -> None:
-    (skin / "manifest.json").write_text(json.dumps({"clips": clips}), encoding="utf-8")
+def write_manifest(skin_root: Path, clips: dict) -> None:
+    (skin_root / "manifest.json").write_text(json.dumps({"clips": clips}), encoding="utf-8")
 
 
-def run_tool(skin: Path) -> subprocess.CompletedProcess[str]:
+def run_tool(skin_root: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(SCRIPT), str(skin)],
+        [sys.executable, str(SCRIPT), str(skin_root)],
         cwd=ROOT,
         text=True,
         stdout=subprocess.PIPE,
@@ -61,8 +81,8 @@ def run_tool(skin: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def require_failure(skin: Path, expected_message: str) -> None:
-    result = run_tool(skin)
+def require_failure(skin_root: Path, expected_message: str) -> None:
+    result = run_tool(skin_root)
     require(result.returncode != 0, f"expected failure containing {expected_message!r}")
     require(expected_message in result.stderr, result.stderr)
     require("Traceback" not in result.stderr, result.stderr)
@@ -84,30 +104,46 @@ def main() -> None:
         make_source_gif(source)
 
         write_manifest(skin, {
-            "talking.loop.right": valid_clip(),
+            "thinking.enter.right": valid_clip(frame_range=[1, 2]),
+            "thinking.loop.right": valid_clip(frame_range=[3, 4]),
+            "thinking.exit.right": valid_clip(frame_range=[5, 6]),
         })
 
         stale = skin / "generated" / "clips" / "stale.gif"
         stale.parent.mkdir(parents=True, exist_ok=True)
         stale.write_bytes(b"stale")
+        stale_qrc = skin / "generated" / "clips.qrc"
+        stale_qrc.write_text("<RCC />", encoding="utf-8")
+        unrelated_qrc = skin / "generated" / "keep.qrc"
+        unrelated_qrc.write_text("<RCC />", encoding="utf-8")
 
         result = run_tool(skin)
         require(result.returncode == 0, result.stderr)
+        require("generated 3 clips under" in result.stdout, result.stdout)
+        require("generated/clips" in result.stdout, result.stdout)
 
-        output = skin / "generated" / "clips" / "talking.loop.right.gif"
-        qrc = skin / "generated" / "clips.qrc"
-        require(output.is_file(), "generated clip should be written")
-        require(qrc.is_file(), "generated qrc should be written")
+        generated = skin / "generated" / "clips"
+        enter = generated / "thinking.enter.right.gif"
+        loop = generated / "thinking.loop.right.gif"
+        exit = generated / "thinking.exit.right.gif"
+        require(enter.exists(), "enter clip should be generated")
+        require(loop.exists(), "loop clip should be generated")
+        require(exit.exists(), "exit clip should be generated")
         require(not stale.exists(), "script should clean stale generated clips before writing")
-        require(frame_count(output) == 3, "1-based inclusive [2, 4] should generate 3 frames")
-        expected_durations = frame_durations(source)[1:4]
-        require(
-            frame_durations(output) == expected_durations,
-            "generated clip should preserve source frame durations",
-        )
-        qrc_text = qrc.read_text(encoding="utf-8")
-        require('<qresource prefix="/skins/test-skin/generated/clips">' in qrc_text, qrc_text)
-        require('<file alias="talking.loop.right.gif">clips/talking.loop.right.gif</file>' in qrc_text, qrc_text)
+        require(not (skin / "generated" / "clips.qrc").exists(), "tool must not write clips.qrc")
+        require(unrelated_qrc.exists(), "tool must not delete unrelated generated qrc files")
+        require("clips.qrc" not in result.stdout, "tool output must not reference clips.qrc")
+        source_durations = frame_durations(source)
+        for clip_path, expected_durations in [
+            (enter, source_durations[0:2]),
+            (loop, source_durations[2:4]),
+            (exit, source_durations[4:6]),
+        ]:
+            require(frame_count(clip_path) == 2, f"{clip_path.name} should generate 2 frames")
+            require(
+                frame_durations(clip_path) == expected_durations,
+                f"{clip_path.name} should preserve source frame durations",
+            )
 
         duplicate_skin = TMP / "duplicate-frame-skin"
         duplicate_source = duplicate_skin / "assets" / "body" / "gestures" / "thinking-left.gif"
@@ -127,6 +163,46 @@ def main() -> None:
         require(
             frame_durations(duplicate_output) == expected_duplicate_durations,
             "generated duplicate-frame clip should preserve per-frame durations",
+        )
+
+        failure_skin = TMP / "failure-preserves-generated-skin"
+        failure_source = failure_skin / "assets" / "body" / "raw" / "source.gif"
+        make_source_gif(failure_source)
+        existing_clip = failure_skin / "generated" / "clips" / "existing.gif"
+        existing_clip.parent.mkdir(parents=True, exist_ok=True)
+        existing_clip.write_bytes(b"existing")
+        existing_qrc = failure_skin / "generated" / "clips.qrc"
+        existing_qrc.write_text("<RCC />", encoding="utf-8")
+        write_manifest(failure_skin, {
+            "preserve.valid": valid_clip(),
+            "preserve.zzz_missing": valid_clip("file:assets/body/raw/missing.gif"),
+        })
+        result = run_tool(failure_skin)
+        require(result.returncode != 0, "expected missing source to fail")
+        require("source file not found" in result.stderr, result.stderr)
+        require("Traceback" not in result.stderr, result.stderr)
+        require(existing_clip.exists(), "failed generation must not delete existing clips")
+        require(existing_clip.read_bytes() == b"existing", "failed generation must not delete existing clips")
+        require(existing_qrc.exists(), "failed generation must not delete existing clips.qrc")
+
+        atomic_failure_skin = TMP / "atomic-failure-preserves-generated-skin"
+        atomic_source = atomic_failure_skin / "assets" / "body" / "raw" / "source.gif"
+        atomic_duplicate_source = atomic_failure_skin / "assets" / "body" / "raw" / "duplicate-opaque.gif"
+        make_source_gif(atomic_source)
+        make_duplicate_opaque_source_gif(atomic_duplicate_source)
+        atomic_existing_clip = atomic_failure_skin / "generated" / "clips" / "existing.gif"
+        atomic_existing_clip.parent.mkdir(parents=True, exist_ok=True)
+        atomic_existing_clip.write_bytes(b"existing")
+        write_manifest(atomic_failure_skin, {
+            "atomic.valid": valid_clip(),
+            "atomic.zzz_duplicate": valid_clip("file:assets/body/raw/duplicate-opaque.gif", [1, 2]),
+        })
+        result = run_tool(atomic_failure_skin)
+        require(result.returncode != 0, "expected duplicate opaque clip generation to fail")
+        require("duplicate opaque frames" in result.stderr, result.stderr)
+        require(
+            atomic_existing_clip.exists() and atomic_existing_clip.read_bytes() == b"existing",
+            "failed write-time generation must preserve previous generated clips atomically",
         )
 
         (skin / "manifest.json").unlink()

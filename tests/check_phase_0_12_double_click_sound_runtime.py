@@ -24,7 +24,9 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
+    manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    skin_root = manifest_path.parent
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
     action_pools = manifest.get("animationPools", {})
@@ -43,6 +45,7 @@ def main() -> int:
         require(recipe.get("scope") == "doubleClick", f"{recipe_id} 应声明为 doubleClick recipe")
         require(recipe.get("action") == action_id, f"{recipe_id} 应映射到 {action_id}")
         require(recipe.get("sound") == sound_url, f"{recipe_id} 应播放 {sound_url}")
+        require((skin_root / sound_url[len("file:"):]).is_file(), f"皮肤音频文件缺失 {sound_url}")
 
     double_click_pool = action_pools.get("doubleClick.random", {})
     require(double_click_pool, "animationPools 缺少 doubleClick.random")
@@ -50,16 +53,11 @@ def main() -> int:
     require({"doubleClick.holdIt", "doubleClick.objection", "doubleClick.eureka"} <= double_click_recipe_ids, "doubleClick.random 应包含默认双击语音动作")
     require("doubleClick.takeThat" not in double_click_recipe_ids, "Take that 丢徽章应由 Custom Interaction 概率触发")
 
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in [
-        "crossed-right.gif",
-        "crossed-left.gif",
-        "holdit0.wav",
-        "takethat0.wav",
-        "objection0.wav",
-        "eureka0.wav",
-    ]:
-        require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
+    crossed_variants = actions["crossed"].get("variants", {})
+    for facing in ["right", "left"]:
+        clip = crossed_variants.get(facing, {}).get("clip", "")
+        require(clip.startswith("file:"), f"crossed.{facing} 缺少 file: clip")
+        require((skin_root / clip[len("file:"):]).is_file(), f"皮肤文件缺失 {clip}")
 
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     for token in [

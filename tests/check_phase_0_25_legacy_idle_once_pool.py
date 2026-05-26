@@ -20,7 +20,9 @@ def require(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    manifest = json.loads((ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json").read_text(encoding="utf-8"))
+    manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    skin_root = manifest_path.parent
     actions = manifest.get("actions", {})
     recipes = manifest.get("recipes", {})
     idle_entries = manifest.get("animationPools", {}).get("idle.random", {}).get("entries", [])
@@ -42,6 +44,8 @@ def main() -> int:
         variants = action.get("variants", {})
         require(variants.get("right", {}).get("clip") == urls[0], f"{action_id}.right 动画别名不正确")
         require(variants.get("left", {}).get("clip") == urls[1], f"{action_id}.left 动画别名不正确")
+        for url in urls:
+            require((skin_root / url[len("file:"):]).is_file(), f"皮肤文件缺失 {url}")
 
     expected_recipes = {
         "idle.sittingTea": "idle_sitting_tea",
@@ -57,17 +61,6 @@ def main() -> int:
         require(recipe.get("scope") == "idle", f"{recipe_id} 应属于 idle scope")
         require(recipe.get("action") == action_id, f"{recipe_id} 应播放 {action_id}")
         require(recipe_id in idle_recipes, f"idle.random 缺少 {recipe_id}")
-
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
-    for alias in [
-        'alias="idle-sitting-tea-right.gif"',
-        'alias="idle-sitting-tea-left.gif"',
-        'alias="idle-phone-call-right.gif"',
-        'alias="idle-phone-call-left.gif"',
-        'alias="idle-look-back-right.gif"',
-        'alias="idle-look-back-left.gif"',
-    ]:
-        require(alias in qrc, f"qrc 缺少 {alias}")
 
     root_cmake = read("CMakeLists.txt")
     require("check_phase_0_25_legacy_idle_once_pool" in root_cmake, "CTest 未注册 Phase 0.25 检查")

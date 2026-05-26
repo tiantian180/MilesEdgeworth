@@ -33,7 +33,8 @@ def require_action_variants(action: dict, action_id: str) -> None:
 def main() -> int:
     manifest_path = ROOT / "apps/desktop/resources/skins/miles-edgeworth/manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    qrc = read("apps/desktop/resources/pet_assets.qrc")
+    skin_root = manifest_path.parent
+    manifest_text = json.dumps(manifest, ensure_ascii=False)
     pet_runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
     pet_runtime_cpp = read("apps/desktop/src/pet/PetRuntime.cpp")
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
@@ -75,8 +76,14 @@ def main() -> int:
     require(actions["objecting"]["loopMode"] == "onceThenHold", "objecting 应播放一次后定帧")
     require(actions["bow"]["loopMode"] == "onceThenHold", "bow 应播放一次后定帧")
 
-    for alias in ["bow-right.gif", "bow-left.gif", "tea-right.gif", "tea-left.gif"]:
-        require(f'alias="{alias}"' in qrc, f"qrc 缺少 {alias}")
+    for url in [
+        "file:assets/body/interaction/bow-right.gif",
+        "file:assets/body/interaction/bow-left.gif",
+        "file:assets/body/menu/tea-right.gif",
+        "file:assets/body/menu/tea-left.gif",
+    ]:
+        require(url in manifest_text, f"manifest 缺少动画资源 {url}")
+        require((skin_root / url[len("file:"):]).is_file(), f"皮肤文件缺失 {url}")
 
     for token in [
         "Q_PROPERTY(QString currentFacing",

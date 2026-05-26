@@ -1,87 +1,112 @@
 #!/usr/bin/env python3
-import re
+import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
 def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
 
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
 
+
+skin_json = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/skin.json"))
+manifest = json.loads(read("apps/desktop/resources/skins/miles-edgeworth/manifest.json"))
+qrc_path = ROOT / "apps/desktop/resources/pet_assets.qrc"
+qrc_tree = ET.parse(qrc_path)
 loader_h = read("apps/desktop/src/pet/manifest/SkinManifestLoader.h")
+loader_cpp = read("apps/desktop/src/pet/manifest/SkinManifestLoader.cpp")
 manifest_h = read("apps/desktop/src/pet/manifest/SkinManifest.h")
+descriptor_h = read("apps/desktop/src/pet/manifest/SkinDescriptor.h")
 runtime_h = read("apps/desktop/src/pet/PetRuntime.h")
 menu_cpp = read("apps/desktop/src/pet/surface/PetContextMenu.cpp")
-qrc = read("apps/desktop/resources/pet_assets.qrc")
-qrc_path = ROOT / "apps/desktop/resources/pet_assets.qrc"
-skin_assets = ROOT / "apps/desktop/resources/skins/miles-edgeworth/assets"
+cmake = read("apps/desktop/CMakeLists.txt")
 
-tree = ET.parse(qrc_path)
-resources = {
-    resource.attrib.get("prefix", ""): {
-        file_node.attrib.get("alias", ""): (file_node.text or "").strip()
-        for file_node in resource.findall("file")
-    }
-    for resource in tree.getroot().findall("qresource")
-}
-pet_aliases = resources.get("/pet", {})
-audio_aliases = resources.get("/audio", {})
+qresources = qrc_tree.getroot().findall("qresource")
+prefixes = {resource.attrib.get("prefix", "") for resource in qresources}
 
-require("SkinDescriptor.h" in loader_h, "SkinManifestLoader.h must include SkinDescriptor.h")
-require("loadFromDirectory" in loader_h, "loader must expose loadFromDirectory()")
-require("discoverAll" in loader_h, "loader must expose discoverAll()")
-require("resolveSkinUrl" in loader_h, "loader must expose resolveSkinUrl() for tests and deterministic URL handling")
-require("userSkinDirectoryPath" in loader_h, "loader must expose userSkinDirectoryPath()")
-require("portableSkinDirectoryPath" in loader_h, "loader must expose portableSkinDirectoryPath()")
+allowed_prefixes = {"/icon"}
+for forbidden_prefix in ["/pet", "/audio", "/skins/miles-edgeworth"]:
+    require(forbidden_prefix not in prefixes, f"pet_assets.qrc must not keep skin qresource prefix {forbidden_prefix}")
+require(prefixes <= allowed_prefixes, f"pet_assets.qrc prefixes must be app-only resources, got {sorted(prefixes)}")
+require("/icon" in prefixes, "pet_assets.qrc may keep app icon resources under /icon")
 
-require("skinId" in manifest_h, "SkinManifest must store loaded skin id")
-require("skinName" in manifest_h, "SkinManifest must store loaded skin display name")
-require("skinRootUrl" in manifest_h, "SkinManifest must store resolved root URL")
-require("builtin" in manifest_h, "SkinManifest must mark built-in skins")
+for file_node in qrc_tree.getroot().iter("file"):
+    alias = file_node.attrib.get("alias", "")
+    source = (file_node.text or "").strip()
+    for forbidden in [
+        "skins/miles-edgeworth",
+        "generated/clips",
+        "assets/body",
+        "assets/audio",
+        "gifs/",
+        "audios/",
+        ".gif",
+        ".wav",
+    ]:
+        require(
+            forbidden not in alias and forbidden not in source,
+            f"pet_assets.qrc must not embed skin resource token {forbidden}: alias={alias}, source={source}",
+        )
 
-require("availableSkins" in runtime_h, "PetRuntime must expose availableSkins")
-require("activeSkinId" in runtime_h, "PetRuntime must expose activeSkinId")
-require("setActiveSkin" in runtime_h, "PetRuntime must expose setActiveSkin")
-require("reloadActiveSkin" in runtime_h, "PetRuntime must expose reloadActiveSkin")
+require(skin_json.get("skinSchemaVersion") == 1, "skin.json must use skinSchemaVersion 1")
+require(skin_json.get("id") == "miles-edgeworth", "official skin id must stay stable")
+require(skin_json.get("manifest") == "manifest.json", "skin.json must point to manifest.json")
+require(str(skin_json.get("thumbnail", "")).startswith("file:"), "thumbnail must use file: URL")
+require(manifest.get("schemaVersion") == 4, "manifest.json must remain manifest schema v4")
 
-require("皮肤" in menu_cpp, "context menu must expose a skin submenu")
-require("打开皮肤目录" in menu_cpp, "context menu must expose the user skin directory")
-require("重载当前皮肤" in menu_cpp, "context menu must expose skin reload")
+for token in [
+    "loadFromDirectory",
+    "discoverAll",
+    "resolveSkinUrl",
+    "userSkinDirectoryPath",
+    "appSkinDirectoryPath",
+]:
+    require(token in loader_h, f"SkinManifestLoader.h must expose {token}")
+for token in [
+    "skinId",
+    "skinName",
+    "skinRootUrl",
+]:
+    require(token in manifest_h, f"SkinManifest.h must expose {token}")
+for token in [
+    "availableSkins",
+    "activeSkinId",
+    "setActiveSkin",
+    "reloadActiveSkin",
+]:
+    require(token in runtime_h, f"PetRuntime.h must expose {token}")
+for token in [
+    "皮肤",
+    "打开皮肤目录",
+    "重载当前皮肤",
+]:
+    require(token in menu_cpp, f"PetContextMenu.cpp must expose skin UI string {token}")
 
-require('prefix="/skins/miles-edgeworth"' in qrc, "qrc must expose built-in skin under /skins/miles-edgeworth")
-require('alias="skin.json"' in qrc, "qrc must include built-in skin.json")
-require('alias="manifest.json"' in qrc, "qrc must include built-in manifest.json under skin root")
+require("appSkinDirectoryPath" in loader_h, "loader must expose appSkinDirectoryPath()")
+require("portableSkinDirectoryPath" not in loader_h + loader_cpp, "portableSkinDirectoryPath must be replaced")
+require("loadFromResource" not in loader_h + loader_cpp, "qrc manifest loading entry must be removed")
+require("SkinManifestLoader::discoverAll" in loader_cpp, "loader must still expose discoverAll")
+require("qrc:/skins/miles-edgeworth" not in loader_cpp, "loader must not hardcode qrc built-in skin")
+require("skinSchemaVersion" in descriptor_h + loader_cpp, "descriptor loading must validate skinSchemaVersion")
+require("manifestVersion" not in descriptor_h + loader_cpp, "skin metadata must not use manifestVersion")
+require("builtin" not in manifest_h + descriptor_h, "SkinManifest/SkinDescriptor must not expose builtin")
 
-# Phase 1.4 之后，Miles 的内置皮肤既要支持 file: URL，也要保持
-# 旧 qrc:/pet 和 qrc:/audio alias 兼容层。这里集中守住资源目录契约，
-# 避免继续保留 Phase 0.54 的历史阶段测试。
-require(skin_assets.is_dir(), "Miles built-in skin must keep runtime assets under skins/miles-edgeworth/assets")
-require("../../../gifs/" not in qrc, "pet_assets.qrc must not reference legacy root gifs/")
-require("../../../audios/" not in qrc, "pet_assets.qrc must not reference legacy root audios/")
-require("../../../prosbadge.png" not in qrc, "prosecutor badge must be loaded from skin assets/props/")
-
-for alias, source in pet_aliases.items():
-    if alias == "manifest.json":
-        continue
-    require(
-        source.startswith("skins/miles-edgeworth/assets/"),
-        f"pet alias {alias} must load from skin assets, got {source}",
-    )
-    require((qrc_path.parent / source).is_file(), f"pet alias {alias} points to missing file: {source}")
-    require(
-        not re.search(r"/(?:stand|walk|run|once)/\d+\.gif$", source),
-        f"pet alias {alias} still uses legacy numeric GIF filename: {source}",
-    )
-
-for alias, source in audio_aliases.items():
-    require(
-        source.startswith("skins/miles-edgeworth/assets/audio/"),
-        f"audio alias {alias} must load from skin assets/audio, got {source}",
-    )
-    require((qrc_path.parent / source).is_file(), f"audio alias {alias} points to missing file: {source}")
+require("GenerateMilesClips" in cmake, "CMake must still generate Miles clips")
+require("split_manifest_clips.py" in cmake, "CMake must call clip splitter")
+require(
+    "copy_directory" in cmake and "skins/miles-edgeworth" in cmake,
+    "CMake must copy official skin beside executable",
+)
+require("clips.qrc" not in cmake, "generated clips qrc must not be part of CMake")
+require(
+    "SignMilesEdgeworthDesktopBundle" not in cmake,
+    "desktop bundle must be signed once by the MilesEdgeworthDesktop POST_BUILD step",
+)
 
 print("phase 1.4 skin package contract ok")

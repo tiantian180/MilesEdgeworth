@@ -1,10 +1,12 @@
 #include "pet/PetRuntime.h"
 
 #include "pet/interaction/InteractionPipeline.h"
+#include "pet/manifest/SkinPathUtils.h"
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/PetLogging.h"
 #include "pet/selection/AnimationPoolSelector.h"
 
+#include <QDir>
 #include <QRandomGenerator>
 #include <QSettings>
 #include <QTimer>
@@ -14,8 +16,6 @@
 #include <utility>
 
 namespace {
-constexpr auto kFallbackAnimationUrl = "qrc:/pet/stand-right.gif";
-
 QString logBool(bool value)
 {
     return value ? QStringLiteral("true") : QStringLiteral("false");
@@ -611,7 +611,9 @@ AnimationVariant PetRuntime::variantForFacing(
     }
 
     AnimationVariant fallback;
-    fallback.url = QUrl(QString::fromUtf8(kFallbackAnimationUrl));
+    fallback.url = SkinPathUtils::idleStandAnimationUrlForSkinDirectory(
+        QDir(SkinManifestLoader::appSkinDirectoryPath()).filePath(QStringLiteral("miles-edgeworth"))
+    );
     return fallback;
 }
 
@@ -906,6 +908,14 @@ void PetRuntime::setCurrentAction(const QString &actionId, const ActionDefinitio
         return;
     }
 
+    if (actionId != m_manifest.fallbackAction && action.variants.isEmpty()) {
+        qCWarning(petRuntimeLog).noquote()
+            << QStringLiteral("Action '%1' has no animation variants; falling back to '%2'")
+                   .arg(actionId, m_manifest.fallbackAction);
+        playActionInternal(m_manifest.fallbackAction, true);
+        return;
+    }
+
     PhaseDefinition singlePhase;
     singlePhase.loopMode = action.loopMode;
     singlePhase.variants.insert(m_manifest.defaultFacing, variantForAction(action));
@@ -923,6 +933,16 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
 
     const AnimationVariant nextVariant = variantForFacing(phase.variants, m_currentFacing);
     const QUrl nextAnimationUrl = nextVariant.url;
+    if (actionId != m_manifest.fallbackAction
+            && (phase.variants.isEmpty()
+                || !animationUrlPlayable(nextAnimationUrl))) {
+        qCWarning(petRuntimeLog).noquote()
+            << QStringLiteral("Action '%1' phase '%2' references an unavailable animation resource; falling back to '%3'")
+                   .arg(actionId, phaseId, m_manifest.fallbackAction);
+        playActionInternal(m_manifest.fallbackAction, true);
+        return;
+    }
+
     const QString nextLoopMode = phase.loopMode.isEmpty() ? "loop" : phase.loopMode;
     const QString nextPhaseId = phaseId.isEmpty() ? "single" : phaseId;
     const bool nextAutoReturnToIdle = (nextLoopMode == "onceThenIdle");
@@ -975,119 +995,7 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
 
 }
 
-bool PetRuntime::currentPhaseWillReachSustainedLoop() const
+bool PetRuntime::animationUrlPlayable(const QUrl &url) const
 {
-    if (m_currentActionId.isEmpty() || m_currentPhaseId.isEmpty()) {
-        return false;
-    }
-    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
-    QString phaseId = m_currentPhaseId;
-    QSet<QString> visited;
-    while (!phaseId.isEmpty() && !visited.contains(phaseId)) {
-        if (!action.phases.contains(phaseId)) {
-            return false;
-        }
-        visited.insert(phaseId);
-        const PhaseDefinition phase = action.phases.value(phaseId);
-        const QString loopMode = phase.loopMode.isEmpty() ? QStringLiteral("loop") : phase.loopMode;
-        if (loopMode == QStringLiteral("loop")) {
-            return true;
-        }
-        phaseId = phase.nextPhase;
-    }
-    return false;
-}
-
-bool PetRuntime::cleanFinishBoundaryReached() const
-{
-    if (m_currentActionId.isEmpty()) {
-        return true;
-    }
-
-    const QString idleAction = actionForState(QStringLiteral("idle"));
-    if (m_currentRecipeId.isEmpty()
-            && m_currentState == QStringLiteral("idle")
-            && !idleAction.isEmpty()
-            && m_currentActionId == idleAction) {
-        return true;
-    }
-
-    if (m_currentLoopMode == QStringLiteral("onceThenHold")) {
-        return m_currentPlaybackAtBoundary;
-    }
-
-    if (m_currentLoopMode == QStringLiteral("hold")) {
-        return true;
-    }
-
-    return m_currentPlaybackAtBoundary;
-}
-
-bool PetRuntime::continueCleanFinishIfPossible()
-{
-    if (!m_cleanFinishCallback || !cleanFinishBoundaryReached()) {
-        return false;
-    }
-
-    if (advanceRuntimeControlledRecipeStepForCleanFinish()) {
-        return true;
-    }
-
-    const ActionDefinition action = m_manifest.actions.value(m_currentActionId);
-    if (!m_cleanFinishExitInProgress
-            && !action.exitPhase.isEmpty()
-            && m_currentPhaseId != action.exitPhase
-            && action.phases.contains(action.exitPhase)) {
-        m_cleanFinishExitInProgress = true;
-        playPhase(m_currentActionId, action.exitPhase);
-        return true;
-    }
-
-    triggerCleanFinishCallback();
-    return true;
-}
-
-void PetRuntime::triggerCleanFinishCallback()
-{
-    if (!m_cleanFinishCallback) {
-        return;
-    }
-
-    if (m_cleanFinishSafetyTimer != nullptr) {
-        m_cleanFinishSafetyTimer->stop();
-    }
-
-    std::function<void()> callback = std::move(m_cleanFinishCallback);
-    m_cleanFinishCallback = nullptr;
-    m_cleanFinishExitInProgress = false;
-
-    const int serialBeforeCallback = m_playbackSerial;
-    callback();
-
-    if (m_playbackSerial == serialBeforeCallback && !m_suppressAutoIdle) {
-        if (m_autoIdleTimer == nullptr) {
-            m_autoIdleTimer = new QTimer(this);
-            m_autoIdleTimer->setSingleShot(true);
-            connect(m_autoIdleTimer, &QTimer::timeout, this, [this]() {
-                returnToIdle();
-            });
-        }
-        m_autoIdleTimer->start(kAutoIdleAfterCleanFinishMs);
-    }
-}
-
-void PetRuntime::clearCleanFinishCallback()
-{
-    if (m_cleanFinishSafetyTimer != nullptr) {
-        m_cleanFinishSafetyTimer->stop();
-    }
-    m_cleanFinishCallback = nullptr;
-    m_cleanFinishExitInProgress = false;
-}
-
-void PetRuntime::stopAutoIdleTimer()
-{
-    if (m_autoIdleTimer != nullptr) {
-        m_autoIdleTimer->stop();
-    }
+    return SkinPathUtils::existingLocalFileIsInsideRoot(url, m_manifest.skinRootUrl);
 }
