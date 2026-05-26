@@ -91,5 +91,21 @@ int main()
                 "oversized bubble should clamp to the available top margin");
     }
 
+    {
+        const QRect narrowScreen(0, 0, 500, 400);
+        const QRect pet(170, 340, 120, 40);
+        const ChatBubblePlacementResult result = placeChatBubble(pet, narrowScreen, bubbleSize, margin);
+        require(result.topLeft.x() == narrowScreen.right() - bubbleSize.width() - margin + 1,
+                "normal bubble should clamp to the available right margin");
+    }
+
+    {
+        const QRect shiftedScreen(-500, -300, 500, 400);
+        const QRect pet(-450, -222, 80, 240);
+        const ChatBubblePlacementResult result = placeChatBubble(pet, shiftedScreen, bubbleSize, margin);
+        require(result.topLeft.y() == shiftedScreen.bottom() - bubbleSize.height() - margin + 1,
+                "normal bubble should clamp to the available bottom margin with a shifted screen");
+    }
+
     return 0;
 }

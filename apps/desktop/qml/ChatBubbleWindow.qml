@@ -169,6 +169,11 @@ ApplicationWindow {
         visible = false
     }
 
+    function hideForExpandedChat() {
+        hideTimer.stop()
+        visible = false
+    }
+
     function scheduleHide() {
         const interval = Math.max(2500, Math.min(10000, 2500 + Math.ceil(assistantText.length / 20) * 1000))
         startHideTimer(interval)
@@ -191,7 +196,7 @@ ApplicationWindow {
         }
 
         function onOpenWindowRequested() {
-            bubbleWindow.hideCurrentBubble()
+            bubbleWindow.hideForExpandedChat()
         }
 
         function onSendingChanged() {

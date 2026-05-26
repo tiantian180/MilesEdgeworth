@@ -29,6 +29,8 @@ def main() -> int:
     shell_cpp = read("apps/desktop/src/DesktopShellController.cpp")
     chat_qml = read("apps/desktop/qml/ChatWindow.qml")
     bubble_qml = read("apps/desktop/qml/ChatBubbleWindow.qml")
+    placement_cpp = read("apps/desktop/src/chat/ChatBubblePlacement.cpp")
+    placement_smoke = read("apps/desktop/tests/chat_bubble_placement_smoke.cpp")
 
     require(
         "check_phase_2_4_chat_compact_bubble" in root_cmake,
@@ -56,7 +58,10 @@ def main() -> int:
         "Q_PROPERTY(int petScreenAvailableY READ petScreenAvailableY NOTIFY petWindowGeometryChanged)",
         "Q_PROPERTY(int petScreenAvailableWidth READ petScreenAvailableWidth NOTIFY petWindowGeometryChanged)",
         "Q_PROPERTY(int petScreenAvailableHeight READ petScreenAvailableHeight NOTIFY petWindowGeometryChanged)",
+        "Q_PROPERTY(bool chatWindowExpanded READ chatWindowExpanded NOTIFY chatWindowStateChanged)",
+        "Q_INVOKABLE QVariantMap placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const;",
         "void petWindowGeometryChanged();",
+        "void chatWindowStateChanged();",
     ]:
         require(token in shell_h, f"DesktopShellController.h missing {token}")
     for token in [
@@ -67,8 +72,32 @@ def main() -> int:
         "QWindow::screenChanged",
         "availableGeometry()",
         "emit petWindowGeometryChanged();",
+        "emit chatWindowStateChanged();",
+        "const ChatBubblePlacementResult placement = ::placeChatBubble(",
+        "result.insert(QStringLiteral(\"pointer\"), placement.pointer);",
     ]:
         require(token in shell_cpp, f"DesktopShellController.cpp missing {token}")
+
+    for token in [
+        "pet.right() + 1 + safeMargin",
+        "pet.bottom() + 1 + safeMargin",
+        "available.right() - bubbleWidth - safeMargin + 1",
+        "available.bottom() - bubbleHeight - safeMargin + 1",
+        "QStringLiteral(\"topLeft\")",
+        "QStringLiteral(\"topRight\")",
+        "QStringLiteral(\"bottomLeft\")",
+        "QStringLiteral(\"bottomRight\")",
+    ]:
+        require(token in placement_cpp, f"ChatBubblePlacement.cpp missing {token}")
+    for token in [
+        "top-left pet should keep an exact horizontal margin",
+        "top-right pet should keep an exact horizontal margin",
+        "bottom-left pet should keep an exact vertical margin",
+        "bottom-right pet should keep an exact vertical margin",
+        "normal bubble should clamp to the available right margin",
+        "normal bubble should clamp to the available bottom margin with a shifted screen",
+    ]:
+        require(token in placement_smoke, f"chat_bubble_placement_smoke.cpp missing {token}")
 
     for token in [
         "property bool compactMode",
@@ -98,23 +127,36 @@ def main() -> int:
         "role === \"assistant\"",
         "pending === true",
         "function syncAssistantBubble()",
-        "function clampedBubbleX()",
-        "function clampedBubbleY()",
-        "App.DesktopShell.petScreenAvailableX",
-        "App.DesktopShell.petScreenAvailableY",
-        "App.DesktopShell.petScreenAvailableWidth",
-        "App.DesktopShell.petScreenAvailableHeight",
+        "function updatePlacement()",
+        "App.DesktopShell.placeChatBubble(width, height, bubbleMargin)",
+        "property string pointerPlacement",
+        "App.DesktopShell.chatWindowExpanded",
+        "function hideForExpandedChat()",
+        "bubbleWindow.hideForExpandedChat()",
         "function onSendingChanged()",
         "bubbleWindow.suppressNextAssistantBubble = false",
-        "hideTimer.interval = Math.max(4000, Math.min(12000, 3000 + assistantText.length * 80))",
-        "App.DesktopShell.petWindowX",
-        "App.DesktopShell.petWindowY",
-        "App.DesktopShell.petWindowWidth",
+        "function onChatWindowStateChanged()",
+        "function onPetWindowGeometryChanged()",
+        "const interval = Math.max(2500, Math.min(10000, 2500 + Math.ceil(assistantText.length / 20) * 1000))",
+        "function startHideTimer(interval)",
+        "hideDeadlineMs",
+        "remainingHideMs",
+        "Canvas",
+        "ctx.beginPath()",
+        "ctx.quadraticCurveTo",
+        "ctx.closePath()",
+        "ctx.stroke()",
+        "Text {",
+        "id: messageMeasure",
+        "ScrollView",
         "HoverHandler",
         "App.ChatController.openWindow()",
         "bubbleDismissed = true",
-        "enabled: bubbleHover.hovered",
         "opacity: bubbleHover.hovered ? 1 : 0",
+        "visible: opacity > 0",
+        "text: \"↗\"",
+        "text: \"×\"",
+        "color: \"#8d8780\"",
     ]:
         require(token in bubble_qml, f"ChatBubbleWindow.qml missing {token}")
 
