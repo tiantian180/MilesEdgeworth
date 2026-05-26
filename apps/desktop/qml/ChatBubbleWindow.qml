@@ -26,7 +26,8 @@ ApplicationWindow {
     readonly property int pointerExtent: 30
     readonly property int maxBubbleWidth: 320
     readonly property int minBubbleWidth: 190
-    readonly property int maxBodyHeight: 340
+    readonly property int maxBubbleHeight: 340
+    readonly property int maxBodyHeight: maxBubbleHeight - pointerExtent
     readonly property int bodyWidth: Math.max(minBubbleWidth,
             Math.min(maxBubbleWidth, messageMeasure.contentWidth + contentHorizontalPadding * 2))
     readonly property int bodyHeight: Math.max(76,

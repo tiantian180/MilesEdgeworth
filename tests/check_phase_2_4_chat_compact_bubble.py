@@ -283,7 +283,8 @@ def main() -> int:
 
     for token in [
         "readonly property int maxBubbleWidth: 320",
-        "readonly property int maxBodyHeight: 340",
+        "readonly property int maxBubbleHeight: 340",
+        "readonly property int maxBodyHeight: maxBubbleHeight - pointerExtent",
         "property int tailX: Math.round(width / 2)",
         "nextPlacement.tailX",
         "qrc:/ui-icons/maximize-2.svg",
@@ -291,11 +292,21 @@ def main() -> int:
         "anchors.topMargin: bubbleWindow.bodyTop + 14",
         "anchors.rightMargin: 16",
         "bubbleHover.hovered ? 0.82 : 0",
+        "ctx.lineTo(tailX - tailHalf, bodyTop)",
+        "ctx.lineTo(tailX, 4)",
+        "ctx.lineTo(tailX + tailHalf, bodyTop)",
         "ctx.lineTo(tailX - tailHalf, bodyBottom)",
         "ctx.lineTo(tailX, h - 4)",
         "ctx.lineTo(tailX + tailHalf, bodyBottom)",
     ]:
         require(token in bubble_qml, f"ChatBubbleWindow.qml missing bubble polish token {token}")
+
+    for token in [
+        'text: "↗"',
+        'text: "×"',
+        '"#8d8780"',
+    ]:
+        require(token not in bubble_qml, f"ChatBubbleWindow.qml must not use old glyph control {token}")
 
     print("phase 2.4 compact chat bubble contract ok")
     return 0
