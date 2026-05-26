@@ -47,10 +47,8 @@ func (p *fakeProvider) StreamChat(ctx context.Context, params chat.ChatParams) (
 		return p.streamFunc(ctx, params)
 	}
 
-	events := make(chan chat.StreamEvent, 4)
-	events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+	events := make(chan chat.StreamEvent, 1)
 	events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "异议あり。"}
-	events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
 	close(events)
 	return events, nil
 }
@@ -233,7 +231,6 @@ func TestChatPersistsPartialOnClientCancel(t *testing.T) {
 			events := make(chan chat.StreamEvent)
 			go func() {
 				defer close(events)
-				events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
 				events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "途中"}
 				close(partialSent)
 				<-ctx.Done()
@@ -282,11 +279,9 @@ func TestChatPersistsPartialOnceOnFlushError(t *testing.T) {
 	provider := &fakeProvider{
 		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
 			_ = ctx
-			events := make(chan chat.StreamEvent, 4)
-			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events := make(chan chat.StreamEvent, 2)
 			events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "途中"}
 			events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "まで"}
-			events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
 			close(events)
 			return events, nil
 		},
@@ -298,7 +293,7 @@ func TestChatPersistsPartialOnceOnFlushError(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := &flushErrorRecorder{
 		header:      make(http.Header),
-		failAtFlush: 2,
+		failAtFlush: 3,
 	}
 
 	handler.ServeHTTP(rec, req)
@@ -316,8 +311,7 @@ func TestChatDoesNotPersistAssistantAfterRunError(t *testing.T) {
 	provider := &fakeProvider{
 		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
 			_ = ctx
-			events := make(chan chat.StreamEvent, 4)
-			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events := make(chan chat.StreamEvent, 2)
 			events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "途中"}
 			events <- chat.StreamEvent{Type: "RUN_ERROR", RunID: params.RunID, Error: "provider failed"}
 			close(events)

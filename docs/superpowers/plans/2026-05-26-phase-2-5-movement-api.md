@@ -1358,7 +1358,7 @@ git commit -m "feat: 连接目标移动窗口桥接"
 - Modify: `apps/agent-core/internal/chat/service/service.go`
 - Modify: `apps/agent-core/internal/chat/service/service_test.go`
 
-- [ ] **Step 1: Extend chat model types**
+- [x] **Step 1: Extend chat model types**
 
 In `apps/agent-core/internal/chat/provider.go`, replace `Message`, extend `ChatParams`, and extend `StreamEvent`:
 
@@ -1412,7 +1412,7 @@ import (
 )
 ```
 
-- [ ] **Step 2: Add tool definitions and registry**
+- [x] **Step 2: Add tool definitions and registry**
 
 Create `apps/agent-core/internal/chat/service/tools.go`:
 
@@ -1499,7 +1499,7 @@ func availableTools() []chat.ToolDefinition {
 }
 ```
 
-- [ ] **Step 3: Update Service structure**
+- [x] **Step 3: Update Service structure**
 
 In `apps/agent-core/internal/chat/service/service.go`, add registry:
 
@@ -1528,7 +1528,7 @@ func (s *Service) SubmitToolResult(result ToolResult) bool {
 }
 ```
 
-- [ ] **Step 4: Write failing service tool-loop test**
+- [x] **Step 4: Write failing service tool-loop test**
 
 In `apps/agent-core/internal/chat/service/service_test.go`, extend `fakeProvider`:
 
@@ -1650,7 +1650,7 @@ Add imports:
 	"encoding/json"
 ```
 
-- [ ] **Step 5: Implement Service tool loop**
+- [x] **Step 5: Implement Service tool loop**
 
 Replace `Service.StreamChat` with a version that:
 
@@ -1700,7 +1700,7 @@ func appendToolMessages(messages []chat.Message, toolCall chat.StreamEvent, resu
 }
 ```
 
-- [ ] **Step 6: Update OpenAI provider request types**
+- [x] **Step 6: Update OpenAI provider request types**
 
 In `apps/agent-core/internal/chat/openai/provider.go`, replace `chatMessage` with:
 
@@ -1764,7 +1764,7 @@ func makeChatTools(tools []chat.ToolDefinition) []chatToolDefinition {
 
 Set `Tools: makeChatTools(params.Tools)` in streaming request body.
 
-- [ ] **Step 7: Stop provider-owned run lifecycle**
+- [x] **Step 7: Stop provider-owned run lifecycle**
 
 In `Provider.pipe`, remove sends for:
 
@@ -1776,7 +1776,7 @@ Keep `TEXT_MESSAGE_START`, `TEXT_MESSAGE_CONTENT`, `TEXT_MESSAGE_END`, `CUSTOM e
 
 If `params.Continuation` is true, still emit a fresh `TEXT_MESSAGE_START` with the current `MessageID`.
 
-- [ ] **Step 8: Aggregate OpenAI streaming tool_calls**
+- [x] **Step 8: Aggregate OpenAI streaming tool_calls**
 
 Extend `chatCompletionStreamChunk`:
 
@@ -1844,7 +1844,7 @@ send(ctx, events, chat.StreamEvent{
 
 Then return without emitting `TEXT_MESSAGE_END` if no text content started. If text content started before tool call, flush parser and emit `TEXT_MESSAGE_END` before the `TOOL_CALL`.
 
-- [ ] **Step 9: Update provider tests**
+- [x] **Step 9: Update provider tests**
 
 In `apps/agent-core/internal/chat/openai/provider_test.go`, update `TestStreamChatHappyPath` to expect no provider-level `RUN_STARTED` / `RUN_FINISHED`. Add a new test:
 
@@ -1902,7 +1902,7 @@ func TestStreamChatAggregatesToolCall(t *testing.T) {
 }
 ```
 
-- [ ] **Step 10: Run Go chat tests**
+- [x] **Step 10: Run Go chat tests**
 
 Run:
 

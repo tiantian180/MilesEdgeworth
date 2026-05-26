@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -78,24 +79,47 @@ func normalizeChatCompletionsURL(raw string) string {
 	}
 }
 
+type chatToolDefinition struct {
+	Type     string `json:"type"`
+	Function struct {
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		Parameters  json.RawMessage `json:"parameters"`
+	} `json:"function"`
+}
+
 type chatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role       string          `json:"role"`
+	Content    string          `json:"content,omitempty"`
+	ToolCalls  []chat.ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string          `json:"tool_call_id,omitempty"`
 }
 
 type chatCompletionRequest struct {
-	Model       string        `json:"model"`
-	Messages    []chatMessage `json:"messages"`
-	Stream      bool          `json:"stream"`
-	Temperature *float64      `json:"temperature,omitempty"`
-	MaxTokens   *int          `json:"max_tokens,omitempty"`
+	Model             string               `json:"model"`
+	Messages          []chatMessage        `json:"messages"`
+	Stream            bool                 `json:"stream"`
+	Temperature       *float64             `json:"temperature,omitempty"`
+	MaxTokens         *int                 `json:"max_tokens,omitempty"`
+	Tools             []chatToolDefinition `json:"tools,omitempty"`
+	ParallelToolCalls *bool                `json:"parallel_tool_calls,omitempty"`
 }
 
 type chatCompletionStreamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			ToolCalls []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
 		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 }
 
@@ -110,11 +134,13 @@ func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-ch
 
 	messages := makeChatMessages(params.Messages)
 	body := chatCompletionRequest{
-		Model:       p.model,
-		Messages:    messages,
-		Stream:      true,
-		Temperature: p.temperature,
-		MaxTokens:   p.maxTokens,
+		Model:             p.model,
+		Messages:          messages,
+		Stream:            true,
+		Temperature:       p.temperature,
+		MaxTokens:         p.maxTokens,
+		Tools:             makeChatTools(params.Tools),
+		ParallelToolCalls: parallelToolCallsParam(params.Tools),
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
@@ -221,9 +247,35 @@ func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string
 func makeChatMessages(messages []chat.Message) []chatMessage {
 	out := make([]chatMessage, 0, len(messages))
 	for _, message := range messages {
-		out = append(out, chatMessage{Role: message.Role, Content: message.Content})
+		out = append(out, chatMessage{
+			Role:       message.Role,
+			Content:    message.Content,
+			ToolCalls:  message.ToolCalls,
+			ToolCallID: message.ToolCallID,
+		})
 	}
 	return out
+}
+
+func makeChatTools(tools []chat.ToolDefinition) []chatToolDefinition {
+	out := make([]chatToolDefinition, 0, len(tools))
+	for _, tool := range tools {
+		var item chatToolDefinition
+		item.Type = "function"
+		item.Function.Name = tool.Name
+		item.Function.Description = tool.Description
+		item.Function.Parameters = tool.Parameters
+		out = append(out, item)
+	}
+	return out
+}
+
+func parallelToolCallsParam(tools []chat.ToolDefinition) *bool {
+	if len(tools) == 0 {
+		return nil
+	}
+	enabled := false
+	return &enabled
 }
 
 func providerErrorMessage(resp *http.Response, endpoint string, sample []byte) string {
@@ -259,27 +311,20 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	defer resp.Body.Close()
 	defer close(events)
 
-	if !send(ctx, events, chat.StreamEvent{Type: "RUN_STARTED", RunID: runID}) {
-		return
-	}
-	if !send(ctx, events, chat.StreamEvent{
-		Type:  "CUSTOM",
-		Name:  "miles.pet.lifecycle",
-		RunID: runID,
-		Value: map[string]any{"state": "thinking"},
-	}) {
-		return
-	}
-	if !send(ctx, events, chat.StreamEvent{
-		Type:      "TEXT_MESSAGE_START",
-		RunID:     runID,
-		MessageID: messageID,
-		Role:      "assistant",
-	}) {
-		return
-	}
-
 	sawFirstSpeaking := false
+	textStarted := false
+	ensureTextStarted := func() bool {
+		if textStarted {
+			return true
+		}
+		textStarted = true
+		return send(ctx, events, chat.StreamEvent{
+			Type:      "TEXT_MESSAGE_START",
+			RunID:     runID,
+			MessageID: messageID,
+			Role:      "assistant",
+		})
+	}
 	var pendingRawDelta strings.Builder
 	takeRawDelta := func() string {
 		raw := pendingRawDelta.String()
@@ -291,6 +336,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		"neutral",
 		func(text string) {
 			rawDelta := takeRawDelta()
+			if !ensureTextStarted() {
+				return
+			}
 			if !sawFirstSpeaking {
 				sawFirstSpeaking = true
 				logger.Debug("fallback expression inserted",
@@ -317,6 +365,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		func(tag string) {
 			rawDelta := takeRawDelta()
 			sawFirstSpeaking = true
+			if !ensureTextStarted() {
+				return
+			}
 			logger.Debug("expression tag parsed", "tag", tag)
 			send(ctx, events, chat.StreamEvent{
 				Type:     "CUSTOM",
@@ -327,6 +378,13 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 			})
 		},
 	)
+
+	type pendingToolCall struct {
+		id        string
+		name      strings.Builder
+		arguments strings.Builder
+	}
+	pendingTools := map[int]*pendingToolCall{}
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -348,6 +406,22 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 			continue
 		}
 		for _, choice := range chunk.Choices {
+			for _, tool := range choice.Delta.ToolCalls {
+				item := pendingTools[tool.Index]
+				if item == nil {
+					item = &pendingToolCall{}
+					pendingTools[tool.Index] = item
+				}
+				if tool.ID != "" {
+					item.id = tool.ID
+				}
+				if tool.Function.Name != "" {
+					item.name.WriteString(tool.Function.Name)
+				}
+				if tool.Function.Arguments != "" {
+					item.arguments.WriteString(tool.Function.Arguments)
+				}
+			}
 			if choice.Delta.Content != "" {
 				logger.Debug("provider delta received", "len", len([]rune(choice.Delta.Content)))
 				if mileslog.PayloadLoggingEnabled() {
@@ -370,12 +444,36 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	parser.Flush()
 	logger.Debug("stream finished")
 
-	send(ctx, events, chat.StreamEvent{
-		Type:      "TEXT_MESSAGE_END",
-		RunID:     runID,
-		MessageID: messageID,
-	})
-	send(ctx, events, chat.StreamEvent{Type: "RUN_FINISHED", RunID: runID})
+	if textStarted {
+		if !send(ctx, events, chat.StreamEvent{
+			Type:      "TEXT_MESSAGE_END",
+			RunID:     runID,
+			MessageID: messageID,
+		}) {
+			return
+		}
+	}
+	if len(pendingTools) == 0 {
+		return
+	}
+
+	indexes := make([]int, 0, len(pendingTools))
+	for index := range pendingTools {
+		indexes = append(indexes, index)
+	}
+	sort.Ints(indexes)
+	for _, index := range indexes {
+		item := pendingTools[index]
+		if !send(ctx, events, chat.StreamEvent{
+			Type:       "TOOL_CALL",
+			RunID:      runID,
+			ToolCallID: item.id,
+			ToolName:   item.name.String(),
+			ToolArgs:   item.arguments.String(),
+		}) {
+			return
+		}
+	}
 }
 
 func send(ctx context.Context, events chan<- chat.StreamEvent, e chat.StreamEvent) bool {
