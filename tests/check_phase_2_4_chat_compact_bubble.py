@@ -196,6 +196,21 @@ def main() -> int:
         require(token in composer_qml, f"ChatComposer.qml missing compact polish token {token}")
 
     for token in [
+        "flags: Qt.Window | Qt.FramelessWindowHint",
+        "color: \"transparent\"",
+        "id: expandedShell",
+        "id: expandedTitleBar",
+        "qrc:/ui-icons/menu.svg",
+        "qrc:/ui-icons/settings.svg",
+        "qrc:/ui-icons/refresh-ccw.svg",
+        "qrc:/ui-icons/minimize-2.svg",
+        "expandedTitleDragArea",
+        "showExpanded()",
+        "showCompact()",
+    ]:
+        require(token in chat_qml, f"ChatWindow.qml missing expanded polish token {token}")
+
+    for token in [
         "property bool compactMode",
         "property int compactWidth: 380",
         "property int compactMinHeight: 56",
@@ -220,12 +235,17 @@ def main() -> int:
         "App.DesktopShell.setChatWindowExpanded(visible && !compactMode)",
         "visible: !chatWindow.compactMode",
         "enabled: chatWindow.compactMode",
-        "text: \"收起\"",
         "onExpandRequested: App.ChatController.openWindow()",
         "onCloseRequested: chatWindow.hideChatUi()",
         "App.ChatController.sendMessage(text)",
     ]:
         require(token in chat_qml, f"ChatWindow.qml missing {token}")
+    for token in [
+        "text: \"设置\"",
+        "text: \"重连\"",
+        "text: \"收起\"",
+    ]:
+        require(token not in chat_qml, f"ChatWindow.qml must replace old text button {token}")
 
     for token in [
         "ApplicationWindow",
