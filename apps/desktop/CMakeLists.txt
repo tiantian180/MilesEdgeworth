@@ -225,6 +225,7 @@ qt_add_qml_module(MilesEdgeworthDesktop
     VERSION 1.0
     QML_FILES
         qml/ChatBubbleWindow.qml
+        qml/ChatComposer.qml
         qml/ChatWindow.qml
         qml/PetWindow.qml
         qml/SettingsWindow.qml
