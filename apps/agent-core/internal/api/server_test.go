@@ -190,6 +190,121 @@ func TestChatRejectsUnknownConversation(t *testing.T) {
 	}
 }
 
+func TestToolResultEndpointRoutesResultToWaitingRun(t *testing.T) {
+	provider := &fakeProvider{}
+	provider.streamFunc = func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+		_ = ctx
+		events := make(chan chat.StreamEvent, 3)
+		switch provider.calls() {
+		case 1:
+			events <- chat.StreamEvent{
+				Type:       "TOOL_CALL",
+				RunID:      params.RunID,
+				ToolCallID: "tc-1",
+				ToolName:   "pet_motion",
+				ToolArgs:   `{"action":"moveTo","x":0.5,"y":0.5}`,
+			}
+		default:
+			events <- chat.StreamEvent{Type: "TEXT_MESSAGE_CONTENT", RunID: params.RunID, MessageID: params.MessageID, Delta: "到着しました。"}
+		}
+		close(events)
+		return events, nil
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"move"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("chat status = %d, want 200", resp.StatusCode)
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	var toolEvent chat.StreamEvent
+	for {
+		event := readNextSSEEvent(t, reader)
+		if event.Type == "TOOL_CALL" {
+			toolEvent = event
+			break
+		}
+	}
+
+	wrongBody := fmt.Sprintf(`{"runId":%q,"toolCallId":"wrong","result":{"success":true}}`, toolEvent.RunID)
+	wrongResp, err := http.Post(server.URL+"/v1/chat/tool-result", "application/json", strings.NewReader(wrongBody))
+	if err != nil {
+		t.Fatalf("POST mismatched /v1/chat/tool-result: %v", err)
+	}
+	defer wrongResp.Body.Close()
+	if wrongResp.StatusCode != http.StatusNotFound {
+		payload, _ := io.ReadAll(wrongResp.Body)
+		t.Fatalf("mismatched tool result status = %d, want 404; body=%s", wrongResp.StatusCode, payload)
+	}
+
+	body := fmt.Sprintf(`{"runId":%q,"toolCallId":%q,"result":{"success":true}}`, toolEvent.RunID, toolEvent.ToolCallID)
+	toolResp, err := http.Post(server.URL+"/v1/chat/tool-result", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST /v1/chat/tool-result: %v", err)
+	}
+	defer toolResp.Body.Close()
+	if toolResp.StatusCode != http.StatusAccepted {
+		payload, _ := io.ReadAll(toolResp.Body)
+		t.Fatalf("tool result status = %d, want 202; body=%s", toolResp.StatusCode, payload)
+	}
+
+	for {
+		event := readNextSSEEvent(t, reader)
+		if event.Type == "RUN_FINISHED" {
+			break
+		}
+	}
+	if provider.calls() != 2 {
+		t.Fatalf("provider calls = %d, want 2", provider.calls())
+	}
+}
+
+func TestToolResultEndpointReturns404ForStaleRun(t *testing.T) {
+	_, handler := newTestHandler(t, nil, 8192)
+
+	body := strings.NewReader(`{"runId":"missing-run","toolCallId":"tc-1","result":{"success":true}}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/tool-result", body)
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404; body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestToolResultEndpointRejectsBadRequests(t *testing.T) {
+	_, handler := newTestHandler(t, nil, 8192)
+
+	tests := []struct {
+		name   string
+		method string
+		body   string
+		want   int
+	}{
+		{name: "bad json", method: http.MethodPost, body: `{`, want: http.StatusBadRequest},
+		{name: "missing run", method: http.MethodPost, body: `{"toolCallId":"tc-1","result":{"success":true}}`, want: http.StatusBadRequest},
+		{name: "missing tool call", method: http.MethodPost, body: `{"runId":"run-1","result":{"success":true}}`, want: http.StatusBadRequest},
+		{name: "missing result", method: http.MethodPost, body: `{"runId":"run-1","toolCallId":"tc-1"}`, want: http.StatusBadRequest},
+		{name: "wrong method", method: http.MethodGet, body: ``, want: http.StatusMethodNotAllowed},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, "/v1/chat/tool-result", strings.NewReader(tt.body))
+			res := httptest.NewRecorder()
+
+			handler.ServeHTTP(res, req)
+
+			if res.Code != tt.want {
+				t.Fatalf("status = %d, want %d; body=%s", res.Code, tt.want, res.Body.String())
+			}
+		})
+	}
+}
+
 func TestGetConversationMessagesIncludesPartialFlag(t *testing.T) {
 	st, server := newTestServer(t, &fakeProvider{}, 8192)
 	conv := createConversation(t, st)
@@ -539,6 +654,47 @@ func readSSEEvents(t *testing.T, body io.Reader) []chat.StreamEvent {
 		events = append(events, event)
 	}
 	return events
+}
+
+func readNextSSEEvent(t *testing.T, reader *bufio.Reader) chat.StreamEvent {
+	t.Helper()
+
+	type result struct {
+		event chat.StreamEvent
+		err   error
+	}
+	done := make(chan result, 1)
+	go func() {
+		for {
+			line, err := reader.ReadBytes('\n')
+			if err != nil {
+				done <- result{err: err}
+				return
+			}
+			line = bytes.TrimSpace(line)
+			if !bytes.HasPrefix(line, []byte("data: ")) {
+				continue
+			}
+			var event chat.StreamEvent
+			if err := json.Unmarshal(bytes.TrimPrefix(line, []byte("data: ")), &event); err != nil {
+				done <- result{err: fmt.Errorf("decode SSE event %q: %w", line, err)}
+				return
+			}
+			done <- result{event: event}
+			return
+		}
+	}()
+
+	select {
+	case got := <-done:
+		if got.err != nil {
+			t.Fatalf("read SSE event: %v", got.err)
+		}
+		return got.event
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for SSE event")
+		return chat.StreamEvent{}
+	}
 }
 
 func eventually(t *testing.T, timeout time.Duration, check func() bool) {

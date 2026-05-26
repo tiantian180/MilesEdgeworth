@@ -45,6 +45,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversations", s.handleConversations)
 	mux.HandleFunc("/v1/conversations/", s.handleConversationByID)
 	mux.HandleFunc("/v1/chat/messages", s.handleChatMessages)
+	mux.HandleFunc("/v1/chat/tool-result", s.handleChatToolResult)
 	return mux
 }
 
@@ -272,6 +273,39 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	persistPartialOnce(false)
+}
+
+func (s *Server) handleChatToolResult(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w, http.MethodPost)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBodyBytes)
+	var req struct {
+		RunID      string          `json:"runId"`
+		ToolCallID string          `json:"toolCallId"`
+		Result     json.RawMessage `json:"result"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON"})
+		return
+	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	req.ToolCallID = strings.TrimSpace(req.ToolCallID)
+	if req.RunID == "" || req.ToolCallID == "" || len(req.Result) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "runId, toolCallId, and result are required"})
+		return
+	}
+	if !s.chatService.SubmitToolResult(chatservice.ToolResult{
+		RunID:      req.RunID,
+		ToolCallID: req.ToolCallID,
+		Result:     req.Result,
+	}) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "tool result target not found"})
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

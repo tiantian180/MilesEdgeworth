@@ -1237,7 +1237,7 @@ Expected:
 100% tests passed
 ```
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 Run:
 
@@ -1933,7 +1933,7 @@ git commit -m "feat: 添加 sidecar 工具调用循环"
 - Modify: `apps/agent-core/internal/api/server.go`
 - Modify: `apps/agent-core/internal/api/server_test.go`
 
-- [ ] **Step 1: Add failing API route test**
+- [x] **Step 1: Add failing API route test**
 
 In `apps/agent-core/internal/api/server_test.go`, add:
 
@@ -1962,7 +1962,7 @@ Add imports if absent:
 	"strings"
 ```
 
-- [ ] **Step 2: Register route**
+- [x] **Step 2: Register route**
 
 In `Server.Routes`, add:
 
@@ -1970,7 +1970,7 @@ In `Server.Routes`, add:
 	mux.HandleFunc("/v1/chat/tool-result", s.handleChatToolResult)
 ```
 
-- [ ] **Step 3: Implement handler**
+- [x] **Step 3: Implement handler**
 
 In `apps/agent-core/internal/api/server.go`, add:
 
@@ -2009,7 +2009,7 @@ func (s *Server) handleChatToolResult(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-- [ ] **Step 4: Run API tests**
+- [x] **Step 4: Run API tests**
 
 Run:
 
