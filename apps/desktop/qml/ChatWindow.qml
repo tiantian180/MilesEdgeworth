@@ -559,20 +559,6 @@ ApplicationWindow {
             border.color: chatWindow.compactMode ? "#d7cec3" : "transparent"
             border.width: chatWindow.compactMode ? 1 : 0
 
-            MouseArea {
-                anchors.fill: parent
-                enabled: chatWindow.compactMode
-                acceptedButtons: Qt.LeftButton
-                propagateComposedEvents: true
-                onPressed: function(mouse) {
-                    if (mouse.y < 8 || mouse.x < 46 || mouse.x > width - 46) {
-                        chatWindow.startSystemMove()
-                    } else {
-                        mouse.accepted = false
-                    }
-                }
-            }
-
             ChatComposer {
                 id: compactComposer
 
@@ -595,6 +581,36 @@ ApplicationWindow {
                         chatWindow.maximumHeight = chatWindow.height
                     }
                 }
+            }
+
+            MouseArea {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                height: 8
+                enabled: chatWindow.compactMode
+                acceptedButtons: Qt.LeftButton
+                onPressed: chatWindow.startSystemMove()
+            }
+
+            MouseArea {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 46
+                enabled: chatWindow.compactMode
+                acceptedButtons: Qt.LeftButton
+                onPressed: chatWindow.startSystemMove()
+            }
+
+            MouseArea {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: 46
+                enabled: chatWindow.compactMode
+                acceptedButtons: Qt.LeftButton
+                onPressed: chatWindow.startSystemMove()
             }
         }
     }
