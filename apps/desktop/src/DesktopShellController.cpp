@@ -11,6 +11,7 @@
 #include <QPoint>
 #include <QRect>
 #include <QScreen>
+#include <QSize>
 #include <QString>
 #include <QStringList>
 #include <QSystemTrayIcon>
