@@ -86,6 +86,11 @@ def main() -> int:
         icon_svg = read(f"apps/desktop/resources/icons/{icon_name}.svg")
         require('fill="none"' in icon_svg, f"{icon_name}.svg must use fill=\"none\"")
 
+    for icon_name in ["arrow-up-white", "arrow-up-muted"]:
+        icon_svg = read(f"apps/desktop/resources/icons/{icon_name}.svg")
+        require('stroke-width="2.4"' in icon_svg, f"{icon_name}.svg must use the refined arrow stroke")
+        require('d="m7 10 5-5 5 5"' in icon_svg, f"{icon_name}.svg must use the narrower arrow head")
+
     square_stop_svg = read("apps/desktop/resources/icons/square-stop.svg")
     require('fill="#5f554b"' in square_stop_svg, "square-stop.svg must use fill=\"#5f554b\"")
 
@@ -191,10 +196,12 @@ def main() -> int:
         "readonly property int outerVerticalPadding: compactMode ? 7 : 14",
         "readonly property bool readyToSend: canSubmit && !App.ChatController.sending",
         "readonly property int buttonSize: compactMode ? 30 : 32",
-        "readonly property int sideButtonWidth: compactMode ? 30 : 0",
+        "readonly property int sideButtonWidth: compactMode ? 36 : 0",
         "readonly property int sideIconSize: 14",
-        "width: App.ChatController.sending ? 10 : 14",
+        "width: App.ChatController.sending ? 13 : 16",
         "sourceSize.width: width",
+        'tooltipText: ""',
+        "ToolTip.visible: !root.compactMode && hovered",
         "hoverEnabled: true",
         "sendButton.hovered ? \"#3b668a\" : \"#315a7d\"",
         "App.ChatController.sending",
@@ -307,7 +314,7 @@ def main() -> int:
         "nextPlacement.tailX",
         "qrc:/ui-icons/maximize-2.svg",
         "qrc:/ui-icons/x.svg",
-        "anchors.topMargin: bubbleWindow.bodyTop + 14",
+        "anchors.topMargin: bubbleWindow.bodyTop + 6",
         "anchors.rightMargin: 20",
         "anchors.rightMargin: bubbleWindow.contentHorizontalPadding",
         "bubbleHover.hovered ? 0.82 : 0",

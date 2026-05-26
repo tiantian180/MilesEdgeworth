@@ -30,7 +30,7 @@ Item {
             Math.min(inputMaxHeight, Math.ceil(input.contentHeight + 18)))
     readonly property int outerVerticalPadding: compactMode ? 7 : 14
     readonly property int buttonSize: compactMode ? 30 : 32
-    readonly property int sideButtonWidth: compactMode ? 30 : 0
+    readonly property int sideButtonWidth: compactMode ? 36 : 0
     readonly property int sideIconSize: 14
 
     implicitWidth: compactMode ? compactBarWidth : 520
@@ -76,7 +76,7 @@ Item {
             visible: root.compactMode
             iconSource: root.expandIconSource
             iconSize: root.sideIconSize
-            tooltipText: "展开聊天"
+            tooltipText: ""
             showHoverFill: false
             Layout.preferredWidth: visible ? root.sideButtonWidth : 0
             Layout.preferredHeight: root.inputMinHeight
@@ -140,13 +140,13 @@ Item {
                 hoverEnabled: true
                 text: ""
                 padding: 0
-                ToolTip.visible: hovered
+                ToolTip.visible: !root.compactMode && hovered
                 ToolTip.text: App.ChatController.sending ? "停止回复" : "发送"
                 contentItem: Item {
                     Image {
                         anchors.centerIn: parent
-                        width: App.ChatController.sending ? 10 : 14
-                        height: App.ChatController.sending ? 10 : 14
+                        width: App.ChatController.sending ? 13 : 16
+                        height: App.ChatController.sending ? 13 : 16
                         source: App.ChatController.sending ? root.stopIconSource : root.sendIconSource
                         sourceSize.width: width
                         sourceSize.height: height
@@ -176,7 +176,7 @@ Item {
             visible: root.compactMode
             iconSource: root.closeIconSource
             iconSize: root.sideIconSize
-            tooltipText: "隐藏聊天"
+            tooltipText: ""
             showHoverFill: false
             Layout.preferredWidth: visible ? root.sideButtonWidth : 0
             Layout.preferredHeight: root.inputMinHeight

@@ -338,7 +338,7 @@ ApplicationWindow {
 
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.topMargin: bubbleWindow.bodyTop + 14
+            anchors.topMargin: bubbleWindow.bodyTop + 6
             anchors.rightMargin: 20
             spacing: 5
             z: 2
@@ -358,7 +358,7 @@ ApplicationWindow {
                 height: 14
                 implicitWidth: 14
                 implicitHeight: 14
-                tooltipText: "展开聊天"
+                tooltipText: ""
                 showHoverFill: false
                 onClicked: App.ChatController.openWindow()
             }
@@ -372,7 +372,7 @@ ApplicationWindow {
                 height: 14
                 implicitWidth: 14
                 implicitHeight: 14
-                tooltipText: "隐藏气泡"
+                tooltipText: ""
                 showHoverFill: false
                 onClicked: bubbleWindow.hideCurrentBubble()
             }
