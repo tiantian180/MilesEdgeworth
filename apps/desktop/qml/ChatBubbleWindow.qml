@@ -23,11 +23,12 @@ ApplicationWindow {
     readonly property int bubbleMargin: 12
     readonly property int contentHorizontalPadding: 24
     readonly property int contentVerticalPadding: 22
-    readonly property int pointerExtent: 30
+    readonly property int pointerExtent: 20
     readonly property int maxBubbleWidth: 320
     readonly property int minBubbleWidth: 190
     readonly property int maxBubbleHeight: 340
     readonly property int maxBodyHeight: maxBubbleHeight - pointerExtent
+    readonly property bool bodyAtMaxHeight: messageMeasure.contentHeight + contentVerticalPadding * 2 >= maxBodyHeight
     readonly property int bodyWidth: Math.max(minBubbleWidth,
             Math.min(maxBubbleWidth, messageMeasure.contentWidth + contentHorizontalPadding * 2))
     readonly property int bodyHeight: Math.max(76,
@@ -47,7 +48,7 @@ ApplicationWindow {
         x = nextPlacement.x || 0
         y = nextPlacement.y || 0
         pointerPlacement = nextPlacement.pointer || "bottomLeft"
-        tailX = Math.max(42, Math.min(width - 42, nextPlacement.tailX || Math.round(width / 2)))
+        tailX = Math.max(38, Math.min(width - 38, nextPlacement.tailX || Math.round(width / 2)))
         if (bubbleCanvas) {
             bubbleCanvas.requestPaint()
         }
@@ -272,8 +273,8 @@ ApplicationWindow {
                 const ctx = getContext("2d")
                 const w = bubbleWindow.width
                 const h = bubbleWindow.height
-                const tailX = Math.max(42, Math.min(w - 42, bubbleWindow.tailX))
-                const tailHalf = 18
+                const tailX = Math.max(38, Math.min(w - 38, bubbleWindow.tailX))
+                const tailHalf = 10
                 const bodyTop = bubbleWindow.bodyTop
                 const bodyBottom = bubbleWindow.bodyBottom
                 const radius = 22
@@ -281,6 +282,8 @@ ApplicationWindow {
                 const right = w - 4
 
                 ctx.clearRect(0, 0, w, h)
+                ctx.lineJoin = "round"
+                ctx.lineCap = "round"
                 ctx.beginPath()
                 ctx.moveTo(left + radius, bodyTop)
 
@@ -308,7 +311,7 @@ ApplicationWindow {
 
                 ctx.fillStyle = "#fffdf8"
                 ctx.fill()
-                ctx.lineWidth = 3
+                ctx.lineWidth = 2.4
                 ctx.strokeStyle = "#6f6a63"
                 ctx.stroke()
             }
@@ -336,8 +339,9 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.right: parent.right
             anchors.topMargin: bubbleWindow.bodyTop + 14
-            anchors.rightMargin: 16
-            spacing: 8
+            anchors.rightMargin: 20
+            spacing: 5
+            z: 2
             opacity: bubbleHover.hovered ? 0.82 : 0
             visible: opacity > 0
 
@@ -349,9 +353,11 @@ ApplicationWindow {
                 id: expandButton
 
                 iconSource: "qrc:/ui-icons/maximize-2.svg"
-                iconSize: 16
-                width: 22
-                height: 22
+                iconSize: 12
+                width: 16
+                height: 16
+                implicitWidth: 16
+                implicitHeight: 16
                 tooltipText: "展开聊天"
                 showHoverFill: false
                 onClicked: App.ChatController.openWindow()
@@ -361,9 +367,11 @@ ApplicationWindow {
                 id: closeBubbleButton
 
                 iconSource: "qrc:/ui-icons/x.svg"
-                iconSize: 16
-                width: 22
-                height: 22
+                iconSize: 12
+                width: 16
+                height: 16
+                implicitWidth: 16
+                implicitHeight: 16
                 tooltipText: "隐藏气泡"
                 showHoverFill: false
                 onClicked: bubbleWindow.hideCurrentBubble()
@@ -378,7 +386,7 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.leftMargin: bubbleWindow.contentHorizontalPadding
-            anchors.rightMargin: bubbleWindow.contentHorizontalPadding + 60
+            anchors.rightMargin: bubbleWindow.contentHorizontalPadding
             anchors.topMargin: bubbleWindow.pointerPlacement.startsWith("top")
                     ? bubbleWindow.pointerExtent + bubbleWindow.contentVerticalPadding
                     : bubbleWindow.contentVerticalPadding
@@ -408,7 +416,7 @@ ApplicationWindow {
 
                 onTextChanged: {
                     if (!bubbleHover.hovered && !activeFocus) {
-                        cursorPosition = text.length
+                        cursorPosition = bubbleWindow.bodyAtMaxHeight ? text.length : 0
                     }
                 }
             }

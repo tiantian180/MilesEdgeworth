@@ -22,13 +22,14 @@ Item {
     readonly property bool hasText: input.text.trim().length > 0
     readonly property bool canSubmit: App.ChatController.sending
             || (App.ChatController.sidecarReady && providerConfigured && hasText)
+    readonly property bool readyToSend: canSubmit && !App.ChatController.sending
     readonly property int compactBarWidth: 380
-    readonly property int inputMinHeight: compactMode ? 42 : 52
+    readonly property int inputMinHeight: compactMode ? 42 : 50
     readonly property int inputMaxHeight: compactMode ? 140 : 156
     readonly property int inputTargetHeight: Math.max(inputMinHeight,
             Math.min(inputMaxHeight, Math.ceil(input.contentHeight + 18)))
     readonly property int outerVerticalPadding: compactMode ? 7 : 14
-    readonly property int buttonSize: compactMode ? 34 : 38
+    readonly property int buttonSize: compactMode ? 30 : 32
 
     implicitWidth: compactMode ? compactBarWidth : 520
     implicitHeight: inputTargetHeight + outerVerticalPadding * 2
@@ -72,7 +73,7 @@ Item {
 
             visible: root.compactMode
             iconSource: root.expandIconSource
-            iconSize: 20
+            iconSize: 18
             tooltipText: "展开聊天"
             showHoverFill: false
             Layout.preferredWidth: visible ? 36 : 0
@@ -130,29 +131,35 @@ Item {
                 width: root.buttonSize
                 height: root.buttonSize
                 anchors.right: parent.right
-                anchors.rightMargin: root.compactMode ? 8 : 10
+                anchors.rightMargin: root.compactMode ? 7 : 9
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: root.compactMode ? 5 : 8
                 enabled: root.canSubmit
+                hoverEnabled: true
                 text: ""
                 padding: 0
                 ToolTip.visible: hovered
                 ToolTip.text: App.ChatController.sending ? "停止回复" : "发送"
                 contentItem: Image {
                     source: App.ChatController.sending ? root.stopIconSource : root.sendIconSource
-                    sourceSize.width: App.ChatController.sending ? 18 : 22
-                    sourceSize.height: App.ChatController.sending ? 18 : 22
+                    sourceSize.width: App.ChatController.sending ? 11 : 16
+                    sourceSize.height: App.ChatController.sending ? 11 : 16
                     fillMode: Image.PreserveAspectFit
                     horizontalAlignment: Image.AlignHCenter
                     verticalAlignment: Image.AlignVCenter
+                    opacity: sendButton.enabled ? 1.0 : 0.38
                     smooth: true
                 }
                 background: Rectangle {
                     radius: root.buttonSize / 2
-                    color: sendButton.enabled
-                            ? (sendButton.down ? "#254867" : "#315a7d")
-                            : "#ede8df"
-                    border.color: sendButton.enabled ? "#254867" : "#d7cec3"
+                    color: App.ChatController.sending
+                            ? (sendButton.down ? "#dfd5c9" : (sendButton.hovered ? "#f4ecdf" : "#eee8de"))
+                            : (root.readyToSend
+                            ? (sendButton.down ? "#244861" : (sendButton.hovered ? "#3b668a" : "#315a7d"))
+                            : "#eee8de")
+                    border.color: App.ChatController.sending
+                            ? "#d1c6ba"
+                            : (root.readyToSend ? (sendButton.hovered ? "#2d5576" : "#315a7d") : "#d8cec1")
                 }
                 onClicked: root.submitOrCancel()
             }
@@ -163,7 +170,7 @@ Item {
 
             visible: root.compactMode
             iconSource: root.closeIconSource
-            iconSize: 20
+            iconSize: 18
             tooltipText: "隐藏聊天"
             showHoverFill: false
             Layout.preferredWidth: visible ? 36 : 0

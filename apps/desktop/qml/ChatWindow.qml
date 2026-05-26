@@ -167,6 +167,7 @@ ApplicationWindow {
             color: "#fffaf2"
             border.color: "#d8cec1"
             border.width: 1
+            antialiasing: true
             clip: true
 
             ColumnLayout {
@@ -177,8 +178,8 @@ ApplicationWindow {
                     id: expandedTitleBar
 
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 54
-                    color: "#fffaf2"
+                    Layout.preferredHeight: 46
+                    color: "transparent"
 
                     MouseArea {
                         id: expandedTitleDragArea
@@ -191,13 +192,16 @@ ApplicationWindow {
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 18
-                        anchors.rightMargin: 18
+                        anchors.leftMargin: 16
+                        anchors.rightMargin: 16
                         z: 1
-                        spacing: 10
+                        spacing: 8
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/menu.svg"
+                            iconSize: 18
+                            Layout.preferredWidth: 28
+                            Layout.preferredHeight: 28
                             tooltipText: "会话"
                             onClicked: chatWindow.conversationPanelOpen = !chatWindow.conversationPanelOpen
                         }
@@ -205,7 +209,7 @@ ApplicationWindow {
                         Label {
                             text: "Miles"
                             color: "#2d2925"
-                            font.pixelSize: 19
+                            font.pixelSize: 18
                             font.weight: Font.DemiBold
                         }
 
@@ -219,7 +223,7 @@ ApplicationWindow {
                         Label {
                             text: App.ChatController.statusText
                             color: App.ChatController.sidecarReady ? "#557c59" : "#8a4b38"
-                            font.pixelSize: 13
+                            font.pixelSize: 12
                             elide: Text.ElideRight
                             Layout.maximumWidth: 128
                         }
@@ -228,12 +232,18 @@ ApplicationWindow {
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/settings.svg"
+                            iconSize: 17
+                            Layout.preferredWidth: 28
+                            Layout.preferredHeight: 28
                             tooltipText: "设置"
                             onClicked: App.SettingsController.openWindow()
                         }
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/refresh-ccw.svg"
+                            iconSize: 17
+                            Layout.preferredWidth: 28
+                            Layout.preferredHeight: 28
                             tooltipText: "重连"
                             enabled: !App.ChatController.sending
                             onClicked: {
@@ -244,12 +254,18 @@ ApplicationWindow {
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/minimize-2.svg"
+                            iconSize: 17
+                            Layout.preferredWidth: 28
+                            Layout.preferredHeight: 28
                             tooltipText: "收起"
                             onClicked: chatWindow.showCompact()
                         }
 
                         MilesIconButton {
                             iconSource: "qrc:/ui-icons/x.svg"
+                            iconSize: 17
+                            Layout.preferredWidth: 28
+                            Layout.preferredHeight: 28
                             tooltipText: "隐藏聊天"
                             onClicked: chatWindow.hideChatUi()
                         }
@@ -569,9 +585,11 @@ ApplicationWindow {
             visible: chatWindow.compactMode
             Layout.fillWidth: true
             Layout.preferredHeight: compactComposer.implicitHeight
-            radius: 0
-            color: "transparent"
-            border.width: 0
+            radius: 18
+            color: "#fffaf2"
+            border.color: "#d8cec1"
+            border.width: 1
+            antialiasing: true
 
             MouseArea {
                 id: compactDragArea
