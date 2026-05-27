@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"milesedgeworth/agent-core/internal/chat"
 	"milesedgeworth/agent-core/internal/store"
@@ -913,6 +914,65 @@ func TestStreamChatMultipleToolCallsReturnRunError(t *testing.T) {
 	}
 	if !strings.Contains(got[len(got)-1].Error, "multiple tool calls") {
 		t.Fatalf("RUN_ERROR = %q, want multiple tool calls diagnostic", got[len(got)-1].Error)
+	}
+}
+
+func TestStreamChatEmitsToolTimeoutEventBeforeContinuation(t *testing.T) {
+	oldTimeout := ToolResultTimeout
+	ToolResultTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { ToolResultTimeout = oldTimeout })
+
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "走到右边。")
+
+	provider := &fakeProvider{
+		streamEventLists: [][]chat.StreamEvent{
+			{
+				{Type: "TOOL_CALL", RunID: "run-1", ToolCallID: "tc-1", ToolName: "pet_motion", ToolArgs: `{"action":"moveTo","x":1,"y":0.5}`},
+			},
+			{
+				{Type: "TEXT_MESSAGE_START", RunID: "run-1", MessageID: "msg-2", Role: "assistant"},
+				{Type: "TEXT_MESSAGE_CONTENT", RunID: "run-1", MessageID: "msg-2", Delta: "移动超时。"},
+				{Type: "TEXT_MESSAGE_END", RunID: "run-1", MessageID: "msg-2"},
+			},
+		},
+	}
+
+	events, err := newTestService(s, provider, 8192).StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []chat.StreamEvent
+	for event := range events {
+		got = append(got, event)
+	}
+	if provider.streamCalls != 2 {
+		t.Fatalf("stream calls = %d, want continuation after timeout", provider.streamCalls)
+	}
+	foundTimeoutEvent := false
+	for _, event := range got {
+		if event.Type == "CUSTOM" && event.Name == ToolTimedOutEventName {
+			foundTimeoutEvent = true
+			if event.Value["toolCallId"] != "tc-1" {
+				t.Fatalf("timeout event toolCallId = %+v", event.Value)
+			}
+		}
+	}
+	if !foundTimeoutEvent {
+		t.Fatalf("events = %+v, want %s custom event", got, ToolTimedOutEventName)
+	}
+	secondMessages := provider.streamParamsList[1].Messages
+	if secondMessages[len(secondMessages)-1].Content != `{"success":false,"reason":"timeout"}` {
+		t.Fatalf("timeout tool result content = %q", secondMessages[len(secondMessages)-1].Content)
 	}
 }
 

@@ -72,6 +72,9 @@ void MotionController::setScreenGeometry(const QRect &screenGeometry)
 
 void MotionController::setCurrentPosition(const QPoint &petWindowPosition)
 {
+    if (m_state == State::Moving) {
+        return;
+    }
     m_currentPosition = petWindowPosition;
     m_currentPositionF = QPointF(petWindowPosition);
 }

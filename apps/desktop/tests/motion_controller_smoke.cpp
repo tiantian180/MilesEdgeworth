@@ -6,6 +6,7 @@
 #include <QPoint>
 #include <QRect>
 #include <QThread>
+#include <QTimer>
 #include <QVector>
 
 #include <cmath>
@@ -240,6 +241,39 @@ int main(int argc, char *argv[])
     require(waitFor([&]() { return lowSpeedCompleted; }, 500),
             "low speed movement should accumulate subpixel progress and complete");
     require(lowSpeedController.currentPosition() == QPoint(2, 0), "low speed movement should finish at target");
+
+    MotionController feedbackController;
+    feedbackController.configure(lowSpeedConfig);
+    feedbackController.setScreenGeometry(QRect(0, 0, 100, 100));
+    feedbackController.setCurrentPosition(QPoint(0, 0));
+
+    bool feedbackCompleted = false;
+    QVector<QPoint> feedbackPositions;
+    QTimer feedbackTimer;
+    feedbackTimer.setInterval(1);
+    QObject::connect(&feedbackTimer, &QTimer::timeout, &feedbackController,
+                     [&feedbackController, &feedbackTimer]() {
+                         if (!feedbackController.isMoving()) {
+                             feedbackTimer.stop();
+                             return;
+                         }
+                         feedbackController.setCurrentPosition(feedbackController.currentPosition());
+                     });
+    QObject::connect(&feedbackController, &MotionController::positionChanged, &feedbackController,
+                     [&](const QPoint &position) {
+                         feedbackPositions.append(position);
+                     });
+    QObject::connect(&feedbackController, &MotionController::completed, &feedbackController,
+                     [&](double, double) {
+                         feedbackCompleted = true;
+                     });
+    feedbackController.moveTo(0.02, 0.0, QStringLiteral("walk"));
+    feedbackTimer.start();
+    require(waitFor([&]() { return feedbackCompleted; }, 500),
+            "window feedback during movement must not reset subpixel progress");
+    require(feedbackController.currentPosition() == QPoint(2, 0),
+            "window feedback movement should finish at target");
+    require(!feedbackPositions.isEmpty(), "window feedback movement should emit positions");
 
     MotionController idleClampController;
     idleClampController.configure(testConfig());

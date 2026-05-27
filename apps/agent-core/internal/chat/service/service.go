@@ -229,6 +229,18 @@ func (s *Service) streamChatRun(ctx context.Context, req BuildRequest, events ch
 		if !ok {
 			return
 		}
+		if result.TimedOut && !send(ctx, events, chat.StreamEvent{
+			Type:      "CUSTOM",
+			Name:      ToolTimedOutEventName,
+			RunID:     req.RunID,
+			MessageID: req.MessageID,
+			Value: map[string]any{
+				"toolCallId": pendingToolCall.ToolCallID,
+				"toolName":   pendingToolCall.ToolName,
+			},
+		}) {
+			return
+		}
 		workingMessages = appendToolMessages(workingMessages, pendingToolCall, callContent.String(), result)
 		toolCalls++
 		continuation = true

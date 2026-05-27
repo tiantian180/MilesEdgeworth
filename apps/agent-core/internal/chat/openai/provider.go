@@ -90,7 +90,7 @@ type chatToolDefinition struct {
 
 type chatMessage struct {
 	Role             string          `json:"role"`
-	Content          string          `json:"content,omitempty"`
+	Content          *string         `json:"content"`
 	ReasoningContent string          `json:"reasoning_content,omitempty"`
 	ToolCalls        []chat.ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID       string          `json:"tool_call_id,omitempty"`
@@ -152,32 +152,11 @@ func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-ch
 		Tools:             makeChatTools(params.Tools),
 		ParallelToolCalls: parallelToolCallsParam(params.Tools),
 	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		close(events)
-		return events, err
-	}
 	logger.Debug("request prepared",
 		"model", p.model,
 		"endpoint", sanitizeEndpoint(p.baseURL),
 		"knownTags", len(params.KnownExpressionIDs),
 		"messages", len(messages))
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		p.baseURL, bytes.NewReader(encoded))
-	if err != nil {
-		close(events)
-		return events, err
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
-	httpReq.Header.Set("Accept", "text/event-stream")
-
-	resp, err := p.httpClient.Do(httpReq)
-	if err != nil {
-		close(events)
-		return events, err
-	}
 
 	runID := params.RunID
 	if runID == "" {
@@ -188,19 +167,42 @@ func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-ch
 		messageID = "openai-msg-1"
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		// Drain a small sample for diagnostics, then close.
-		sample, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		resp.Body.Close()
-		go func() {
-			defer close(events)
-			send(ctx, events, chat.StreamEvent{
-				Type:  "RUN_ERROR",
-				RunID: runID,
-				Error: providerErrorMessage(resp, p.baseURL, sample),
-			})
-		}()
-		return events, nil
+	resp, sample, err := p.doStreamChatRequest(ctx, body)
+	if err != nil {
+		close(events)
+		return events, err
+	}
+
+	retriedParallel := false
+	retriedTools := false
+	for resp.StatusCode != http.StatusOK {
+		switch {
+		case !retriedParallel && body.ParallelToolCalls != nil && providerRejectedField(sample, "parallel_tool_calls"):
+			retriedParallel = true
+			body.ParallelToolCalls = nil
+			logger.Warn("provider rejected parallel_tool_calls; retrying without the field")
+		case !retriedTools && len(body.Tools) > 0 && providerRejectedField(sample, "tool"):
+			retriedTools = true
+			body.Tools = nil
+			body.ParallelToolCalls = nil
+			logger.Warn("provider rejected tools; retrying without tool definitions")
+		default:
+			go func(resp *http.Response, sample []byte) {
+				defer close(events)
+				send(ctx, events, chat.StreamEvent{
+					Type:  "RUN_ERROR",
+					RunID: runID,
+					Error: providerErrorMessage(resp, p.baseURL, sample),
+				})
+			}(resp, sample)
+			return events, nil
+		}
+
+		resp, sample, err = p.doStreamChatRequest(ctx, body)
+		if err != nil {
+			close(events)
+			return events, err
+		}
 	}
 
 	knownTags := append([]string(nil), params.KnownExpressionIDs...)
@@ -208,6 +210,32 @@ func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-ch
 
 	go p.pipe(ctx, resp, events, runID, messageID, knownTags)
 	return events, nil
+}
+
+func (p *Provider) doStreamChatRequest(ctx context.Context, body chatCompletionRequest) (*http.Response, []byte, error) {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		p.baseURL, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+	httpReq.Header.Set("Accept", "text/event-stream")
+
+	resp, err := p.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		sample, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		resp.Body.Close()
+		return resp, sample, nil
+	}
+	return resp, nil, nil
 }
 
 func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string, error) {
@@ -247,7 +275,7 @@ func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string
 		return "", err
 	}
 	for _, choice := range completion.Choices {
-		if content := strings.TrimSpace(choice.Message.Content); content != "" {
+		if content := strings.TrimSpace(messageContent(choice.Message.Content)); content != "" {
 			return content, nil
 		}
 	}
@@ -257,15 +285,31 @@ func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string
 func makeChatMessages(messages []chat.Message) []chatMessage {
 	out := make([]chatMessage, 0, len(messages))
 	for _, message := range messages {
+		content := messageContentForRequest(message)
 		out = append(out, chatMessage{
 			Role:             message.Role,
-			Content:          message.Content,
+			Content:          content,
 			ReasoningContent: message.ReasoningContent,
 			ToolCalls:        message.ToolCalls,
 			ToolCallID:       message.ToolCallID,
 		})
 	}
 	return out
+}
+
+func messageContentForRequest(message chat.Message) *string {
+	if message.Role == "assistant" && len(message.ToolCalls) > 0 && message.Content == "" {
+		return nil
+	}
+	content := message.Content
+	return &content
+}
+
+func messageContent(content *string) string {
+	if content == nil {
+		return ""
+	}
+	return *content
 }
 
 func makeChatTools(tools []chat.ToolDefinition) []chatToolDefinition {
@@ -305,6 +349,19 @@ func providerErrorMessage(resp *http.Response, endpoint string, sample []byte) s
 		message += ": " + body
 	}
 	return message
+}
+
+func providerRejectedField(sample []byte, field string) bool {
+	message := strings.ToLower(string(sample))
+	if !strings.Contains(message, strings.ToLower(field)) {
+		return false
+	}
+	for _, marker := range []string{"not support", "unsupported", "unknown", "unrecognized", "invalid field", "extra field"} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func sanitizeEndpoint(endpoint string) string {

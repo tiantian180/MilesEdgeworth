@@ -198,6 +198,108 @@ func TestStreamChatAggregatesToolCall(t *testing.T) {
 	}
 }
 
+func TestStreamChatRetriesWithoutParallelToolCallsWhenUnsupported(t *testing.T) {
+	var requestBodies []map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		requestBodies = append(requestBodies, body)
+		if len(requestBodies) == 1 {
+			http.Error(w, `{"error":{"message":"unknown field parallel_tool_calls"}}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"[EXPR:neutral]可以。\"}}]}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "test-model", nil, nil)
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		RunID:              "run-1",
+		MessageID:          "msg-1",
+		KnownExpressionIDs: []string{"neutral"},
+		Messages:           []chat.Message{{Role: "user", Content: "hi"}},
+		Tools: []chat.ToolDefinition{{
+			Name:        "pet_motion",
+			Description: "move pet",
+			Parameters:  json.RawMessage(`{"type":"object"}`),
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	if len(requestBodies) != 2 {
+		t.Fatalf("requests = %d, want retry once", len(requestBodies))
+	}
+	if requestBodies[0]["parallel_tool_calls"] != false {
+		t.Fatalf("first request should include parallel_tool_calls=false: %+v", requestBodies[0])
+	}
+	if _, ok := requestBodies[1]["parallel_tool_calls"]; ok {
+		t.Fatalf("retry should omit parallel_tool_calls: %+v", requestBodies[1])
+	}
+	if _, ok := requestBodies[1]["tools"]; !ok {
+		t.Fatalf("parallel retry should keep tools: %+v", requestBodies[1])
+	}
+}
+
+func TestStreamChatRetriesWithoutToolsWhenToolCallingUnsupported(t *testing.T) {
+	var requestBodies []map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		requestBodies = append(requestBodies, body)
+		if len(requestBodies) == 1 {
+			http.Error(w, `{"error":{"message":"tools are not supported by this model"}}`, http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"[EXPR:neutral]可以。\"}}]}\n\n")
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "test-model", nil, nil)
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		RunID:              "run-1",
+		MessageID:          "msg-1",
+		KnownExpressionIDs: []string{"neutral"},
+		Messages:           []chat.Message{{Role: "user", Content: "hi"}},
+		Tools: []chat.ToolDefinition{{
+			Name:        "pet_motion",
+			Description: "move pet",
+			Parameters:  json.RawMessage(`{"type":"object"}`),
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	if len(requestBodies) != 2 {
+		t.Fatalf("requests = %d, want retry once", len(requestBodies))
+	}
+	if _, ok := requestBodies[0]["tools"]; !ok {
+		t.Fatalf("first request should include tools: %+v", requestBodies[0])
+	}
+	if _, ok := requestBodies[1]["tools"]; ok {
+		t.Fatalf("tool fallback retry should omit tools: %+v", requestBodies[1])
+	}
+	if _, ok := requestBodies[1]["parallel_tool_calls"]; ok {
+		t.Fatalf("tool fallback retry should omit parallel_tool_calls: %+v", requestBodies[1])
+	}
+}
+
 func TestStreamChatPreservesReasoningContentForToolCall(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -299,6 +401,60 @@ func TestStreamChatSendsReasoningContentInAssistantToolMessage(t *testing.T) {
 	}
 	if assistant["reasoning_content"] != "需要移动到目标位置。" {
 		t.Fatalf("assistant reasoning_content = %+v", assistant["reasoning_content"])
+	}
+}
+
+func TestStreamChatSendsNullContentForToolOnlyAssistantMessage(t *testing.T) {
+	var requestBody map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "test-model", nil, nil)
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		RunID:     "run-1",
+		MessageID: "msg-1",
+		Messages: []chat.Message{
+			{Role: "user", Content: "move"},
+			{
+				Role: "assistant",
+				ToolCalls: []chat.ToolCall{{
+					ID:   "tc-1",
+					Type: "function",
+					Function: chat.ToolCallFunction{
+						Name:      "pet_motion",
+						Arguments: `{"action":"moveTo","x":0.5,"y":0.5}`,
+					},
+				}},
+			},
+			{Role: "tool", Content: `{"success":true}`, ToolCallID: "tc-1"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	messages, ok := requestBody["messages"].([]any)
+	if !ok || len(messages) != 3 {
+		t.Fatalf("messages = %+v", requestBody["messages"])
+	}
+	assistant, ok := messages[1].(map[string]any)
+	if !ok {
+		t.Fatalf("assistant message = %+v", messages[1])
+	}
+	if _, ok := assistant["content"]; !ok {
+		t.Fatalf("assistant tool-only message should include content:null, got %+v", assistant)
+	}
+	if assistant["content"] != nil {
+		t.Fatalf("assistant content = %+v, want nil", assistant["content"])
 	}
 }
 

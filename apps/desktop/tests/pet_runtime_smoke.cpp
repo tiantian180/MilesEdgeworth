@@ -1055,6 +1055,14 @@ int main(int argc, char *argv[])
                 "拖拽取消不应由 PetRuntime 自行 returnToIdle，应交给拖拽流程接管");
 
         runtime.returnToIdle();
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+        runtime.requestMotion("teleport", 1.0, 1.0, "walk");
+        require(motionInterruptedCount == 3, "非法 motion action 应发出 motionInterrupted");
+        require(interruptedResult.value("reason").toString() == "invalid_action",
+                "非法 motion action reason 应为 invalid_action");
+        require(runtime.currentState() == "idle", "非法 motion action 应保持 idle");
+
+        runtime.returnToIdle();
         runtime.playRecipe("walk.east");
         require(runtime.currentActionId() == "walk", "普通 walk.east recipe 应保持原有随机漫步路径");
         require(runtime.currentLoopMode() == "onceThenIdle", "普通随机 walk 不应继承目标移动 loop override");

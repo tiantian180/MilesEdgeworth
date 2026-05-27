@@ -10,16 +10,19 @@ import (
 )
 
 const (
-	MaxToolCallsPerRun = 3
-	ToolResultTimeout  = 120 * time.Second
-	PetMotionToolName  = "pet_motion"
-	ToolCallEventType  = "TOOL_CALL"
+	MaxToolCallsPerRun    = 3
+	PetMotionToolName     = "pet_motion"
+	ToolCallEventType     = "TOOL_CALL"
+	ToolTimedOutEventName = "miles.chat.tool.timeout"
 )
+
+var ToolResultTimeout = 120 * time.Second
 
 type ToolResult struct {
 	RunID      string          `json:"runId"`
 	ToolCallID string          `json:"toolCallId"`
 	Result     json.RawMessage `json:"result"`
+	TimedOut   bool            `json:"-"`
 }
 
 type toolWaiter struct {
@@ -81,7 +84,8 @@ func waitForToolResult(ctx context.Context, waiter *toolWaiter) (ToolResult, boo
 	case <-timer.C:
 		waiter.close()
 		return ToolResult{
-			Result: json.RawMessage(`{"success":false,"reason":"timeout"}`),
+			Result:   json.RawMessage(`{"success":false,"reason":"timeout"}`),
+			TimedOut: true,
 		}, true
 	}
 }

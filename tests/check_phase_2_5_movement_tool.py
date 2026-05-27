@@ -43,6 +43,7 @@ def main() -> int:
     service_go = read("apps/agent-core/internal/chat/service/service.go")
     tools_go = read("apps/agent-core/internal/chat/service/tools.go")
     api_go = read("apps/agent-core/internal/api/server.go")
+    movement_design = read("docs/v2/设计方案/移动系统与工具调用设计.md")
 
     require("check_phase_2_5_movement_tool" in root_cmake,
             "root CMake must register Phase 2.5 contract check")
@@ -123,6 +124,7 @@ def main() -> int:
         "tool_calls",
         "makeChatTools",
         "parallel_tool_calls",
+        "providerRejectedField",
         "TOOL_CALL",
         "FinishReason",
         "pendingTools",
@@ -132,12 +134,15 @@ def main() -> int:
         "PetMotionTool",
         "MaxToolCallsPerRun",
         "ToolResultTimeout",
+        "ToolTimedOutEventName",
         "SubmitToolResult",
         "appendToolMessages",
         "RUN_STARTED",
         "RUN_FINISHED",
     ]:
         require(token in tools_go + service_go, f"service tool loop missing {token}")
+    require("content:null" in movement_design and "role + content" in movement_design,
+            "movement design must document tool message wire format and persistence limitation")
 
     compact_tools = tools_go.replace(" ", "")
     require('"enum":["moveTo","moveBy"]' in compact_tools,

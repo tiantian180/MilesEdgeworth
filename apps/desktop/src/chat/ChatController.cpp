@@ -41,6 +41,7 @@ constexpr auto kToolResultUrl = "http://127.0.0.1:39710/v1/chat/tool-result";
 constexpr auto kExpressionRequestedEvent = "miles.pet.expression.requested";
 constexpr auto kLifecycleEvent = "miles.pet.lifecycle";
 constexpr auto kMemorySummarizingEvent = "miles.chat.memory.summarizing";
+constexpr auto kToolTimedOutEvent = "miles.chat.tool.timeout";
 constexpr int kSidecarRestartDelayMs = 150;
 constexpr int kSidecarRestartRetryDelayMs = 300;
 constexpr int kSidecarRestartMaxAttempts = 3;
@@ -916,6 +917,13 @@ void ChatController::applyStreamEvent(const ChatStreamEvent &event)
 
     if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kMemorySummarizingEvent)) {
         setStatusText(QStringLiteral("整理记忆中..."));
+        return;
+    }
+
+    if (event.type == QStringLiteral("CUSTOM") && event.name == QString::fromLatin1(kToolTimedOutEvent)) {
+        qCWarning(chatLog).noquote() << "tool result timed out"
+                                     << QStringLiteral("toolCallId=%1").arg(event.value.value(QStringLiteral("toolCallId")).toString());
+        setStatusText(QStringLiteral("工具执行超时，正在恢复"));
         return;
     }
 

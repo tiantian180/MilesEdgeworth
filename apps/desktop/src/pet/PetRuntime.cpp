@@ -416,7 +416,16 @@ void PetRuntime::requestMotion(const QString &action, double x, double y, const 
     }
     if (normalizedAction == QStringLiteral("moveBy")) {
         m_motionController.moveBy(x, y, mode);
+        return;
     }
+    const QVariantMap result = motionResult(
+        false,
+        m_motionController.currentPercentPositionForResult(),
+        QStringLiteral("invalid_action")
+    );
+    exitMovingState();
+    returnToIdle();
+    emit motionInterrupted(result);
 }
 
 void PetRuntime::stopMotion()
