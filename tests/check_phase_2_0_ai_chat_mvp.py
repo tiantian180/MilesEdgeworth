@@ -136,7 +136,7 @@ def main() -> int:
         "macOS platform layer must expose companion behavior for chat windows",
     )
     require(
-        "setMacApplicationDockVisible(bool visible)" in mac_behavior_h + mac_behavior_mm,
+        "enterMacAccessoryMode()" in mac_behavior_h + mac_behavior_mm,
         "macOS platform layer must expose startup application activation policy control",
     )
     require(
@@ -144,7 +144,11 @@ def main() -> int:
         "macOS app must be able to start in accessory activation policy",
     )
     require(
-        "setMacApplicationDockVisible(false)" in main_cpp,
+        "NSApplicationActivationPolicyRegular" not in mac_behavior_h + mac_behavior_mm,
+        "macOS platform layer must not keep a public path back to Regular activation policy",
+    )
+    require(
+        "enterMacAccessoryMode()" in main_cpp,
         "main must start macOS in accessory mode; chat visibility must not change activation policy",
     )
     require("loadFromModule(\"MilesEdgeworth\", \"ChatWindow\")" in main_cpp, "main must load ChatWindow QML")

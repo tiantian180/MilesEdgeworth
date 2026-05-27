@@ -153,7 +153,7 @@ void prepareMacCompanionWindowForShow(QWindow *window)
     [nativeWindow orderFrontRegardless];
 }
 
-void setMacApplicationDockVisible(bool visible)
+void enterMacAccessoryMode()
 {
-    [NSApp setActivationPolicy:visible ? NSApplicationActivationPolicyRegular : NSApplicationActivationPolicyAccessory];
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 }

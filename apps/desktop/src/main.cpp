@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     app.setQuitOnLastWindowClosed(false);
     QQuickStyle::setStyle("Basic");
 #ifdef Q_OS_MACOS
-    setMacApplicationDockVisible(false);
+    enterMacAccessoryMode();
 #endif
 
     DesktopShellController shellController;

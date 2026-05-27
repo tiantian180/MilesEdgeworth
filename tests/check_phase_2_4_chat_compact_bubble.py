@@ -172,6 +172,10 @@ def main() -> int:
         "makeKeyAndOrderFront" not in companion_show_body,
         "bubble companion show path should re-apply and order front without stealing key focus",
     )
+    require(
+        "App.DesktopShell.prepareChatBubbleWindowForShow()\n        raise()" not in bubble_qml,
+        "ChatBubbleWindow should not call QML raise immediately after prepareChatBubbleWindowForShow",
+    )
 
     for token in [
         "PetVisibleBounds.cpp",

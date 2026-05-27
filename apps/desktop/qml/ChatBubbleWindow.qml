@@ -151,7 +151,6 @@ ApplicationWindow {
 
         visible = true
         App.DesktopShell.prepareChatBubbleWindowForShow()
-        raise()
 
         if (assistantPending === true) {
             hideTimer.stop()

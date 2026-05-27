@@ -52,7 +52,7 @@ def main() -> int:
     function_body = extract_function(source, "setMacPetWindowAlwaysOnTop")
     context_menu_body = extract_function(source, "prepareMacPetWindowForContextMenu")
     companion_open_body = extract_function(source, "prepareMacCompanionWindowForOpen")
-    dock_body = extract_function(source, "setMacApplicationDockVisible")
+    accessory_body = extract_function(source, "enterMacAccessoryMode")
 
     forbidden_tokens = [
         "moveWindowToStationarySkyLightSpace",
@@ -110,7 +110,7 @@ def main() -> int:
     activating_functions = {
         "prepareMacPetWindowForContextMenu": context_menu_body,
         "prepareMacCompanionWindowForOpen": companion_open_body,
-        "setMacApplicationDockVisible": dock_body,
+        "enterMacAccessoryMode": accessory_body,
     }
     for name, body in activating_functions.items():
         if "activateIgnoringOtherApps" in body:
@@ -133,6 +133,9 @@ def main() -> int:
         return 1
     if "MILES_DIAG_SKIP_CHAT_DOCK_POLICY" in source or "MILES_SPACES" in source + chat_window_source + shell_source:
         print("macOS Space 调试开关和临时日志不应进入正式实现。", file=sys.stderr)
+        return 1
+    if "NSApplicationActivationPolicyRegular" in source + header:
+        print("桌宠应用不应再暴露切回 Regular activation policy 的平台路径。", file=sys.stderr)
         return 1
     if "makeKeyAndOrderFront" not in companion_open_body:
         print("聊天窗打开时应让 companion window 自身成为 key window，而不是激活整个应用。", file=sys.stderr)
