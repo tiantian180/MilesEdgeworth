@@ -133,6 +133,35 @@ func TestBuildMessagesPutsPersonaBeforeExpressionRules(t *testing.T) {
 	}
 }
 
+func TestBuildMessagesKeepsAssistantExpressionMarkers(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "前の推論を覚えているか。")
+	appendMessage(t, s, conv.ID, store.RoleAssistant, "[EXPR:objection]その推論には穴がある。")
+	appendMessage(t, s, conv.ID, store.RoleUser, "続けて。")
+
+	messages, _, err := newTestService(s, &fakeProvider{}, 8192).BuildMessages(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var assistantContent string
+	for _, msg := range messages {
+		if msg.Role == store.RoleAssistant {
+			assistantContent = msg.Content
+			break
+		}
+	}
+	if assistantContent != "[EXPR:objection]その推論には穴がある。" {
+		t.Fatalf("assistant content = %q, want raw expression history", assistantContent)
+	}
+}
+
 func TestBuildMessagesExpressionRulesPreferDescription(t *testing.T) {
 	s := openTestStore(t)
 	conv, err := s.CreateConversation("miles-edgeworth")
