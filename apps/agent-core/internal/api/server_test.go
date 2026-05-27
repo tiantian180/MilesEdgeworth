@@ -771,7 +771,7 @@ func TestChatPersistsRawPartialOnFlushError(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rec := &flushErrorRecorder{
 		header:      make(http.Header),
-		failAtFlush: 3,
+		failAtFlush: 5,
 	}
 
 	handler.ServeHTTP(rec, req)
