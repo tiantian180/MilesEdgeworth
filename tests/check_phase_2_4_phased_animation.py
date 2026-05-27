@@ -46,6 +46,8 @@ def main() -> int:
     controller_cpp = read("apps/desktop/src/chat/ChatController.cpp")
     provider_go = read("apps/agent-core/internal/chat/openai/provider.go")
     provider_test = read("apps/agent-core/internal/chat/openai/provider_test.go")
+    service_go = read("apps/agent-core/internal/chat/service/service.go")
+    service_test = read("apps/agent-core/internal/chat/service/service_test.go")
     root_cmake = read("CMakeLists.txt")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
     debt_doc = read("docs/v2/参考资料/技术债务与评审待办.md")
@@ -220,10 +222,14 @@ def main() -> int:
     require('requestPetExpression(QStringLiteral("error"), QStringLiteral("neutral"))' not in fail_reply_body,
             "failCurrentReply must not request an error expression after aborting")
 
-    require('"miles.pet.lifecycle"' in provider_go, "Go provider must emit lifecycle event")
+    require('"miles.pet.lifecycle"' in service_go, "Go service must emit lifecycle event")
+    require('"miles.pet.lifecycle"' not in provider_go,
+            "Go provider must not own lifecycle events after service-level tool loop")
     require('"miles.pet.expression.requested"' in provider_go, "Go provider must still emit expression events")
     require('"state":         "idle"' not in provider_go, "Go provider must not emit idle expression on stream end")
-    require("miles.pet.lifecycle" in provider_test, "Go provider tests must cover lifecycle")
+    require("miles.pet.lifecycle" in service_test, "Go service tests must cover lifecycle")
+    require("provider must not emit run lifecycle events" in provider_test,
+            "Go provider tests must assert lifecycle ownership moved out of provider")
 
     require("check_phase_2_4_phased_animation" in root_cmake,
             "CTest must register Phase 2.4 contract check")

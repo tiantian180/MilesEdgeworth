@@ -28,6 +28,7 @@ class ChatController : public QObject
     Q_PROPERTY(bool sidecarReady READ sidecarReady NOTIFY sidecarReadyChanged)
     Q_PROPERTY(bool providerConfigured READ providerConfigured NOTIFY providerConfiguredChanged)
     Q_PROPERTY(bool sending READ sending NOTIFY sendingChanged)
+    Q_PROPERTY(bool executingTool READ executingTool NOTIFY executingToolChanged)
     Q_PROPERTY(QString statusText READ statusText NOTIFY statusTextChanged)
     Q_PROPERTY(QVariantList messages READ messages NOTIFY messagesChanged)
     Q_PROPERTY(QVariantList conversations READ conversations NOTIFY conversationsChanged)
@@ -41,6 +42,7 @@ public:
         BUFFERING_FOR_START,
         STREAMING,
         GATED,
+        EXECUTING_TOOL,
         WAITING_FOR_ANIMATION_END,
     };
 
@@ -50,6 +52,7 @@ public:
     bool sidecarReady() const { return m_sidecarReady; }
     bool providerConfigured() const { return m_providerConfigured; }
     bool sending() const { return m_sending; }
+    bool executingTool() const { return m_phase == ChatPhase::EXECUTING_TOOL; }
     QString statusText() const { return m_statusText; }
     QVariantList messages() const { return m_messages; }
     QVariantList conversations() const { return m_conversations; }
@@ -77,6 +80,7 @@ signals:
     void sidecarReadyChanged();
     void providerConfiguredChanged();
     void sendingChanged();
+    void executingToolChanged();
     void statusTextChanged();
     void messagesChanged();
     void conversationsChanged();
@@ -91,6 +95,14 @@ private:
         QString state;
         QString expression;
         QString textBuffer;
+    };
+
+    struct PendingToolCall
+    {
+        QString runId;
+        QString toolCallId;
+        QString toolName;
+        QString toolArgs;
     };
 
     QVariantMap messageObject(const QString &role, const QString &text, bool pending, bool error) const;
@@ -116,6 +128,17 @@ private:
     void handleSegmentDrained(int segmentId);
     void handlePacerEmpty();
     void handleStartTimeout();
+    void handleToolCall(const ChatStreamEvent &event);
+    bool hasPendingToolCall() const;
+    void executeToolCallAfterCleanFinish();
+    void executePetMotionTool(const PendingToolCall &toolCall);
+    bool parsePetMotionArgs(const QString &toolArgs, QString *action, double *x, double *y, QString *mode) const;
+    QVariantMap invalidToolResult(const QString &error) const;
+    void postToolResult(const QString &runId, const QString &toolCallId, const QVariantMap &result, int retryCount = 1);
+    void resumeAfterToolResult();
+    void handleMotionToolCompleted(const QVariantMap &result);
+    void handleMotionToolInterrupted(const QVariantMap &result);
+    void handleMotionToolTimeout();
     void drainQueuedSegmentsToPacer();
     void resetReplySessionState();
     void appendChunkToCurrentMessage(const QString &chunk, quint64 streamId);
@@ -159,6 +182,7 @@ private:
     ChatPhase m_phase = ChatPhase::IDLE;
     QString m_pendingThinkingState;
     QString m_pendingThinkingExpression;
+    PendingToolCall m_pendingToolCall;
     int m_nextSegmentId = 0;
     int m_activeSegmentId = -1;
     QString m_activeState;
@@ -166,8 +190,10 @@ private:
     ChatTextPacer *m_pacer = nullptr;
     QTimer m_gateTimeout;
     QTimer m_startTimeout;
+    QTimer m_motionToolTimeout;
     static constexpr int kGateTimeoutMs = 2000;
     static constexpr int kStartTimeoutMs = 3000;
+    static constexpr int kMotionToolTimeoutMs = 90000;
     bool m_sidecarReady = false;
     bool m_providerConfigured = false;
     bool m_sending = false;
@@ -180,6 +206,7 @@ private:
     bool m_textDrained = false;
     bool m_pacerEmpty = true;
     bool m_cleanFinishRequestPending = false;
+    bool m_motionToolTimedOut = false;
     quint64 m_deferredCleanFinishStreamId = 0;
     quint64 m_deferredCleanFinishGeneration = 0;
     quint64 m_deferredCleanFinishRequestId = 0;

@@ -10,6 +10,7 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 
@@ -58,6 +59,11 @@ void require(bool condition, const char *message)
         std::cerr << message << "\n";
         std::exit(1);
     }
+}
+
+void requireNear(double actual, double expected, const char *message)
+{
+    require(std::abs(actual - expected) < 0.001, message);
 }
 
 void requireLocalUrl(const QUrl &url, const char *message)
@@ -124,6 +130,49 @@ bool writeValidIdleManifest(const QDir &skinDir)
   }
 }
 )JSON"));
+}
+
+SkinManifest loadManifestWithMotionBlock(const QString &motionBlock)
+{
+    QTemporaryDir dir;
+    require(dir.isValid(), "motion test skin directory should be valid");
+    QDir skinDir(dir.path());
+    require(skinDir.mkpath(QStringLiteral("assets/body/idle")), "motion test assets directory should be created");
+    require(writeFile(skinDir.filePath(QStringLiteral("assets/body/idle/stand.gif")),
+                      QStringLiteral("fake stand gif")),
+            "motion test fallback asset should be written");
+    require(writeSkinJson(
+                skinDir,
+                QStringLiteral("motion-test-skin"),
+                QStringLiteral("Motion Test Skin")
+            ),
+            "motion test skin.json should be written");
+    require(writeFile(skinDir.filePath(QStringLiteral("manifest.json")), QStringLiteral(R"JSON(
+{
+  "schemaVersion": 4,
+  "fallbackAction": "idle_stand",
+  "defaultFacing": "right",
+%1  "states": { "idle": { "action": "idle_stand" } },
+  "actions": {
+    "idle_stand": {
+      "variants": {
+        "right": {
+          "clip": "file:assets/body/idle/stand.gif"
+        }
+      }
+    }
+  }
+}
+)JSON").arg(motionBlock)), "motion test manifest should be written");
+
+    return SkinManifestLoader::loadFromDirectory(dir.path());
+}
+
+void requireMotion(const MotionDefinition &motion, double walkSpeed, double runSpeed, double snapDistance)
+{
+    requireNear(motion.walkSpeed, walkSpeed, "manifest motion.walkSpeed should match expected value");
+    requireNear(motion.runSpeed, runSpeed, "manifest motion.runSpeed should match expected value");
+    requireNear(motion.snapDistance, snapDistance, "manifest motion.snapDistance should match expected value");
 }
 
 void requireAllAnimationAndAudioUrlsAreLocalFiles(const SkinManifest &manifest)
@@ -230,6 +279,11 @@ int main(int argc, char **argv)
 {
   "schemaVersion": 4,
   "defaultFacing": "right",
+  "motion": {
+    "walkSpeed": 42,
+    "runSpeed": 84,
+    "snapDistance": 6
+  },
   "states": { "idle": { "action": "idle_stand" } },
   "clips": {
     "thinking.enter.right": {
@@ -333,7 +387,26 @@ int main(int argc, char **argv)
     require(manifest.skinName == QStringLiteral("测试皮肤"), "loadFromDirectory should populate skinName");
     require(manifest.skinRootUrl.isLocalFile(), "filesystem manifest root should be a local file URL");
     require(manifest.actions.contains(QStringLiteral("idle_stand")), "filesystem manifest should load actions");
+    requireMotion(manifest.motion, 42.0, 84.0, 6.0);
     requireAllAnimationAndAudioUrlsAreLocalFiles(manifest);
+
+    requireMotion(loadManifestWithMotionBlock(QString()).motion, 60.0, 120.0, 5.0);
+    requireMotion(loadManifestWithMotionBlock(QStringLiteral(R"JSON(  "motion": {
+    "walkSpeed": 77
+  },
+)JSON")).motion, 77.0, 120.0, 5.0);
+    requireMotion(loadManifestWithMotionBlock(QStringLiteral(R"JSON(  "motion": {
+    "walkSpeed": -1,
+    "runSpeed": 0,
+    "snapDistance": -5
+  },
+)JSON")).motion, 60.0, 120.0, 5.0);
+    requireMotion(loadManifestWithMotionBlock(QStringLiteral(R"JSON(  "motion": {
+    "walkSpeed": "fast",
+    "runSpeed": null,
+    "snapDistance": 9
+  },
+)JSON")).motion, 60.0, 120.0, 9.0);
 
     const QString expectedAnimationUrl = QUrl::fromLocalFile(
         skinDir.filePath(QStringLiteral("assets/body/idle/stand.gif"))

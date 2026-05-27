@@ -351,6 +351,21 @@ SkinManifest parseManifestDocument(const QJsonDocument &document, const LoadCont
     manifest.canvas.hitZoneSize = canvas.value("hitZoneSize").toDouble(manifest.canvas.hitZoneSize);
     manifest.canvas.idleLoopActionId = canvas.value("idleLoopAction").toString();
 
+    const QJsonObject motion = root.value("motion").toObject();
+    manifest.motion.walkSpeed = motion.value("walkSpeed").toDouble(manifest.motion.walkSpeed);
+    manifest.motion.runSpeed = motion.value("runSpeed").toDouble(manifest.motion.runSpeed);
+    manifest.motion.snapDistance = motion.value("snapDistance").toDouble(manifest.motion.snapDistance);
+    const MotionDefinition defaultMotion;
+    if (manifest.motion.walkSpeed <= 0.0) {
+        manifest.motion.walkSpeed = defaultMotion.walkSpeed;
+    }
+    if (manifest.motion.runSpeed <= 0.0) {
+        manifest.motion.runSpeed = defaultMotion.runSpeed;
+    }
+    if (manifest.motion.snapDistance <= 0.0) {
+        manifest.motion.snapDistance = defaultMotion.snapDistance;
+    }
+
     const QJsonObject audio = root.value("audio").toObject();
     manifest.audio.defaultVoiceLanguage = audio.value("defaultVoiceLanguage").toString();
     const QJsonArray voiceLanguages = audio.value("voiceLanguages").toArray();

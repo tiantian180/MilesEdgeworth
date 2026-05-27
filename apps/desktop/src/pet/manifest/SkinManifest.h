@@ -215,6 +215,13 @@ struct CanvasDefinition
     QString idleLoopActionId;
 };
 
+struct MotionDefinition
+{
+    double walkSpeed = 60.0;
+    double runSpeed = 120.0;
+    double snapDistance = 5.0;
+};
+
 // PetSizeDefinition 描述一个尺寸档位（迷你 / 小 / 中 / 大）。
 // id 用于持久化记住用户偏好，scale 是相对 windowSize/imageSize 的倍数。
 struct PetSizeDefinition
@@ -314,6 +321,7 @@ struct SkinManifest
     QString personaPrompt;
 
     CanvasDefinition canvas;
+    MotionDefinition motion;
     AudioDefinition audio;
     CapabilityDefinition capabilities;
     QList<PetSizeDefinition> sizes;

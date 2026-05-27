@@ -7,6 +7,7 @@
 #include "pet/selection/AnimationPoolSelector.h"
 
 #include <QDir>
+#include <QPointF>
 #include <QRandomGenerator>
 #include <QSettings>
 #include <QTimer>
@@ -27,6 +28,38 @@ PetRuntime::PetRuntime(QObject *parent)
 {
     connect(&m_propController, &PropController::currentPropChanged, this, &PetRuntime::currentPropChanged);
     connect(&m_propController, &PropController::currentPropPlaybackSerialChanged, this, &PetRuntime::currentPropPlaybackSerialChanged);
+    connect(&m_motionController, &MotionController::started, this, [this](const QString &direction, const QString &mode) {
+        m_currentMotionMode = mode;
+        enterMovingState();
+        playLocomotion(mode, direction);
+    });
+    connect(&m_motionController, &MotionController::positionChanged, this, [this](const QPoint &newPosition) {
+        emit motionPositionChanged(newPosition);
+    });
+    connect(&m_motionController, &MotionController::directionChanged, this, [this](const QString &direction) {
+        playLocomotion(m_currentMotionMode, direction);
+    });
+    connect(&m_motionController, &MotionController::completed, this, [this](double finalX, double finalY) {
+        const QVariantMap result = motionResult(true, QPointF(finalX, finalY));
+        exitMovingState();
+        returnToIdle();
+        emit motionCompleted(result);
+    });
+    connect(&m_motionController, &MotionController::interrupted, this, [this](const QString &reason) {
+        const QString resultReason = reason == QStringLiteral("drag")
+            ? QStringLiteral("interrupted_by_user")
+            : reason;
+        const QVariantMap result = motionResult(
+            false,
+            m_motionController.currentPercentPositionForResult(),
+            resultReason
+        );
+        exitMovingState();
+        if (reason != QStringLiteral("drag")) {
+            returnToIdle();
+        }
+        emit motionInterrupted(result);
+    });
 
     refreshAvailableSkins();
     const QString savedSkinId = QSettings()
@@ -169,7 +202,22 @@ void PetRuntime::playLocomotion(const QString &actionId, const QString &movement
         }
     }
 
-    playAction(actionId);
+    if (!m_motionLoopOverride) {
+        playAction(actionId);
+        return;
+    }
+
+    QString nextActionId = actionId.trimmed();
+    if (!m_manifest.actions.contains(nextActionId)) {
+        nextActionId = m_manifest.fallbackAction;
+    }
+    if (!m_manifest.actions.contains(nextActionId)) {
+        return;
+    }
+
+    ActionDefinition action = m_manifest.actions.value(nextActionId);
+    action.loopMode = QStringLiteral("loop");
+    setCurrentAction(nextActionId, action);
 }
 
 void PetRuntime::playRecipe(const QString &recipeId)
@@ -314,8 +362,7 @@ void PetRuntime::setAudioLanguage(const QString &languageId)
 
 void PetRuntime::toggleAutoMovementEnabled()
 {
-    m_autoMovementEnabled = !m_autoMovementEnabled;
-    emit autoMovementEnabledChanged();
+    setAutoMovementEnabled(!m_autoMovementEnabled);
 }
 
 void PetRuntime::setPetSize(const QString &sizeId)
@@ -343,6 +390,7 @@ void PetRuntime::setPetSize(const QString &sizeId)
 
     m_petSizeId = normalizedSizeId;
     m_petScale = nextScale;
+    configureMotionController();
     emit petScaleChanged();
 }
 
@@ -354,6 +402,50 @@ void PetRuntime::startStartupSequence()
 void PetRuntime::requestExpression(const QString &state, const QString &expression)
 {
     requestExpression(state, expression, InterruptHint::Immediate);
+}
+
+void PetRuntime::requestMotion(const QString &action, double x, double y, const QString &mode)
+{
+    configureMotionController();
+    m_currentMotionMode = mode == QStringLiteral("run") ? QStringLiteral("run") : QStringLiteral("walk");
+
+    const QString normalizedAction = action.trimmed();
+    if (normalizedAction == QStringLiteral("moveTo")) {
+        m_motionController.moveTo(x, y, mode);
+        return;
+    }
+    if (normalizedAction == QStringLiteral("moveBy")) {
+        m_motionController.moveBy(x, y, mode);
+        return;
+    }
+    const QVariantMap result = motionResult(
+        false,
+        m_motionController.currentPercentPositionForResult(),
+        QStringLiteral("invalid_action")
+    );
+    exitMovingState();
+    returnToIdle();
+    emit motionInterrupted(result);
+}
+
+void PetRuntime::stopMotion()
+{
+    m_motionController.stop();
+}
+
+void PetRuntime::cancelMotionForDrag()
+{
+    m_motionController.cancelForDrag();
+}
+
+void PetRuntime::setMotionScreenGeometry(const QRect &screenGeometry)
+{
+    m_motionController.setScreenGeometry(screenGeometry);
+}
+
+void PetRuntime::setMotionCurrentPosition(const QPoint &petWindowPosition)
+{
+    m_motionController.setCurrentPosition(petWindowPosition);
 }
 
 void PetRuntime::requestExpression(const QString &state, const QString &expression, InterruptHint interruptHint)
@@ -998,4 +1090,71 @@ void PetRuntime::setCurrentPhase(const QString &actionId, const QString &phaseId
 bool PetRuntime::animationUrlPlayable(const QUrl &url) const
 {
     return SkinPathUtils::existingLocalFileIsInsideRoot(url, m_manifest.skinRootUrl);
+}
+
+void PetRuntime::setAutoMovementEnabled(bool enabled)
+{
+    if (m_autoMovementEnabled == enabled) {
+        return;
+    }
+
+    m_autoMovementEnabled = enabled;
+    emit autoMovementEnabledChanged();
+}
+
+void PetRuntime::configureMotionController()
+{
+    MotionConfig config;
+    config.walkSpeed = m_manifest.motion.walkSpeed;
+    config.runSpeed = m_manifest.motion.runSpeed;
+    config.snapDistance = m_manifest.motion.snapDistance;
+    config.petScale = m_petScale > 0.0 ? m_petScale : 1.0;
+    config.petWindowSize = m_manifest.canvas.windowSize;
+    config.availableDirections = m_manifest.movementDirections;
+    m_motionController.configure(config);
+}
+
+void PetRuntime::enterMovingState()
+{
+    if (!m_hasMotionAutoMovementSnapshot) {
+        m_autoMovementEnabledBeforeMotion = m_autoMovementEnabled;
+        m_hasMotionAutoMovementSnapshot = true;
+    }
+
+    const bool stateChanged = m_currentState != QStringLiteral("moving");
+    m_currentState = QStringLiteral("moving");
+    if (stateChanged) {
+        emit currentStateChanged();
+    }
+
+    setSuppressAutoIdle(true);
+    m_motionLoopOverride = true;
+    setAutoMovementEnabled(false);
+}
+
+void PetRuntime::exitMovingState()
+{
+    m_motionLoopOverride = false;
+    setSuppressAutoIdle(false);
+    const bool restoreAutoMovementEnabled = m_hasMotionAutoMovementSnapshot
+        ? m_autoMovementEnabledBeforeMotion
+        : true;
+    m_hasMotionAutoMovementSnapshot = false;
+    setAutoMovementEnabled(restoreAutoMovementEnabled);
+}
+
+QVariantMap PetRuntime::motionResult(bool success, const QPointF &position, const QString &reason) const
+{
+    QVariantMap result;
+    QVariantMap positionMap;
+    positionMap.insert(QStringLiteral("x"), position.x());
+    positionMap.insert(QStringLiteral("y"), position.y());
+    result.insert(QStringLiteral("success"), success);
+    result.insert(QStringLiteral("position"), positionMap);
+    if (!success) {
+        result.insert(QStringLiteral("reason"), reason);
+    } else if (m_motionController.lastMoveWasClamped()) {
+        result.insert(QStringLiteral("note"), QStringLiteral("clamped_to_screen_edge"));
+    }
+    return result;
 }

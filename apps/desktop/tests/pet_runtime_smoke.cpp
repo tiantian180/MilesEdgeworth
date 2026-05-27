@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -284,6 +285,18 @@ void waitForMilliseconds(int milliseconds)
     QEventLoop loop;
     QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
     loop.exec();
+}
+
+bool waitUntil(std::function<bool()> predicate, int timeoutMs)
+{
+    const int stepMs = 10;
+    for (int elapsedMs = 0; elapsedMs < timeoutMs; elapsedMs += stepMs) {
+        if (predicate()) {
+            return true;
+        }
+        waitForMilliseconds(stepMs);
+    }
+    return predicate();
 }
 
 } // namespace
@@ -957,10 +970,150 @@ int main(int argc, char *argv[])
     require(runtime.currentActionId() == "walk", "walk.current 应切回走路动作");
     require(runtime.currentMovementDirection() == "northEast", "walk/run current recipe 应沿用当前方向");
 
+    {
+        runtime.returnToIdle();
+        runtime.setPetSize("mini");
+        runtime.setMotionScreenGeometry(QRect(0, 0, 200, 200));
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+
+        int motionPositionChanges = 0;
+        int motionCompletedCount = 0;
+        QVariantMap completedResult;
+        const QMetaObject::Connection positionConnection = QObject::connect(&runtime, &PetRuntime::motionPositionChanged, [&motionPositionChanges](const QPoint &) {
+            ++motionPositionChanges;
+        });
+        const QMetaObject::Connection completedConnection = QObject::connect(&runtime, &PetRuntime::motionCompleted, [&](const QVariantMap &result) {
+            ++motionCompletedCount;
+            completedResult = result;
+        });
+
+        runtime.requestMotion("moveTo", 1.0, 0.0, "walk");
+        require(runtime.currentState() == "moving", "requestMotion(moveTo) 应进入 moving 状态");
+        require(runtime.currentActionId() == "walk", "目标移动应直接播放 locomotion action，而不是 setState(moving) 副作用");
+        require(runtime.currentMovementDirection() == "east", "moveTo 右侧目标应量化为 east");
+        require(runtime.currentLoopMode() == "loop", "目标移动期间 walk/run 应临时 loop 播放");
+        require(!runtime.currentAutoReturnToIdle(), "目标移动期间 walk/run 不应自动回 idle");
+        require(waitUntil([&]() { return motionPositionChanges > 0; }, 1000),
+                "MotionController positionChanged 应转发为 motionPositionChanged");
+        require(waitUntil([&]() { return motionCompletedCount == 1; }, 2500),
+                "MotionController completed 应转发为 motionCompleted");
+        require(completedResult.value("success").toBool(), "完成结果 success 应为 true");
+        require(completedResult.value("position").toMap().value("x").toDouble() > 0.99,
+                "完成结果应包含最终百分比 x");
+        require(runtime.currentState() == "idle", "目标移动完成后应回到 idle");
+
+        runtime.toggleAutoMovementEnabled();
+        require(!runtime.autoMovementEnabled(), "目标移动前测试应先禁用随机移动");
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+        completedResult.clear();
+        motionCompletedCount = 0;
+        runtime.requestMotion("moveTo", 1.0, 0.0, "walk");
+        require(waitUntil([&]() { return motionCompletedCount == 1; }, 2500),
+                "禁用随机移动时目标移动仍应完成");
+        require(!runtime.autoMovementEnabled(),
+                "目标移动完成后应恢复进入移动前的 autoMovementEnabled 偏好");
+        runtime.toggleAutoMovementEnabled();
+        require(runtime.autoMovementEnabled(), "motion 偏好保持测试后应恢复随机移动");
+
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+        completedResult.clear();
+        motionCompletedCount = 0;
+        runtime.requestMotion("moveTo", 2.0, 0.0, "run");
+        require(waitUntil([&]() { return motionCompletedCount == 1; }, 2500),
+                "clamp 后目标移动仍应完成");
+        require(completedResult.value("success").toBool(), "clamp 完成结果 success 应为 true");
+        require(completedResult.value("note").toString() == "clamped_to_screen_edge",
+                "clamp 完成结果应包含 clamped_to_screen_edge note");
+
+        int motionInterruptedCount = 0;
+        bool stopInterruptedObservedIdle = false;
+        QVariantMap interruptedResult;
+        const QMetaObject::Connection interruptedConnection = QObject::connect(&runtime, &PetRuntime::motionInterrupted, [&](const QVariantMap &result) {
+            ++motionInterruptedCount;
+            interruptedResult = result;
+            if (result.value("reason").toString() == "stop") {
+                stopInterruptedObservedIdle = runtime.currentState() == "idle";
+            }
+        });
+
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+        runtime.requestMotion("moveTo", 1.0, 1.0, "walk");
+        runtime.stopMotion();
+        require(motionInterruptedCount == 1, "stopMotion 应发出 motionInterrupted");
+        require(!interruptedResult.value("success").toBool(), "stopMotion 结果 success 应为 false");
+        require(interruptedResult.value("reason").toString() == "stop", "stopMotion reason 应为 stop");
+        require(runtime.currentState() == "idle", "stopMotion 应回到 idle");
+        require(stopInterruptedObservedIdle, "stopMotion 的 motionInterrupted 槽应观察到 runtime 已回 idle");
+
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+        runtime.requestMotion("moveTo", 1.0, 1.0, "walk");
+        runtime.cancelMotionForDrag();
+        require(motionInterruptedCount == 2, "拖拽取消应发出 motionInterrupted");
+        require(interruptedResult.value("reason").toString() == "interrupted_by_user",
+                "拖拽取消结果 reason 应映射为 interrupted_by_user");
+        require(runtime.currentState() == "moving",
+                "拖拽取消不应由 PetRuntime 自行 returnToIdle，应交给拖拽流程接管");
+
+        runtime.returnToIdle();
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+        runtime.requestMotion("teleport", 1.0, 1.0, "walk");
+        require(motionInterruptedCount == 3, "非法 motion action 应发出 motionInterrupted");
+        require(interruptedResult.value("reason").toString() == "invalid_action",
+                "非法 motion action reason 应为 invalid_action");
+        require(runtime.currentState() == "idle", "非法 motion action 应保持 idle");
+
+        runtime.returnToIdle();
+        runtime.playRecipe("walk.east");
+        require(runtime.currentActionId() == "walk", "普通 walk.east recipe 应保持原有随机漫步路径");
+        require(runtime.currentLoopMode() == "onceThenIdle", "普通随机 walk 不应继承目标移动 loop override");
+        require(runtime.currentAutoReturnToIdle(), "普通随机 walk 仍应自动回 idle");
+        require(runtime.consumeFrameMovementDelta().value("dx").toDouble() > 0.0,
+                "普通随机 walk 仍应输出帧移动增量");
+
+        QObject::disconnect(positionConnection);
+        QObject::disconnect(completedConnection);
+        QObject::disconnect(interruptedConnection);
+    }
+
     runtime.toggleAutoMovementEnabled();
     walkDelta = runtime.consumeFrameMovementDelta();
     require(walkDelta.value("dx").toDouble() == 0.0 && walkDelta.value("dy").toDouble() == 0.0, "禁止走动后移动增量应为 0");
     runtime.toggleAutoMovementEnabled();
+
+    {
+        runtime.returnToIdle();
+        runtime.setMotionScreenGeometry(QRect(0, 0, 200, 200));
+        runtime.setMotionCurrentPosition(QPoint(0, 0));
+
+        int motionInterruptedCount = 0;
+        QVariantMap interruptedResult;
+        const QMetaObject::Connection interruptedConnection = QObject::connect(&runtime, &PetRuntime::motionInterrupted, [&](const QVariantMap &result) {
+            ++motionInterruptedCount;
+            interruptedResult = result;
+        });
+
+        runtime.requestMotion("moveTo", 1.0, 1.0, "walk");
+        bridge.submitDragStarted(100);
+        require(motionInterruptedCount == 1, "submitDragStarted 应打断活跃目标移动");
+        require(interruptedResult.value("reason").toString() == "interrupted_by_user",
+                "submitDragStarted 打断结果 reason 应映射为 interrupted_by_user");
+
+        bridge.submitDragMoved(90);
+        bridge.submitDragMoved(110);
+        bridge.submitDragMoved(85);
+        bridge.submitDragMoved(115);
+        bridge.submitDragMoved(80);
+        require(runtime.currentActionId() == "drag_crouch",
+                "submitDragStarted 打断移动后仍应继续原有拖拽晃动流程");
+        bridge.submitDragEnded();
+        require(runtime.currentActionId() == "drag_stand_up_quick",
+                "submitDragStarted 打断移动后松手仍应进入拖拽释放流程");
+        runtime.handleAnimationFinished();
+        require(runtime.currentActionId() == "idle_stand",
+                "submitDragStarted 打断移动后的拖拽释放播完应回到 idle");
+
+        QObject::disconnect(interruptedConnection);
+    }
 
     // 旧版拖拽晃动会在 1 秒内统计左右换向次数：达到阈值后先蹲下，
     // 松手时再根据蹲下动画是否播到末帧，选择快速站起或完整站起。

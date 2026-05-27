@@ -296,6 +296,7 @@ void PetRuntime::applyManifestState(bool preserveRuntimeState)
     if (hasNextSize) {
         m_petSizeId = nextSizeId;
         m_petScale = nextScale;
+        configureMotionController();
         if (previousPetSizeId != m_petSizeId || previousPetScale != m_petScale) {
             emit petScaleChanged();
         }
@@ -306,6 +307,7 @@ void PetRuntime::applyManifestState(bool preserveRuntimeState)
     // 否则切换后会继续暴露旧 sizeId / scale。
     m_petSizeId.clear();
     m_petScale = 1.0;
+    configureMotionController();
     if (previousPetSizeId != m_petSizeId || previousPetScale != m_petScale) {
         emit petScaleChanged();
     }

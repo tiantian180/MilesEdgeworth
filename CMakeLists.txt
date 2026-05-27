@@ -638,6 +638,14 @@ if(BUILD_TESTING)
                     ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_4_chat_compact_bubble.py
         )
 
+        # Phase 2.5 的移动工具调用检查：守住 pet_motion tool、
+        # MotionController、ChatController EXECUTING_TOOL 和 sidecar tool-result 循环。
+        add_test(
+            NAME check_phase_2_5_movement_tool
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_phase_2_5_movement_tool.py
+        )
+
         # Logging standard check: keeps Qt + Go logging categories, env vars,
         # payload safety, and sidecar stderr forwarding aligned with docs/v2/设计方案/日志规范设计.md.
         add_test(

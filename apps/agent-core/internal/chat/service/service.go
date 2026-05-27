@@ -22,6 +22,7 @@ type Service struct {
 	provider chat.Provider
 	catalog  ModelCatalog
 	modelID  string
+	tools    toolRegistry
 }
 
 type BuildRequest struct {
@@ -40,6 +41,10 @@ func New(store *store.Store, provider chat.Provider, catalog ModelCatalog, model
 		catalog:  catalog,
 		modelID:  modelID,
 	}
+}
+
+func (s *Service) SubmitToolResult(result ToolResult) bool {
+	return s.tools.submit(result)
 }
 
 func EstimateTokens(text string) int {
@@ -123,14 +128,157 @@ func (s *Service) StreamChat(ctx context.Context, req BuildRequest) (<-chan chat
 	if err != nil {
 		return nil, err
 	}
-	return s.provider.StreamChat(ctx, chat.ChatParams{
-		ConversationID:     req.ConversationID,
-		RunID:              req.RunID,
-		MessageID:          req.MessageID,
-		Operation:          "chat",
-		Messages:           messages,
-		KnownExpressionIDs: knownExpressionIDs,
-	})
+
+	events := make(chan chat.StreamEvent, 32)
+	go s.streamChatRun(ctx, req, events, messages, knownExpressionIDs)
+	return events, nil
+}
+
+func (s *Service) streamChatRun(ctx context.Context, req BuildRequest, events chan<- chat.StreamEvent, messages []chat.Message, knownExpressionIDs []string) {
+	defer close(events)
+
+	if !send(ctx, events, chat.StreamEvent{Type: "RUN_STARTED", RunID: req.RunID}) {
+		return
+	}
+	if !send(ctx, events, chat.StreamEvent{
+		Type:  "CUSTOM",
+		Name:  "miles.pet.lifecycle",
+		RunID: req.RunID,
+		Value: map[string]any{"state": "thinking"},
+	}) {
+		return
+	}
+
+	workingMessages := append([]chat.Message(nil), messages...)
+	toolCalls := 0
+	continuation := false
+	for {
+		providerMessageID := req.MessageID
+		if toolCalls > 0 {
+			providerMessageID = fmt.Sprintf("%s-tool-%d", req.MessageID, toolCalls)
+		}
+		providerEvents, err := s.provider.StreamChat(ctx, chat.ChatParams{
+			ConversationID:     req.ConversationID,
+			RunID:              req.RunID,
+			MessageID:          providerMessageID,
+			Operation:          "chat",
+			Messages:           workingMessages,
+			KnownExpressionIDs: knownExpressionIDs,
+			Tools:              availableTools(),
+			Continuation:       continuation,
+		})
+		if err != nil {
+			send(ctx, events, chat.StreamEvent{
+				Type:      "RUN_ERROR",
+				RunID:     req.RunID,
+				MessageID: req.MessageID,
+				Error:     err.Error(),
+			})
+			return
+		}
+
+		var callContent strings.Builder
+		var pendingToolCalls []chat.StreamEvent
+		for event := range providerEvents {
+			if event.Type == ToolCallEventType {
+				pendingToolCalls = append(pendingToolCalls, event)
+				continue
+			}
+			if event.Type == "TEXT_MESSAGE_CONTENT" {
+				callContent.WriteString(event.Delta)
+			}
+			if !send(ctx, events, event) {
+				return
+			}
+			if event.Type == "RUN_ERROR" {
+				return
+			}
+		}
+
+		if len(pendingToolCalls) > 1 {
+			send(ctx, events, chat.StreamEvent{
+				Type:      "RUN_ERROR",
+				RunID:     req.RunID,
+				MessageID: req.MessageID,
+				Error:     "multiple tool calls in one provider response are not supported",
+			})
+			return
+		}
+		if len(pendingToolCalls) == 0 {
+			send(ctx, events, chat.StreamEvent{Type: "RUN_FINISHED", RunID: req.RunID})
+			return
+		}
+		if toolCalls >= MaxToolCallsPerRun {
+			send(ctx, events, chat.StreamEvent{
+				Type:      "RUN_ERROR",
+				RunID:     req.RunID,
+				MessageID: req.MessageID,
+				Error:     "maximum tool calls exceeded",
+			})
+			return
+		}
+
+		pendingToolCall := pendingToolCalls[0]
+		waiter := s.tools.register(req.RunID, pendingToolCall.ToolCallID)
+		if !send(ctx, events, pendingToolCall) {
+			s.tools.unregister(req.RunID)
+			return
+		}
+		result, ok := waitForToolResult(ctx, waiter)
+		s.tools.unregister(req.RunID)
+		if !ok {
+			return
+		}
+		if result.TimedOut && !send(ctx, events, chat.StreamEvent{
+			Type:      "CUSTOM",
+			Name:      ToolTimedOutEventName,
+			RunID:     req.RunID,
+			MessageID: req.MessageID,
+			Value: map[string]any{
+				"toolCallId": pendingToolCall.ToolCallID,
+				"toolName":   pendingToolCall.ToolName,
+			},
+		}) {
+			return
+		}
+		workingMessages = appendToolMessages(workingMessages, pendingToolCall, callContent.String(), result)
+		toolCalls++
+		continuation = true
+	}
+}
+
+func send(ctx context.Context, events chan<- chat.StreamEvent, event chat.StreamEvent) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case events <- event:
+		return true
+	}
+}
+
+func appendToolMessages(messages []chat.Message, toolCall chat.StreamEvent, content string, result ToolResult) []chat.Message {
+	return append(messages,
+		chat.Message{
+			Role:             "assistant",
+			Content:          content,
+			ReasoningContent: toolCall.ReasoningContent,
+			ToolCalls: []chat.ToolCall{
+				{
+					ID:   toolCall.ToolCallID,
+					Type: "function",
+					Function: chat.ToolCallFunction{
+						Name:      toolCall.ToolName,
+						Arguments: toolCall.ToolArgs,
+					},
+				},
+			},
+		},
+		chat.Message{
+			Role:       "tool",
+			Content:    string(result.Result),
+			ToolCallID: toolCall.ToolCallID,
+		},
+	)
 }
 
 func (s *Service) contextLimit() int {

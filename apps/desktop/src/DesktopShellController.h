@@ -13,6 +13,7 @@
 
 class QAction;
 class QMenu;
+class QScreen;
 class QSystemTrayIcon;
 class QWindow;
 
@@ -50,6 +51,7 @@ public:
     int petScreenAvailableY() const;
     int petScreenAvailableWidth() const;
     int petScreenAvailableHeight() const;
+    QRect petMotionScreenGeometry() const;
     bool chatWindowExpanded() const;
     void setPetWindow(QWindow *window);
     void setPetVisibleLocalBounds(const QRect &bounds);
@@ -65,6 +67,8 @@ public slots:
     Q_INVOKABLE void placePetWindowForStartup(double petScale);
     Q_INVOKABLE void movePetWindowBy(double dx, double dy);
     Q_INVOKABLE void movePetWindowTo(double x, double y);
+    // MotionController has already clamped this position; do not apply shell clamp again.
+    Q_INVOKABLE void movePetWindowToMotionClampedPosition(const QPoint &position);
     Q_INVOKABLE void setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize);
     Q_INVOKABLE void clearPetInputMask();
     Q_INVOKABLE void setChatWindowExpanded(bool expanded);
@@ -84,6 +88,7 @@ private:
     void applyCurrentLayerMode();
     void applyCompanionWindowBehavior(QWindow *window);
     QPointF legacyStartupPosition(double petScale) const;
+    QScreen *petTargetScreen() const;
     QRect petScreenAvailableGeometry() const;
     QRect petVisibleScreenGeometry() const;
     QRect virtualDesktopGeometry() const;

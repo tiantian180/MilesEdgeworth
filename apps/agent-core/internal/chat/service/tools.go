@@ -1,0 +1,107 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"sync"
+	"time"
+
+	"milesedgeworth/agent-core/internal/chat"
+)
+
+const (
+	MaxToolCallsPerRun    = 3
+	PetMotionToolName     = "pet_motion"
+	ToolCallEventType     = "TOOL_CALL"
+	ToolTimedOutEventName = "miles.chat.tool.timeout"
+)
+
+var ToolResultTimeout = 120 * time.Second
+
+type ToolResult struct {
+	RunID      string          `json:"runId"`
+	ToolCallID string          `json:"toolCallId"`
+	Result     json.RawMessage `json:"result"`
+	TimedOut   bool            `json:"-"`
+}
+
+type toolWaiter struct {
+	toolCallID string
+	ch         chan ToolResult
+	mu         sync.Mutex
+	closed     bool
+}
+
+type toolRegistry struct {
+	values sync.Map
+}
+
+func (r *toolRegistry) register(runID, toolCallID string) *toolWaiter {
+	waiter := &toolWaiter{
+		toolCallID: toolCallID,
+		ch:         make(chan ToolResult, 1),
+	}
+	r.values.Store(runID, waiter)
+	return waiter
+}
+
+func (r *toolRegistry) unregister(runID string) {
+	if value, ok := r.values.Load(runID); ok {
+		waiter := value.(*toolWaiter)
+		waiter.close()
+	}
+	r.values.Delete(runID)
+}
+
+func (r *toolRegistry) submit(result ToolResult) bool {
+	value, ok := r.values.Load(result.RunID)
+	if !ok {
+		return false
+	}
+	waiter := value.(*toolWaiter)
+	waiter.mu.Lock()
+	defer waiter.mu.Unlock()
+	if waiter.closed || waiter.toolCallID != result.ToolCallID {
+		return false
+	}
+	select {
+	case waiter.ch <- result:
+		return true
+	default:
+		return false
+	}
+}
+
+func waitForToolResult(ctx context.Context, waiter *toolWaiter) (ToolResult, bool) {
+	timer := time.NewTimer(ToolResultTimeout)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		waiter.close()
+		return ToolResult{}, false
+	case result := <-waiter.ch:
+		return result, true
+	case <-timer.C:
+		waiter.close()
+		return ToolResult{
+			Result:   json.RawMessage(`{"success":false,"reason":"timeout"}`),
+			TimedOut: true,
+		}, true
+	}
+}
+
+func (w *toolWaiter) close() {
+	w.mu.Lock()
+	w.closed = true
+	w.mu.Unlock()
+}
+
+var PetMotionTool = chat.ToolDefinition{
+	Name:        PetMotionToolName,
+	Description: "Move the desktop pet. Coordinates are normalized decimal values, not 0-100 percentages. For moveTo, screen center is x=0.5,y=0.5; never use 50 for center. For moveBy, x/y are relative deltas.",
+	Parameters:  json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["moveTo","moveBy"],"description":"moveTo: move to normalized screen coordinates; moveBy: move relative to the current position"},"x":{"type":"number","minimum":-1,"maximum":1,"description":"normalized decimal x. moveTo uses 0.0..1.0 where center is 0.5, not 50; moveBy uses -1.0..1.0 relative delta"},"y":{"type":"number","minimum":-1,"maximum":1,"description":"normalized decimal y. moveTo uses 0.0..1.0 where center is 0.5, not 50; moveBy uses -1.0..1.0 relative delta"},"mode":{"type":"string","enum":["walk","run"],"description":"Movement speed mode; defaults to walk"}},"required":["action","x","y"]}`),
+}
+
+func availableTools() []chat.ToolDefinition {
+	return []chat.ToolDefinition{PetMotionTool}
+}

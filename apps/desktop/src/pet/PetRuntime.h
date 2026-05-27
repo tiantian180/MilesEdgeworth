@@ -5,6 +5,7 @@
 #include "pet/effects/AudioController.h"
 #include "pet/effects/PropController.h"
 #include "pet/events/PetEvent.h"
+#include "pet/motion/MotionController.h"
 #include "pet/requests/ActionRequest.h"
 #include "pet/runtime/RuntimeSnapshot.h"
 
@@ -12,8 +13,10 @@
 #include <QJSEngine>
 #include <QList>
 #include <QObject>
+#include <QPoint>
 #include <QQmlEngine>
 #include <QRectF>
+#include <QRect>
 #include <QStringList>
 #include <QString>
 #include <QUrl>
@@ -159,6 +162,11 @@ public:
     Q_INVOKABLE void returnToIdle();
     // 由 agent / 模型提交一个表达请求；走 ExpressionMappingResolver 转成 ActionRequest。
     Q_INVOKABLE void requestExpression(const QString &state, const QString &expression);
+    Q_INVOKABLE void requestMotion(const QString &action, double x, double y, const QString &mode);
+    Q_INVOKABLE void stopMotion();
+    Q_INVOKABLE void cancelMotionForDrag();
+    Q_INVOKABLE void setMotionScreenGeometry(const QRect &screenGeometry);
+    Q_INVOKABLE void setMotionCurrentPosition(const QPoint &petWindowPosition);
     void requestExpression(const QString &state, const QString &expression, InterruptHint interruptHint);
     // 表层（QMovie）报告当前动画播完，触发后续 recipe step / action.completed 行为触发。
     Q_INVOKABLE void handleAnimationFinished();
@@ -203,6 +211,9 @@ signals:
     void availableAudioLanguagesChanged();
     void availablePetSizesChanged();
     void skinManifestReloaded();
+    void motionPositionChanged(const QPoint &newPosition);
+    void motionCompleted(const QVariantMap &result);
+    void motionInterrupted(const QVariantMap &result);
 
 private:
     QString actionForState(const QString &state) const;
@@ -237,6 +248,11 @@ private:
     void triggerCleanFinishCallback();
     void clearCleanFinishCallback();
     void stopAutoIdleTimer();
+    void setAutoMovementEnabled(bool enabled);
+    void configureMotionController();
+    void enterMovingState();
+    void exitMovingState();
+    QVariantMap motionResult(bool success, const QPointF &position, const QString &reason = QString()) const;
     void applyManifestState(bool preserveRuntimeState = false);
     bool activateSkin(const QString &skinId, bool persistSelection);
     bool reloadActiveSkin(SkinReloadMode mode);
@@ -255,9 +271,11 @@ private:
     QString m_currentPhaseId;
     QString m_currentFacing;
     QString m_currentMovementDirection;
+    QString m_currentMotionMode = "walk";
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
     AudioController m_audioController;
+    MotionController m_motionController;
     bool m_autoMovementEnabled = true;
     QString m_petSizeId;
     double m_petScale = 0.0;
@@ -272,6 +290,9 @@ private:
     bool m_cleanFinishExitInProgress = false;
     bool m_returnToIdleAfterExit = false;
     bool m_suppressAutoIdle = false;
+    bool m_motionLoopOverride = false;
+    bool m_autoMovementEnabledBeforeMotion = true;
+    bool m_hasMotionAutoMovementSnapshot = false;
 
     static constexpr int kCleanFinishSafetyMs = 2000;
     static constexpr int kAutoIdleAfterCleanFinishMs = 3000;

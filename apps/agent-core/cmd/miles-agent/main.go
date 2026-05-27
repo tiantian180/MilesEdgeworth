@@ -63,8 +63,12 @@ func main() {
 				Temperature:    cfg.Temperature,
 				MaxTokens:      cfg.MaxTokens,
 				CaptureContent: cfg.Langfuse.CaptureContent,
+				CaptureSSE:     cfg.Langfuse.CaptureSSE,
 			})
-			logger.Info("langfuse tracing enabled", "hostSet", true, "captureContent", cfg.Langfuse.CaptureContent)
+			logger.Info("langfuse tracing enabled",
+				"hostSet", true,
+				"captureContent", cfg.Langfuse.CaptureContent,
+				"captureSSE", cfg.Langfuse.CaptureSSE)
 		}
 	}
 

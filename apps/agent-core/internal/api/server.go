@@ -46,6 +46,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/v1/conversations", s.handleConversations)
 	mux.HandleFunc("/v1/conversations/", s.handleConversationByID)
 	mux.HandleFunc("/v1/chat/messages", s.handleChatMessages)
+	mux.HandleFunc("/v1/chat/tool-result", s.handleChatToolResult)
 	return mux
 }
 
@@ -253,6 +254,9 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	finished := false
 	providerError := false
+	// Tracks text that the expression parser already recovered from RawDelta.
+	// Matching TEXT_MESSAGE_CONTENT prefixes are skipped so raw replies keep
+	// expression markers without duplicating the visible text.
 	pendingRawCoverage := ""
 	coverageParser := expression.NewParser(nil, "neutral", func(text string) {
 		pendingRawCoverage += text
@@ -265,11 +269,16 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		if event.Type == "TEXT_MESSAGE_CONTENT" {
 			displayReply.WriteString(event.Delta)
 			if event.RawDelta == "" && !strings.HasPrefix(pendingRawCoverage, event.Delta) {
+				// Flush incomplete raw marker tails before deciding this text is
+				// not covered by prior RawDelta bytes.
 				coverageParser.Flush()
 			}
 			if strings.HasPrefix(pendingRawCoverage, event.Delta) {
+				// This visible delta was already represented by RawDelta.
 				pendingRawCoverage = strings.TrimPrefix(pendingRawCoverage, event.Delta)
 			} else if event.RawDelta == "" {
+				// Provider/test event has no RawDelta, so preserve its text in
+				// the raw transcript as-is.
 				rawReply.WriteString(event.Delta)
 				pendingRawCoverage = ""
 			}
@@ -295,6 +304,39 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	persistPartialOnce(false)
+}
+
+func (s *Server) handleChatToolResult(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w, http.MethodPost)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBodyBytes)
+	var req struct {
+		RunID      string          `json:"runId"`
+		ToolCallID string          `json:"toolCallId"`
+		Result     json.RawMessage `json:"result"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON"})
+		return
+	}
+	req.RunID = strings.TrimSpace(req.RunID)
+	req.ToolCallID = strings.TrimSpace(req.ToolCallID)
+	if req.RunID == "" || req.ToolCallID == "" || len(req.Result) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "runId, toolCallId, and result are required"})
+		return
+	}
+	if !s.chatService.SubmitToolResult(chatservice.ToolResult{
+		RunID:      req.RunID,
+		ToolCallID: req.ToolCallID,
+		Result:     req.Result,
+	}) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "tool result target not found"})
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

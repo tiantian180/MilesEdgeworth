@@ -38,6 +38,9 @@
         // 原文 payload 日志开关。默认保持 "0"；只有本地排查模型原始 delta 时才临时改成 "1"。
         { "name": "MILES_LOG_PAYLOADS", "value": "0" },
 
+        // Langfuse 输出默认记录流式聚合后的完整模型结果；只有排查 SSE chunk 时才临时改成 "1"。
+        { "name": "MILES_LANGFUSE_CAPTURE_SSE", "value": "0" },
+
         // 可选：调试本地 sidecar 时，用这个变量覆盖 sidecar 可执行文件路径。
         // { "name": "MILESEDGEWORTH_AGENT_PATH", "value": "${workspaceFolder}/build/apps/agent-core/miles-agent" },
 

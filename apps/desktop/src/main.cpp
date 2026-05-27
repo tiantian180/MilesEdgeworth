@@ -15,6 +15,7 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QPoint>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
 #include <QTimer>
@@ -85,13 +86,24 @@ int main(int argc, char *argv[])
     });
 
     PetSurfaceWindow petSurfaceWindow(&petRuntime, &petEventBridge, &shellController, &chatController);
+    auto syncMotionEnvironment = [&shellController, &petRuntime]() {
+        petRuntime.setMotionScreenGeometry(shellController.petMotionScreenGeometry());
+        petRuntime.setMotionCurrentPosition(QPoint(shellController.petWindowX(), shellController.petWindowY()));
+    };
+    QObject::connect(&shellController, &DesktopShellController::petWindowGeometryChanged,
+                     &petRuntime, syncMotionEnvironment);
+    QObject::connect(&petRuntime, &PetRuntime::motionPositionChanged,
+                     &shellController, [&shellController](const QPoint &position) {
+                         shellController.movePetWindowToMotionClampedPosition(position);
+                     });
     petSurfaceWindow.show();
     petSurfaceWindow.winId();
 
     // QWidget 需要先创建 native handle，macOS 原生层才能拿到 NSWindow。
-    QTimer::singleShot(0, &petSurfaceWindow, [&petSurfaceWindow, &shellController, &petRuntime]() {
+    QTimer::singleShot(0, &petSurfaceWindow, [&petSurfaceWindow, &shellController, &petRuntime, syncMotionEnvironment]() {
         shellController.setPetWindow(petSurfaceWindow.windowHandle());
         shellController.placePetWindowForStartup(petRuntime.petScale());
+        syncMotionEnvironment();
     });
 
     return app.exec();

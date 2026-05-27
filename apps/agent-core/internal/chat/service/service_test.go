@@ -2,32 +2,48 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"milesedgeworth/agent-core/internal/chat"
 	"milesedgeworth/agent-core/internal/store"
 )
 
 type fakeProvider struct {
-	completeText  string
-	completeTexts []string
-	completeErr   error
-	completeCalls int
-	onComplete    func()
-	streamCalls   int
-	streamParams  chat.ChatParams
-	streamEvents  chan chat.StreamEvent
-	streamErr     error
+	completeText     string
+	completeTexts    []string
+	completeErr      error
+	completeCalls    int
+	onComplete       func()
+	streamCalls      int
+	streamParams     chat.ChatParams
+	streamParamsList []chat.ChatParams
+	streamEvents     chan chat.StreamEvent
+	streamEventLists [][]chat.StreamEvent
+	streamErr        error
 }
 
 func (p *fakeProvider) StreamChat(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
 	_ = ctx
 	p.streamCalls++
 	p.streamParams = params
-	if p.streamEvents != nil || p.streamErr != nil {
-		return p.streamEvents, p.streamErr
+	p.streamParamsList = append(p.streamParamsList, params)
+	if p.streamErr != nil {
+		return nil, p.streamErr
+	}
+	if len(p.streamEventLists) >= p.streamCalls {
+		events := make(chan chat.StreamEvent, len(p.streamEventLists[p.streamCalls-1]))
+		for _, event := range p.streamEventLists[p.streamCalls-1] {
+			events <- event
+		}
+		close(events)
+		return events, nil
+	}
+	if p.streamEvents != nil {
+		return p.streamEvents, nil
 	}
 	events := make(chan chat.StreamEvent)
 	close(events)
@@ -82,6 +98,61 @@ func TestEstimateTokensUsesRuneCount(t *testing.T) {
 	if got := EstimateTokens("你好"); got != 4 {
 		t.Fatalf("EstimateTokens = %d, want 4", got)
 	}
+}
+
+func TestPetMotionToolDescribesNormalizedDecimalCoordinates(t *testing.T) {
+	contract := PetMotionTool.Description + "\n" + string(PetMotionTool.Parameters)
+	for _, want := range []string{"normalized decimal", "0.5", "not 50"} {
+		if !strings.Contains(contract, want) {
+			t.Fatalf("pet_motion schema should teach %q, got:\n%s", want, contract)
+		}
+	}
+
+	var params map[string]any
+	if err := json.Unmarshal(PetMotionTool.Parameters, &params); err != nil {
+		t.Fatalf("parse pet_motion schema: %v", err)
+	}
+	properties, ok := params["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("schema missing properties: %+v", params)
+	}
+	for _, name := range []string{"x", "y"} {
+		property, ok := properties[name].(map[string]any)
+		if !ok {
+			t.Fatalf("schema missing %s property: %+v", name, properties)
+		}
+		if property["minimum"] != float64(-1) || property["maximum"] != float64(1) {
+			t.Fatalf("%s bounds = [%v, %v], want [-1, 1]", name, property["minimum"], property["maximum"])
+		}
+	}
+}
+
+func TestToolRegistryRejectsToolCallIDMismatch(t *testing.T) {
+	var registry toolRegistry
+	waiter := registry.register("run-1", "tc-1")
+	defer registry.unregister("run-1")
+
+	if registry.submit(ToolResult{RunID: "run-1", ToolCallID: "wrong", Result: json.RawMessage(`{"success":true}`)}) {
+		t.Fatal("mismatched toolCallID should be rejected")
+	}
+	if !registry.submit(ToolResult{RunID: "run-1", ToolCallID: "tc-1", Result: json.RawMessage(`{"success":true}`)}) {
+		t.Fatal("matching toolCallID should be accepted")
+	}
+	got := <-waiter.ch
+	if got.ToolCallID != "tc-1" {
+		t.Fatalf("toolCallID = %q, want tc-1", got.ToolCallID)
+	}
+}
+
+func TestToolRegistryRejectsClosedWaiter(t *testing.T) {
+	var registry toolRegistry
+	waiter := registry.register("run-1", "tc-1")
+	waiter.close()
+
+	if registry.submit(ToolResult{RunID: "run-1", ToolCallID: "tc-1", Result: json.RawMessage(`{"success":true}`)}) {
+		t.Fatal("closed waiter should reject late tool result")
+	}
+	registry.unregister("run-1")
 }
 
 func TestBuildMessagesPutsPersonaBeforeExpressionRules(t *testing.T) {
@@ -602,6 +673,8 @@ func TestStreamChatForwardsBuiltParams(t *testing.T) {
 	if events == nil {
 		t.Fatal("events = nil, want stream channel")
 	}
+	for range events {
+	}
 	if provider.streamCalls != 1 {
 		t.Fatalf("streamCalls = %d, want 1", provider.streamCalls)
 	}
@@ -620,6 +693,315 @@ func TestStreamChatForwardsBuiltParams(t *testing.T) {
 	}
 	if params.Messages[1].Role != store.RoleUser || params.Messages[1].Content != "指出矛盾。" {
 		t.Fatalf("user message = %+v", params.Messages[1])
+	}
+}
+
+func TestStreamChatToolLoopEmitsSingleRunLifecycle(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "走到右边。")
+
+	provider := &fakeProvider{
+		streamEventLists: [][]chat.StreamEvent{
+			{
+				{Type: "TOOL_CALL", RunID: "run-1", ToolCallID: "tc-1", ToolName: "pet_motion", ToolArgs: `{"action":"moveTo","x":1,"y":0.5}`},
+			},
+			{
+				{Type: "TEXT_MESSAGE_START", RunID: "run-1", MessageID: "msg-2", Role: "assistant"},
+				{Type: "TEXT_MESSAGE_CONTENT", RunID: "run-1", MessageID: "msg-2", Delta: "到了。"},
+				{Type: "TEXT_MESSAGE_END", RunID: "run-1", MessageID: "msg-2"},
+			},
+		},
+	}
+	service := newTestService(s, provider, 8192)
+
+	events, err := service.StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []chat.StreamEvent
+	for event := range events {
+		got = append(got, event)
+		if event.Type == "TOOL_CALL" {
+			if service.SubmitToolResult(ToolResult{
+				RunID:      "run-1",
+				ToolCallID: "wrong",
+				Result:     json.RawMessage(`{"success":true}`),
+			}) {
+				t.Fatal("SubmitToolResult should reject mismatched toolCallID")
+			}
+			ok := service.SubmitToolResult(ToolResult{
+				RunID:      "run-1",
+				ToolCallID: "tc-1",
+				Result:     json.RawMessage(`{"success":true,"position":{"x":1,"y":0.5}}`),
+			})
+			if !ok {
+				t.Fatal("SubmitToolResult should find waiting run")
+			}
+		}
+	}
+
+	if provider.streamCalls != 2 {
+		t.Fatalf("stream calls = %d, want 2", provider.streamCalls)
+	}
+	if len(provider.streamParamsList[0].Tools) != 1 || provider.streamParamsList[0].Tools[0].Name != "pet_motion" {
+		t.Fatalf("first provider call should include pet_motion tool: %+v", provider.streamParamsList[0].Tools)
+	}
+	if provider.streamParamsList[0].Continuation {
+		t.Fatalf("first provider call should not be continuation: %+v", provider.streamParamsList[0])
+	}
+	if !provider.streamParamsList[1].Continuation {
+		t.Fatalf("second provider call should be continuation: %+v", provider.streamParamsList[1])
+	}
+	if provider.streamParamsList[1].MessageID != "msg-1-tool-1" {
+		t.Fatalf("second provider call messageID = %q, want msg-1-tool-1", provider.streamParamsList[1].MessageID)
+	}
+	secondMessages := provider.streamParamsList[1].Messages
+	if len(secondMessages) < 2 {
+		t.Fatalf("second provider call missing tool context: %+v", secondMessages)
+	}
+	if secondMessages[len(secondMessages)-2].Role != "assistant" || len(secondMessages[len(secondMessages)-2].ToolCalls) != 1 {
+		t.Fatalf("second provider call missing assistant tool_calls message: %+v", secondMessages)
+	}
+	if secondMessages[len(secondMessages)-1].Role != "tool" || secondMessages[len(secondMessages)-1].ToolCallID != "tc-1" {
+		t.Fatalf("second provider call missing tool result message: %+v", secondMessages)
+	}
+	if secondMessages[len(secondMessages)-1].Content != `{"success":true,"position":{"x":1,"y":0.5}}` {
+		t.Fatalf("tool result content = %q", secondMessages[len(secondMessages)-1].Content)
+	}
+
+	runStarted := 0
+	runFinished := 0
+	thinkingLifecycle := 0
+	for _, event := range got {
+		if event.Type == "RUN_STARTED" {
+			runStarted++
+		}
+		if event.Type == "RUN_FINISHED" {
+			runFinished++
+		}
+		if event.Type == "CUSTOM" && event.Name == "miles.pet.lifecycle" && event.Value["state"] == "thinking" {
+			thinkingLifecycle++
+		}
+	}
+	if runStarted != 1 || runFinished != 1 || thinkingLifecycle != 1 {
+		t.Fatalf("run lifecycle = started %d finished %d thinking %d, want 1/1/1; events=%+v",
+			runStarted, runFinished, thinkingLifecycle, got)
+	}
+}
+
+func TestStreamChatToolLoopPreservesAssistantContentBeforeToolCall(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "走到中间。")
+
+	provider := &fakeProvider{
+		streamEventLists: [][]chat.StreamEvent{
+			{
+				{Type: "TEXT_MESSAGE_START", RunID: "run-1", MessageID: "msg-1", Role: "assistant"},
+				{Type: "TEXT_MESSAGE_CONTENT", RunID: "run-1", MessageID: "msg-1", Delta: "我先过去。"},
+				{Type: "TEXT_MESSAGE_END", RunID: "run-1", MessageID: "msg-1"},
+				{Type: "TOOL_CALL", RunID: "run-1", ToolCallID: "tc-1", ToolName: "pet_motion", ToolArgs: `{"action":"moveTo","x":0.5,"y":0.5}`},
+			},
+			{
+				{Type: "TEXT_MESSAGE_START", RunID: "run-1", MessageID: "msg-2", Role: "assistant"},
+				{Type: "TEXT_MESSAGE_CONTENT", RunID: "run-1", MessageID: "msg-2", Delta: "到了。"},
+				{Type: "TEXT_MESSAGE_END", RunID: "run-1", MessageID: "msg-2"},
+			},
+		},
+	}
+	service := newTestService(s, provider, 8192)
+	events, err := service.StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for event := range events {
+		if event.Type == "TOOL_CALL" {
+			if !service.SubmitToolResult(ToolResult{
+				RunID:      "run-1",
+				ToolCallID: "tc-1",
+				Result:     json.RawMessage(`{"success":true,"position":{"x":0.5,"y":0.5}}`),
+			}) {
+				t.Fatal("SubmitToolResult should accept matching tool result")
+			}
+		}
+	}
+
+	secondMessages := provider.streamParamsList[1].Messages
+	assistantToolMessage := secondMessages[len(secondMessages)-2]
+	if assistantToolMessage.Role != "assistant" || len(assistantToolMessage.ToolCalls) != 1 {
+		t.Fatalf("assistant tool message = %+v", assistantToolMessage)
+	}
+	if assistantToolMessage.Content != "我先过去。" {
+		t.Fatalf("assistant tool message content = %q, want prior text", assistantToolMessage.Content)
+	}
+}
+
+func TestStreamChatToolLoopPreservesReasoningContentBeforeToolResult(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "走到中间。")
+
+	provider := &fakeProvider{
+		streamEventLists: [][]chat.StreamEvent{
+			{
+				{Type: "TOOL_CALL", RunID: "run-1", ToolCallID: "tc-1", ToolName: "pet_motion", ToolArgs: `{"action":"moveTo","x":0.5,"y":0.5}`, ReasoningContent: "需要移动到目标位置。"},
+			},
+			{
+				{Type: "TEXT_MESSAGE_START", RunID: "run-1", MessageID: "msg-2", Role: "assistant"},
+				{Type: "TEXT_MESSAGE_CONTENT", RunID: "run-1", MessageID: "msg-2", Delta: "到了。"},
+				{Type: "TEXT_MESSAGE_END", RunID: "run-1", MessageID: "msg-2"},
+			},
+		},
+	}
+	service := newTestService(s, provider, 8192)
+	events, err := service.StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for event := range events {
+		if event.Type == "TOOL_CALL" {
+			if !service.SubmitToolResult(ToolResult{
+				RunID:      "run-1",
+				ToolCallID: "tc-1",
+				Result:     json.RawMessage(`{"success":true,"position":{"x":0.5,"y":0.5}}`),
+			}) {
+				t.Fatal("SubmitToolResult should accept matching tool result")
+			}
+		}
+	}
+
+	secondMessages := provider.streamParamsList[1].Messages
+	assistantToolMessage := secondMessages[len(secondMessages)-2]
+	if assistantToolMessage.ReasoningContent != "需要移动到目标位置。" {
+		t.Fatalf("assistant tool reasoning content = %q", assistantToolMessage.ReasoningContent)
+	}
+}
+
+func TestStreamChatMultipleToolCallsReturnRunError(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "移动两次。")
+
+	provider := &fakeProvider{
+		streamEventLists: [][]chat.StreamEvent{
+			{
+				{Type: "TOOL_CALL", RunID: "run-1", ToolCallID: "tc-1", ToolName: "pet_motion", ToolArgs: `{"action":"moveTo","x":0.5,"y":0.5}`},
+				{Type: "TOOL_CALL", RunID: "run-1", ToolCallID: "tc-2", ToolName: "pet_motion", ToolArgs: `{"action":"moveBy","x":0.1,"y":0}`},
+			},
+		},
+	}
+	service := newTestService(s, provider, 8192)
+	events, err := service.StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []chat.StreamEvent
+	for event := range events {
+		got = append(got, event)
+		if event.Type == "TOOL_CALL" {
+			t.Fatalf("multiple tool calls should error before emitting TOOL_CALL: %+v", got)
+		}
+	}
+	if provider.streamCalls != 1 {
+		t.Fatalf("stream calls = %d, want 1", provider.streamCalls)
+	}
+	if len(got) == 0 || got[len(got)-1].Type != "RUN_ERROR" {
+		t.Fatalf("events = %+v, want RUN_ERROR", got)
+	}
+	if !strings.Contains(got[len(got)-1].Error, "multiple tool calls") {
+		t.Fatalf("RUN_ERROR = %q, want multiple tool calls diagnostic", got[len(got)-1].Error)
+	}
+}
+
+func TestStreamChatEmitsToolTimeoutEventBeforeContinuation(t *testing.T) {
+	oldTimeout := ToolResultTimeout
+	ToolResultTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { ToolResultTimeout = oldTimeout })
+
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "走到右边。")
+
+	provider := &fakeProvider{
+		streamEventLists: [][]chat.StreamEvent{
+			{
+				{Type: "TOOL_CALL", RunID: "run-1", ToolCallID: "tc-1", ToolName: "pet_motion", ToolArgs: `{"action":"moveTo","x":1,"y":0.5}`},
+			},
+			{
+				{Type: "TEXT_MESSAGE_START", RunID: "run-1", MessageID: "msg-2", Role: "assistant"},
+				{Type: "TEXT_MESSAGE_CONTENT", RunID: "run-1", MessageID: "msg-2", Delta: "移动超时。"},
+				{Type: "TEXT_MESSAGE_END", RunID: "run-1", MessageID: "msg-2"},
+			},
+		},
+	}
+
+	events, err := newTestService(s, provider, 8192).StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got []chat.StreamEvent
+	for event := range events {
+		got = append(got, event)
+	}
+	if provider.streamCalls != 2 {
+		t.Fatalf("stream calls = %d, want continuation after timeout", provider.streamCalls)
+	}
+	foundTimeoutEvent := false
+	for _, event := range got {
+		if event.Type == "CUSTOM" && event.Name == ToolTimedOutEventName {
+			foundTimeoutEvent = true
+			if event.Value["toolCallId"] != "tc-1" {
+				t.Fatalf("timeout event toolCallId = %+v", event.Value)
+			}
+		}
+	}
+	if !foundTimeoutEvent {
+		t.Fatalf("events = %+v, want %s custom event", got, ToolTimedOutEventName)
+	}
+	secondMessages := provider.streamParamsList[1].Messages
+	if secondMessages[len(secondMessages)-1].Content != `{"success":false,"reason":"timeout"}` {
+		t.Fatalf("timeout tool result content = %q", secondMessages[len(secondMessages)-1].Content)
 	}
 }
 

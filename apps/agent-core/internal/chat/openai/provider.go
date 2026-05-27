@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -78,25 +79,58 @@ func normalizeChatCompletionsURL(raw string) string {
 	}
 }
 
+type chatToolDefinition struct {
+	Type     string `json:"type"`
+	Function struct {
+		Name        string          `json:"name"`
+		Description string          `json:"description"`
+		Parameters  json.RawMessage `json:"parameters"`
+	} `json:"function"`
+}
+
 type chatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role             string          `json:"role"`
+	Content          *string         `json:"content"`
+	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	ToolCalls        []chat.ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string          `json:"tool_call_id,omitempty"`
 }
 
 type chatCompletionRequest struct {
-	Model       string        `json:"model"`
-	Messages    []chatMessage `json:"messages"`
-	Stream      bool          `json:"stream"`
-	Temperature *float64      `json:"temperature,omitempty"`
-	MaxTokens   *int          `json:"max_tokens,omitempty"`
+	Model             string               `json:"model"`
+	Messages          []chatMessage        `json:"messages"`
+	Stream            bool                 `json:"stream"`
+	Temperature       *float64             `json:"temperature,omitempty"`
+	MaxTokens         *int                 `json:"max_tokens,omitempty"`
+	Tools             []chatToolDefinition `json:"tools,omitempty"`
+	ParallelToolCalls *bool                `json:"parallel_tool_calls,omitempty"`
 }
 
 type chatCompletionStreamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			ToolCalls        []struct {
+				Index    int    `json:"index"`
+				ID       string `json:"id"`
+				Type     string `json:"type"`
+				Function struct {
+					Name      string `json:"name"`
+					Arguments string `json:"arguments"`
+				} `json:"function"`
+			} `json:"tool_calls"`
 		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
+}
+
+type streamedProviderOutput struct {
+	Role             string          `json:"role"`
+	Content          string          `json:"content,omitempty"`
+	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	ToolCalls        []chat.ToolCall `json:"tool_calls,omitempty"`
+	FinishReason     string          `json:"finish_reason,omitempty"`
 }
 
 type chatCompletionResponse struct {
@@ -110,38 +144,19 @@ func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-ch
 
 	messages := makeChatMessages(params.Messages)
 	body := chatCompletionRequest{
-		Model:       p.model,
-		Messages:    messages,
-		Stream:      true,
-		Temperature: p.temperature,
-		MaxTokens:   p.maxTokens,
-	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		close(events)
-		return events, err
+		Model:             p.model,
+		Messages:          messages,
+		Stream:            true,
+		Temperature:       p.temperature,
+		MaxTokens:         p.maxTokens,
+		Tools:             makeChatTools(params.Tools),
+		ParallelToolCalls: parallelToolCallsParam(params.Tools),
 	}
 	logger.Debug("request prepared",
 		"model", p.model,
 		"endpoint", sanitizeEndpoint(p.baseURL),
 		"knownTags", len(params.KnownExpressionIDs),
 		"messages", len(messages))
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		p.baseURL, bytes.NewReader(encoded))
-	if err != nil {
-		close(events)
-		return events, err
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
-	httpReq.Header.Set("Accept", "text/event-stream")
-
-	resp, err := p.httpClient.Do(httpReq)
-	if err != nil {
-		close(events)
-		return events, err
-	}
 
 	runID := params.RunID
 	if runID == "" {
@@ -152,19 +167,42 @@ func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-ch
 		messageID = "openai-msg-1"
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		// Drain a small sample for diagnostics, then close.
-		sample, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		resp.Body.Close()
-		go func() {
-			defer close(events)
-			send(ctx, events, chat.StreamEvent{
-				Type:  "RUN_ERROR",
-				RunID: runID,
-				Error: providerErrorMessage(resp, p.baseURL, sample),
-			})
-		}()
-		return events, nil
+	resp, sample, err := p.doStreamChatRequest(ctx, body)
+	if err != nil {
+		close(events)
+		return events, err
+	}
+
+	retriedParallel := false
+	retriedTools := false
+	for resp.StatusCode != http.StatusOK {
+		switch {
+		case !retriedParallel && body.ParallelToolCalls != nil && providerRejectedField(sample, "parallel_tool_calls"):
+			retriedParallel = true
+			body.ParallelToolCalls = nil
+			logger.Warn("provider rejected parallel_tool_calls; retrying without the field")
+		case !retriedTools && len(body.Tools) > 0 && providerRejectedField(sample, "tool"):
+			retriedTools = true
+			body.Tools = nil
+			body.ParallelToolCalls = nil
+			logger.Warn("provider rejected tools; retrying without tool definitions")
+		default:
+			go func(resp *http.Response, sample []byte) {
+				defer close(events)
+				send(ctx, events, chat.StreamEvent{
+					Type:  "RUN_ERROR",
+					RunID: runID,
+					Error: providerErrorMessage(resp, p.baseURL, sample),
+				})
+			}(resp, sample)
+			return events, nil
+		}
+
+		resp, sample, err = p.doStreamChatRequest(ctx, body)
+		if err != nil {
+			close(events)
+			return events, err
+		}
 	}
 
 	knownTags := append([]string(nil), params.KnownExpressionIDs...)
@@ -172,6 +210,32 @@ func (p *Provider) StreamChat(ctx context.Context, params chat.ChatParams) (<-ch
 
 	go p.pipe(ctx, resp, events, runID, messageID, knownTags)
 	return events, nil
+}
+
+func (p *Provider) doStreamChatRequest(ctx context.Context, body chatCompletionRequest) (*http.Response, []byte, error) {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		p.baseURL, bytes.NewReader(encoded))
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+p.apiKey)
+	httpReq.Header.Set("Accept", "text/event-stream")
+
+	resp, err := p.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		sample, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		resp.Body.Close()
+		return resp, sample, nil
+	}
+	return resp, nil, nil
 }
 
 func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string, error) {
@@ -211,7 +275,7 @@ func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string
 		return "", err
 	}
 	for _, choice := range completion.Choices {
-		if content := strings.TrimSpace(choice.Message.Content); content != "" {
+		if content := strings.TrimSpace(messageContent(choice.Message.Content)); content != "" {
 			return content, nil
 		}
 	}
@@ -221,9 +285,52 @@ func (p *Provider) Complete(ctx context.Context, params chat.ChatParams) (string
 func makeChatMessages(messages []chat.Message) []chatMessage {
 	out := make([]chatMessage, 0, len(messages))
 	for _, message := range messages {
-		out = append(out, chatMessage{Role: message.Role, Content: message.Content})
+		content := messageContentForRequest(message)
+		out = append(out, chatMessage{
+			Role:             message.Role,
+			Content:          content,
+			ReasoningContent: message.ReasoningContent,
+			ToolCalls:        message.ToolCalls,
+			ToolCallID:       message.ToolCallID,
+		})
 	}
 	return out
+}
+
+func messageContentForRequest(message chat.Message) *string {
+	if message.Role == "assistant" && len(message.ToolCalls) > 0 && message.Content == "" {
+		return nil
+	}
+	content := message.Content
+	return &content
+}
+
+func messageContent(content *string) string {
+	if content == nil {
+		return ""
+	}
+	return *content
+}
+
+func makeChatTools(tools []chat.ToolDefinition) []chatToolDefinition {
+	out := make([]chatToolDefinition, 0, len(tools))
+	for _, tool := range tools {
+		var item chatToolDefinition
+		item.Type = "function"
+		item.Function.Name = tool.Name
+		item.Function.Description = tool.Description
+		item.Function.Parameters = tool.Parameters
+		out = append(out, item)
+	}
+	return out
+}
+
+func parallelToolCallsParam(tools []chat.ToolDefinition) *bool {
+	if len(tools) == 0 {
+		return nil
+	}
+	enabled := false
+	return &enabled
 }
 
 func providerErrorMessage(resp *http.Response, endpoint string, sample []byte) string {
@@ -244,6 +351,19 @@ func providerErrorMessage(resp *http.Response, endpoint string, sample []byte) s
 	return message
 }
 
+func providerRejectedField(sample []byte, field string) bool {
+	message := strings.ToLower(string(sample))
+	if !strings.Contains(message, strings.ToLower(field)) {
+		return false
+	}
+	for _, marker := range []string{"not support", "unsupported", "unknown", "unrecognized", "invalid field", "extra field"} {
+		if strings.Contains(message, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 func sanitizeEndpoint(endpoint string) string {
 	parsed, err := url.Parse(endpoint)
 	if err != nil {
@@ -259,27 +379,20 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	defer resp.Body.Close()
 	defer close(events)
 
-	if !send(ctx, events, chat.StreamEvent{Type: "RUN_STARTED", RunID: runID}) {
-		return
-	}
-	if !send(ctx, events, chat.StreamEvent{
-		Type:  "CUSTOM",
-		Name:  "miles.pet.lifecycle",
-		RunID: runID,
-		Value: map[string]any{"state": "thinking"},
-	}) {
-		return
-	}
-	if !send(ctx, events, chat.StreamEvent{
-		Type:      "TEXT_MESSAGE_START",
-		RunID:     runID,
-		MessageID: messageID,
-		Role:      "assistant",
-	}) {
-		return
-	}
-
 	sawFirstSpeaking := false
+	textStarted := false
+	ensureTextStarted := func() bool {
+		if textStarted {
+			return true
+		}
+		textStarted = true
+		return send(ctx, events, chat.StreamEvent{
+			Type:      "TEXT_MESSAGE_START",
+			RunID:     runID,
+			MessageID: messageID,
+			Role:      "assistant",
+		})
+	}
 	var pendingRawDelta strings.Builder
 	takeRawDelta := func() string {
 		raw := pendingRawDelta.String()
@@ -291,6 +404,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		"neutral",
 		func(text string) {
 			rawDelta := takeRawDelta()
+			if !ensureTextStarted() {
+				return
+			}
 			if !sawFirstSpeaking {
 				sawFirstSpeaking = true
 				logger.Debug("fallback expression inserted",
@@ -317,6 +433,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		func(tag string) {
 			rawDelta := takeRawDelta()
 			sawFirstSpeaking = true
+			if !ensureTextStarted() {
+				return
+			}
 			logger.Debug("expression tag parsed", "tag", tag)
 			send(ctx, events, chat.StreamEvent{
 				Type:     "CUSTOM",
@@ -327,6 +446,18 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 			})
 		},
 	)
+
+	type pendingToolCall struct {
+		id        string
+		typeName  string
+		name      strings.Builder
+		arguments strings.Builder
+	}
+	pendingTools := map[int]*pendingToolCall{}
+	var contentOutput strings.Builder
+	var reasoningContent strings.Builder
+	var providerStreamOutput strings.Builder
+	finishReason := ""
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -339,6 +470,10 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		if payload == "[DONE]" {
 			break
 		}
+		if providerStreamOutput.Len() > 0 {
+			providerStreamOutput.WriteByte('\n')
+		}
+		providerStreamOutput.WriteString(payload)
 		var chunk chatCompletionStreamChunk
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
 			logger.Warn("malformed provider chunk skipped", "error", err)
@@ -348,13 +483,41 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 			continue
 		}
 		for _, choice := range chunk.Choices {
+			if choice.Delta.ReasoningContent != "" {
+				// DeepSeek thinking mode requires this field to be replayed in
+				// the assistant tool_calls message on the continuation request.
+				reasoningContent.WriteString(choice.Delta.ReasoningContent)
+			}
+			for _, tool := range choice.Delta.ToolCalls {
+				item := pendingTools[tool.Index]
+				if item == nil {
+					item = &pendingToolCall{}
+					pendingTools[tool.Index] = item
+				}
+				if tool.ID != "" {
+					item.id = tool.ID
+				}
+				if tool.Type != "" {
+					item.typeName = tool.Type
+				}
+				if tool.Function.Name != "" {
+					item.name.WriteString(tool.Function.Name)
+				}
+				if tool.Function.Arguments != "" {
+					item.arguments.WriteString(tool.Function.Arguments)
+				}
+			}
 			if choice.Delta.Content != "" {
+				contentOutput.WriteString(choice.Delta.Content)
 				logger.Debug("provider delta received", "len", len([]rune(choice.Delta.Content)))
 				if mileslog.PayloadLoggingEnabled() {
 					logger.Debug("provider delta payload", "text", choice.Delta.Content)
 				}
 				pendingRawDelta.WriteString(choice.Delta.Content)
 				parser.Feed(choice.Delta.Content)
+			}
+			if choice.FinishReason != "" {
+				finishReason = choice.FinishReason
 			}
 		}
 	}
@@ -370,12 +533,80 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	parser.Flush()
 	logger.Debug("stream finished")
 
-	send(ctx, events, chat.StreamEvent{
-		Type:      "TEXT_MESSAGE_END",
-		RunID:     runID,
-		MessageID: messageID,
-	})
-	send(ctx, events, chat.StreamEvent{Type: "RUN_FINISHED", RunID: runID})
+	indexes := make([]int, 0, len(pendingTools))
+	for index := range pendingTools {
+		indexes = append(indexes, index)
+	}
+	sort.Ints(indexes)
+	toolCalls := make([]chat.ToolCall, 0, len(indexes))
+	for _, index := range indexes {
+		item := pendingTools[index]
+		typeName := item.typeName
+		if typeName == "" {
+			typeName = "function"
+		}
+		toolCalls = append(toolCalls, chat.ToolCall{
+			ID:   item.id,
+			Type: typeName,
+			Function: chat.ToolCallFunction{
+				Name:      item.name.String(),
+				Arguments: item.arguments.String(),
+			},
+		})
+	}
+	streamOutput := providerStreamOutput.String()
+	providerOutput := makeStreamedProviderOutput(contentOutput.String(), reasoningContent.String(), toolCalls, finishReason)
+	if textStarted {
+		if !send(ctx, events, chat.StreamEvent{
+			Type:                 "TEXT_MESSAGE_END",
+			RunID:                runID,
+			MessageID:            messageID,
+			ProviderOutput:       providerOutput,
+			ProviderStreamOutput: streamOutput,
+		}) {
+			return
+		}
+	}
+	if len(pendingTools) == 0 {
+		return
+	}
+
+	for _, index := range indexes {
+		item := pendingTools[index]
+		toolProviderOutput := ""
+		toolProviderStreamOutput := ""
+		if index == indexes[0] && !textStarted {
+			toolProviderOutput = providerOutput
+			toolProviderStreamOutput = streamOutput
+		}
+		if !send(ctx, events, chat.StreamEvent{
+			Type:                 "TOOL_CALL",
+			RunID:                runID,
+			ToolCallID:           item.id,
+			ToolName:             item.name.String(),
+			ToolArgs:             item.arguments.String(),
+			ReasoningContent:     reasoningContent.String(),
+			ProviderOutput:       toolProviderOutput,
+			ProviderStreamOutput: toolProviderStreamOutput,
+		}) {
+			return
+		}
+	}
+}
+
+func makeStreamedProviderOutput(content, reasoningContent string, toolCalls []chat.ToolCall, finishReason string) string {
+	output := streamedProviderOutput{
+		Role:             "assistant",
+		Content:          content,
+		ReasoningContent: reasoningContent,
+		ToolCalls:        toolCalls,
+		FinishReason:     finishReason,
+	}
+	encoded, err := json.Marshal(output)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
 }
 
 func send(ctx context.Context, events chan<- chat.StreamEvent, e chat.StreamEvent) bool {

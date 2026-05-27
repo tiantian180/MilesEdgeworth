@@ -17,6 +17,7 @@ func TestFromEnv(t *testing.T) {
 	t.Setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
 	t.Setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
 	t.Setenv("MILES_LANGFUSE_CAPTURE_CONTENT", "0")
+	t.Setenv("MILES_LANGFUSE_CAPTURE_SSE", "1")
 
 	cfg := config.FromEnv()
 
@@ -53,6 +54,9 @@ func TestFromEnv(t *testing.T) {
 	if cfg.Langfuse.CaptureContent {
 		t.Fatal("Langfuse.CaptureContent should be false when env is 0")
 	}
+	if !cfg.Langfuse.CaptureSSE {
+		t.Fatal("Langfuse.CaptureSSE should be true when env is 1")
+	}
 }
 
 func TestFromEnvDefaults(t *testing.T) {
@@ -66,6 +70,7 @@ func TestFromEnvDefaults(t *testing.T) {
 	t.Setenv("LANGFUSE_PUBLIC_KEY", "")
 	t.Setenv("LANGFUSE_SECRET_KEY", "")
 	t.Setenv("MILES_LANGFUSE_CAPTURE_CONTENT", "")
+	t.Setenv("MILES_LANGFUSE_CAPTURE_SSE", "")
 
 	cfg := config.FromEnv()
 
@@ -83,6 +88,9 @@ func TestFromEnvDefaults(t *testing.T) {
 	}
 	if !cfg.Langfuse.CaptureContent {
 		t.Fatal("Langfuse should capture content by default when enabled later")
+	}
+	if cfg.Langfuse.CaptureSSE {
+		t.Fatal("Langfuse should not capture raw SSE by default")
 	}
 }
 

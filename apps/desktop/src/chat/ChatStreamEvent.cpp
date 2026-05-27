@@ -63,6 +63,9 @@ ChatStreamEvent eventFromObject(const QJsonObject &object)
     event.role = object.value("role").toString();
     event.delta = object.value("delta").toString();
     event.error = object.value("error").toString();
+    event.toolCallId = object.value("toolCallId").toString();
+    event.toolName = object.value("toolName").toString();
+    event.toolArgs = object.value("toolArgs").toString();
     event.value = object.value("value").toObject().toVariantMap();
     return event;
 }

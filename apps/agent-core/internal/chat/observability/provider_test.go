@@ -23,7 +23,12 @@ type fakeProvider struct {
 func (p *fakeProvider) StreamChat(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
 	_ = ctx
 	p.streamParams = params
-	return p.streamEvents, nil
+	if p.streamEvents != nil {
+		return p.streamEvents, nil
+	}
+	events := make(chan chat.StreamEvent)
+	close(events)
+	return events, nil
 }
 
 func (p *fakeProvider) Complete(ctx context.Context, params chat.ChatParams) (string, error) {
@@ -116,6 +121,179 @@ func TestStreamChatCreatesLangfuseGenerationSpan(t *testing.T) {
 	}
 	if !strings.Contains(attrs["langfuse.observation.usage_details"], `"input"`) {
 		t.Fatalf("usage details missing input estimate: %q", attrs["langfuse.observation.usage_details"])
+	}
+}
+
+func TestStreamChatCapturesAssembledProviderOutputAndFullToolRequest(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	t.Cleanup(func() { _ = tracerProvider.Shutdown(context.Background()) })
+
+	streamOutput := `{"choices":[{"delta":{"reasoning_content":"需要移动。"}}]}` + "\n" +
+		`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"tc-1","type":"function","function":{"name":"pet_motion","arguments":"{\"action\":\"moveTo\",\"x\":0.5,\"y\":0.5}"}}]},"finish_reason":"tool_calls"}]}`
+	assembledOutput := `{"role":"assistant","reasoning_content":"需要移动。","tool_calls":[{"id":"tc-1","type":"function","function":{"name":"pet_motion","arguments":"{\"action\":\"moveTo\",\"x\":0.5,\"y\":0.5}"}}],"finish_reason":"tool_calls"}`
+	events := make(chan chat.StreamEvent, 1)
+	events <- chat.StreamEvent{
+		Type:                 "TOOL_CALL",
+		RunID:                "run-1",
+		ToolCallID:           "tc-1",
+		ToolName:             "pet_motion",
+		ToolArgs:             `{"action":"moveTo","x":0.5,"y":0.5}`,
+		ReasoningContent:     "需要移动。",
+		ProviderOutput:       assembledOutput,
+		ProviderStreamOutput: streamOutput,
+	}
+	close(events)
+
+	next := &fakeProvider{streamEvents: events}
+	provider := observability.WrapProvider(next, observability.Options{
+		TracerProvider: tracerProvider,
+		Model:          "test-model",
+		CaptureContent: true,
+	})
+
+	stream, err := provider.StreamChat(context.Background(), chat.ChatParams{
+		ConversationID: "conv-1",
+		RunID:          "run-1",
+		MessageID:      "msg-1-tool-1",
+		Operation:      "chat",
+		Messages: []chat.Message{
+			{Role: "user", Content: "走到中间"},
+			{
+				Role:             "assistant",
+				Content:          "我先过去。",
+				ReasoningContent: "需要移动。",
+				ToolCalls: []chat.ToolCall{{
+					ID:   "tc-1",
+					Type: "function",
+					Function: chat.ToolCallFunction{
+						Name:      "pet_motion",
+						Arguments: `{"action":"moveTo","x":0.5,"y":0.5}`,
+					},
+				}},
+			},
+			{Role: "tool", Content: `{"success":true}`, ToolCallID: "tc-1"},
+		},
+		Tools: []chat.ToolDefinition{{
+			Name:        "pet_motion",
+			Description: "move pet",
+			Parameters:  []byte(`{"type":"object"}`),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("StreamChat: %v", err)
+	}
+	for range stream {
+	}
+
+	spans := exporter.GetSpans()
+	if len(spans) != 1 {
+		t.Fatalf("span count = %d, want 1", len(spans))
+	}
+	attrs := spanAttributes(spans[0].Attributes)
+	if attrs["langfuse.observation.output"] != assembledOutput {
+		t.Fatalf("output = %q, want assembled provider output", attrs["langfuse.observation.output"])
+	}
+	if strings.Contains(attrs["langfuse.observation.output"], "chat.completion.chunk") {
+		t.Fatalf("default output should not capture SSE chunks: %q", attrs["langfuse.observation.output"])
+	}
+	input := attrs["langfuse.observation.input"]
+	for _, want := range []string{
+		`"tool_calls"`,
+		`"tool_call_id":"tc-1"`,
+		`"reasoning_content":"需要移动。"`,
+		`"tools"`,
+		`"parallel_tool_calls":false`,
+	} {
+		if !strings.Contains(input, want) {
+			t.Fatalf("input missing %s: %q", want, input)
+		}
+	}
+}
+
+func TestStreamChatCapturesProviderStreamOutputWhenEnabled(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	t.Cleanup(func() { _ = tracerProvider.Shutdown(context.Background()) })
+
+	streamOutput := `{"object":"chat.completion.chunk","choices":[{"delta":{"content":"你好"}}]}` + "\n" +
+		`{"object":"chat.completion.chunk","choices":[{"delta":{"content":"。"},"finish_reason":"stop"}]}`
+	assembledOutput := `{"role":"assistant","content":"你好。","finish_reason":"stop"}`
+	events := make(chan chat.StreamEvent, 1)
+	events <- chat.StreamEvent{
+		Type:                 "TEXT_MESSAGE_END",
+		RunID:                "run-1",
+		MessageID:            "msg-1",
+		ProviderOutput:       assembledOutput,
+		ProviderStreamOutput: streamOutput,
+	}
+	close(events)
+
+	next := &fakeProvider{streamEvents: events}
+	provider := observability.WrapProvider(next, observability.Options{
+		TracerProvider: tracerProvider,
+		Model:          "test-model",
+		CaptureContent: true,
+		CaptureSSE:     true,
+	})
+
+	stream, err := provider.StreamChat(context.Background(), chat.ChatParams{
+		ConversationID: "conv-1",
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+		Operation:      "chat",
+		Messages:       []chat.Message{{Role: "user", Content: "hello"}},
+	})
+	if err != nil {
+		t.Fatalf("StreamChat: %v", err)
+	}
+	for range stream {
+	}
+
+	spans := exporter.GetSpans()
+	if len(spans) != 1 {
+		t.Fatalf("span count = %d, want 1", len(spans))
+	}
+	attrs := spanAttributes(spans[0].Attributes)
+	if attrs["langfuse.observation.output"] != streamOutput {
+		t.Fatalf("output = %q, want provider stream output", attrs["langfuse.observation.output"])
+	}
+}
+
+func TestStreamChatCallsForSameRunShareTraceID(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	t.Cleanup(func() { _ = tracerProvider.Shutdown(context.Background()) })
+
+	provider := observability.WrapProvider(&fakeProvider{}, observability.Options{
+		TracerProvider: tracerProvider,
+		Model:          "test-model",
+		CaptureContent: true,
+	})
+
+	for _, messageID := range []string{"msg-1", "msg-1-tool-1"} {
+		stream, err := provider.StreamChat(context.Background(), chat.ChatParams{
+			ConversationID: "conv-1",
+			RunID:          "run-1",
+			MessageID:      messageID,
+			Operation:      "chat",
+			Messages:       []chat.Message{{Role: "user", Content: "走到中间"}},
+		})
+		if err != nil {
+			t.Fatalf("StreamChat: %v", err)
+		}
+		for range stream {
+		}
+	}
+
+	spans := exporter.GetSpans()
+	if len(spans) != 2 {
+		t.Fatalf("span count = %d, want 2", len(spans))
+	}
+	firstTraceID := spans[0].SpanContext.TraceID()
+	secondTraceID := spans[1].SpanContext.TraceID()
+	if firstTraceID != secondTraceID {
+		t.Fatalf("trace ids differ: %s != %s", firstTraceID, secondTraceID)
 	}
 }
 
