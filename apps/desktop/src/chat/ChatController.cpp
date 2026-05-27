@@ -1533,7 +1533,7 @@ QVariantMap ChatController::invalidToolResult(const QString &error) const
     return result;
 }
 
-void ChatController::postToolResult(const QString &runId, const QString &toolCallId, const QVariantMap &result)
+void ChatController::postToolResult(const QString &runId, const QString &toolCallId, const QVariantMap &result, int retryCount)
 {
     QJsonObject body;
     body.insert(QStringLiteral("runId"), runId);
@@ -1543,12 +1543,17 @@ void ChatController::postToolResult(const QString &runId, const QString &toolCal
     QNetworkRequest request{QUrl(toolResultUrl())};
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
     QNetworkReply *reply = m_network.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, this, [reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, runId, toolCallId, result, retryCount]() {
         const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (reply->error() != QNetworkReply::NoError || status >= 400) {
             qCWarning(chatLog).noquote() << "tool result POST failed"
                                          << QStringLiteral("status=%1").arg(status)
                                          << QStringLiteral("error=%1").arg(reply->errorString());
+            if (retryCount > 0) {
+                QTimer::singleShot(300, this, [this, runId, toolCallId, result, retryCount]() {
+                    postToolResult(runId, toolCallId, result, retryCount - 1);
+                });
+            }
         }
         reply->deleteLater();
     });

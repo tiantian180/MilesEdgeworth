@@ -80,6 +80,7 @@ public:
 
     int count() const { return bodies.size(); }
     QByteArray bodyAt(int index) const { return bodies.at(index); }
+    void setFailuresBeforeSuccess(int count) { failuresBeforeSuccess = count; }
     QString url() const
     {
         return QStringLiteral("http://127.0.0.1:%1/v1/chat/tool-result").arg(server.serverPort());
@@ -119,17 +120,27 @@ private:
 
         bodies.append(buffer.mid(bodyStart, bodyLength));
         buffers.remove(socket);
-        socket->write("HTTP/1.1 200 OK\r\n"
-                      "Content-Type: application/json\r\n"
-                      "Content-Length: 2\r\n"
-                      "Connection: close\r\n"
-                      "\r\n{}");
+        if (failuresBeforeSuccess > 0) {
+            --failuresBeforeSuccess;
+            socket->write("HTTP/1.1 500 Internal Server Error\r\n"
+                          "Content-Type: application/json\r\n"
+                          "Content-Length: 2\r\n"
+                          "Connection: close\r\n"
+                          "\r\n{}");
+        } else {
+            socket->write("HTTP/1.1 200 OK\r\n"
+                          "Content-Type: application/json\r\n"
+                          "Content-Length: 2\r\n"
+                          "Connection: close\r\n"
+                          "\r\n{}");
+        }
         socket->disconnectFromHost();
     }
 
     QTcpServer server;
     QHash<QTcpSocket *, QByteArray> buffers;
     QList<QByteArray> bodies;
+    int failuresBeforeSuccess = 0;
 };
 } // namespace
 
@@ -1941,6 +1952,35 @@ int main(int argc, char *argv[])
             require(residualBody.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-residual"),
                     "residual RUN_FINISHED must not corrupt pending toolCallId");
         }
+        qunsetenv("MILESEDGEWORTH_TOOL_RESULT_URL");
+    }
+
+    // --- Phase 2.5: tool result POST retries once after transient failure ---
+    {
+        ToolResultCapture retryResults;
+        retryResults.setFailuresBeforeSuccess(1);
+        require(retryResults.listen(), "retry tool result capture server should listen");
+        qputenv("MILESEDGEWORTH_TOOL_RESULT_URL", retryResults.url().toUtf8());
+
+        ChatController retryController(nullptr, &settings);
+        ChatStreamEvent retryStarted;
+        retryStarted.type = QStringLiteral("RUN_STARTED");
+        retryStarted.runId = QStringLiteral("retry-run");
+        retryController.applyStreamEvent(retryStarted);
+
+        ChatStreamEvent retryTool;
+        retryTool.type = QStringLiteral("TOOL_CALL");
+        retryTool.runId = QStringLiteral("retry-run");
+        retryTool.toolCallId = QStringLiteral("tc-retry");
+        retryTool.toolName = QStringLiteral("pet_motion");
+        retryTool.toolArgs = QStringLiteral("{\"action\":\"moveBy\",\"x\":0.1,\"y\":0.1}");
+        retryController.applyStreamEvent(retryTool);
+
+        require(waitFor([&retryResults]() { return retryResults.count() == 2; }, 2000),
+                "tool result POST should retry once after transient failure");
+        const QJsonObject retryBody = QJsonDocument::fromJson(retryResults.bodyAt(1)).object();
+        require(retryBody.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-retry"),
+                "retried tool result should keep the toolCallId");
         qunsetenv("MILESEDGEWORTH_TOOL_RESULT_URL");
     }
 

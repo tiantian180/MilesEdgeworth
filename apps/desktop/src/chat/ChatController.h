@@ -134,7 +134,7 @@ private:
     void executePetMotionTool(const PendingToolCall &toolCall);
     bool parsePetMotionArgs(const QString &toolArgs, QString *action, double *x, double *y, QString *mode) const;
     QVariantMap invalidToolResult(const QString &error) const;
-    void postToolResult(const QString &runId, const QString &toolCallId, const QVariantMap &result);
+    void postToolResult(const QString &runId, const QString &toolCallId, const QVariantMap &result, int retryCount = 1);
     void resumeAfterToolResult();
     void handleMotionToolCompleted(const QVariantMap &result);
     void handleMotionToolInterrupted(const QVariantMap &result);

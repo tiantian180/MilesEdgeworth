@@ -484,6 +484,8 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		}
 		for _, choice := range chunk.Choices {
 			if choice.Delta.ReasoningContent != "" {
+				// DeepSeek thinking mode requires this field to be replayed in
+				// the assistant tool_calls message on the continuation request.
 				reasoningContent.WriteString(choice.Delta.ReasoningContent)
 			}
 			for _, tool := range choice.Delta.ToolCalls {
