@@ -89,10 +89,11 @@ type chatToolDefinition struct {
 }
 
 type chatMessage struct {
-	Role       string          `json:"role"`
-	Content    string          `json:"content,omitempty"`
-	ToolCalls  []chat.ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string          `json:"tool_call_id,omitempty"`
+	Role             string          `json:"role"`
+	Content          string          `json:"content,omitempty"`
+	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	ToolCalls        []chat.ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID       string          `json:"tool_call_id,omitempty"`
 }
 
 type chatCompletionRequest struct {
@@ -108,8 +109,9 @@ type chatCompletionRequest struct {
 type chatCompletionStreamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content   string `json:"content"`
-			ToolCalls []struct {
+			Content          string `json:"content"`
+			ReasoningContent string `json:"reasoning_content"`
+			ToolCalls        []struct {
 				Index    int    `json:"index"`
 				ID       string `json:"id"`
 				Type     string `json:"type"`
@@ -248,10 +250,11 @@ func makeChatMessages(messages []chat.Message) []chatMessage {
 	out := make([]chatMessage, 0, len(messages))
 	for _, message := range messages {
 		out = append(out, chatMessage{
-			Role:       message.Role,
-			Content:    message.Content,
-			ToolCalls:  message.ToolCalls,
-			ToolCallID: message.ToolCallID,
+			Role:             message.Role,
+			Content:          message.Content,
+			ReasoningContent: message.ReasoningContent,
+			ToolCalls:        message.ToolCalls,
+			ToolCallID:       message.ToolCallID,
 		})
 	}
 	return out
@@ -385,6 +388,8 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		arguments strings.Builder
 	}
 	pendingTools := map[int]*pendingToolCall{}
+	var reasoningContent strings.Builder
+	var providerRawOutput strings.Builder
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -397,6 +402,10 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		if payload == "[DONE]" {
 			break
 		}
+		if providerRawOutput.Len() > 0 {
+			providerRawOutput.WriteByte('\n')
+		}
+		providerRawOutput.WriteString(payload)
 		var chunk chatCompletionStreamChunk
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
 			logger.Warn("malformed provider chunk skipped", "error", err)
@@ -406,6 +415,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 			continue
 		}
 		for _, choice := range chunk.Choices {
+			if choice.Delta.ReasoningContent != "" {
+				reasoningContent.WriteString(choice.Delta.ReasoningContent)
+			}
 			for _, tool := range choice.Delta.ToolCalls {
 				item := pendingTools[tool.Index]
 				if item == nil {
@@ -444,11 +456,13 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	parser.Flush()
 	logger.Debug("stream finished")
 
+	rawOutput := providerRawOutput.String()
 	if textStarted {
 		if !send(ctx, events, chat.StreamEvent{
-			Type:      "TEXT_MESSAGE_END",
-			RunID:     runID,
-			MessageID: messageID,
+			Type:              "TEXT_MESSAGE_END",
+			RunID:             runID,
+			MessageID:         messageID,
+			ProviderRawOutput: rawOutput,
 		}) {
 			return
 		}
@@ -464,12 +478,18 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	sort.Ints(indexes)
 	for _, index := range indexes {
 		item := pendingTools[index]
+		toolRawOutput := ""
+		if index == indexes[0] && !textStarted {
+			toolRawOutput = rawOutput
+		}
 		if !send(ctx, events, chat.StreamEvent{
-			Type:       "TOOL_CALL",
-			RunID:      runID,
-			ToolCallID: item.id,
-			ToolName:   item.name.String(),
-			ToolArgs:   item.arguments.String(),
+			Type:              "TOOL_CALL",
+			RunID:             runID,
+			ToolCallID:        item.id,
+			ToolName:          item.name.String(),
+			ToolArgs:          item.arguments.String(),
+			ReasoningContent:  reasoningContent.String(),
+			ProviderRawOutput: toolRawOutput,
 		}) {
 			return
 		}

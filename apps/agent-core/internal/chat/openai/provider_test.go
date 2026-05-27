@@ -198,6 +198,105 @@ func TestStreamChatAggregatesToolCall(t *testing.T) {
 	}
 }
 
+func TestStreamChatPreservesReasoningContentForToolCall(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		flusher := w.(http.Flusher)
+		for _, c := range []string{
+			`{"choices":[{"delta":{"reasoning_content":"我需要移动到目标位置。"}}]}`,
+			`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"tc-1","type":"function","function":{"name":"pet_motion","arguments":"{\"action\":\"moveTo\",\"x\":0.5,\"y\":0.5}"}}]},"finish_reason":"tool_calls"}]}`,
+			`[DONE]`,
+		} {
+			fmt.Fprintf(w, "data: %s\n\n", c)
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "test-model", nil, nil)
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		RunID:     "run-1",
+		MessageID: "msg-1",
+		Messages:  []chat.Message{{Role: "user", Content: "move"}},
+		Tools: []chat.ToolDefinition{{
+			Name:        "pet_motion",
+			Description: "move pet",
+			Parameters:  json.RawMessage(`{"type":"object"}`),
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []chat.StreamEvent
+	for event := range events {
+		got = append(got, event)
+	}
+	if len(got) != 1 || got[0].Type != "TOOL_CALL" {
+		t.Fatalf("events = %+v, want one TOOL_CALL", got)
+	}
+	if got[0].ReasoningContent != "我需要移动到目标位置。" {
+		t.Fatalf("reasoning content = %q", got[0].ReasoningContent)
+	}
+	if !strings.Contains(got[0].ProviderRawOutput, `"reasoning_content":"我需要移动到目标位置。"`) ||
+		!strings.Contains(got[0].ProviderRawOutput, `"tool_calls"`) {
+		t.Fatalf("provider raw output missing original chunks: %q", got[0].ProviderRawOutput)
+	}
+}
+
+func TestStreamChatSendsReasoningContentInAssistantToolMessage(t *testing.T) {
+	var requestBody map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+
+	p := openai.NewProvider(upstream.URL, "sk-test", "test-model", nil, nil)
+	events, err := p.StreamChat(context.Background(), chat.ChatParams{
+		RunID:     "run-1",
+		MessageID: "msg-1",
+		Messages: []chat.Message{
+			{Role: "user", Content: "move"},
+			{
+				Role:             "assistant",
+				Content:          "我先过去。",
+				ReasoningContent: "需要移动到目标位置。",
+				ToolCalls: []chat.ToolCall{{
+					ID:   "tc-1",
+					Type: "function",
+					Function: chat.ToolCallFunction{
+						Name:      "pet_motion",
+						Arguments: `{"action":"moveTo","x":0.5,"y":0.5}`,
+					},
+				}},
+			},
+			{Role: "tool", Content: `{"success":true}`, ToolCallID: "tc-1"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+
+	messages, ok := requestBody["messages"].([]any)
+	if !ok || len(messages) != 3 {
+		t.Fatalf("messages = %+v", requestBody["messages"])
+	}
+	assistant, ok := messages[1].(map[string]any)
+	if !ok {
+		t.Fatalf("assistant message = %+v", messages[1])
+	}
+	if assistant["reasoning_content"] != "需要移动到目标位置。" {
+		t.Fatalf("assistant reasoning_content = %+v", assistant["reasoning_content"])
+	}
+}
+
 func TestStreamChatEndsTextBeforeToolCall(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")

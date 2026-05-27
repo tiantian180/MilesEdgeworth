@@ -62,8 +62,12 @@ func (p *tracedProvider) StreamChat(ctx context.Context, params chat.ChatParams)
 
 		var output strings.Builder
 		var rawOutput strings.Builder
+		var providerRawOutput string
 		var providerError string
 		for event := range events {
+			if event.ProviderRawOutput != "" {
+				providerRawOutput = event.ProviderRawOutput
+			}
 			if event.RawDelta != "" {
 				rawOutput.WriteString(event.RawDelta)
 			}
@@ -81,9 +85,12 @@ func (p *tracedProvider) StreamChat(ctx context.Context, params chat.ChatParams)
 			out <- event
 		}
 
-		recordedOutput := output.String()
-		if rawOutput.Len() > 0 {
+		recordedOutput := providerRawOutput
+		if recordedOutput == "" && rawOutput.Len() > 0 {
 			recordedOutput = rawOutput.String()
+		}
+		if recordedOutput == "" {
+			recordedOutput = output.String()
 		}
 		p.finishGenerationSpan(span, params, recordedOutput)
 		if providerError == "" {
@@ -108,6 +115,7 @@ func (p *tracedProvider) Complete(ctx context.Context, params chat.ChatParams) (
 }
 
 func (p *tracedProvider) startGenerationSpan(ctx context.Context, name string, params chat.ChatParams, stream bool) (context.Context, trace.Span) {
+	ctx = contextWithRunTrace(ctx, params.RunID)
 	ctx, span := p.tracer.Start(ctx, name, trace.WithSpanKind(trace.SpanKindClient))
 	attrs := []attribute.KeyValue{
 		attribute.String("langfuse.trace.name", name),
@@ -128,7 +136,7 @@ func (p *tracedProvider) startGenerationSpan(ctx context.Context, name string, p
 		attrs = append(attrs, attribute.String("deployment.environment.name", strings.TrimSpace(p.opts.Environment)))
 	}
 	if p.opts.CaptureContent {
-		input := jsonString(requestPayloadForTrace(p.opts, params.Messages, stream))
+		input := jsonString(requestPayloadForTrace(p.opts, params, stream))
 		attrs = append(attrs,
 			attribute.String("langfuse.trace.input", input),
 			attribute.String("langfuse.observation.input", input),
@@ -156,6 +164,27 @@ func (p *tracedProvider) finishGenerationSpan(span trace.Span, params chat.ChatP
 	span.SetAttributes(attrs...)
 }
 
+func contextWithRunTrace(ctx context.Context, runID string) context.Context {
+	if strings.TrimSpace(runID) == "" || trace.SpanContextFromContext(ctx).IsValid() {
+		return ctx
+	}
+	sum := sha256.Sum256([]byte("milesedgeworth-run:" + runID))
+	var traceID trace.TraceID
+	copy(traceID[:], sum[:16])
+	var spanID trace.SpanID
+	copy(spanID[:], sum[16:24])
+	if !traceID.IsValid() || !spanID.IsValid() {
+		return ctx
+	}
+	spanContext := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    traceID,
+		SpanID:     spanID,
+		TraceFlags: trace.FlagsSampled,
+		Remote:     true,
+	})
+	return trace.ContextWithRemoteSpanContext(ctx, spanContext)
+}
+
 func recordSpanError(span trace.Span, err error) {
 	span.RecordError(err)
 	span.SetStatus(codes.Error, err.Error())
@@ -176,11 +205,15 @@ func modelParameters(opts Options) map[string]any {
 	return params
 }
 
-func requestPayloadForTrace(opts Options, messages []chat.Message, stream bool) map[string]any {
+func requestPayloadForTrace(opts Options, params chat.ChatParams, stream bool) map[string]any {
 	payload := map[string]any{
-		"messages": messagesForTrace(messages),
+		"messages": messagesForTrace(params.Messages),
 		"model":    opts.Model,
 		"stream":   stream,
+	}
+	if len(params.Tools) > 0 {
+		payload["tools"] = toolsForTrace(params.Tools)
+		payload["parallel_tool_calls"] = false
 	}
 	if opts.Temperature != nil {
 		payload["temperature"] = *opts.Temperature
@@ -191,12 +224,37 @@ func requestPayloadForTrace(opts Options, messages []chat.Message, stream bool) 
 	return payload
 }
 
-func messagesForTrace(messages []chat.Message) []map[string]string {
-	out := make([]map[string]string, 0, len(messages))
+func messagesForTrace(messages []chat.Message) []map[string]any {
+	out := make([]map[string]any, 0, len(messages))
 	for _, message := range messages {
-		out = append(out, map[string]string{
-			"role":    message.Role,
-			"content": message.Content,
+		item := map[string]any{"role": message.Role}
+		if message.Content != "" {
+			item["content"] = message.Content
+		}
+		if message.ReasoningContent != "" {
+			item["reasoning_content"] = message.ReasoningContent
+		}
+		if len(message.ToolCalls) > 0 {
+			item["tool_calls"] = message.ToolCalls
+		}
+		if message.ToolCallID != "" {
+			item["tool_call_id"] = message.ToolCallID
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func toolsForTrace(tools []chat.ToolDefinition) []map[string]any {
+	out := make([]map[string]any, 0, len(tools))
+	for _, tool := range tools {
+		out = append(out, map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name":        tool.Name,
+				"description": tool.Description,
+				"parameters":  tool.Parameters,
+			},
 		})
 	}
 	return out

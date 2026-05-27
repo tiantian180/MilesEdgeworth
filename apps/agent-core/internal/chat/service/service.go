@@ -247,8 +247,9 @@ func send(ctx context.Context, events chan<- chat.StreamEvent, event chat.Stream
 func appendToolMessages(messages []chat.Message, toolCall chat.StreamEvent, content string, result ToolResult) []chat.Message {
 	return append(messages,
 		chat.Message{
-			Role:    "assistant",
-			Content: content,
+			Role:             "assistant",
+			Content:          content,
+			ReasoningContent: toolCall.ReasoningContent,
 			ToolCalls: []chat.ToolCall{
 				{
 					ID:   toolCall.ToolCallID,

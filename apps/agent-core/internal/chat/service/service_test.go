@@ -796,6 +796,55 @@ func TestStreamChatToolLoopPreservesAssistantContentBeforeToolCall(t *testing.T)
 	}
 }
 
+func TestStreamChatToolLoopPreservesReasoningContentBeforeToolResult(t *testing.T) {
+	s := openTestStore(t)
+	conv, err := s.CreateConversation("miles-edgeworth")
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendMessage(t, s, conv.ID, store.RoleUser, "走到中间。")
+
+	provider := &fakeProvider{
+		streamEventLists: [][]chat.StreamEvent{
+			{
+				{Type: "TOOL_CALL", RunID: "run-1", ToolCallID: "tc-1", ToolName: "pet_motion", ToolArgs: `{"action":"moveTo","x":0.5,"y":0.5}`, ReasoningContent: "需要移动到目标位置。"},
+			},
+			{
+				{Type: "TEXT_MESSAGE_START", RunID: "run-1", MessageID: "msg-2", Role: "assistant"},
+				{Type: "TEXT_MESSAGE_CONTENT", RunID: "run-1", MessageID: "msg-2", Delta: "到了。"},
+				{Type: "TEXT_MESSAGE_END", RunID: "run-1", MessageID: "msg-2"},
+			},
+		},
+	}
+	service := newTestService(s, provider, 8192)
+	events, err := service.StreamChat(context.Background(), BuildRequest{
+		ConversationID: conv.ID,
+		RunID:          "run-1",
+		MessageID:      "msg-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for event := range events {
+		if event.Type == "TOOL_CALL" {
+			if !service.SubmitToolResult(ToolResult{
+				RunID:      "run-1",
+				ToolCallID: "tc-1",
+				Result:     json.RawMessage(`{"success":true,"position":{"x":0.5,"y":0.5}}`),
+			}) {
+				t.Fatal("SubmitToolResult should accept matching tool result")
+			}
+		}
+	}
+
+	secondMessages := provider.streamParamsList[1].Messages
+	assistantToolMessage := secondMessages[len(secondMessages)-2]
+	if assistantToolMessage.ReasoningContent != "需要移动到目标位置。" {
+		t.Fatalf("assistant tool reasoning content = %q", assistantToolMessage.ReasoningContent)
+	}
+}
+
 func TestStreamChatMultipleToolCallsReturnRunError(t *testing.T) {
 	s := openTestStore(t)
 	conv, err := s.CreateConversation("miles-edgeworth")
