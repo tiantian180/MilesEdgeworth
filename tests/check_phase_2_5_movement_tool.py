@@ -144,6 +144,10 @@ def main() -> int:
             "pet_motion schema must expose moveTo and moveBy only")
     require('"stop"' not in tools_go,
             "pet_motion schema must not expose stop")
+    require("normalized decimal" in tools_go and "0.5" in tools_go and "not 50" in tools_go,
+            "pet_motion schema must describe normalized decimal coordinates and avoid 0-100 ambiguity")
+    require('"minimum":-1' in compact_tools and '"maximum":1' in compact_tools,
+            "pet_motion schema must bound x/y to normalized decimal ranges")
 
     require("/v1/chat/tool-result" in api_go,
             "API server must expose tool result endpoint")

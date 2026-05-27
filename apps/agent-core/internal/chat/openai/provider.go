@@ -125,6 +125,14 @@ type chatCompletionStreamChunk struct {
 	} `json:"choices"`
 }
 
+type streamedProviderOutput struct {
+	Role             string          `json:"role"`
+	Content          string          `json:"content,omitempty"`
+	ReasoningContent string          `json:"reasoning_content,omitempty"`
+	ToolCalls        []chat.ToolCall `json:"tool_calls,omitempty"`
+	FinishReason     string          `json:"finish_reason,omitempty"`
+}
+
 type chatCompletionResponse struct {
 	Choices []struct {
 		Message chatMessage `json:"message"`
@@ -384,12 +392,15 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 
 	type pendingToolCall struct {
 		id        string
+		typeName  string
 		name      strings.Builder
 		arguments strings.Builder
 	}
 	pendingTools := map[int]*pendingToolCall{}
+	var contentOutput strings.Builder
 	var reasoningContent strings.Builder
-	var providerRawOutput strings.Builder
+	var providerStreamOutput strings.Builder
+	finishReason := ""
 
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -402,10 +413,10 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		if payload == "[DONE]" {
 			break
 		}
-		if providerRawOutput.Len() > 0 {
-			providerRawOutput.WriteByte('\n')
+		if providerStreamOutput.Len() > 0 {
+			providerStreamOutput.WriteByte('\n')
 		}
-		providerRawOutput.WriteString(payload)
+		providerStreamOutput.WriteString(payload)
 		var chunk chatCompletionStreamChunk
 		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
 			logger.Warn("malformed provider chunk skipped", "error", err)
@@ -427,6 +438,9 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 				if tool.ID != "" {
 					item.id = tool.ID
 				}
+				if tool.Type != "" {
+					item.typeName = tool.Type
+				}
 				if tool.Function.Name != "" {
 					item.name.WriteString(tool.Function.Name)
 				}
@@ -435,12 +449,16 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 				}
 			}
 			if choice.Delta.Content != "" {
+				contentOutput.WriteString(choice.Delta.Content)
 				logger.Debug("provider delta received", "len", len([]rune(choice.Delta.Content)))
 				if mileslog.PayloadLoggingEnabled() {
 					logger.Debug("provider delta payload", "text", choice.Delta.Content)
 				}
 				pendingRawDelta.WriteString(choice.Delta.Content)
 				parser.Feed(choice.Delta.Content)
+			}
+			if choice.FinishReason != "" {
+				finishReason = choice.FinishReason
 			}
 		}
 	}
@@ -456,13 +474,36 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 	parser.Flush()
 	logger.Debug("stream finished")
 
-	rawOutput := providerRawOutput.String()
+	indexes := make([]int, 0, len(pendingTools))
+	for index := range pendingTools {
+		indexes = append(indexes, index)
+	}
+	sort.Ints(indexes)
+	toolCalls := make([]chat.ToolCall, 0, len(indexes))
+	for _, index := range indexes {
+		item := pendingTools[index]
+		typeName := item.typeName
+		if typeName == "" {
+			typeName = "function"
+		}
+		toolCalls = append(toolCalls, chat.ToolCall{
+			ID:   item.id,
+			Type: typeName,
+			Function: chat.ToolCallFunction{
+				Name:      item.name.String(),
+				Arguments: item.arguments.String(),
+			},
+		})
+	}
+	streamOutput := providerStreamOutput.String()
+	providerOutput := makeStreamedProviderOutput(contentOutput.String(), reasoningContent.String(), toolCalls, finishReason)
 	if textStarted {
 		if !send(ctx, events, chat.StreamEvent{
-			Type:              "TEXT_MESSAGE_END",
-			RunID:             runID,
-			MessageID:         messageID,
-			ProviderRawOutput: rawOutput,
+			Type:                 "TEXT_MESSAGE_END",
+			RunID:                runID,
+			MessageID:            messageID,
+			ProviderOutput:       providerOutput,
+			ProviderStreamOutput: streamOutput,
 		}) {
 			return
 		}
@@ -471,29 +512,42 @@ func (p *Provider) pipe(ctx context.Context, resp *http.Response, events chan<- 
 		return
 	}
 
-	indexes := make([]int, 0, len(pendingTools))
-	for index := range pendingTools {
-		indexes = append(indexes, index)
-	}
-	sort.Ints(indexes)
 	for _, index := range indexes {
 		item := pendingTools[index]
-		toolRawOutput := ""
+		toolProviderOutput := ""
+		toolProviderStreamOutput := ""
 		if index == indexes[0] && !textStarted {
-			toolRawOutput = rawOutput
+			toolProviderOutput = providerOutput
+			toolProviderStreamOutput = streamOutput
 		}
 		if !send(ctx, events, chat.StreamEvent{
-			Type:              "TOOL_CALL",
-			RunID:             runID,
-			ToolCallID:        item.id,
-			ToolName:          item.name.String(),
-			ToolArgs:          item.arguments.String(),
-			ReasoningContent:  reasoningContent.String(),
-			ProviderRawOutput: toolRawOutput,
+			Type:                 "TOOL_CALL",
+			RunID:                runID,
+			ToolCallID:           item.id,
+			ToolName:             item.name.String(),
+			ToolArgs:             item.arguments.String(),
+			ReasoningContent:     reasoningContent.String(),
+			ProviderOutput:       toolProviderOutput,
+			ProviderStreamOutput: toolProviderStreamOutput,
 		}) {
 			return
 		}
 	}
+}
+
+func makeStreamedProviderOutput(content, reasoningContent string, toolCalls []chat.ToolCall, finishReason string) string {
+	output := streamedProviderOutput{
+		Role:             "assistant",
+		Content:          content,
+		ReasoningContent: reasoningContent,
+		ToolCalls:        toolCalls,
+		FinishReason:     finishReason,
+	}
+	encoded, err := json.Marshal(output)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
 }
 
 func send(ctx context.Context, events chan<- chat.StreamEvent, e chat.StreamEvent) bool {

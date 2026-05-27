@@ -85,6 +85,7 @@ def main() -> int:
         "LANGFUSE_PUBLIC_KEY",
         "LANGFUSE_SECRET_KEY",
         "MILES_LANGFUSE_CAPTURE_CONTENT",
+        "MILES_LANGFUSE_CAPTURE_SSE",
     ]:
         require(token in chat_cpp + config_go, f"sidecar env wiring missing {token}")
     require("LANGFUSE_SECRET_KEY" not in chat_cpp.split("launch sidecar", 1)[-1],
@@ -111,6 +112,8 @@ def main() -> int:
     require("system_prompt_hash" in observability_go, "traces must include prompt version metadata")
     require("CaptureContent" in observability_go and "input_chars" in observability_go,
             "wrapper must support metadata-only tracing when content capture is disabled")
+    require("CaptureSSE" in observability_go and "ProviderStreamOutput" in chat_provider_go + observability_go,
+            "wrapper must keep raw SSE capture behind an explicit opt-in")
     require("observability.WrapProvider" in main_go, "main must wrap configured provider")
     require("cfg.Langfuse.Enabled()" in main_go, "main must skip Langfuse when incomplete")
     langfuse_log = main_go.split('logger.Info("langfuse tracing enabled"', 1)[-1].split(")", 1)[0]

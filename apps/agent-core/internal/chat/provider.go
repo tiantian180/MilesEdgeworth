@@ -56,20 +56,21 @@ type ChatParams struct {
 }
 
 type StreamEvent struct {
-	Type              string         `json:"type"`
-	Name              string         `json:"name,omitempty"`
-	RunID             string         `json:"runId,omitempty"`
-	MessageID         string         `json:"messageId,omitempty"`
-	Role              string         `json:"role,omitempty"`
-	Delta             string         `json:"delta,omitempty"`
-	RawDelta          string         `json:"-"`
-	Value             map[string]any `json:"value,omitempty"`
-	Error             string         `json:"error,omitempty"`
-	ToolCallID        string         `json:"toolCallId,omitempty"`
-	ToolName          string         `json:"toolName,omitempty"`
-	ToolArgs          string         `json:"toolArgs,omitempty"`
-	ReasoningContent  string         `json:"-"`
-	ProviderRawOutput string         `json:"-"`
+	Type                 string         `json:"type"`
+	Name                 string         `json:"name,omitempty"`
+	RunID                string         `json:"runId,omitempty"`
+	MessageID            string         `json:"messageId,omitempty"`
+	Role                 string         `json:"role,omitempty"`
+	Delta                string         `json:"delta,omitempty"`
+	RawDelta             string         `json:"-"`
+	Value                map[string]any `json:"value,omitempty"`
+	Error                string         `json:"error,omitempty"`
+	ToolCallID           string         `json:"toolCallId,omitempty"`
+	ToolName             string         `json:"toolName,omitempty"`
+	ToolArgs             string         `json:"toolArgs,omitempty"`
+	ReasoningContent     string         `json:"-"`
+	ProviderOutput       string         `json:"-"`
+	ProviderStreamOutput string         `json:"-"`
 }
 
 type Provider interface {

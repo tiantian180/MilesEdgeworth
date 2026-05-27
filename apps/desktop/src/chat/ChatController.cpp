@@ -25,11 +25,15 @@
 #include <csignal>
 #endif
 
+#include <cmath>
 #include <utility>
 
 namespace {
 Q_LOGGING_CATEGORY(chatLog, "miles.chat", QtInfoMsg)
 
+constexpr auto kInvalidPetMotionArguments =
+    "invalid pet_motion arguments: use action moveTo/moveBy; x/y must be normalized decimal values, "
+    "not 0-100 percentages; moveTo center is x=0.5,y=0.5";
 constexpr auto kHealthUrl = "http://127.0.0.1:39710/health";
 constexpr auto kConversationsUrl = "http://127.0.0.1:39710/v1/conversations";
 constexpr auto kChatMessagesUrl = "http://127.0.0.1:39710/v1/chat/messages";
@@ -257,6 +261,7 @@ void ChatController::launchSidecarProcess()
                                << QStringLiteral("model=%1").arg(env.value(QStringLiteral("MILES_PROVIDER_MODEL")))
                                << QStringLiteral("langfuseSet=%1").arg(logBool(env.contains(QStringLiteral("LANGFUSE_HOST"))))
                                << QStringLiteral("langfuseCaptureContent=%1").arg(logBool(env.value(QStringLiteral("MILES_LANGFUSE_CAPTURE_CONTENT")) == QStringLiteral("1")))
+                               << QStringLiteral("langfuseCaptureSSE=%1").arg(logBool(env.value(QStringLiteral("MILES_LANGFUSE_CAPTURE_SSE")) == QStringLiteral("1")))
                                << QStringLiteral("logLevel=%1").arg(env.value(QStringLiteral("MILES_LOG_LEVEL"), QStringLiteral("info")))
                                << QStringLiteral("logFileSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_LOG_FILE"))))
                                << QStringLiteral("dataDirSet=%1").arg(logBool(env.contains(QStringLiteral("MILES_DATA_DIR"))))
@@ -1455,7 +1460,7 @@ void ChatController::executePetMotionTool(const PendingToolCall &toolCall)
     if (!parsePetMotionArgs(toolCall.toolArgs, &action, &x, &y, &mode)) {
         postToolResult(toolCall.runId,
                        toolCall.toolCallId,
-                       invalidToolResult(QStringLiteral("invalid pet_motion arguments")));
+                       invalidToolResult(QString::fromLatin1(kInvalidPetMotionArguments)));
         resumeAfterToolResult();
         return;
     }
@@ -1496,6 +1501,16 @@ bool ChatController::parsePetMotionArgs(const QString &toolArgs, QString *action
     *action = parsedAction;
     *x = object.value(QStringLiteral("x")).toDouble();
     *y = object.value(QStringLiteral("y")).toDouble();
+    if (!std::isfinite(*x) || !std::isfinite(*y)) {
+        return false;
+    }
+    if (parsedAction == QStringLiteral("moveTo")) {
+        if (*x < 0.0 || *x > 1.0 || *y < 0.0 || *y > 1.0) {
+            return false;
+        }
+    } else if (*x < -1.0 || *x > 1.0 || *y < -1.0 || *y > 1.0) {
+        return false;
+    }
     *mode = object.value(QStringLiteral("mode")).toString() == QStringLiteral("run")
         ? QStringLiteral("run")
         : QStringLiteral("walk");

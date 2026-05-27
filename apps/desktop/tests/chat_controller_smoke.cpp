@@ -1783,6 +1783,22 @@ int main(int argc, char *argv[])
         require(!invalidArgsResult.value(QStringLiteral("error")).toString().isEmpty(),
                 "invalid pet_motion args result should include an error message");
 
+        ChatStreamEvent percentArgsTool;
+        percentArgsTool.type = QStringLiteral("TOOL_CALL");
+        percentArgsTool.runId = QStringLiteral("tool-run");
+        percentArgsTool.toolCallId = QStringLiteral("tc-percent-args");
+        percentArgsTool.toolName = QStringLiteral("pet_motion");
+        percentArgsTool.toolArgs = QStringLiteral("{\"action\":\"moveTo\",\"x\":50,\"y\":50}");
+        toolController.applyStreamEvent(percentArgsTool);
+        require(waitFor([&toolResults]() { return toolResults.count() == 5; }, 1000),
+                "moveTo with 0-100 percentage args should POST an error tool result");
+        const QJsonObject percentArgsResult = QJsonDocument::fromJson(toolResults.bodyAt(4)).object()
+            .value(QStringLiteral("result")).toObject();
+        require(!percentArgsResult.value(QStringLiteral("success")).toBool(),
+                "moveTo with percentage args result should be success=false");
+        require(percentArgsResult.value(QStringLiteral("error")).toString().contains(QStringLiteral("0.5")),
+                "moveTo with percentage args error should teach normalized decimal coordinates");
+
         ChatController nullRuntimeController(nullptr, &settings);
         ChatStreamEvent nullStarted;
         nullStarted.type = QStringLiteral("RUN_STARTED");
@@ -1796,9 +1812,9 @@ int main(int argc, char *argv[])
         nullTool.toolName = QStringLiteral("pet_motion");
         nullTool.toolArgs = QStringLiteral("{\"action\":\"moveBy\",\"x\":0.1,\"y\":0.1}");
         nullRuntimeController.applyStreamEvent(nullTool);
-        require(waitFor([&toolResults]() { return toolResults.count() == 5; }, 1000),
+        require(waitFor([&toolResults]() { return toolResults.count() == 6; }, 1000),
                 "pet_motion with null runtime should POST an error tool result");
-        const QJsonObject nullRuntimeResult = QJsonDocument::fromJson(toolResults.bodyAt(4)).object()
+        const QJsonObject nullRuntimeResult = QJsonDocument::fromJson(toolResults.bodyAt(5)).object()
             .value(QStringLiteral("result")).toObject();
         require(!nullRuntimeResult.value(QStringLiteral("success")).toBool(),
                 "null runtime pet_motion result should be success=false");
@@ -1829,7 +1845,7 @@ int main(int argc, char *argv[])
 
             cancelController.cancelCurrentReply();
             waitFor([]() { return false; }, 250);
-            require(toolResults.count() == 5,
+            require(toolResults.count() == 6,
                     "explicit user cancellation during tool execution must not POST a tool result");
 
             PetRuntime duplicateRuntime;
@@ -1854,7 +1870,7 @@ int main(int argc, char *argv[])
             ChatStreamEvent repeatedPrimaryTool = primaryTool;
             duplicateController.applyStreamEvent(repeatedPrimaryTool);
             waitFor([]() { return false; }, 150);
-            require(toolResults.count() == 5,
+            require(toolResults.count() == 6,
                     "repeated TOOL_CALL with the same toolCallId should be ignored, not posted as a result");
 
             ChatStreamEvent duplicateTool;
@@ -1865,9 +1881,9 @@ int main(int argc, char *argv[])
             duplicateTool.toolArgs = QStringLiteral("{\"action\":\"moveTo\",\"x\":0,\"y\":1}");
             duplicateController.applyStreamEvent(duplicateTool);
 
-            require(waitFor([&toolResults]() { return toolResults.count() == 6; }, 1000),
+            require(waitFor([&toolResults]() { return toolResults.count() == 7; }, 1000),
                     "duplicate TOOL_CALL while pending should POST an error for the duplicate call");
-            const QJsonObject duplicateBody = QJsonDocument::fromJson(toolResults.bodyAt(5)).object();
+            const QJsonObject duplicateBody = QJsonDocument::fromJson(toolResults.bodyAt(6)).object();
             require(duplicateBody.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-duplicate"),
                     "duplicate TOOL_CALL error should target the duplicate toolCallId");
             require(!duplicateBody.value(QStringLiteral("result")).toObject()
@@ -1879,9 +1895,9 @@ int main(int argc, char *argv[])
             }
             require(duplicateRuntime.currentState() == QStringLiteral("moving"),
                     "duplicate TOOL_CALL must not overwrite the original pending tool");
-            require(waitFor([&toolResults]() { return toolResults.count() == 7; }, 3000),
+            require(waitFor([&toolResults]() { return toolResults.count() == 8; }, 3000),
                     "original pending tool should still complete after duplicate TOOL_CALL is rejected");
-            const QJsonObject primaryBody = QJsonDocument::fromJson(toolResults.bodyAt(6)).object();
+            const QJsonObject primaryBody = QJsonDocument::fromJson(toolResults.bodyAt(7)).object();
             require(primaryBody.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-primary"),
                     "original pending tool result should keep the original toolCallId");
             require(primaryBody.value(QStringLiteral("result")).toObject()
@@ -1919,9 +1935,9 @@ int main(int argc, char *argv[])
                     "residual RUN_FINISHED during tool execution must not clear EXECUTING_TOOL");
             require(residualController.statusText() == QStringLiteral("Miles 正在移动…"),
                     "residual RUN_FINISHED during tool execution must not reset status text");
-            require(waitFor([&toolResults]() { return toolResults.count() == 8; }, 3000),
+            require(waitFor([&toolResults]() { return toolResults.count() == 9; }, 3000),
                     "tool should still POST result after residual RUN_FINISHED is ignored");
-            const QJsonObject residualBody = QJsonDocument::fromJson(toolResults.bodyAt(7)).object();
+            const QJsonObject residualBody = QJsonDocument::fromJson(toolResults.bodyAt(8)).object();
             require(residualBody.value(QStringLiteral("toolCallId")).toString() == QStringLiteral("tc-residual"),
                     "residual RUN_FINISHED must not corrupt pending toolCallId");
         }

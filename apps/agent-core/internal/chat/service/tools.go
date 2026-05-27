@@ -94,8 +94,8 @@ func (w *toolWaiter) close() {
 
 var PetMotionTool = chat.ToolDefinition{
 	Name:        PetMotionToolName,
-	Description: "Move the desktop pet. moveTo uses reachable screen percentage coordinates; moveBy moves relative to the current position.",
-	Parameters:  json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["moveTo","moveBy"],"description":"moveTo: move to reachable screen percentage coordinates; moveBy: move relative to the current position"},"x":{"type":"number","description":"moveTo: reachable x percentage; moveBy: relative x percentage"},"y":{"type":"number","description":"moveTo: reachable y percentage; moveBy: relative y percentage"},"mode":{"type":"string","enum":["walk","run"],"description":"Movement speed mode; defaults to walk"}},"required":["action","x","y"]}`),
+	Description: "Move the desktop pet. Coordinates are normalized decimal values, not 0-100 percentages. For moveTo, screen center is x=0.5,y=0.5; never use 50 for center. For moveBy, x/y are relative deltas.",
+	Parameters:  json.RawMessage(`{"type":"object","properties":{"action":{"type":"string","enum":["moveTo","moveBy"],"description":"moveTo: move to normalized screen coordinates; moveBy: move relative to the current position"},"x":{"type":"number","minimum":-1,"maximum":1,"description":"normalized decimal x. moveTo uses 0.0..1.0 where center is 0.5, not 50; moveBy uses -1.0..1.0 relative delta"},"y":{"type":"number","minimum":-1,"maximum":1,"description":"normalized decimal y. moveTo uses 0.0..1.0 where center is 0.5, not 50; moveBy uses -1.0..1.0 relative delta"},"mode":{"type":"string","enum":["walk","run"],"description":"Movement speed mode; defaults to walk"}},"required":["action","x","y"]}`),
 }
 
 func availableTools() []chat.ToolDefinition {

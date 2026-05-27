@@ -23,6 +23,7 @@ type Options struct {
 	MaxTokens      *int
 	Environment    string
 	CaptureContent bool
+	CaptureSSE     bool
 }
 
 type tracedProvider struct {
@@ -62,11 +63,15 @@ func (p *tracedProvider) StreamChat(ctx context.Context, params chat.ChatParams)
 
 		var output strings.Builder
 		var rawOutput strings.Builder
-		var providerRawOutput string
+		var providerOutput string
+		var providerStreamOutput string
 		var providerError string
 		for event := range events {
-			if event.ProviderRawOutput != "" {
-				providerRawOutput = event.ProviderRawOutput
+			if event.ProviderOutput != "" {
+				providerOutput = event.ProviderOutput
+			}
+			if event.ProviderStreamOutput != "" {
+				providerStreamOutput = event.ProviderStreamOutput
 			}
 			if event.RawDelta != "" {
 				rawOutput.WriteString(event.RawDelta)
@@ -85,7 +90,10 @@ func (p *tracedProvider) StreamChat(ctx context.Context, params chat.ChatParams)
 			out <- event
 		}
 
-		recordedOutput := providerRawOutput
+		recordedOutput := providerOutput
+		if p.opts.CaptureSSE && providerStreamOutput != "" {
+			recordedOutput = providerStreamOutput
+		}
 		if recordedOutput == "" && rawOutput.Len() > 0 {
 			recordedOutput = rawOutput.String()
 		}

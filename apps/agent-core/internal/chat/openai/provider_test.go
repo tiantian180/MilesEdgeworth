@@ -204,8 +204,8 @@ func TestStreamChatPreservesReasoningContentForToolCall(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		flusher := w.(http.Flusher)
 		for _, c := range []string{
-			`{"choices":[{"delta":{"reasoning_content":"我需要移动到目标位置。"}}]}`,
-			`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"tc-1","type":"function","function":{"name":"pet_motion","arguments":"{\"action\":\"moveTo\",\"x\":0.5,\"y\":0.5}"}}]},"finish_reason":"tool_calls"}]}`,
+			`{"id":"chunk-1","object":"chat.completion.chunk","choices":[{"delta":{"reasoning_content":"我需要移动到目标位置。"}}]}`,
+			`{"id":"chunk-1","object":"chat.completion.chunk","choices":[{"delta":{"tool_calls":[{"index":0,"id":"tc-1","type":"function","function":{"name":"pet_motion","arguments":"{\"action\":\"moveTo\",\"x\":0.5,\"y\":0.5}"}}]},"finish_reason":"tool_calls"}]}`,
 			`[DONE]`,
 		} {
 			fmt.Fprintf(w, "data: %s\n\n", c)
@@ -238,9 +238,14 @@ func TestStreamChatPreservesReasoningContentForToolCall(t *testing.T) {
 	if got[0].ReasoningContent != "我需要移动到目标位置。" {
 		t.Fatalf("reasoning content = %q", got[0].ReasoningContent)
 	}
-	if !strings.Contains(got[0].ProviderRawOutput, `"reasoning_content":"我需要移动到目标位置。"`) ||
-		!strings.Contains(got[0].ProviderRawOutput, `"tool_calls"`) {
-		t.Fatalf("provider raw output missing original chunks: %q", got[0].ProviderRawOutput)
+	if !strings.Contains(got[0].ProviderOutput, `"reasoning_content":"我需要移动到目标位置。"`) ||
+		!strings.Contains(got[0].ProviderOutput, `"tool_calls"`) ||
+		!strings.Contains(got[0].ProviderOutput, `"finish_reason":"tool_calls"`) {
+		t.Fatalf("provider output missing assembled model result: %q", got[0].ProviderOutput)
+	}
+	if !strings.Contains(got[0].ProviderStreamOutput, `"reasoning_content":"我需要移动到目标位置。"`) ||
+		!strings.Contains(got[0].ProviderStreamOutput, `"chat.completion.chunk"`) {
+		t.Fatalf("provider stream output missing original chunks: %q", got[0].ProviderStreamOutput)
 	}
 }
 

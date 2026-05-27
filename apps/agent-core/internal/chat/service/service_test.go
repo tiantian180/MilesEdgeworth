@@ -99,6 +99,33 @@ func TestEstimateTokensUsesRuneCount(t *testing.T) {
 	}
 }
 
+func TestPetMotionToolDescribesNormalizedDecimalCoordinates(t *testing.T) {
+	contract := PetMotionTool.Description + "\n" + string(PetMotionTool.Parameters)
+	for _, want := range []string{"normalized decimal", "0.5", "not 50"} {
+		if !strings.Contains(contract, want) {
+			t.Fatalf("pet_motion schema should teach %q, got:\n%s", want, contract)
+		}
+	}
+
+	var params map[string]any
+	if err := json.Unmarshal(PetMotionTool.Parameters, &params); err != nil {
+		t.Fatalf("parse pet_motion schema: %v", err)
+	}
+	properties, ok := params["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("schema missing properties: %+v", params)
+	}
+	for _, name := range []string{"x", "y"} {
+		property, ok := properties[name].(map[string]any)
+		if !ok {
+			t.Fatalf("schema missing %s property: %+v", name, properties)
+		}
+		if property["minimum"] != float64(-1) || property["maximum"] != float64(1) {
+			t.Fatalf("%s bounds = [%v, %v], want [-1, 1]", name, property["minimum"], property["maximum"])
+		}
+	}
+}
+
 func TestToolRegistryRejectsToolCallIDMismatch(t *testing.T) {
 	var registry toolRegistry
 	waiter := registry.register("run-1", "tc-1")

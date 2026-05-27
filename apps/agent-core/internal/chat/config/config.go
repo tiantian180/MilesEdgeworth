@@ -22,6 +22,7 @@ type LangfuseConfig struct {
 	PublicKey      string
 	SecretKey      string
 	CaptureContent bool
+	CaptureSSE     bool
 }
 
 func FromEnv() ProviderConfig {
@@ -37,6 +38,7 @@ func FromEnv() ProviderConfig {
 			PublicKey:      strings.TrimSpace(os.Getenv("LANGFUSE_PUBLIC_KEY")),
 			SecretKey:      strings.TrimSpace(os.Getenv("LANGFUSE_SECRET_KEY")),
 			CaptureContent: parseBool(os.Getenv("MILES_LANGFUSE_CAPTURE_CONTENT"), true),
+			CaptureSSE:     parseBool(os.Getenv("MILES_LANGFUSE_CAPTURE_SSE"), false),
 		},
 	}
 }
