@@ -178,6 +178,290 @@ func TestChatPersistsUserAndAssistant(t *testing.T) {
 	}
 }
 
+func TestChatPersistsRawAssistantReplyButStreamsCleanText(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 8)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{
+				Type:     "CUSTOM",
+				Name:     "miles.pet.expression.requested",
+				RunID:    params.RunID,
+				RawDelta: "[EXPR:objection]",
+				Value:    map[string]any{"state": "speaking", "expression": "objection"},
+			}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "异议あり。",
+				RawDelta:  "异议あり。",
+			}
+			events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
+			close(events)
+			return events, nil
+		},
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("chat status = %d, want 200", resp.StatusCode)
+	}
+	events := readSSEEvents(t, resp.Body)
+	seenCleanDelta := false
+	for _, event := range events {
+		if strings.Contains(event.Delta, "[EXPR:") {
+			t.Fatalf("SSE delta leaked expression marker: %+v", event)
+		}
+		if event.Type == "TEXT_MESSAGE_CONTENT" && event.Delta == "异议あり。" {
+			seenCleanDelta = true
+		}
+	}
+	if !seenCleanDelta {
+		t.Fatalf("events = %+v, want clean text delta", events)
+	}
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "[EXPR:objection]异议あり。" || messages[1].IsPartial {
+		t.Fatalf("stored assistant message = %+v, want raw expression reply", messages[1])
+	}
+}
+
+func TestChatPersistsFallbackExpressionRawTextOnce(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 8)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{
+				Type:     "CUSTOM",
+				Name:     "miles.pet.expression.requested",
+				RunID:    params.RunID,
+				RawDelta: "没有标签的回复。",
+				Value:    map[string]any{"state": "speaking", "expression": "neutral"},
+			}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "没有标签的回复。",
+			}
+			events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
+			close(events)
+			return events, nil
+		},
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("chat status = %d, want 200", resp.StatusCode)
+	}
+	_ = readSSEEvents(t, resp.Body)
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "没有标签的回复。" || messages[1].IsPartial {
+		t.Fatalf("stored assistant message = %+v, want raw text once", messages[1])
+	}
+}
+
+func TestChatPersistsMarkerAndTextRawChunkOnce(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 8)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{
+				Type:     "CUSTOM",
+				Name:     "miles.pet.expression.requested",
+				RunID:    params.RunID,
+				RawDelta: "[EXPR:polite]好的。",
+				Value:    map[string]any{"state": "speaking", "expression": "polite"},
+			}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "好的。",
+			}
+			events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
+			close(events)
+			return events, nil
+		},
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("chat status = %d, want 200", resp.StatusCode)
+	}
+	_ = readSSEEvents(t, resp.Body)
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "[EXPR:polite]好的。" || messages[1].IsPartial {
+		t.Fatalf("stored assistant message = %+v, want marker and text raw chunk once", messages[1])
+	}
+}
+
+func TestChatPersistsSplitRawChunkTextOnce(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 8)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "第一段",
+				RawDelta:  "第一段[EXPR:polite]第二段",
+			}
+			events <- chat.StreamEvent{
+				Type:  "CUSTOM",
+				Name:  "miles.pet.expression.requested",
+				RunID: params.RunID,
+				Value: map[string]any{"state": "speaking", "expression": "polite"},
+			}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "第二段",
+			}
+			events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
+			close(events)
+			return events, nil
+		},
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("chat status = %d, want 200", resp.StatusCode)
+	}
+	_ = readSSEEvents(t, resp.Body)
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "第一段[EXPR:polite]第二段" || messages[1].IsPartial {
+		t.Fatalf("stored assistant message = %+v, want split raw chunk once", messages[1])
+	}
+}
+
+func TestChatPersistsSplitMarkerRawChunksOnce(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 8)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "第一段",
+				RawDelta:  "第一段[EX",
+			}
+			events <- chat.StreamEvent{
+				Type:     "CUSTOM",
+				Name:     "miles.pet.expression.requested",
+				RunID:    params.RunID,
+				RawDelta: "PR:polite]第二段",
+				Value:    map[string]any{"state": "speaking", "expression": "polite"},
+			}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "第二段",
+			}
+			events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
+			close(events)
+			return events, nil
+		},
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("chat status = %d, want 200", resp.StatusCode)
+	}
+	_ = readSSEEvents(t, resp.Body)
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "第一段[EXPR:polite]第二段" || messages[1].IsPartial {
+		t.Fatalf("stored assistant message = %+v, want split marker raw chunks once", messages[1])
+	}
+}
+
+func TestChatPersistsIncompleteMarkerTailOnce(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 8)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "第一段",
+				RawDelta:  "第一段[EX",
+			}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "[EX",
+			}
+			events <- chat.StreamEvent{Type: "RUN_FINISHED", RunID: params.RunID}
+			close(events)
+			return events, nil
+		},
+	}
+	st, server := newTestServer(t, provider, 8192)
+	conv := createConversation(t, st)
+
+	resp := postChat(t, server.URL, fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("chat status = %d, want 200", resp.StatusCode)
+	}
+	_ = readSSEEvents(t, resp.Body)
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "第一段[EX" || messages[1].IsPartial {
+		t.Fatalf("stored assistant message = %+v, want incomplete marker tail once", messages[1])
+	}
+}
+
 func TestChatRejectsUnknownConversation(t *testing.T) {
 	provider := &fakeProvider{}
 	_, server := newTestServer(t, provider, 8192)
@@ -223,6 +507,40 @@ func TestGetConversationMessagesIncludesPartialFlag(t *testing.T) {
 	}
 	if !messages[1].IsPartial {
 		t.Fatalf("reply isPartial = false, want true")
+	}
+}
+
+func TestGetConversationMessagesStripsExpressionTagsForAssistantContent(t *testing.T) {
+	st, server := newTestServer(t, &fakeProvider{}, 8192)
+	conv := createConversation(t, st)
+	if _, err := st.AppendMessage(conv.ID, store.RoleUser, "検事", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.AppendMessage(conv.ID, store.RoleAssistant, "[EXPR:objection]异议あり。[EXPR:polite]失礼。", false); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(server.URL + "/v1/conversations/" + conv.ID + "/messages")
+	if err != nil {
+		t.Fatalf("GET messages: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var messages []store.Message
+	if err := json.NewDecoder(resp.Body).Decode(&messages); err != nil {
+		t.Fatalf("decode messages: %v", err)
+	}
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2", len(messages))
+	}
+	if messages[0].Content != "検事" {
+		t.Fatalf("user content = %q, want unchanged text", messages[0].Content)
+	}
+	if messages[1].Content != "异议あり。失礼。" {
+		t.Fatalf("assistant content = %q, want clean display text", messages[1].Content)
 	}
 }
 
@@ -309,6 +627,51 @@ func TestChatPersistsPartialOnceOnFlushError(t *testing.T) {
 	}
 	if messages[1].Role != store.RoleAssistant || messages[1].Content != "途中" || !messages[1].IsPartial {
 		t.Fatalf("partial message = %+v", messages[1])
+	}
+}
+
+func TestChatPersistsRawPartialOnFlushError(t *testing.T) {
+	provider := &fakeProvider{
+		streamFunc: func(ctx context.Context, params chat.ChatParams) (<-chan chat.StreamEvent, error) {
+			_ = ctx
+			events := make(chan chat.StreamEvent, 4)
+			events <- chat.StreamEvent{Type: "RUN_STARTED", RunID: params.RunID}
+			events <- chat.StreamEvent{
+				Type:     "CUSTOM",
+				Name:     "miles.pet.expression.requested",
+				RunID:    params.RunID,
+				RawDelta: "[EXPR:objection]",
+				Value:    map[string]any{"state": "speaking", "expression": "objection"},
+			}
+			events <- chat.StreamEvent{
+				Type:      "TEXT_MESSAGE_CONTENT",
+				RunID:     params.RunID,
+				MessageID: params.MessageID,
+				Delta:     "途中",
+				RawDelta:  "途中",
+			}
+			close(events)
+			return events, nil
+		},
+	}
+	st, handler := newTestHandler(t, provider, 8192)
+	conv := createConversation(t, st)
+	body := strings.NewReader(fmt.Sprintf(`{"conversationId":%q,"message":"hello"}`, conv.ID))
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/messages", body)
+	req.Header.Set("Content-Type", "application/json")
+	rec := &flushErrorRecorder{
+		header:      make(http.Header),
+		failAtFlush: 3,
+	}
+
+	handler.ServeHTTP(rec, req)
+
+	messages := getMessages(t, st, conv.ID)
+	if len(messages) != 2 {
+		t.Fatalf("message count = %d, want 2: %+v", len(messages), messages)
+	}
+	if messages[1].Role != store.RoleAssistant || messages[1].Content != "[EXPR:objection]途中" || !messages[1].IsPartial {
+		t.Fatalf("partial message = %+v, want raw expression partial", messages[1])
 	}
 }
 
