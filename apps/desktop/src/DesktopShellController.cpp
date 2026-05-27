@@ -313,6 +313,19 @@ void DesktopShellController::prepareChatWindowForOpen()
 #endif
 }
 
+void DesktopShellController::prepareChatBubbleWindowForShow()
+{
+    if (m_chatBubbleWindow == nullptr) {
+        return;
+    }
+
+#ifdef Q_OS_MACOS
+    prepareMacCompanionWindowForShow(m_chatBubbleWindow);
+#else
+    m_chatBubbleWindow->raise();
+#endif
+}
+
 QVariantMap DesktopShellController::placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const
 {
     const QRect petGeometry = petVisibleScreenGeometry();

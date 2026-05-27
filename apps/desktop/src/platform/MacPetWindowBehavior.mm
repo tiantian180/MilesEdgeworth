@@ -142,6 +142,17 @@ void prepareMacCompanionWindowForOpen(QWindow *window)
     [nativeWindow makeKeyAndOrderFront:nil];
 }
 
+void prepareMacCompanionWindowForShow(QWindow *window)
+{
+    NSWindow *nativeWindow = nativeWindowForQWindow(window);
+    if (nativeWindow == nil) {
+        return;
+    }
+
+    applyMacCompanionWindowBehavior(window);
+    [nativeWindow orderFrontRegardless];
+}
+
 void setMacApplicationDockVisible(bool visible)
 {
     [NSApp setActivationPolicy:visible ? NSApplicationActivationPolicyRegular : NSApplicationActivationPolicyAccessory];

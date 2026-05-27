@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +22,26 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+def extract_function(source: str, name: str) -> str:
+    match = re.search(rf"\b{name}\s*\([^)]*\)\s*\{{", source)
+    if match is None:
+        raise AssertionError(f"missing function: {name}")
+
+    index = match.end() - 1
+    depth = 0
+    while index < len(source):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[match.start() : index + 1]
+        index += 1
+
+    raise AssertionError(f"unclosed function: {name}")
+
+
 def main() -> int:
     root_cmake = read("CMakeLists.txt")
     desktop_cmake = read("apps/desktop/CMakeLists.txt")
@@ -28,6 +49,8 @@ def main() -> int:
     main_cpp = read("apps/desktop/src/main.cpp")
     shell_h = read("apps/desktop/src/DesktopShellController.h")
     shell_cpp = read("apps/desktop/src/DesktopShellController.cpp")
+    mac_behavior_h = read("apps/desktop/src/platform/MacPetWindowBehavior.h")
+    mac_behavior_mm = read("apps/desktop/src/platform/MacPetWindowBehavior.mm")
     surface_h = read("apps/desktop/src/pet/surface/PetSurfaceWindow.h")
     surface_cpp = read("apps/desktop/src/pet/surface/PetSurfaceWindow.cpp")
     visible_bounds_h = read("apps/desktop/src/pet/surface/PetVisibleBounds.h")
@@ -39,6 +62,7 @@ def main() -> int:
     bubble_qml = read("apps/desktop/qml/ChatBubbleWindow.qml")
     placement_cpp = read("apps/desktop/src/chat/ChatBubblePlacement.cpp")
     placement_smoke = read("apps/desktop/tests/chat_bubble_placement_smoke.cpp")
+    companion_show_body = extract_function(mac_behavior_mm, "prepareMacCompanionWindowForShow")
 
     require(
         "check_phase_2_4_chat_compact_bubble" in root_cmake,
@@ -119,6 +143,7 @@ def main() -> int:
         "Q_PROPERTY(int petScreenAvailableHeight READ petScreenAvailableHeight NOTIFY petWindowGeometryChanged)",
         "Q_PROPERTY(bool chatWindowExpanded READ chatWindowExpanded NOTIFY chatWindowStateChanged)",
         "Q_INVOKABLE QVariantMap placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const;",
+        "Q_INVOKABLE void prepareChatBubbleWindowForShow();",
         "void petWindowGeometryChanged();",
         "void chatWindowStateChanged();",
     ]:
@@ -134,8 +159,19 @@ def main() -> int:
         "emit chatWindowStateChanged();",
         "const ChatBubblePlacementResult placement = ::placeChatBubble(",
         "result.insert(QStringLiteral(\"pointer\"), placement.pointer);",
+        "void DesktopShellController::prepareChatBubbleWindowForShow()",
+        "prepareMacCompanionWindowForShow(m_chatBubbleWindow);",
     ]:
         require(token in shell_cpp, f"DesktopShellController.cpp missing {token}")
+    require("prepareMacCompanionWindowForShow(QWindow *window)" in mac_behavior_h + mac_behavior_mm,
+            "macOS companion bubble show behavior missing prepareMacCompanionWindowForShow")
+    for token in ["applyMacCompanionWindowBehavior(window);", "[nativeWindow orderFrontRegardless];"]:
+        require(token in companion_show_body,
+                f"macOS companion bubble show behavior missing {token}")
+    require(
+        "makeKeyAndOrderFront" not in companion_show_body,
+        "bubble companion show path should re-apply and order front without stealing key focus",
+    )
 
     for token in [
         "PetVisibleBounds.cpp",
@@ -296,6 +332,7 @@ def main() -> int:
         "function syncAssistantBubble()",
         "function updatePlacement()",
         "App.DesktopShell.placeChatBubble(width, height, bubbleMargin)",
+        "App.DesktopShell.prepareChatBubbleWindowForShow()",
         "property string pointerPlacement",
         "App.DesktopShell.chatWindowExpanded",
         "function hideForExpandedChat()",

@@ -31,6 +31,10 @@ void applyMacCompanionWindowBehavior(QWindow *window);
 // 当前 Space 的前台窗口栈。
 void prepareMacCompanionWindowForOpen(QWindow *window);
 
+// 显示非输入型 companion 窗口前调用。它只重新应用层级并前置窗口，
+// 不让窗口成为 key window，避免桌宠回复气泡抢走用户当前输入焦点。
+void prepareMacCompanionWindowForShow(QWindow *window);
+
 // 调整整个应用的 Dock / activation policy。当前只在启动时进入 accessory
 // 模式；聊天窗显隐不能调用它，否则 macOS 会把全屏 Space 中的操作带回
 // 应用原来的桌面 Space。

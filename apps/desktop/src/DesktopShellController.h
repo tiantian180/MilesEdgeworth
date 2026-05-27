@@ -69,6 +69,7 @@ public slots:
     Q_INVOKABLE void clearPetInputMask();
     Q_INVOKABLE void setChatWindowExpanded(bool expanded);
     Q_INVOKABLE void prepareChatWindowForOpen();
+    Q_INVOKABLE void prepareChatBubbleWindowForShow();
     Q_INVOKABLE QVariantMap placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const;
 
 signals:
