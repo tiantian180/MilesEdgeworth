@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"milesedgeworth/agent-core/internal/chat"
+	"milesedgeworth/agent-core/internal/chat/expression"
 	chatservice "milesedgeworth/agent-core/internal/chat/service"
 	"milesedgeworth/agent-core/internal/store"
 )
@@ -211,13 +212,18 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	var reply strings.Builder
+	var displayReply strings.Builder
+	var rawReply strings.Builder
 	partialPersisted := false
 	persistPartialOnce := func(providerError bool) {
 		if partialPersisted {
 			return
 		}
-		if s.persistPartialReply(req.ConversationID, reply.String(), providerError) {
+		displayContent := displayReply.String()
+		if providerError || displayContent == "" {
+			return
+		}
+		if s.persistPartialReply(req.ConversationID, replyContent(rawReply.String(), displayContent), providerError) {
 			partialPersisted = true
 		}
 	}
@@ -248,9 +254,26 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	finished := false
 	providerError := false
+	pendingRawCoverage := ""
+	coverageParser := expression.NewParser(nil, "neutral", func(text string) {
+		pendingRawCoverage += text
+	}, func(string) {})
 	for event := range events {
+		if event.RawDelta != "" {
+			rawReply.WriteString(event.RawDelta)
+			coverageParser.Feed(event.RawDelta)
+		}
 		if event.Type == "TEXT_MESSAGE_CONTENT" {
-			reply.WriteString(event.Delta)
+			displayReply.WriteString(event.Delta)
+			if event.RawDelta == "" && !strings.HasPrefix(pendingRawCoverage, event.Delta) {
+				coverageParser.Flush()
+			}
+			if strings.HasPrefix(pendingRawCoverage, event.Delta) {
+				pendingRawCoverage = strings.TrimPrefix(pendingRawCoverage, event.Delta)
+			} else if event.RawDelta == "" {
+				rawReply.WriteString(event.Delta)
+				pendingRawCoverage = ""
+			}
 		}
 		if event.Type == "RUN_ERROR" {
 			providerError = true
@@ -264,12 +287,12 @@ func (s *Server) handleChatMessages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	content := reply.String()
-	if providerError || content == "" {
+	displayContent := displayReply.String()
+	if providerError || displayContent == "" {
 		return
 	}
 	if finished && ctx.Err() == nil {
-		_, _ = s.store.AppendMessage(req.ConversationID, store.RoleAssistant, content, false)
+		_, _ = s.store.AppendMessage(req.ConversationID, store.RoleAssistant, replyContent(rawReply.String(), displayContent), false)
 		return
 	}
 	persistPartialOnce(false)
@@ -336,6 +359,13 @@ func (s *Server) persistPartialReply(conversationID, content string, providerErr
 	return err == nil
 }
 
+func replyContent(rawContent, displayContent string) string {
+	if rawContent != "" {
+		return rawContent
+	}
+	return displayContent
+}
+
 func writeStoreError(w http.ResponseWriter, err error) {
 	if errors.Is(err, store.ErrNotFound) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "conversation not found"})
@@ -390,10 +420,27 @@ func messageResponses(messages []store.Message) []messageResponse {
 		responses = append(responses, messageResponse{
 			ID:        msg.ID,
 			Role:      msg.Role,
-			Content:   msg.Content,
+			Content:   responseContent(msg),
 			IsPartial: msg.IsPartial,
 			CreatedAt: msg.CreatedAt,
 		})
 	}
 	return responses
+}
+
+func responseContent(msg store.Message) string {
+	if msg.Role != store.RoleAssistant {
+		return msg.Content
+	}
+	return stripExpressionMarkers(msg.Content)
+}
+
+func stripExpressionMarkers(content string) string {
+	var out strings.Builder
+	parser := expression.NewParser(nil, "neutral", func(text string) {
+		out.WriteString(text)
+	}, func(string) {})
+	parser.Feed(content)
+	parser.Flush()
+	return out.String()
 }

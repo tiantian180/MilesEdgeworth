@@ -249,6 +249,7 @@ RUN_FINISHED
 
 - `expression.requested` 事件**永远**出现在它对应段的文字之前。
 - `[EXPR:x]` 标记本身不进入 `TEXT_MESSAGE_CONTENT`，Qt 侧看不到它。
+- `TEXT_MESSAGE_CONTENT` 是面向 UI 的展示文本事件，不定义会话持久化格式；持久化层保存包含 `[EXPR:x]` 的原始 assistant 回复供后续模型上下文使用。
 - `lifecycle` 事件不参与 segment queue，ChatController 直接处理。
 - 一次 RUN 中允许任意数量的 expression 切换。
 
