@@ -164,6 +164,26 @@ void DesktopShellController::setPetVisibleLocalBounds(const QRect &bounds)
     emit petWindowGeometryChanged();
 }
 
+void DesktopShellController::setChatWindow(QWindow *window)
+{
+    if (m_chatWindow == window) {
+        return;
+    }
+
+    m_chatWindow = window;
+    applyCompanionWindowBehavior(m_chatWindow);
+}
+
+void DesktopShellController::setChatBubbleWindow(QWindow *window)
+{
+    if (m_chatBubbleWindow == window) {
+        return;
+    }
+
+    m_chatBubbleWindow = window;
+    applyCompanionWindowBehavior(m_chatBubbleWindow);
+}
+
 void DesktopShellController::setAlwaysOnTop(bool alwaysOnTop)
 {
     if (m_alwaysOnTop == alwaysOnTop) {
@@ -285,15 +305,6 @@ void DesktopShellController::clearPetInputMask()
     WindowInputMaskController::clearMask(m_petWindow);
 }
 
-void DesktopShellController::setChatWindowDockVisible(bool visible)
-{
-#ifdef Q_OS_MACOS
-    setMacApplicationDockVisible(visible);
-#else
-    Q_UNUSED(visible);
-#endif
-}
-
 void DesktopShellController::setChatWindowExpanded(bool expanded)
 {
     if (m_chatWindowExpanded == expanded) {
@@ -302,6 +313,33 @@ void DesktopShellController::setChatWindowExpanded(bool expanded)
 
     m_chatWindowExpanded = expanded;
     emit chatWindowStateChanged();
+}
+
+void DesktopShellController::prepareChatWindowForOpen()
+{
+    if (m_chatWindow == nullptr) {
+        return;
+    }
+
+#ifdef Q_OS_MACOS
+    prepareMacCompanionWindowForOpen(m_chatWindow);
+#else
+    m_chatWindow->raise();
+    m_chatWindow->requestActivate();
+#endif
+}
+
+void DesktopShellController::prepareChatBubbleWindowForShow()
+{
+    if (m_chatBubbleWindow == nullptr) {
+        return;
+    }
+
+#ifdef Q_OS_MACOS
+    prepareMacCompanionWindowForShow(m_chatBubbleWindow);
+#else
+    m_chatBubbleWindow->raise();
+#endif
 }
 
 QVariantMap DesktopShellController::placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const
@@ -362,6 +400,19 @@ void DesktopShellController::applyCurrentLayerMode()
     // Windows/Linux 后续需要结合托盘和任务栏策略单独验证。
     m_petWindow->setFlag(Qt::WindowStaysOnTopHint, m_alwaysOnTop);
     m_petWindow->show();
+#endif
+}
+
+void DesktopShellController::applyCompanionWindowBehavior(QWindow *window)
+{
+    if (window == nullptr) {
+        return;
+    }
+
+#ifdef Q_OS_MACOS
+    applyMacCompanionWindowBehavior(window);
+#else
+    Q_UNUSED(window);
 #endif
 }
 

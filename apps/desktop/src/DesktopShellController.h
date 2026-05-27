@@ -55,6 +55,8 @@ public:
     bool chatWindowExpanded() const;
     void setPetWindow(QWindow *window);
     void setPetVisibleLocalBounds(const QRect &bounds);
+    void setChatWindow(QWindow *window);
+    void setChatBubbleWindow(QWindow *window);
 
 public slots:
     void setAlwaysOnTop(bool alwaysOnTop);
@@ -69,8 +71,9 @@ public slots:
     Q_INVOKABLE void movePetWindowToMotionClampedPosition(const QPoint &position);
     Q_INVOKABLE void setPetInputMask(const QUrl &animationUrl, double imageSize, double windowSize);
     Q_INVOKABLE void clearPetInputMask();
-    Q_INVOKABLE void setChatWindowDockVisible(bool visible);
     Q_INVOKABLE void setChatWindowExpanded(bool expanded);
+    Q_INVOKABLE void prepareChatWindowForOpen();
+    Q_INVOKABLE void prepareChatBubbleWindowForShow();
     Q_INVOKABLE QVariantMap placeChatBubble(int bubbleWidth, int bubbleHeight, int margin) const;
 
 signals:
@@ -83,6 +86,7 @@ signals:
 private:
     void createTrayIcon();
     void applyCurrentLayerMode();
+    void applyCompanionWindowBehavior(QWindow *window);
     QPointF legacyStartupPosition(double petScale) const;
     QScreen *petTargetScreen() const;
     QRect petScreenAvailableGeometry() const;
@@ -91,6 +95,8 @@ private:
     QPointF clampedPetWindowPosition(const QPointF &candidatePosition) const;
 
     QWindow *m_petWindow = nullptr;
+    QWindow *m_chatWindow = nullptr;
+    QWindow *m_chatBubbleWindow = nullptr;
     QList<QMetaObject::Connection> m_petWindowGeometryConnections;
     QSystemTrayIcon *m_trayIcon = nullptr;
     QMenu *m_trayMenu = nullptr;
