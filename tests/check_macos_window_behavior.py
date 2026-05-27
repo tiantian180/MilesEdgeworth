@@ -15,9 +15,13 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 MAC_BEHAVIOR = ROOT / "apps/desktop/src/platform/MacPetWindowBehavior.mm"
+MAC_BEHAVIOR_H = ROOT / "apps/desktop/src/platform/MacPetWindowBehavior.h"
 PET_WINDOW_QML = ROOT / "apps/desktop/qml/PetWindow.qml"
 DESKTOP_CMAKE = ROOT / "apps/desktop/CMakeLists.txt"
 MAIN_CPP = ROOT / "apps/desktop/src/main.cpp"
+CHAT_WINDOW_QML = ROOT / "apps/desktop/qml/ChatWindow.qml"
+SHELL_CONTROLLER_H = ROOT / "apps/desktop/src/DesktopShellController.h"
+SHELL_CONTROLLER_CPP = ROOT / "apps/desktop/src/DesktopShellController.cpp"
 
 
 def extract_function(source: str, name: str) -> str:
@@ -44,7 +48,11 @@ def extract_function(source: str, name: str) -> str:
 
 def main() -> int:
     source = MAC_BEHAVIOR.read_text(encoding="utf-8")
+    header = MAC_BEHAVIOR_H.read_text(encoding="utf-8")
     function_body = extract_function(source, "setMacPetWindowAlwaysOnTop")
+    context_menu_body = extract_function(source, "prepareMacPetWindowForContextMenu")
+    companion_open_body = extract_function(source, "prepareMacCompanionWindowForOpen")
+    accessory_body = extract_function(source, "enterMacAccessoryMode")
 
     forbidden_tokens = [
         "moveWindowToStationarySkyLightSpace",
@@ -90,11 +98,66 @@ def main() -> int:
 
     cmake_source = DESKTOP_CMAKE.read_text(encoding="utf-8")
     main_source = MAIN_CPP.read_text(encoding="utf-8")
+    chat_window_source = CHAT_WINDOW_QML.read_text(encoding="utf-8")
+    shell_source = SHELL_CONTROLLER_H.read_text(encoding="utf-8") + SHELL_CONTROLLER_CPP.read_text(encoding="utf-8")
     if "Widgets" not in cmake_source or "Qt6::Widgets" not in cmake_source:
         print("Qt.labs.platform 菜单需要链接 Qt Widgets 作为平台菜单兼容层。", file=sys.stderr)
         return 1
     if "QApplication" not in main_source or "QGuiApplication app" in main_source:
         print("Qt.labs.platform 菜单应使用 QApplication，而不是纯 QGuiApplication。", file=sys.stderr)
+        return 1
+
+    activating_functions = {
+        "prepareMacPetWindowForContextMenu": context_menu_body,
+        "prepareMacCompanionWindowForOpen": companion_open_body,
+        "enterMacAccessoryMode": accessory_body,
+    }
+    for name, body in activating_functions.items():
+        if "activateIgnoringOtherApps" in body:
+            print(
+                f"{name} 不应主动激活应用；否则会把全屏 Space 中的桌宠操作带回原桌面 Space。",
+                file=sys.stderr,
+            )
+            return 1
+    if "App.DesktopShell.setChatWindowDockVisible" in chat_window_source:
+        print(
+            "聊天窗显示/隐藏不应切换 NSApplicationActivationPolicy；否则会把全屏 Space 操作带回应用原桌面。",
+            file=sys.stderr,
+        )
+        return 1
+    if "setChatWindowDockVisible" in shell_source:
+        print(
+            "DesktopShellController 不应再暴露聊天窗 Dock 可见性入口；聊天窗应作为 companion window 跟随桌宠。",
+            file=sys.stderr,
+        )
+        return 1
+    if "MILES_DIAG_SKIP_CHAT_DOCK_POLICY" in source or "MILES_SPACES" in source + chat_window_source + shell_source:
+        print("macOS Space 调试开关和临时日志不应进入正式实现。", file=sys.stderr)
+        return 1
+    if "NSApplicationActivationPolicyRegular" in source + header:
+        print("桌宠应用不应再暴露切回 Regular activation policy 的平台路径。", file=sys.stderr)
+        return 1
+    if "makeKeyAndOrderFront" not in companion_open_body:
+        print("聊天窗打开时应让 companion window 自身成为 key window，而不是激活整个应用。", file=sys.stderr)
+        return 1
+
+    companion_required_tokens = [
+        "applyMacCompanionWindowBehavior(QWindow *window)",
+        "prepareMacCompanionWindowForOpen(QWindow *window)",
+        "NSWindowCollectionBehaviorCanJoinAllSpaces",
+        "NSWindowCollectionBehaviorFullScreenAuxiliary",
+        "NSWindowCollectionBehaviorStationary",
+        "kCGScreenSaverWindowLevelKey",
+        "orderFrontRegardless",
+        "makeKeyAndOrderFront",
+    ]
+    missing_companion_tokens = [
+        token for token in companion_required_tokens
+        if token not in source + header
+    ]
+    if missing_companion_tokens:
+        joined = ", ".join(missing_companion_tokens)
+        print(f"聊天/气泡窗口缺少跨 Space 全屏辅助窗口行为：{joined}", file=sys.stderr)
         return 1
 
     return 0

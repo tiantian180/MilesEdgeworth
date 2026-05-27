@@ -22,6 +22,19 @@ void setMacPetWindowAlwaysOnTop(QWindow *window, bool alwaysOnTop);
 // Space 成为可接收菜单的前台上下文。
 void prepareMacPetWindowForContextMenu(QWindow *window);
 
-// 聊天窗口是普通工作窗口，打开时应让应用显示在 Dock；关闭后恢复桌宠
-// 辅助应用模式，避免只剩桌宠本体时占用普通应用位置。
-void setMacApplicationDockVisible(bool visible);
+// 聊天窗和桌宠回复气泡不是桌宠本体，但用户会从桌宠所在的当前 Space
+// 打开它们。它们需要和桌宠一样加入所有 Space，并允许显示在全屏应用上方，
+// 否则在桌宠跟随到全屏 Space 后，聊天 UI 会留在原来的桌面 Space。
+void applyMacCompanionWindowBehavior(QWindow *window);
+
+// 打开聊天窗前调用：确保 native 窗口已经具备 companion 行为，并进入
+// 当前 Space 的前台窗口栈。
+void prepareMacCompanionWindowForOpen(QWindow *window);
+
+// 显示非输入型 companion 窗口前调用。它只重新应用层级并前置窗口，
+// 不让窗口成为 key window，避免桌宠回复气泡抢走用户当前输入焦点。
+void prepareMacCompanionWindowForShow(QWindow *window);
+
+// 启动时进入 accessory 模式。聊天窗显隐不能切回普通 Regular app，
+// 否则 macOS 会把全屏 Space 中的操作带回应用原来的桌面 Space。
+void enterMacAccessoryMode();

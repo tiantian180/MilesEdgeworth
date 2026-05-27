@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
     app.setQuitOnLastWindowClosed(false);
     QQuickStyle::setStyle("Basic");
 #ifdef Q_OS_MACOS
-    setMacApplicationDockVisible(false);
+    enterMacAccessoryMode();
 #endif
 
     DesktopShellController shellController;
@@ -68,6 +68,15 @@ int main(int argc, char *argv[])
     if (chatEngine.rootObjects().size() < 3) {
         return 1;
     }
+    // rootObjects follows the loadFromModule order above:
+    // 0 = ChatWindow, 1 = SettingsWindow, 2 = ChatBubbleWindow.
+    auto *chatWindow = qobject_cast<QWindow *>(chatEngine.rootObjects().at(0));
+    auto *chatBubbleWindow = qobject_cast<QWindow *>(chatEngine.rootObjects().at(2));
+    if (chatWindow == nullptr || chatBubbleWindow == nullptr) {
+        return 1;
+    }
+    shellController.setChatWindow(chatWindow);
+    shellController.setChatBubbleWindow(chatBubbleWindow);
     chatController.startSidecar();
 
     shellController.setPetScale(petRuntime.petScale());

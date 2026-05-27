@@ -35,6 +35,19 @@ NSWindowCollectionBehavior baseCollectionBehavior(NSWindow *window)
                 | NSWindowCollectionBehaviorFullScreenDisallowsTiling;
     return behavior;
 }
+
+NSWindowCollectionBehavior companionCollectionBehavior(NSWindow *window)
+{
+    NSWindowCollectionBehavior behavior = baseCollectionBehavior(window);
+    behavior &= ~NSWindowCollectionBehaviorMoveToActiveSpace;
+    behavior |= NSWindowCollectionBehaviorCanJoinAllSpaces
+                | NSWindowCollectionBehaviorStationary
+                | NSWindowCollectionBehaviorFullScreenAuxiliary;
+    if (@available(macOS 13.0, *)) {
+        behavior |= NSWindowCollectionBehaviorCanJoinAllApplications;
+    }
+    return behavior;
+}
 }
 
 void applyMacPetWindowBaseBehavior(QWindow *window)
@@ -98,13 +111,49 @@ void prepareMacPetWindowForContextMenu(QWindow *window)
     }
 
     [nativeWindow orderFrontRegardless];
-    [NSApp activateIgnoringOtherApps:YES];
 }
 
-void setMacApplicationDockVisible(bool visible)
+void applyMacCompanionWindowBehavior(QWindow *window)
 {
-    [NSApp setActivationPolicy:visible ? NSApplicationActivationPolicyRegular : NSApplicationActivationPolicyAccessory];
-    if (visible) {
-        [NSApp activateIgnoringOtherApps:YES];
+    NSWindow *nativeWindow = nativeWindowForQWindow(window);
+    if (nativeWindow == nil) {
+        return;
     }
+
+    [nativeWindow setHidesOnDeactivate:NO];
+    [nativeWindow setCanHide:NO];
+    [nativeWindow setRestorable:NO];
+    [nativeWindow setOpaque:NO];
+    [nativeWindow setBackgroundColor:[NSColor clearColor]];
+    [nativeWindow setAnimationBehavior:NSWindowAnimationBehaviorNone];
+    [nativeWindow setCollectionBehavior:companionCollectionBehavior(nativeWindow)];
+    [nativeWindow setLevel:CGWindowLevelForKey(kCGScreenSaverWindowLevelKey)];
+}
+
+void prepareMacCompanionWindowForOpen(QWindow *window)
+{
+    NSWindow *nativeWindow = nativeWindowForQWindow(window);
+    if (nativeWindow == nil) {
+        return;
+    }
+
+    applyMacCompanionWindowBehavior(window);
+    [nativeWindow orderFrontRegardless];
+    [nativeWindow makeKeyAndOrderFront:nil];
+}
+
+void prepareMacCompanionWindowForShow(QWindow *window)
+{
+    NSWindow *nativeWindow = nativeWindowForQWindow(window);
+    if (nativeWindow == nil) {
+        return;
+    }
+
+    applyMacCompanionWindowBehavior(window);
+    [nativeWindow orderFrontRegardless];
+}
+
+void enterMacAccessoryMode()
+{
+    [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 }
