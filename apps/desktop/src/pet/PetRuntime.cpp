@@ -5,11 +5,11 @@
 #include "pet/manifest/SkinManifestLoader.h"
 #include "pet/PetLogging.h"
 #include "pet/selection/AnimationPoolSelector.h"
+#include "settings/AppSettings.h"
 
 #include <QDir>
 #include <QPointF>
 #include <QRandomGenerator>
-#include <QSettings>
 #include <QTimer>
 #include <QtGlobal>
 #include <QVariantMap>
@@ -31,19 +31,20 @@ PetRuntime::PetRuntime(QObject *parent)
     connect(&m_motionController, &MotionController::started, this, [this](const QString &direction, const QString &mode) {
         m_currentMotionMode = mode;
         enterMovingState();
-        playLocomotion(mode, direction);
+        playLocomotion(m_pointerMotionActive ? pointerLocomotionAction(direction) : mode, direction);
     });
     connect(&m_motionController, &MotionController::positionChanged, this, [this](const QPoint &newPosition) {
         emit motionPositionChanged(newPosition);
     });
     connect(&m_motionController, &MotionController::directionChanged, this, [this](const QString &direction) {
-        playLocomotion(m_currentMotionMode, direction);
+        playLocomotion(m_pointerMotionActive ? pointerLocomotionAction(direction) : m_currentMotionMode, direction);
     });
     connect(&m_motionController, &MotionController::completed, this, [this](double finalX, double finalY) {
         const QVariantMap result = motionResult(true, QPointF(finalX, finalY));
+        const bool pointerMotion = std::exchange(m_pointerMotionActive, false);
         exitMovingState();
         returnToIdle();
-        emit motionCompleted(result);
+        if (!pointerMotion) emit motionCompleted(result);
     });
     connect(&m_motionController, &MotionController::interrupted, this, [this](const QString &reason) {
         const QString resultReason = reason == QStringLiteral("drag")
@@ -54,15 +55,17 @@ PetRuntime::PetRuntime(QObject *parent)
             m_motionController.currentPercentPositionForResult(),
             resultReason
         );
+        const bool pointerMotion = std::exchange(m_pointerMotionActive, false);
         exitMovingState();
         if (reason != QStringLiteral("drag")) {
             returnToIdle();
         }
-        emit motionInterrupted(result);
+        if (!pointerMotion) emit motionInterrupted(result);
     });
 
+    m_reducedMotion = AppSettings().value(QStringLiteral("pet/reducedMotion"), false).toBool();
     refreshAvailableSkins();
-    const QString savedSkinId = QSettings()
+    const QString savedSkinId = AppSettings()
         .value(QStringLiteral("skin/activeSkinId"), QStringLiteral("miles-edgeworth"))
         .toString();
 
@@ -76,6 +79,15 @@ PetRuntime::PetRuntime(QObject *parent)
         setState(QStringLiteral("idle"));
         startStartupSequence();
     }
+
+    AppSettings settings;
+    const QString savedSizeId = settings.value(QStringLiteral("pet/sizeId")).toString();
+    if (!savedSizeId.isEmpty()) {
+        setPetSize(savedSizeId);
+    }
+    if (settings.contains(QStringLiteral("pet/autoMovementEnabled"))) {
+        setAutoMovementEnabled(settings.value(QStringLiteral("pet/autoMovementEnabled")).toBool());
+    }
 }
 
 QString PetRuntime::activeSkinId() const
@@ -86,6 +98,7 @@ QString PetRuntime::activeSkinId() const
 RuntimeSnapshot PetRuntime::snapshot() const
 {
     RuntimeSnapshot snapshot;
+    snapshot.reducedMotion = m_reducedMotion;
     snapshot.currentState = m_currentState;
     snapshot.currentActionId = m_currentActionId;
     snapshot.currentRecipeId = m_currentRecipeId;
@@ -128,7 +141,9 @@ bool PetRuntime::currentActionAcceptsIdleLoopFinished() const
 
 void PetRuntime::setState(const QString &state)
 {
+    stopPointerMotion();
     QString nextState = state.trimmed();
+    if (!nextState.isEmpty() && nextState != QStringLiteral("idle")) hideCurrentProp();
     if (nextState.isEmpty()) {
         nextState = "idle";
     }
@@ -187,6 +202,8 @@ void PetRuntime::toggleFacing()
 
 void PetRuntime::playAction(const QString &actionId)
 {
+    stopPointerMotion();
+    if (actionId != actionForState(QStringLiteral("idle"))) hideCurrentProp();
     playActionInternal(actionId, true);
 }
 
@@ -222,6 +239,7 @@ void PetRuntime::playLocomotion(const QString &actionId, const QString &movement
 
 void PetRuntime::playRecipe(const QString &recipeId)
 {
+    stopPointerMotion();
     const QString nextRecipeId = recipeId.trimmed();
     if (!m_manifest.recipes.contains(nextRecipeId)) {
         return;
@@ -230,6 +248,8 @@ void PetRuntime::playRecipe(const QString &recipeId)
     if (m_currentRecipeId == nextRecipeId && m_currentRecipeStepRuntimeControlled) {
         return;
     }
+
+    hideCurrentProp();
 
     const bool recipeChanged = (m_currentRecipeId != nextRecipeId);
     m_returnToIdleAfterExit = false;
@@ -274,6 +294,7 @@ void PetRuntime::playAnimationFromPool(const QString &poolId)
 
 void PetRuntime::submitActionRequest(const ActionRequest &request)
 {
+    if (request.kind != ActionRequestKind::None) stopPointerMotion();
     if (request.kind == ActionRequestKind::None) {
         qCDebug(petRuntimeLog).noquote() << "ignore empty action request"
                                           << QStringLiteral("hideCurrentProp=%1").arg(logBool(request.hideCurrentProp));
@@ -362,7 +383,16 @@ void PetRuntime::setAudioLanguage(const QString &languageId)
 
 void PetRuntime::toggleAutoMovementEnabled()
 {
-    setAutoMovementEnabled(!m_autoMovementEnabled);
+    setAutoMovementEnabled(!autoMovementPreference());
+}
+
+void PetRuntime::setReducedMotion(bool reduced)
+{
+    if (m_reducedMotion == reduced) return;
+    m_reducedMotion = reduced;
+    AppSettings().setValue(QStringLiteral("pet/reducedMotion"), reduced);
+    if (reduced) stopPointerMotion();
+    emit reducedMotionChanged();
 }
 
 void PetRuntime::setPetSize(const QString &sizeId)
@@ -390,6 +420,7 @@ void PetRuntime::setPetSize(const QString &sizeId)
 
     m_petSizeId = normalizedSizeId;
     m_petScale = nextScale;
+    AppSettings().setValue(QStringLiteral("pet/sizeId"), m_petSizeId);
     configureMotionController();
     emit petScaleChanged();
 }
@@ -406,6 +437,7 @@ void PetRuntime::requestExpression(const QString &state, const QString &expressi
 
 void PetRuntime::requestMotion(const QString &action, double x, double y, const QString &mode)
 {
+    stopPointerMotion();
     configureMotionController();
     m_currentMotionMode = mode == QStringLiteral("run") ? QStringLiteral("run") : QStringLiteral("walk");
 
@@ -431,6 +463,40 @@ void PetRuntime::requestMotion(const QString &action, double x, double y, const 
 void PetRuntime::stopMotion()
 {
     m_motionController.stop();
+}
+
+void PetRuntime::requestPointerMotion(double x, double y)
+{
+    // A local interaction must never take ownership of an agent's active move.
+    if (!m_pointerMotionActive && (m_motionController.isMoving() || m_currentState != QStringLiteral("idle"))) return;
+    if (!m_pointerMotionActive) {
+        configureMotionController();
+        m_pointerMotionActive = true;
+    }
+    m_motionController.moveTo(x, y, QStringLiteral("walk"));
+}
+
+void PetRuntime::stopPointerMotion()
+{
+    if (m_pointerMotionActive) m_motionController.stop();
+}
+
+QString PetRuntime::pointerLocomotionAction(const QString &direction) const
+{
+    if (m_manifest.actions.contains(QStringLiteral("walk"))) return QStringLiteral("walk");
+    // Uploaded pets store left/right walks as separate actions. Select by
+    // declared movement, not by a particular pet's action IDs.
+    const bool left = direction == QStringLiteral("left") || direction.contains(QStringLiteral("West")) || direction == QStringLiteral("west");
+    QStringList actionIds = m_manifest.actions.keys();
+    actionIds.sort();
+    for (const QString &id : actionIds) {
+        const auto &action = m_manifest.actions[id];
+        for (const QPointF &delta : action.movementDeltas) {
+            if ((left && delta.x() < 0) || (!left && delta.x() > 0)) return id;
+        }
+    }
+    // A pet with only a still image can follow without inventing animation.
+    return actionForState(QStringLiteral("idle"));
 }
 
 void PetRuntime::cancelMotionForDrag()
@@ -541,7 +607,7 @@ QVariantMap PetRuntime::consumeFrameMovementDelta() const
     delta.insert("dx", 0.0);
     delta.insert("dy", 0.0);
 
-    if (!m_autoMovementEnabled) {
+    if (!m_autoMovementEnabled || m_reducedMotion) {
         return delta;
     }
 
@@ -1094,11 +1160,13 @@ bool PetRuntime::animationUrlPlayable(const QUrl &url) const
 
 void PetRuntime::setAutoMovementEnabled(bool enabled)
 {
-    if (m_autoMovementEnabled == enabled) {
+    if (autoMovementPreference() == enabled) {
         return;
     }
 
-    m_autoMovementEnabled = enabled;
+    if (m_hasMotionAutoMovementSnapshot) m_autoMovementEnabledBeforeMotion = enabled;
+    else m_autoMovementEnabled = enabled;
+    AppSettings().setValue(QStringLiteral("pet/autoMovementEnabled"), enabled);
     emit autoMovementEnabledChanged();
 }
 
@@ -1129,7 +1197,8 @@ void PetRuntime::enterMovingState()
 
     setSuppressAutoIdle(true);
     m_motionLoopOverride = true;
-    setAutoMovementEnabled(false);
+    m_autoMovementEnabled = false;
+    emit autoMovementEnabledChanged();
 }
 
 void PetRuntime::exitMovingState()
@@ -1140,7 +1209,8 @@ void PetRuntime::exitMovingState()
         ? m_autoMovementEnabledBeforeMotion
         : true;
     m_hasMotionAutoMovementSnapshot = false;
-    setAutoMovementEnabled(restoreAutoMovementEnabled);
+    m_autoMovementEnabled = restoreAutoMovementEnabled;
+    emit autoMovementEnabledChanged();
 }
 
 QVariantMap PetRuntime::motionResult(bool success, const QPointF &position, const QString &reason) const

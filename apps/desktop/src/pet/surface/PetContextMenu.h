@@ -3,6 +3,7 @@
 #include <QPoint>
 
 class DesktopShellController;
+class CursorFollowController;
 class ChatController;
 class PetEventBridge;
 class PetRuntime;
@@ -19,6 +20,7 @@ public:
         PetEventBridge *eventBridge,
         DesktopShellController *shellController,
         ChatController *chatController,
+        CursorFollowController *cursorFollow,
         const QPoint &globalPosition
     );
 };

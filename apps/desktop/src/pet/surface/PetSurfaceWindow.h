@@ -8,6 +8,7 @@
 
 class DesktopShellController;
 class ChatController;
+class CursorFollowController;
 class QLabel;
 class QContextMenuEvent;
 class QMouseEvent;
@@ -75,6 +76,8 @@ private:
     QSoundEffect *m_soundEffect = nullptr;
     PropSurfaceWindow *m_propWindow = nullptr;
     QTimer m_singleClickTimer;
+    CursorFollowController *m_cursorFollow = nullptr;
+    QTimer m_cursorFollowTimer;
     QTimer m_propExpireTimer;
     QPoint m_pressPosition;
     QPoint m_pendingSingleClickPosition;
@@ -82,4 +85,5 @@ private:
     bool m_dragMoved = false;
     bool m_doubleClickPending = false;
     bool m_contextMenuPending = false;
+    bool m_contextMenuOpen = false;
 };

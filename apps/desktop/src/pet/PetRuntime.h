@@ -56,6 +56,7 @@ class PetRuntime : public QObject
     Q_PROPERTY(QString currentAudioLanguageId READ currentAudioLanguageId NOTIFY currentAudioLanguageChanged)
     Q_PROPERTY(QVariantList availableAudioLanguages READ availableAudioLanguages NOTIFY availableAudioLanguagesChanged)
     Q_PROPERTY(bool autoMovementEnabled READ autoMovementEnabled NOTIFY autoMovementEnabledChanged)
+    Q_PROPERTY(bool reducedMotion READ reducedMotion WRITE setReducedMotion NOTIFY reducedMotionChanged)
     Q_PROPERTY(QString petSizeId READ petSizeId NOTIFY petScaleChanged)
     Q_PROPERTY(QVariantList availablePetSizes READ availablePetSizes NOTIFY availablePetSizesChanged)
     Q_PROPERTY(double petScale READ petScale NOTIFY petScaleChanged)
@@ -99,6 +100,8 @@ public:
     QString currentAudioLanguageId() const { return m_audioController.currentLanguageId(); }
     QVariantList availableAudioLanguages() const { return m_audioController.availableLanguages(); }
     bool autoMovementEnabled() const { return m_autoMovementEnabled; }
+    bool reducedMotion() const { return m_reducedMotion; }
+    bool autoMovementPreference() const { return m_hasMotionAutoMovementSnapshot ? m_autoMovementEnabledBeforeMotion : m_autoMovementEnabled; }
     QString petSizeId() const { return m_petSizeId; }
     QVariantList availablePetSizes() const;
     double petScale() const { return m_petScale; }
@@ -145,6 +148,7 @@ public:
     Q_INVOKABLE void toggleAudioMuted();
     Q_INVOKABLE void setAudioLanguage(const QString &languageId);
     Q_INVOKABLE void toggleAutoMovementEnabled();
+    Q_INVOKABLE void setReducedMotion(bool reduced);
     Q_INVOKABLE void setPetSize(const QString &sizeId);
     Q_INVOKABLE bool setActiveSkin(const QString &skinId);
     Q_INVOKABLE bool reloadActiveSkin();
@@ -164,6 +168,9 @@ public:
     Q_INVOKABLE void requestExpression(const QString &state, const QString &expression);
     Q_INVOKABLE void requestMotion(const QString &action, double x, double y, const QString &mode);
     Q_INVOKABLE void stopMotion();
+    bool pointerMotionActive() const { return m_pointerMotionActive; }
+    void requestPointerMotion(double x, double y);
+    void stopPointerMotion();
     Q_INVOKABLE void cancelMotionForDrag();
     Q_INVOKABLE void setMotionScreenGeometry(const QRect &screenGeometry);
     Q_INVOKABLE void setMotionCurrentPosition(const QPoint &petWindowPosition);
@@ -197,6 +204,7 @@ signals:
     void audioMutedChanged();
     void currentAudioLanguageChanged();
     void autoMovementEnabledChanged();
+    void reducedMotionChanged();
     void petScaleChanged();
     void pointerInteractionEnabledChanged();
     void sleepStateChanged();
@@ -250,6 +258,7 @@ private:
     void stopAutoIdleTimer();
     void setAutoMovementEnabled(bool enabled);
     void configureMotionController();
+    QString pointerLocomotionAction(const QString &direction) const;
     void enterMovingState();
     void exitMovingState();
     QVariantMap motionResult(bool success, const QPointF &position, const QString &reason = QString()) const;
@@ -272,11 +281,13 @@ private:
     QString m_currentFacing;
     QString m_currentMovementDirection;
     QString m_currentMotionMode = "walk";
+    bool m_pointerMotionActive = false;
     QString m_currentLoopMode = "loop";
     bool m_currentAutoReturnToIdle = false;
     AudioController m_audioController;
     MotionController m_motionController;
     bool m_autoMovementEnabled = true;
+    bool m_reducedMotion = false;
     QString m_petSizeId;
     double m_petScale = 0.0;
     QUrl m_currentAnimationUrl;

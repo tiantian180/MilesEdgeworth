@@ -30,6 +30,7 @@ public:
     // ---- 鼠标 / 拖拽事件入口 ----
     Q_INVOKABLE void submitPrimaryClick(double x, double y, double width, double height);
     Q_INVOKABLE void submitDoubleClick();
+    void submitPointerFollowArrived();
     Q_INVOKABLE void submitDragStarted(double globalX);
     // 每次 mouseMove 调用一次；返回是否刚好触发了 dragShake（一秒内连续反向移动达阈值）。
     Q_INVOKABLE void submitDragMoved(double globalX);

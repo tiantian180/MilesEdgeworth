@@ -47,6 +47,11 @@ void PetEventBridge::submitDoubleClick()
     submitEvent(PetEvent::pointerDoubleClick());
 }
 
+void PetEventBridge::submitPointerFollowArrived()
+{
+    submitEvent(PetEvent::pointerFollowArrived());
+}
+
 void PetEventBridge::submitDoubleClickForTest(double randomValue)
 {
     submitEvent(PetEvent::pointerDoubleClick(randomValue));

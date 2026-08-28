@@ -8,6 +8,8 @@ MilesEdgeworth 正在从旧版 Qt Widgets 桌宠，升级为 Qt 6 驱动的可�
 
 - `apps/desktop/`：Qt 6 桌面壳层、Pet Runtime、原生桌宠 surface、系统菜单和平台窗口适配。
 - `apps/desktop/resources/skins/miles-edgeworth/assets/`：Miles 皮肤包资源，包括动画、语音、Prop 图片和源素材。
+- `apps/desktop/resources/skins/meow-market-leader/`：游资大神 · 喵龙头皮肤，包含六段透明动作和鼠标互动。
+- `skills/desktop-pet-skin-factory/`：可复用的宠物皮肤批量制作 skill。
 - `docs/v2/`：新版文档，按设计方案、参考资料、阶段记录分类。
 - `icon/`：图标素材。
 
@@ -58,7 +60,7 @@ my-skin/
 
 右键桌宠 → `皮肤` → `打开皮肤目录` 可以打开当前用户皮肤目录。把皮肤目录放进去后，选择 `重载当前皮肤` 或重启应用即可重新扫描。
 
-官方 Miles 皮肤随 app 放在可执行文件同级的 `skins/miles-edgeworth/` 目录；用户皮肤目录里出现同 id 皮肤时，菜单优先展示用户版本，加载失败时会回退到随包候选。
+官方 Miles 与「游资大神 · 喵龙头」随 app 放在可执行文件同级的 `skins/` 目录；用户皮肤目录里出现同 id 皮肤时，菜单优先展示用户版本，加载失败时会回退到随包候选。
 
 ## Cursor / clangd 代码提示
 

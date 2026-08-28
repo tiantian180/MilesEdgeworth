@@ -1,0 +1,14 @@
+{
+  "actionId": "greeting",
+  "canvas": [512, 512],
+  "targetAnchor": [256, 256],
+  "scale": 1.0,
+  "padding": 8,
+  "alphaThreshold": 100,
+  "loop": false,
+  "mirrorX": false,
+  "frames": [
+    {"source": "images/pose-01.png", "crop": [0, 0, 512, 512], "anchor": [256, 256], "durationMs": 140},
+    {"source": "images/pose-02.png", "crop": [0, 0, 512, 512], "anchor": [256, 256], "durationMs": 100}
+  ]
+}

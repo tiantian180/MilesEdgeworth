@@ -4,6 +4,7 @@
 #include "chat/ChatController.h"
 #include "pet/PetRuntime.h"
 #include "pet/events/PetEventBridge.h"
+#include "pet/interaction/CursorFollowController.h"
 #include "pet/manifest/SkinManifestLoader.h"
 
 #include <QAction>
@@ -33,6 +34,7 @@ void PetContextMenu::show(
     PetEventBridge *eventBridge,
     DesktopShellController *shellController,
     ChatController *chatController,
+    CursorFollowController *cursorFollow,
     const QPoint &globalPosition
 )
 {
@@ -81,13 +83,24 @@ void PetContextMenu::show(
 
     QAction *movementAction = menu.addAction(QStringLiteral("禁止走动"));
     movementAction->setCheckable(true);
-    movementAction->setChecked(!runtime->autoMovementEnabled());
+    movementAction->setChecked(!runtime->autoMovementPreference());
     QObject::connect(movementAction, &QAction::triggered, runtime, &PetRuntime::toggleAutoMovementEnabled);
+
+    QAction *followAction = menu.addAction(QStringLiteral("跟随鼠标互动"));
+    followAction->setObjectName(QStringLiteral("cursorFollowAction"));
+    followAction->setCheckable(true);
+    followAction->setChecked(cursorFollow->enabled());
+    QObject::connect(followAction, &QAction::toggled, cursorFollow, &CursorFollowController::setEnabled);
 
     QAction *muteAction = menu.addAction(QStringLiteral("静音"));
     muteAction->setCheckable(true);
     muteAction->setChecked(runtime->audioMuted());
     QObject::connect(muteAction, &QAction::triggered, runtime, &PetRuntime::toggleAudioMuted);
+
+    QAction *reduceMotionAction = menu.addAction(QStringLiteral("减少动态效果"));
+    reduceMotionAction->setCheckable(true);
+    reduceMotionAction->setChecked(runtime->reducedMotion());
+    QObject::connect(reduceMotionAction, &QAction::toggled, runtime, &PetRuntime::setReducedMotion);
 
     QAction *chatAction = menu.addAction(QStringLiteral("聊天"));
     QObject::connect(chatAction, &QAction::triggered, parent, [chatController]() {

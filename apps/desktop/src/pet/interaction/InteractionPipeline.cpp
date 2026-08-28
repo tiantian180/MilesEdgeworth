@@ -43,6 +43,8 @@ QString behaviorRuleEventName(const PetEvent &event)
         return QString::fromUtf8(kDragShakeEventName);
     case PetEventType::PointerDragReleased:
         return QString::fromUtf8(kDragReleasedEventName);
+    case PetEventType::PointerFollowArrived:
+        return QStringLiteral("pointer.followArrived");
     default:
         return {};
     }
@@ -149,7 +151,7 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
 
         const QString idleAction = manifest.stateToAction.value("idle");
         if (!idleAction.isEmpty() && snapshot.currentActionId != idleAction) {
-            requests.append(ActionRequest::returnToIdle());
+            requests.append(ActionRequest::returnToIdle().withHiddenCurrentProp());
             return requests;
         }
 
@@ -180,7 +182,7 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
         // 声明顺序选择第一条命中的行为，保持旧版分区优先级。
         for (const ClickBehaviorEntry &entry : manifest.clickBehaviors.singleClick) {
             if (entry.zoneId == zoneId) {
-                appendIfPlayable(requests, entry.request);
+                appendIfPlayable(requests, entry.request.withHiddenCurrentProp());
                 break;
             }
         }
@@ -211,6 +213,13 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
         }
         return requests;
 
+    case PetEventType::PointerFollowArrived:
+        if (snapshot.reducedMotion || snapshot.currentState != QStringLiteral("idle") || !snapshot.currentRecipeId.isEmpty()
+                || snapshot.currentPropVisible
+                || snapshot.currentActionId != manifest.stateToAction.value(QStringLiteral("idle"))) {
+            return requests;
+        }
+        [[fallthrough]];
     case PetEventType::PointerDragShake:
     case PetEventType::PointerDragReleased:
         if (!snapshot.pointerInteractionEnabled || snapshot.sleeping || snapshot.sleepTransitioning) {
@@ -239,7 +248,7 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
                 requests.append(ActionRequest::recipe(manifest.capabilities.rest.enterRecipeId));
             }
         } else if (event.commandId == QString::fromUtf8(kReturnToIdleCommandId)) {
-            requests.append(ActionRequest::returnToIdle());
+            requests.append(ActionRequest::returnToIdle().withHiddenCurrentProp());
         } else if (event.commandId == QString::fromUtf8(kFacingToggleCommandId)) {
             requests.append(ActionRequest::toggleFacing());
         } else {
@@ -249,6 +258,8 @@ QList<ActionRequest> InteractionPipeline::handleEvent(
 
     case PetEventType::IdleLoopFinished:
     case PetEventType::RuntimeStarted:
+        if (snapshot.reducedMotion) return requests;
+        [[fallthrough]];
     case PetEventType::ActionCompleted:
         appendBehaviorTriggerRequests(requests, manifest, snapshot, event);
         return requests;

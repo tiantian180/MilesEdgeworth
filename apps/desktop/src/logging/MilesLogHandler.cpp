@@ -12,13 +12,11 @@
 #include <QtLogging>
 
 #include <cstdio>
-#include <memory>
-
 namespace {
 
 QtMessageHandler previousHandler = nullptr;
 QMutex logMutex;
-std::unique_ptr<QFile> logFile;
+QString logFilePath;
 bool installed = false;
 
 QString levelName(QtMsgType type)
@@ -66,11 +64,16 @@ void writeDiagnostic(const QString &message)
 void writeFileLine(const QString &line)
 {
     QMutexLocker locker(&logMutex);
-    if (logFile == nullptr || !logFile->isOpen()) {
+    if (logFilePath.isEmpty()) {
         return;
     }
 
-    QTextStream stream(logFile.get());
+    QFile logFile(logFilePath);
+    if (!logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        writeDiagnostic(QStringLiteral("MilesLogHandler: failed to append MILES_LOG_FILE: ") + logFilePath);
+        return;
+    }
+    QTextStream stream(&logFile);
     stream << line << '\n';
     stream.flush();
 }
@@ -118,13 +121,7 @@ void install()
             writeDiagnostic(QStringLiteral("MilesLogHandler: failed to truncate MILES_LOG_FILE: ") + filePath);
         } else {
             truncateFile.close();
-            logFile = std::make_unique<QFile>(filePath);
-        }
-
-        if (logFile != nullptr
-            && !logFile->open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
-            writeDiagnostic(QStringLiteral("MilesLogHandler: failed to append MILES_LOG_FILE: ") + filePath);
-            logFile.reset();
+            logFilePath = filePath;
         }
     }
 

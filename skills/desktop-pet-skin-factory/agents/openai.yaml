@@ -1,0 +1,4 @@
+interface:
+  display_name: "桌宠皮肤工坊"
+  short_description: "为各种宠物设计专属装扮、创意道具与连续动作，从角色定稿到顾客定制交付"
+  default_prompt: "用 $desktop-pet-skin-factory 为这只宠物设计一套有个性的主题皮肤，保留它的特征，先完成装扮与动作设计，再制作代表动画并扩展整套。"

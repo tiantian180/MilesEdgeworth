@@ -26,6 +26,7 @@ struct RuntimeSnapshot
     QString currentPropExpiredRecipeId;
     bool currentPropVisible = false;
     bool pointerInteractionEnabled = true;
+    bool reducedMotion = false;
     bool sleeping = false;
     bool sleepTransitioning = false;
 };

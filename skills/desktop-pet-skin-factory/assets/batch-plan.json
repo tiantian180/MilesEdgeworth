@@ -1,0 +1,44 @@
+{
+  "batchId": "sample-batch",
+  "projectRoot": null,
+  "requestedModel": null,
+  "actualTool": null,
+  "verifiedModel": null,
+  "skins": [
+    {
+      "id": "sample-pet",
+      "theme": "原创主题，由用户范围确定",
+      "characterMode": "preserve-native",
+      "designBrief": "design-brief.md",
+      "requestedPerformanceCount": null,
+      "characterReference": null,
+      "invariants": ["该个体的身体结构、标记、体型与选定画风", "服装道具设计一致", "转向时保持实际身体部位和表面标记对应"],
+      "status": "planned",
+      "actions": [
+        {
+          "id": "greeting",
+          "story": ["准备", "招呼", "收势"],
+          "loop": false,
+          "propMode": "baked-in",
+          "status": "planned",
+          "sourceImage": null,
+          "runtimeAsset": "assets/gifs/greeting.gif",
+          "framePlan": null,
+          "revision": "r001",
+          "lastGoodStage": "planned",
+          "repairStage": null,
+          "compileReport": null,
+          "sourceSha256": {},
+          "quality": { "minimumDistinctPoses": null, "canvas": null, "padding": null },
+          "generationAttempts": [],
+          "checks": {
+            "alpha": null,
+            "visual": { "record": null },
+            "runtime": { "verdict": null, "evidence": [], "testedAssetSha256": null }
+          },
+          "blocker": null
+        }
+      ]
+    }
+  ]
+}

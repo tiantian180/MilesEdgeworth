@@ -1,9 +1,9 @@
 #include "pet/PetRuntime.h"
 
 #include "pet/manifest/SkinManifestLoader.h"
+#include "settings/AppSettings.h"
 
 #include <QSet>
-#include <QSettings>
 #include <QVariantMap>
 
 namespace {
@@ -211,7 +211,7 @@ bool PetRuntime::activateSkin(const QString &skinId, bool persistSelection)
     for (const SkinDescriptor &descriptor : descriptors) {
         if (loadSkinDescriptor(descriptor, SkinReloadMode::PlayStartup)) {
             if (persistSelection) {
-                QSettings().setValue(QStringLiteral("skin/activeSkinId"), m_activeSkinId);
+                AppSettings().setValue(QStringLiteral("skin/activeSkinId"), m_activeSkinId);
             }
             return true;
         }
@@ -243,6 +243,7 @@ bool PetRuntime::reloadActiveSkin(SkinReloadMode mode)
 
 void PetRuntime::applyManifestState(bool preserveRuntimeState)
 {
+    stopPointerMotion();
     const QString previousAudioLanguageId = m_audioController.currentLanguageId();
     const QString previousFacing = m_currentFacing;
     const QString previousMovementDirection = m_currentMovementDirection;

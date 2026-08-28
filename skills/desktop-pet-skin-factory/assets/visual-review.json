@@ -1,0 +1,19 @@
+{
+  "actionId": "greeting",
+  "verdict": "pending",
+  "planSha256": null,
+  "assetSha256": null,
+  "sourceSha256": {},
+  "checks": {
+    "lightBackground": false,
+    "darkBackground": false,
+    "actualSize": false,
+    "normalSpeed": false,
+    "slowSpeed": false,
+    "loopOrExit": false,
+    "propsAndSilhouette": false,
+    "identityAndMotion": false
+  },
+  "observations": "",
+  "evidence": []
+}

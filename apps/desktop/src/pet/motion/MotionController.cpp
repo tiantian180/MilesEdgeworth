@@ -82,13 +82,15 @@ void MotionController::setCurrentPosition(const QPoint &petWindowPosition)
 void MotionController::moveTo(double x, double y, const QString &mode)
 {
     bool clamped = false;
-    beginMove(targetForPercent(x, y, &clamped), mode, clamped);
+    const QPoint target = targetForPercent(x, y, &clamped);
+    beginMove(target, mode, clamped);
 }
 
 void MotionController::moveBy(double dx, double dy, const QString &mode)
 {
     bool clamped = false;
-    beginMove(targetForDeltaPercent(dx, dy, &clamped), mode, clamped);
+    const QPoint target = targetForDeltaPercent(dx, dy, &clamped);
+    beginMove(target, mode, clamped);
 }
 
 void MotionController::stop()
@@ -221,6 +223,12 @@ QString MotionController::directionForVector(const QPointF &vector) const
     }
 
     const auto &directions = canonicalDirections();
+    // Two-direction image pets declare left/right rather than eight headings.
+    if (m_config.availableDirections.contains(QStringLiteral("left"))
+            && m_config.availableDirections.contains(QStringLiteral("right"))) {
+        if (std::abs(vector.x()) < 1.0 && !m_currentDirection.isEmpty()) return m_currentDirection;
+        return vector.x() < 0 ? QStringLiteral("left") : QStringLiteral("right");
+    }
     const int directionIndex = static_cast<int>(std::round(degrees / kDegreesPerDirection)) % directions.size();
     const QString quantized = directions.at(directionIndex).name;
     if (m_config.availableDirections.contains(quantized)) {

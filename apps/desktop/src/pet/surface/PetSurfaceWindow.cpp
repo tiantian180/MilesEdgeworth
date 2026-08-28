@@ -5,6 +5,7 @@
 #include "pet/PetLogging.h"
 #include "pet/PetRuntime.h"
 #include "pet/events/PetEventBridge.h"
+#include "pet/interaction/CursorFollowController.h"
 #include "pet/surface/PetContextMenu.h"
 #include "pet/surface/PetVisibleBounds.h"
 #include "pet/surface/PropSurfaceWindow.h"
@@ -13,7 +14,9 @@
 #include "platform/MacPetWindowBehavior.h"
 #endif
 
+#include <QApplication>
 #include <QContextMenuEvent>
+#include <QCursor>
 #include <QImage>
 #include <QLabel>
 #include <QMouseEvent>
@@ -31,6 +34,7 @@ namespace {
 constexpr int kAlphaThreshold = 8;
 constexpr int kDoubleClickIntervalMs = 300;
 constexpr int kDragThresholdPx = 3;
+constexpr int kReducedMotionActionDurationMs = 200;
 } // namespace
 
 PetSurfaceWindow::PetSurfaceWindow(
@@ -53,6 +57,38 @@ PetSurfaceWindow::PetSurfaceWindow(
     Q_ASSERT(m_runtime != nullptr);
     Q_ASSERT(m_eventBridge != nullptr);
     Q_ASSERT(m_shellController != nullptr);
+
+    m_cursorFollow = new CursorFollowController(m_runtime, this);
+    connect(m_cursorFollow, &CursorFollowController::arrived,
+            m_eventBridge, &PetEventBridge::submitPointerFollowArrived);
+    m_cursorFollowTimer.setInterval(40);
+    connect(m_cursorFollow, &CursorFollowController::enabledChanged, this, [this]() {
+        if (m_cursorFollow->enabled()) {
+            m_cursorFollowTimer.start();
+        } else {
+            m_cursorFollowTimer.stop();
+        }
+    });
+    connect(&m_cursorFollowTimer, &QTimer::timeout, this, [this]() {
+        const bool blocked = !isVisible()
+            || m_contextMenuOpen
+            || QApplication::mouseButtons() != Qt::NoButton
+            || QApplication::activeModalWidget() != nullptr
+            || (m_chatController != nullptr && m_chatController->sending());
+        m_cursorFollow->update(
+            QCursor::pos(),
+            geometry(),
+            m_shellController->petMotionScreenGeometry(),
+            blocked
+        );
+    });
+    if (m_chatController != nullptr) {
+        connect(m_chatController, &ChatController::sendingChanged, this, [this]() {
+            if (m_chatController->sending()) {
+                m_cursorFollow->pause();
+            }
+        });
+    }
 
     setWindowTitle(QStringLiteral("MilesEdgeworth v2"));
     setAttribute(Qt::WA_TranslucentBackground, true);
@@ -98,6 +134,7 @@ PetSurfaceWindow::PetSurfaceWindow(
     connect(m_movie, &QMovie::frameChanged, this, &PetSurfaceWindow::handleMovieFrameChanged);
     connect(m_runtime, &PetRuntime::petScaleChanged, this, &PetSurfaceWindow::syncSizeFromRuntime);
     connect(m_runtime, &PetRuntime::playbackSerialChanged, this, &PetSurfaceWindow::restartMovieFromRuntime);
+    connect(m_runtime, &PetRuntime::reducedMotionChanged, this, &PetSurfaceWindow::restartMovieFromRuntime);
     connect(m_runtime, &PetRuntime::soundPlaybackSerialChanged, this, &PetSurfaceWindow::playSoundFromRuntime);
     connect(m_runtime, &PetRuntime::audioMutedChanged, this, [this]() {
         m_soundEffect->setVolume(m_runtime->audioMuted() ? 0.0f : 0.8f);
@@ -150,6 +187,7 @@ void PetSurfaceWindow::mousePressEvent(QMouseEvent *event)
         return;
     }
 
+    m_cursorFollow->pause();
     if (m_singleClickTimer.isActive()) {
         m_singleClickTimer.stop();
         m_doubleClickPending = true;
@@ -270,6 +308,22 @@ void PetSurfaceWindow::restartMovieFromRuntime()
     m_petLabel->setMovie(m_movie);
     m_movie->stop();
     m_movie->setFileName(path);
+    if (m_runtime->reducedMotion()) {
+        m_movie->jumpToFrame(0);
+        m_movie->setPaused(true);
+        applyCurrentFrameMask();
+        syncVisibleBoundsToShell();
+
+        const int playbackSerial = m_runtime->playbackSerial();
+        if (m_runtime->currentAutoReturnToIdle()
+                || m_runtime->currentLoopMode() == QStringLiteral("once")
+                || m_runtime->currentLoopMode() == QStringLiteral("onceThenHold")) {
+            scheduleAnimationCompletion(playbackSerial, kReducedMotionActionDurationMs);
+        } else if (m_runtime->currentLoopMode() == QStringLiteral("hold")) {
+            m_eventBridge->submitHoldAnimationReachedEnd();
+        }
+        return;
+    }
     // 不要先 jumpToFrame(0) 再 start()：Qt 会同步发出 frame 0，
     // 随后 start() 立刻进入 frame 1，walk/run 的首帧就没有正常显示时长。
     // 直接 start() 可让 QMovie 以正常节奏从首帧开始。
@@ -459,10 +513,21 @@ void PetSurfaceWindow::syncVisibleBoundsToShell()
 
 void PetSurfaceWindow::showContextMenuAt(const QPoint &globalPosition)
 {
+    m_contextMenuOpen = true;
+    m_cursorFollow->pause();
 #ifdef Q_OS_MACOS
     prepareMacPetWindowForContextMenu(windowHandle());
 #endif
-    PetContextMenu::show(this, m_runtime, m_eventBridge, m_shellController, m_chatController, globalPosition);
+    PetContextMenu::show(
+        this,
+        m_runtime,
+        m_eventBridge,
+        m_shellController,
+        m_chatController,
+        m_cursorFollow,
+        globalPosition
+    );
+    m_contextMenuOpen = false;
 }
 
 void PetSurfaceWindow::showContextMenuQueued(const QPoint &globalPosition)

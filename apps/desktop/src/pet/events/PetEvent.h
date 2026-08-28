@@ -18,6 +18,7 @@ enum class PetEventType
     PointerDoubleClick,        // 双击桌宠：可带 randomValue 触发概率玩法
     PointerDragShake,          // 拖拽时连续左右晃动达到阈值（由 GestureTracker 识别）
     PointerDragReleased,       // 拖拽松手：dragHoldCompleted 区分蹲下动画是否播完
+    PointerFollowArrived,      // 本地追鼠标到达停靠范围；皮肤选择回应动作
     MenuCommand,               // 右键菜单命令：commandId 区分通用 runtime.* 与皮肤定制
     IdleLoopFinished,          // idle 动画完成一轮循环，可触发"随机抽一个空闲动作"
     RuntimeStarted,            // 桌宠启动时触发一次（用于公文包入场等启动 recipe）
@@ -91,6 +92,13 @@ struct PetEvent
         PetEvent event;
         event.type = PetEventType::MenuCommand;
         event.commandId = id.trimmed();
+        return event;
+    }
+
+    static PetEvent pointerFollowArrived()
+    {
+        PetEvent event;
+        event.type = PetEventType::PointerFollowArrived;
         return event;
     }
 

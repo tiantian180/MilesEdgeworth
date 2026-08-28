@@ -1,0 +1,11 @@
+{
+  "id": "meow-market-leader",
+  "name": "游资大神 · 喵龙头",
+  "version": "1.0.0",
+  "author": "DesktopCat",
+  "license": "GPL-3.0-or-later",
+  "minAppVersion": "0.2.0",
+  "skinSchemaVersion": 1,
+  "manifest": "manifest.json",
+  "thumbnail": "file:assets/images/idle.png"
+}

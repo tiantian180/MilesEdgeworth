@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 4,
+  "id": "meow-market-leader",
+  "name": "游资大神 · 喵龙头",
+  "defaultFacing": "right",
+  "facings": [
+    "right"
+  ],
+  "canvas": {
+    "windowSize": 480,
+    "imageSize": 450,
+    "hitZoneSize": 512,
+    "idleLoopAction": "watch"
+  },
+  "defaultSize": "small",
+  "sizes": [
+    {
+      "id": "mini",
+      "label": "迷你",
+      "scale": 0.5
+    },
+    {
+      "id": "small",
+      "label": "小",
+      "scale": 0.7
+    },
+    {
+      "id": "medium",
+      "label": "中",
+      "scale": 1
+    },
+    {
+      "id": "big",
+      "label": "大",
+      "scale": 1.35
+    }
+  ],
+  "states": {
+    "idle": {
+      "action": "watch"
+    },
+    "thinking": {
+      "action": "watch"
+    },
+    "speaking": {
+      "action": "watch"
+    },
+    "error": {
+      "action": "watch"
+    }
+  },
+  "fallbackAction": "watch",
+  "actions": {
+    "watch": {
+      "label": "安静盯盘",
+      "category": "idle",
+      "loopMode": "loop",
+      "variants": {
+        "right": {
+          "clip": "file:assets/gifs/watch.gif"
+        }
+      }
+    },
+    "strike": {
+      "label": "果断出手",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "variants": {
+        "right": {
+          "clip": "file:assets/gifs/strike.gif"
+        }
+      }
+    },
+    "seal": {
+      "label": "扫单封板",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "variants": {
+        "right": {
+          "clip": "file:assets/gifs/seal.gif"
+        }
+      }
+    },
+    "spotlight": {
+      "label": "龙头高光",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "variants": {
+        "right": {
+          "clip": "file:assets/gifs/spotlight.gif"
+        }
+      }
+    },
+    "fumble": {
+      "label": "失手挠头",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "variants": {
+        "right": {
+          "clip": "file:assets/gifs/fumble.gif"
+        }
+      }
+    },
+    "relax": {
+      "label": "收盘喝茶",
+      "category": "interaction",
+      "loopMode": "onceThenIdle",
+      "variants": {
+        "right": {
+          "clip": "file:assets/gifs/relax.gif"
+        }
+      }
+    }
+  },
+  "hitZones": {
+    "head": {
+      "type": "rect",
+      "x": 200,
+      "y": 95,
+      "width": 140,
+      "height": 130
+    },
+    "seal": {
+      "type": "rect",
+      "x": 55,
+      "y": 330,
+      "width": 115,
+      "height": 115
+    },
+    "body": {
+      "type": "rect",
+      "x": 0,
+      "y": 0,
+      "width": 512,
+      "height": 512
+    }
+  },
+  "clickBehaviors": {
+    "singleClick": [
+      {
+        "zone": "head",
+        "action": "fumble"
+      },
+      {
+        "zone": "seal",
+        "action": "seal"
+      },
+      {
+        "zone": "body",
+        "action": "strike"
+      }
+    ],
+    "doubleClick": [
+      {
+        "action": "spotlight"
+      }
+    ]
+  },
+  "skinCommands": {
+    "market.1.watch": {
+      "label": "安静盯盘",
+      "request": {
+        "action": "watch"
+      }
+    },
+    "market.2.strike": {
+      "label": "果断出手",
+      "request": {
+        "action": "strike"
+      }
+    },
+    "market.3.seal": {
+      "label": "扫单封板",
+      "request": {
+        "action": "seal"
+      }
+    },
+    "market.4.spotlight": {
+      "label": "龙头高光",
+      "request": {
+        "action": "spotlight"
+      }
+    },
+    "market.5.fumble": {
+      "label": "失手挠头",
+      "request": {
+        "action": "fumble"
+      }
+    },
+    "market.6.relax": {
+      "label": "收盘喝茶",
+      "request": {
+        "action": "relax"
+      }
+    }
+  },
+  "behaviorRules": [
+    {
+      "event": "pointer.followArrived",
+      "action": "strike"
+    }
+  ]
+}

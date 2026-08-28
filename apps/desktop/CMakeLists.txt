@@ -18,10 +18,11 @@ endif()
 
 set(MILES_REPOSITORY_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../..")
 set(MILES_BUILTIN_SKIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/resources/skins/miles-edgeworth")
+set(MEOW_MARKET_LEADER_SKIN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/resources/skins/meow-market-leader")
 set(MILES_SPLIT_MANIFEST_CLIPS_SCRIPT "${MILES_REPOSITORY_ROOT}/tools/split_manifest_clips.py")
-set(MILES_COPY_SKIN_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/generated/copy_miles_skin.cmake")
+set(BUNDLED_SKIN_COPY_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/generated/copy_bundled_skin.cmake")
 set(MILES_CODESIGN_BUNDLE_SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/generated/codesign_miles_bundle.cmake")
-set(MILES_COPY_SKIN_LOCK "${CMAKE_CURRENT_BINARY_DIR}/generated/copy_miles_skin.lock")
+set(BUNDLED_SKIN_COPY_LOCK "${CMAKE_CURRENT_BINARY_DIR}/generated/copy_bundled_skin.lock")
 
 file(GLOB_RECURSE MILES_BUILTIN_SKIN_ASSET_INPUTS
     CONFIGURE_DEPENDS
@@ -35,8 +36,14 @@ set(MILES_BUILTIN_SKIN_INPUTS
     ${MILES_BUILTIN_SKIN_ASSET_INPUTS}
 )
 
+file(GLOB_RECURSE MEOW_MARKET_LEADER_SKIN_INPUTS
+    CONFIGURE_DEPENDS
+    LIST_DIRECTORIES false
+    "${MEOW_MARKET_LEADER_SKIN_ROOT}/*"
+)
+
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
-file(WRITE "${MILES_COPY_SKIN_SCRIPT}" [=[
+file(WRITE "${BUNDLED_SKIN_COPY_SCRIPT}" [=[
 foreach(required SOURCE DEST LOCK_FILE)
     if(NOT DEFINED ${required})
         message(FATAL_ERROR "${required} is required")
@@ -114,25 +121,33 @@ add_custom_target(GenerateMilesClips
     VERBATIM
 )
 
-function(add_miles_skin_copy target_name)
-    set(copy_target "Copy${target_name}MilesSkin")
+function(add_bundled_skin_copy target_name)
+    set(copy_target "Copy${target_name}BundledSkins")
     add_custom_target(${copy_target}
         COMMAND "${CMAKE_COMMAND}"
                 "-DSOURCE=${MILES_BUILTIN_SKIN_ROOT}"
                 "-DDEST=$<TARGET_FILE_DIR:${target_name}>/skins/miles-edgeworth"
-                "-DLOCK_FILE=${MILES_COPY_SKIN_LOCK}"
-                -P "${MILES_COPY_SKIN_SCRIPT}"
+                "-DLOCK_FILE=${BUNDLED_SKIN_COPY_LOCK}"
+                -P "${BUNDLED_SKIN_COPY_SCRIPT}"
+        COMMAND "${CMAKE_COMMAND}"
+                "-DSOURCE=${MEOW_MARKET_LEADER_SKIN_ROOT}"
+                "-DDEST=$<TARGET_FILE_DIR:${target_name}>/skins/meow-market-leader"
+                "-DLOCK_FILE=${BUNDLED_SKIN_COPY_LOCK}"
+                -P "${BUNDLED_SKIN_COPY_SCRIPT}"
         DEPENDS
             GenerateMilesClips
             ${MILES_BUILTIN_SKIN_INPUTS}
-            "${MILES_COPY_SKIN_SCRIPT}"
-        COMMENT "Copying Miles Edgeworth skin beside ${target_name}"
+            ${MEOW_MARKET_LEADER_SKIN_INPUTS}
+            "${BUNDLED_SKIN_COPY_SCRIPT}"
+        COMMENT "Copying bundled skins beside ${target_name}"
         VERBATIM
     )
     add_dependencies(${target_name} ${copy_target})
 endfunction()
 
 set(DESKTOP_SOURCES
+    src/pet/interaction/CursorFollowController.cpp
+    src/pet/interaction/CursorFollowController.h
     src/DesktopShellController.cpp
     src/DesktopShellController.h
     src/chat/ChatController.cpp
@@ -270,7 +285,7 @@ set_target_properties(MilesEdgeworthDesktop PROPERTIES
 )
 
 qt_finalize_executable(MilesEdgeworthDesktop)
-add_miles_skin_copy(MilesEdgeworthDesktop)
+add_bundled_skin_copy(MilesEdgeworthDesktop)
 
 if(APPLE)
     add_custom_command(TARGET MilesEdgeworthDesktop POST_BUILD
@@ -429,7 +444,7 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME skin_manifest_loader_smoke COMMAND SkinManifestLoaderSmoke)
-    add_miles_skin_copy(SkinManifestLoaderSmoke)
+    add_bundled_skin_copy(SkinManifestLoaderSmoke)
 
     qt_add_executable(PetRuntimeSmoke
         tests/pet_runtime_smoke.cpp
@@ -497,7 +512,24 @@ if(BUILD_TESTING)
         NAME pet_runtime_smoke
         COMMAND PetRuntimeSmoke
     )
-    add_miles_skin_copy(PetRuntimeSmoke)
+    add_bundled_skin_copy(PetRuntimeSmoke)
+
+    get_target_property(CURSOR_FOLLOW_RUNTIME_SOURCES PetRuntimeSmoke SOURCES)
+    list(FILTER CURSOR_FOLLOW_RUNTIME_SOURCES EXCLUDE REGEX "tests/pet_runtime_smoke\\.cpp$")
+    qt_add_executable(CursorFollowSmoke
+        tests/cursor_follow_smoke.cpp
+        src/pet/interaction/CursorFollowController.cpp
+        src/pet/interaction/CursorFollowController.h
+        ${CURSOR_FOLLOW_RUNTIME_SOURCES}
+    )
+    # AppSettings is application-directory scoped: never test against the user's INI.
+    set_target_properties(CursorFollowSmoke PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/cursor-follow-test"
+    )
+    target_include_directories(CursorFollowSmoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(CursorFollowSmoke PRIVATE Qt6::Core Qt6::Qml)
+    add_bundled_skin_copy(CursorFollowSmoke)
+    add_test(NAME cursor_follow_smoke COMMAND CursorFollowSmoke)
 
     qt_add_executable(ChatControllerSmoke
         tests/chat_controller_smoke.cpp
@@ -575,7 +607,7 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME chat_controller_smoke COMMAND ChatControllerSmoke)
-    add_miles_skin_copy(ChatControllerSmoke)
+    add_bundled_skin_copy(ChatControllerSmoke)
 
     qt_add_executable(SettingsServiceSmoke
         tests/settings_service_smoke.cpp
@@ -649,5 +681,5 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME settings_service_smoke COMMAND SettingsServiceSmoke)
-    add_miles_skin_copy(SettingsServiceSmoke)
+    add_bundled_skin_copy(SettingsServiceSmoke)
 endif()
